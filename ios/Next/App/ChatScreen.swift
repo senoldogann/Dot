@@ -79,6 +79,8 @@ struct ChatScreen: View {
     @State private var stopping: Bool = false
     /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
     @State private var stepsShown: Bool = false
+    /// The link line the pill shows, once a state lasted a second (item 1931: a blip does not flicker).
+    @State private var shownLink: LinkLine?
     /// The helper whose chat a row of the stream opened (item 1909).
     @State private var openedHelper: String?
     /// The answer of a side question (`/btw`), shown in an alert.
@@ -166,6 +168,15 @@ struct ChatScreen: View {
                 if RenderMeter.shown {
                     Text(verbatim: "\(drawings)").font(.system(size: 1)).opacity(0.01).accessibilityIdentifier("debug.renders")
                 }
+            }
+            .task(id: linkNow) {
+                // A state shows once it lasted a second, and goes at once: a blip of the link does not flicker the pill.
+                guard let next = linkNow else {
+                    shownLink = nil
+                    return
+                }
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                shownLink = next
             }
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
             .toolbar { chrome }
@@ -444,10 +455,15 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    status: capsuleStatus, activity: activityWords,
-                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil, queued: view?.queue.messages.count ?? 0,
+                    status: shownLink == nil ? capsuleStatus : nil, activity: activityWords,
+                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil,
+                    // Without a live link, what waits is the phone's own: the messages in its outbox (item 1931).
+                    // The chat's queue on the Mac, which the segment's sheet lists; the phone's own messages still to go
+                    // say so under their bubbles ("Pending", "Waiting for the link"), item 1931.
+                    queued: view?.queue.messages.count ?? 0,
                     helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
-                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping),
+                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping && shownLink == nil,
+                    link: shownLink),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
                 stop: { stop() },
                 openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
@@ -706,8 +722,23 @@ struct ChatScreen: View {
         }
     }
 
+    /// The link line of this moment, before the second's wait (item 1931).
+    private var linkNow: LinkLine? {
+        linkLine(transport: model.transport, freshness: chat?.freshness, mac: model.macName ?? String(localized: "your Mac", comment: "The Mac when its name is not known"))
+    }
+
+    /// Whether the subtitle says what the pill does not (item 1931): since when the copy is saved while offline, that a
+    /// run worked when it was saved, a refused key, an old Dot. Reconnecting and Syncing are the pill's.
+    private var subtitleSaysTheLink: Bool {
+        switch model.transport {
+        case .reconnecting: false
+        case .connecting, .up: model.workingAt[thread] != nil
+        case .offline, .keyRefused, .daemonTooOld: true
+        }
+    }
+
     private var subtitle: String {
-        if let chat, let line = freshnessLine(
+        if subtitleSaysTheLink, let chat, let line = freshnessLine(
             freshness: chat.freshness, transport: model.transport, savedAt: model.savedAt[thread], workingAt: model.workingAt[thread], now: .now)
         {
             return line

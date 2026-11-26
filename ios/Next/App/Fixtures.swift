@@ -24,6 +24,8 @@
         case failed = "n2-failed"
         /// The phone offline with nothing saved of the chat.
         case offline = "n2-offline"
+        /// No link, with the chat's copy saved on the phone (item 1931: the pill says Offline over it).
+        case offlineSaved = "n2-offline-saved"
         /// A chat deleted on the Mac while open.
         case deleted = "n2-deleted"
         /// The agents sheet (§19's one-line titles).
@@ -52,9 +54,11 @@
         /// The snapshot the scene draws.
         func snapshot(now: Double) -> EngineSnapshot {
             var snapshot: EngineSnapshot = .empty
-            snapshot.transport = self == .offline ? .offline : .up
-            snapshot.online = self != .offline
-            let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : .live
+            let linked: Bool = self != .offline && self != .offlineSaved
+            snapshot.transport = linked ? .up : .offline
+            snapshot.online = linked
+            if self == .offlineSaved { snapshot.savedAt[Self.thread] = now - 240 }
+            let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : self == .offlineSaved ? .cached : .live
             if self != .offline {
                 let view: ThreadView = decode(viewJSON(now: now))
                 var chat: ChatProjection = ChatProjection.drawn(view: view, events: decode(eventsJSON(now: now)), freshness: freshness)

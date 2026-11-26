@@ -62,6 +62,23 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
     }
 }
 
+/// The pill's link line (item 1931): a real state of the transport only, never "Reconnecting" over a healthy stream
+/// (R-f §3): no link is Offline, a broken one Reconnecting to the Mac, an up one whose chat is not live yet Syncing;
+/// `nil` while the chat is live, and for a refused key or an old Dot, which the subtitle says. Pure.
+func linkLine(transport: Transport, freshness: Freshness?, mac: String) -> LinkLine? {
+    switch transport {
+    case .offline: return .offline
+    case .reconnecting: return .reconnecting(mac: mac)
+    case .keyRefused, .daemonTooOld: return nil
+    case .connecting, .up:
+        guard let freshness else { return .syncing }
+        switch freshness {
+        case .live, .deleted: return nil
+        case .empty, .cached, .syncing: return .syncing
+        }
+    }
+}
+
 /// Where an owner's message stands, in words (plan §13 B3).
 func deliveryWords(_ delivery: Delivery) -> String {
     switch delivery {
