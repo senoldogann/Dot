@@ -1835,6 +1835,22 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       note(scope, record.ts, "refresh", t("timeline.modelBack", { model: data.model, took: duration(data.waited_s) }), "");
     },
 
+    // A step of desktop_act needs the Mac's own pointer or keyboard while the owner is at the Mac (item 1890): the
+    // batch waits from step `step` until nobody has touched them for `away_after_s`, at most until `until`;
+    // `came_back` says that Dot had them and let go when the owner came back. `desktop_away` ends the wait: `end` is
+    // away (the batch goes on), limit (the owner stayed) or owner (they wrote to the run), after `waited_s`.
+    desktop_waiting_away(scope, record) {
+      const data = record.data;
+      const words = { step: data.step, after: duration(data.away_after_s), until: clock(data.until) };
+      note(scope, record.ts, "pointer", t(data.came_back ? "timeline.awayCameBack" : "timeline.awayWaiting", words), "");
+    },
+    desktop_away(scope, record) {
+      const data = record.data;
+      const words = { step: data.step, took: duration(data.waited_s) };
+      const key = data.end === "away" ? "timeline.awayGone" : data.end === "owner" ? "timeline.awayOwnerWrote" : "timeline.awayGaveUp";
+      note(scope, record.ts, "pointer", t(key, words), "");
+    },
+
     // The schedule that started this run had a reasoning level (`asked`) its model does not offer, and keeps the one the
     // model takes for it (`kept`) from now on (item 1307); said once, the firings after it find the level offered.
     schedule_effort_changed(scope, record) {

@@ -1,7 +1,7 @@
 """What every tool receives while it runs."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol
@@ -134,6 +134,18 @@ class Spawner(Protocol):
         ...
 
 
+class OffClock(Protocol):
+    """Awaits a wait of a running tool off the tool's own clock (item 1890): a batch of desktop steps that waits for
+    the owner to step away is not time the tool spent working, as an answer of the owner's is not."""
+
+    async def __call__[T](self, waiting: Awaitable[T]) -> T: ...
+
+
+async def _on_the_clock[T](waiting: Awaitable[T]) -> T:
+    """The wait as it is, where no executor runs the tool on a clock (a test, a nested call)."""
+    return await waiting
+
+
 @dataclass(frozen=True)
 class ToolContext:
     """``output_chars`` is the most one tool result of the run may carry; a tool that pages its output sizes each page
@@ -191,6 +203,8 @@ class ToolContext:
     # The owner's own messages that reached the run and its model has not read (item 1685), which end a wait; ``None``
     # where no message reaches the run while a tool works (a resumed run's look back, a hand-over, OpenCode).
     owner_words: OwnerWords | None = None
+    # How a tool waits off its own clock (item 1890): handed to the tool by the executor for the call.
+    off_clock: OffClock = _on_the_clock
 
 
 def run_sandbox(ctx: ToolContext) -> Sandbox:
