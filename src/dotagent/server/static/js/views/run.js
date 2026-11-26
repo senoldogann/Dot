@@ -68,6 +68,7 @@ import { waitCounts } from "../waitcounts.js";
 import { createWorkStatus } from "../workstatus.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { attemptWithFallback } from "../modelrefused.js";
+import { MODEL_REFUSED, restartLine } from "../restartline.js";
 import { t, tCount } from "../i18n.js";
 import { stopReading } from "../voice.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
@@ -285,6 +286,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // cut the run off (item 299).
   const resumeWords = el("span", { class: "grow" });
   const resumeLine = el("div", { class: "note resume-line restart-note", hidden: true }, icon("bolt"), resumeWords, resumeButton);
+  // Restart on…, for a run whose model declined its task (item 1889): the owner picks the model; Dot moves to none.
+  const refusedLine = restartLine({ onStarted: (next) => goOn(`/runs/${next.id}`) });
   // A delegated run (item 82) names its parent in the bar as a breadcrumb, the parent's goal a link before its own, and
   // has a pill where the composer would be: the model, how long it took, whether its parent still works, the way back.
   // The pill is in the dock, so it stays at the window's foot as the conversation scrolls (item 244).
@@ -989,7 +992,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // Dot asks stays its own card over the capsule. A computer's window keeps the panes.
   const sheets = createDockSheets();
   const dockBar = createDockBar({ onWork: () => inspector.openTab("run"), onStop: () => stopRun(), onEnd: () => goDown(), sheets });
-  const dock = el("div", { class: "dock" }, capsule.wait, statusBar, resumeLine, queue.element, loops.element, background.element, asks.element, dockBar.element, frame.element, foot);
+  const dock = el("div", { class: "dock" }, capsule.wait, statusBar, resumeLine, refusedLine.element, queue.element, loops.element, background.element, asks.element, dockBar.element, frame.element, foot);
   sheets.add("queue", { anchor: dockBar.segment("queue"), title: () => t("dock.queueTitle"), adopt: queue.element, onOpen: () => queue.expand() });
   sheets.add("loops", {
     anchor: dockBar.segment("loops"),
@@ -1363,7 +1366,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
 
   function syncControls() {
-    resumeLine.hidden = active || !resumable;
+    // A run whose model declined its task is restarted on a model the owner picks, not continued on the one that
+    // declined it (item 1889).
+    resumeLine.hidden = active || !resumable || run.end_reason === MODEL_REFUSED;
+    refusedLine.paint(active ? { ...run, finished_at: null } : run);
     resumeWords.textContent =
       cutOff !== null ? t(CUT_OFF_LINES[cutOff]) : !resumable ? "" : t(asked ? RESUME_WHEN_ASKED : RESUME_WITHOUT_CUT);
     // A delegated run is not steered: its dock keeps the arrow down (item 96) and its pill, whose Stop stops it.
@@ -2439,6 +2445,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     stopLifecycle();
     stopBack();
     computer.dispose();
+    refusedLine.dispose();
     macScreen.dispose();
     withAgent.dispose();
     reactions.dispose();

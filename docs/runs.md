@@ -284,9 +284,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `finish` must come last, the calls after it run as any call does, and the model calls `finish` again once it has read
   their results (item 685).
 - A reply the service's content filter stopped (it ends with `content_filter`) is no nudge: asked again with the same
-  conversation the model is stopped again (item 437). The run fails at once on its own model, saying that the filter
-  stopped it and that another model would answer (item 1225: a run changes its model only when its credits or limits
-  are spent, see [Helpers and standby](models.md#models-and-providers)); the model is not paused for other runs.
+  conversation the model is stopped again (item 437). The run moves to its first standby model that can take it over,
+  as for spent credits (item 1889), and replies that stay empty after the nudges do the same; with none left it fails
+  on its own model, saying that the filter stopped it and that another model would answer (see [Helpers and
+  standby](models.md#models-and-providers)); the model is not paused for other runs. A final answer that declines the
+  task is not a technical block: it is asked again once with the task's grounds when the task is in scope, then the
+  run ends with the model's words and its page offers **Restart on…** (see the same page).
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer. A run that failed so is stored `failed`, but
   its page says "Waiting on you", not "The task failed", and the line that offers Continue says that a message below

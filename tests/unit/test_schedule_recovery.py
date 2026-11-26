@@ -102,6 +102,7 @@ def test_the_ends_a_try_helps_are_a_cut_a_passing_error_a_stall_and_the_plans_li
         "stopped",
         "emergency_stop",
         "limit",
+        "model_refused",
         "goal_check_refused",
         "goal_check_unavailable",
         "internal_error",

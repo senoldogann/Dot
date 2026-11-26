@@ -1,7 +1,7 @@
-# Security scan: the forms of a host you own
+# Security scan: the forms of a host you own or may test
 
-`security_scan` (item 781) reads the forms of a page on a host in `[recon] owned_hosts` or in a scope of
-`[recon] scopes`, and tries a small, benign set of payloads on them: SQL injection, reflected XSS, a login bypass and
+`security_scan` (item 781) reads the forms of a page on a host in `[recon] owned_hosts` or in a scope (`[recon] scopes`
+in the config file, or `scopes.toml`, which `dotx scope` writes), and tries a small, benign set of payloads on them: SQL injection, reflected XSS, a login bypass and
 default credentials. It is the quick check an owner runs after shipping a form, before a real assessment, and the
 first pass over a bug bounty target the owner's scopes allow.
 
@@ -71,8 +71,19 @@ Findings
 The page's own words in a finding are untrusted input, and the result is marked as such. Fix the form: a parameterized
 query, output encoding, a check that does not trust the name, and no default account.
 
+## When a model declines the work
+
+A model may read security work on a target in scope as harm and decline it. Dot gives it the context once, openly: the
+program, its rules and the host's place in the scope, your words when you sent the task, and that the work is finding
+and reporting, not exploiting. A second no stands: the run ends with the model's words, and its page offers **Restart
+on…**, where you pick the model to start the task again on. Dot never pushes past a refusal or moves to another model
+on its own. To have the model you trust with this work take it from the start, choose it under Settings › Models ›
+**Security research model** (`[models.kinds] security`); see [Models](models.md) (item 1889).
+
 ## A note on permission
 
-The scan is for a host the owner listed as theirs. Running it against a host you do not own is not a test; it is an
-attack on someone else's system, and the law treats it that way. If a client asks for one, their written permission
-and the scope belong in the run before the target does.
+The scan is for a host the owner listed as theirs, or one a program or an engagement they are in allows them to
+test. A scope is that allowance written down: the owner writes it with `dotx scope add`, or a run they asked to test a
+program writes it from the program's published scope page, and `dotx scope list` shows each with its rules. Running
+the scan against a host neither covers is not a test; it is an attack on someone else's system, and the law treats it
+that way. If a client asks for one, their written permission and the scope belong in the run before the target does.

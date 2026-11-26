@@ -49,6 +49,11 @@ class ProviderFilterError(ProviderError):
     with the same conversation it is stopped again."""
 
 
+class ProviderEmptyError(ProviderError):
+    """The model kept replying with neither words nor a tool call after the run's nudges (item 1889): a technical block,
+    which moves the run to a standby model as a content filter's stop does."""
+
+
 class ProviderHttpError(ProviderError):
     """The provider answered with a non-success HTTP status."""
 

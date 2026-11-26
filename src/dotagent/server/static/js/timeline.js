@@ -10,7 +10,7 @@ import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { memoryChange } from "./contextpanel.js";
 import { stillAsks } from "./openasks.js";
-import { clip, clock, compact, dateTime, duration, el, repeatsAnswer, setText } from "./dom.js";
+import { clip, clock, compact, dateTime, duration, el, modelName, repeatsAnswer, setText } from "./dom.js";
 import { t, tCount, uiLocale } from "./i18n.js";
 import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
@@ -1797,6 +1797,18 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       }
       scope.panel.meta.textContent = scope.panel.meta.textContent.replace(` · ${data.from}`, ` · ${data.to}`);
       scope.panel.helper.model = data.to;
+    },
+
+    // The run's model declined its task and was given the task's grounds once, openly (item 1889): the program's scope,
+    // the owner's words.
+    refusal_asked_again(scope, record) {
+      note(scope, record.ts, "help", t("timeline.refusalAskedAgain", { model: modelName(String(record.data.model)) }), "warn");
+    },
+
+    // The run's model held to its refusal: the run ends with its words, and the line over the composer offers a
+    // restart on a model the owner picks (item 1889).
+    model_refused(scope, record) {
+      note(scope, record.ts, "alert", t("timeline.modelRefused", { model: modelName(String(record.data.model)) }), "bad");
     },
 
     // The run's model could not be reached (`error`: the connection broke or timed out, or its server failed with a
