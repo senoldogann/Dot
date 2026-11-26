@@ -12,6 +12,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1892](1892.md) | done | 2026-11-25 | The nightly browser run's stale tests follow today's screens, and four small bugs they found are fixed |
 | [1891](1891.md) | done | 2026-11-25 | Item numbers are reserved, and every place that holds one is read |
 | [1890](1890.md) | done | 2026-11-25 | Dot takes the Mac's pointer and keyboard only while the owner is away |
+| [1889](1889.md) | done | 2026-11-25 | A model's no is asked once with the scope, then stands: the owner restarts on a model of their choosing |
 | [1888](1888.md) | done | 2026-11-23 | A scope is one command, not a toml block: `dotx scope add`, `list`, `remove`, `check` over a store every call reads |
 | [1887](1887.md) | done | 2026-11-23 | Authorised security testing is a scope, not a refusal: a bug bounty program's hosts are written down and tested |
 | [1886](1886.md) | done | 2026-11-26 | A pull request runs the Linux checks alone; the macOS suites run on the push to main |

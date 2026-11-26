@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
-from dotagent.config import JudgeProvider, ResumeMode
+from dotagent.config import JudgeProvider, ResumeMode, TaskKind
 from dotagent.core.errors import ConfigError
 from dotagent.core.files import link_target
 from dotagent.core.types import JsonObject
@@ -31,6 +31,8 @@ _TABLE_HEADER: re.Pattern[str] = re.compile(r"^\s*\[")
 _BARE_KEY: re.Pattern[str] = re.compile(r"[A-Za-z0-9_-]+")
 # The table of the context sizes of models (item 250).
 _CONTEXT_TABLE: str = "models.context"
+# The table of the models named for a kind of task (item 1889).
+_KINDS_TABLE: str = "models.kinds"
 _FILE_MODE: int = 0o600
 # One edit at a time in this process: each reads the file, edits it and replaces it, so two at once (the browser mode
 # and raise_window changed together from the web UI) would keep only the later one.
@@ -288,6 +290,14 @@ def with_context_size(text: str, model: str, tokens: int | None) -> str:
     return _with_value(text, _CONTEXT_TABLE, model, _literal(tokens))
 
 
+def with_kind_model(text: str, kind: TaskKind, model: str) -> str:
+    """``text`` with the model of ``kind`` in ``[models.kinds]`` set to ``model``, or left out for ``""``; nothing else
+    changes."""
+    if model == "":
+        return _without_value(text, _KINDS_TABLE, kind)
+    return _with_value(text, _KINDS_TABLE, kind, _literal(model))
+
+
 def with_browser_setting(text: str, key: BrowserSetting, value: SettingValue) -> str:
     """``text`` with ``[browser] key`` set to ``value``; nothing else changes."""
     return with_setting(text, "browser", key, value)
@@ -428,6 +438,18 @@ def set_setting(path: Path, table: ConfigTable, key: SettingKey, value: SettingV
         value,
         lambda text: with_setting(text, table, key, value),
         f"add {key} = {_literal(value)} under [{table}]",
+    )
+
+
+def set_kind_model(path: Path, kind: TaskKind, model: str) -> None:
+    """Write the model a run of ``kind`` starts on into ``[models.kinds]`` of the config file at ``path`` (created when
+    missing), or take it out for ``""`` (item 1889); the result is checked as :func:`set_setting` checks its own."""
+    _edit(
+        path,
+        ("models", "kinds", kind),
+        None if model == "" else model,
+        lambda text: with_kind_model(text, kind, model),
+        f"remove {kind} from [{_KINDS_TABLE}]" if model == "" else f'add {kind} = "{model}" under [{_KINDS_TABLE}]',
     )
 
 
