@@ -598,8 +598,8 @@ struct NewChatSheet: View {
         .tint(Tone.text)
         .task { await model.loadModels() }
         // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
-        .onAppear { text = model.draft(of: AppModel.newChatDraft) }
-        .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft) }
+        .onAppear { text = model.draft(of: AppModel.newChatDraft(agent: agent?.id)) }
+        .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft(agent: agent?.id)) }
         .sheet(isPresented: $choosing) {
             ChatSettingsSheet(
                 initial: settings, providers: model.models, defaults: model.chatDefaults, problem: model.modelsProblem,
@@ -618,7 +618,7 @@ struct NewChatSheet: View {
         let start: ChatStart = ChatStart(choices: settings.choices, planFirst: settings.planFirst)
         Task {
             if let key = await model.startChat(words, photos: photos, start: start, agent: agent?.id) {
-                model.keep(draft: "", of: AppModel.newChatDraft)
+                model.keep(draft: "", of: AppModel.newChatDraft(agent: agent?.id))
                 opened(key)
             } else {
                 close()
