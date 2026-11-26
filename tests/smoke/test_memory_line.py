@@ -30,7 +30,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import MemoryRecord, RunRecord
+from dotagent.store.models import MemoryRecord, RunRecord, ThreadRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -99,11 +99,31 @@ async def login_env() -> dict[str, str]:
 
 @asynccontextmanager
 async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, RunManager, Held, str]]:
-    """The daemon in the home of the environment, with the owner's notes the run works on and a model that plays
-    ``_turns`` once let go, served at the address it yields."""
+    """The daemon in the home of the environment, with the notes the run works on (two of the owner's and one an
+    earlier run saved) and a model that plays ``_turns`` once let go, served at the address it yields."""
     runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
     try:
-        report: MemoryRecord = (await save_memory(runtime.memory, REPORT, [], None, None, None, False)).record
+        # The note the run corrects is one an earlier run saved: a note the owner wrote keeps its words, and a run's
+        # change of it waits for them on the Memory page (item 1865), which leaves no line here.
+        earlier: ThreadRecord = await runtime.store.create_thread("Earlier chat", "test")
+        saver: RunRecord = await runtime.store.create_run(
+            earlier.id,
+            "Note who gets the report",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+        await runtime.store.finish_run(saver.id, "done", "Noted.")
+        report: MemoryRecord = (await save_memory(runtime.memory, REPORT, [], saver.id, None, None, False)).record
         office: MemoryRecord = (await save_memory(runtime.memory, OFFICE, [], None, None, None, False)).record
         await save_memory(runtime.memory, KEPT, [], None, None, None, False)
         held: Held = Held(_turns(report.id, office.id))
@@ -188,9 +208,9 @@ async def test_a_change_of_the_memory_is_a_quiet_line_that_leads_to_the_note(
             try:
                 page: Page = await _open(browser, address, f"/runs/{run.id}", 1280, "light")
                 lines: Locator = page.locator(".timeline .memory-line")
-                # The run's first event is drawn: it starts with the owner's three notes, a line of how it was set up,
-                # which the side panel's Run tab holds (item 365).
-                await expect(page.locator("#panel-run-setup")).to_contain_text("Recalled 3 memories")
+                # The run's first event is drawn: it starts with the owner's two notes (the one an earlier run saved
+                # is not handed to it), a line of how it was set up, which the side panel's Run tab holds (item 365).
+                await expect(page.locator("#panel-run-setup")).to_contain_text("Recalled 2 memories")
                 await expect(lines).to_have_count(0)
                 # As the run works: the lines come in while the page is open.
                 held.go.set()

@@ -376,8 +376,12 @@ function keepPlace(part, change) {
   const seenFrom = box === null ? 0 : box.getBoundingClientRect().top;
   const follows = following(part);
   const before = follows.getBoundingClientRect().top;
+  // Where `part` ends: its own foot, or, while it is hidden and has none, where what follows it starts. The gap between
+  // two turns standing just inside the top of what is seen is no part seen: what grows above it moved what was read.
+  const shown = part.getBoundingClientRect();
+  const ends = shown.height === 0 ? before : shown.bottom;
   change();
-  if (before > seenFrom) {
+  if (ends > seenFrom) {
     return;
   }
   const moved = follows.getBoundingClientRect().top - before;
