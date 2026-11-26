@@ -70,6 +70,9 @@ backup_every_hours = 1.0
 backup_dir = ""
 backup_keep_hourly = 24
 backup_keep_days = 14
+# Below min_free_gb GiB free on the disk of Dot's home (item 1938) the owner is told once, and a copy of the database or
+# an uploaded file is refused with an error that says so, rather than failing half way on a full disk; 0 sets no floor.
+min_free_gb = 5.0
 
 [models]
 # "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter, google (the Gemini models of a
