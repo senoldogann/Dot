@@ -17,8 +17,8 @@ import secrets
 import shutil
 import time
 import weakref
-from collections.abc import Sequence
-from dataclasses import replace
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass, replace
 from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Literal, Self
@@ -673,7 +673,7 @@ def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
     return enter
 
 
-async def _payment_amount(ctx: ToolContext, elements: list[Element | None]) -> Amount | None:
+def _largest_amount(elements: list[Element | None], page_text: str) -> Amount | None:
     """What a payment step moves: the largest of the amounts in the labels of its controls and the total on the page,
     so that a coupon or a basket line beside the payment cannot stand for it and a misread errs towards the hand-off
     (item 385); ``None`` when none says (the money hand-off then holds). Read for the caps of ``[policy.spend]``."""
@@ -684,8 +684,7 @@ async def _payment_amount(ctx: ToolContext, elements: list[Element | None]) -> A
         for amount in (amount_in_label(element.name),)
         if amount is not None
     ]
-    page: TextView = await ctx.browser.read_text(ctx.thread_id, None, 0, _AMOUNT_PAGE_CHARS)
-    total: Amount | None = total_on_page(page.text)
+    total: Amount | None = total_on_page(page_text)
     amounts: list[Amount] = [*named, *([] if total is None else [total])]
     return max(amounts, key=lambda amount: amount.value) if amounts else None
 
@@ -703,6 +702,104 @@ async def _page_check(expected: str, outcome: ActOutcome, ctx: ToolContext) -> P
         expected=expected,
     )
     return await ctx.runtime.judge.judge_page(facts, ctx.run_id)
+
+
+async def _page_text(ctx: ToolContext) -> str:
+    """The visible text of the tab, as much as a payment's total is looked for in."""
+    return (await ctx.browser.read_text(ctx.thread_id, None, 0, _AMOUNT_PAGE_CHARS)).text
+
+
+@dataclass(frozen=True, slots=True)
+class BatchFacts:
+    """A batch of browser steps as the policy weighs it: each step with the element it acts on and the one it drops
+    onto (``judged``), how each step was assessed, the other elements a step at a pixel may land on (``others``) and
+    the page's address. The tools of Chrome and of Safari (item 1959) both judge theirs so."""
+
+    tool: str
+    steps: Sequence[Step]
+    judged: Sequence[tuple[Step, Element | None, Element | None]]
+    assessed: Sequence[StepAssessment]
+    others: Sequence[tuple[Step, Element]]
+    target: str
+
+
+async def judge_batch(
+    facts: BatchFacts,
+    held_back: Callable[[str], str],
+    page_text: Callable[[], Awaitable[str]],
+    ctx: ToolContext,
+) -> ActionInfo:
+    """The action a batch is decided as: its steps' assessments, with what the typed judge finds in the clicks whose
+    labels no pattern knows, one payment at most and one paced public action at most while the owner sets a pace, and
+    a payment's amount from its labels and the page's total (``page_text``). ``held_back`` takes out of a text what the
+    judge must not read (a login filled from the vault)."""
+    steps: Sequence[Step] = facts.steps
+    judged: Sequence[tuple[Step, Element | None, Element | None]] = facts.judged
+    assessed: Sequence[StepAssessment] = facts.assessed
+    assessment: StepAssessment = combine_assessments(list(assessed))
+    kind: ActionKind = _act_kind(list(steps))
+    summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
+    target: str = facts.target
+    # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
+    # It reads them in yolo too, where a payment, a message or a post it finds is the run's (item 443), and the
+    # flags it adds are recorded with the step.
+    # The judge is a model of its own: it reads no login filled from the password manager either (item 493), nor
+    # a cookie a script ran with (item 533).
+    unexplained: tuple[Element, ...] = unexplained_clicks(
+        [*((step, element) for step, element, _ in judged), *facts.others]
+    )
+    judgments: list[ClickJudgment] = await asyncio.gather(
+        *(
+            ctx.runtime.judge.judge_click(
+                ClickFacts(label=held_back(element.name), role=element.role, url=held_back(target)), ctx.run_id
+            )
+            for element in unexplained
+        )
+    )
+    found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]
+    if found:
+        assessment = combine_assessments([assessment, *found])
+    # One payment is decided on its own amount and counts against the caps of its site once: a batch that pays more
+    # than once would pass for the largest of its amounts (item 561), so the steps are sent one call at a time.
+    paying: frozenset[Element] = frozenset(
+        element
+        for element, judgment in zip(unexplained, judgments, strict=True)
+        if "financial" in assessment_for(judgment.reasons).flags
+    )
+    payments: int = payment_steps(
+        [(step, element, part) for (step, element, _), part in zip(judged, assessed, strict=True)], paying
+    )
+    if payments > 1:
+        raise ToolInputError(
+            "A batch takes one payment step at most (a purchase, a donation, a booking, a transfer): each payment "
+            "is decided on its own amount and counts against the owner's caps on its own. Send them one call at "
+            "a time, each once the page shows the one before it done.",
+            {"payment_steps": payments},
+        )
+    # The pace of a site counts a call as one action, so while a pace is set for a class of the batch's public or
+    # social actions the batch carries one of them at most; with none set it carries as many (item 266).
+    paced: list[PaceClass] = [
+        pace for pace in (pace_class(part.flags) for part in [*assessed, *found]) if pace is not None
+    ]
+    limited: list[PaceClass] = paced_in_batch(ctx.runtime.config.policy.pace, paced)
+    if limited:
+        raise ToolInputError(
+            "A batch takes one public or social action at most (a post, a reply, a repost, a message, a follow, a "
+            "like) while the owner sets a pace for them: each one counts toward the pace of the site. Send them "
+            "one call at a time; doing them with a script in the page (browser_eval) would go around the owner's "
+            "pace.",
+            {"public_or_social_steps": len(paced), "paced_classes": list(limited)},
+        )
+    notes: list[str] = [judgment.note for judgment in judgments if judgment.note]
+    if notes:
+        summary = f"{summary} ({'; '.join(notes)})"
+    action: ActionInfo = _action(facts.tool, kind, assessment.risk, summary, target, assessment.flags)
+    if "financial" not in assessment.flags:
+        return action
+    amount: Amount | None = _largest_amount([element for _, element, _ in judged], await page_text())
+    if amount is None:
+        return action
+    return action.model_copy(update={"summary": f"{summary} (amount {render_amount(amount)})", "amount": amount})
 
 
 def _act_tool() -> RegisteredTool:
@@ -736,78 +833,20 @@ def _act_tool() -> RegisteredTool:
             )
             for (step, element, target), ref, more in zip(judged, refs, others, strict=True)
         ]
-        assessment: StepAssessment = combine_assessments(assessed)
-        kind: ActionKind = _act_kind(steps)
-        summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
-        # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
-        # It reads them in yolo too, where a payment, a message or a post it finds is the run's (item 443), and the
-        # flags it adds are recorded with the step.
-        # The judge is a model of its own: it reads no login filled from the password manager either (item 493), nor
-        # a cookie a script ran with (item 533).
-        unexplained: tuple[Element, ...] = unexplained_clicks(
-            [
-                *((step, element) for step, element, _ in judged),
-                *((step, other) for step, more in zip(steps, others, strict=True) for other in more),
-            ]
+        return await judge_batch(
+            BatchFacts(
+                tool="browser_act",
+                steps=steps,
+                judged=judged,
+                assessed=assessed,
+                others=[(step, other) for step, more in zip(steps, others, strict=True) for other in more],
+                target=target,
+            ),
+            lambda text: ctx.browser.held_back(ctx.thread_id, text),
+            lambda: _page_text(ctx),
+            ctx,
         )
-        judgments: list[ClickJudgment] = await asyncio.gather(
-            *(
-                ctx.runtime.judge.judge_click(
-                    ClickFacts(
-                        label=ctx.browser.held_back(ctx.thread_id, element.name),
-                        role=element.role,
-                        url=ctx.browser.held_back(ctx.thread_id, target),
-                    ),
-                    ctx.run_id,
-                )
-                for element in unexplained
-            )
-        )
-        found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]
-        if found:
-            assessment = combine_assessments([assessment, *found])
-        # One payment is decided on its own amount and counts against the caps of its site once: a batch that pays more
-        # than once would pass for the largest of its amounts (item 561), so the steps are sent one call at a time.
-        paying: frozenset[Element] = frozenset(
-            element
-            for element, judgment in zip(unexplained, judgments, strict=True)
-            if "financial" in assessment_for(judgment.reasons).flags
-        )
-        payments: int = payment_steps(
-            [(step, element, part) for (step, element, _), part in zip(judged, assessed, strict=True)], paying
-        )
-        if payments > 1:
-            raise ToolInputError(
-                "A batch takes one payment step at most (a purchase, a donation, a booking, a transfer): each payment "
-                "is decided on its own amount and counts against the owner's caps on its own. Send them one call at "
-                "a time, each once the page shows the one before it done.",
-                {"payment_steps": payments},
-            )
-        # The pace of a site counts a call as one action, so while a pace is set for a class of the batch's public or
-        # social actions the batch carries one of them at most; with none set it carries as many (item 266).
-        paced: list[PaceClass] = [
-            pace for pace in (pace_class(part.flags) for part in [*assessed, *found]) if pace is not None
-        ]
-        limited: list[PaceClass] = paced_in_batch(ctx.runtime.config.policy.pace, paced)
-        if limited:
-            raise ToolInputError(
-                "A batch takes one public or social action at most (a post, a reply, a repost, a message, a follow, a "
-                "like) while the owner sets a pace for them: each one counts toward the pace of the site. Send them "
-                "one call at a time; doing them with a script in the page (browser_eval) would go around the owner's "
-                "pace.",
-                {"public_or_social_steps": len(paced), "paced_classes": list(limited)},
-            )
-        notes: list[str] = [judgment.note for judgment in judgments if judgment.note]
-        if notes:
-            summary = f"{summary} ({'; '.join(notes)})"
-        action: ActionInfo = _action("browser_act", kind, assessment.risk, summary, target, assessment.flags)
-        if "financial" not in assessment.flags:
-            return action
-        amount: Amount | None = await _payment_amount(ctx, [element for _, element, _ in judged])
-        if amount is None:
-            return action
-        return action.model_copy(update={"summary": f"{summary} (amount {render_amount(amount)})", "amount": amount})
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         limit: int = ctx.runtime.config.browser.max_batch_steps

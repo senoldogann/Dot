@@ -347,6 +347,12 @@ final class AppModel {
     /// The owner's words for a chat: queued behind the run at work (D10 default) or, with `steer`, into it.
     @discardableResult
     func send(_ text: String, thread: String, steerInto run: String?, files: [OutgoingAttachment], picks: MessagePicks) async -> String? {
+        #if DEBUG
+            // A fixture draws without an engine or an outbox: what the owner sends there is taken as kept (its drafts too
+            // stay off the phone's storage, `draft(of:)`), so the composer's tests see a send clear the draft (item 1765). Since
+            // item 1930 a send that is not kept leaves the draft and says so, which no fixture send could pass.
+            if engine == nil, fixtureMac != nil { return "fixture-" + UUID().uuidString }
+        #endif
         guard let engine else { return nil }
         do {
             if let run { return try await engine.steer(text, run: run, thread: thread, attachments: files) }

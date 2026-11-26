@@ -191,6 +191,12 @@ here points at a test that no longer exists.
 - `tests/unit/test_review_instructions.py::test_a_short_restriction_behind_a_long_newest_message_is_still_read` — a long
   newest message, read whole, left a short "never email anyone" out of yolo's check of a tainted run, which asks nobody
   (the security review of item 1947).
+- `tests/unit/test_safari_tools.py::test_an_open_never_loads_over_a_tab_of_the_owners_and_reuses_only_its_own_where_it_left_it` — `safari_open`
+  took the chat's tab by its place alone, so a first open, or one after a read of the owner's front tab, loaded over
+  the page the owner had there (item 1959's review).
+- `tests/unit/test_safari_tools.py::test_a_page_whose_answer_cannot_be_read_is_not_quoted_to_the_run` — an answer of
+  the page script that failed to validate, and an error a page made it throw, were put in the error, which reaches the
+  model unfenced and leaves the run trusted (item 1959's review, the class of item 1212).
 - `tests/unit/test_freedom_contract.py::test_no_call_of_any_kind_asks_the_owner_but_what_the_contract_names` — the owner's
   word of 2026-11-24 (yolo and free mode never break): a call of any kind of tool, prepared by its own tool, must go
   through unasked in a yolo or free run, but for the payment, the message or mail and the post the contract names, and a
