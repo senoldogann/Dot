@@ -187,7 +187,8 @@ final class AppModel {
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
-    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
+    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849). Only these show
+    /// as a starting chat (item 2025); a key left in the outbox from an earlier launch is not one of them.
     var startingChats: [String: String] = [:]
 
     /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
