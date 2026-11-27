@@ -43,9 +43,9 @@ import { attempt, confirmDialog, toast } from "./ui.js";
 const LIST_LIMIT = 200;
 const LIST_CAP = 500;
 // The moments a run changes status; a run that waits for an approval is "blocked" until it is answered.
+const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback", "chat_rewound"]);
 // The events that move what a row says it waits on and nothing else of the list (item 2010).
 const WAIT_KINDS = new Set(["helper_released", "terminals_changed"]);
-const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback", "chat_rewound"]);
 // The groups above the chats: what waits for you and what works now (`GET /activity`), each hidden while empty. They
 // are rows as a messaging app's (item 836), with no heading: a row says that it waits or works itself, and its group's
 // name is for a screen reader.

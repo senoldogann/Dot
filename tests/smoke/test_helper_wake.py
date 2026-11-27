@@ -647,6 +647,33 @@ async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_bl
             await browser.close()
 
 
+@pytest.mark.browser
+async def test_a_rows_wait_on_its_helper_goes_when_a_message_lets_the_helper_go(login_env: dict[str, str]) -> None:
+    """Item 2010: the sidebar's row of a chat whose run waits on its helper says "Waiting on 1 helper…"; once a message
+    released the run from its wait (``helper_released``, with the run still at work and no run's end to reload on), the
+    open page's row says it no more."""
+    roles: _Roles = _Roles(
+        main=[ScriptedTurn(text="", calls=(_delegate("slow"),)), _turn("shell", {"command": "sleep 60"})],
+        helpers=[_turn("shell", {"command": "sleep 60"})],
+    )
+    async with _served(login_env, roles) as (runtime, manager, address), async_playwright() as playwright:
+        parent: RunRecord = await _start(manager)
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            row = page.locator(f'.side-run[href="#/runs/{parent.id}"]').first
+            await expect(row.locator(".side-chat-live")).to_have_text("Waiting on 1 helper…", timeout=WAIT_S * 1000)
+            manager.steer(parent.id, "Stop waiting.", ())
+            await expect(row.locator(".side-chat-live")).to_have_count(0, timeout=WAIT_S * 1000)
+            assert (await runtime.store.get_run(parent.id)).status == "running"
+            await page.close()
+            await manager.stop(parent.id)
+            assert (await _ended(manager, parent.id)).status == "cancelled"
+        finally:
+            await browser.close()
+
+
 async def test_a_helper_whose_end_the_store_has_not_taken_is_kept_and_told_once_it_has(
     login_env: dict[str, str],
 ) -> None:
