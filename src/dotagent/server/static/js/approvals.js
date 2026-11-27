@@ -4,6 +4,7 @@
 import { api } from "./api.js";
 import { cardWords, FIXED_REASONS, unsaid } from "./cardwords.js";
 import { codeBlock } from "./codeblock.js";
+import { plainReason, riskWords } from "./approvalwords.js";
 import { clip, dateTime, el } from "./dom.js";
 import { capital, flagWords, kindWords } from "./flagwords.js";
 import { icon } from "./icons.js";
@@ -244,8 +245,8 @@ function present(...parts) {
   return parts.filter((part) => part !== null);
 }
 
-function technicalDetails(args, said) {
-  // A chip whose words the card's text says already is not shown again (item 872).
+/** The chips that say what the step counts as, left out where the card's text says it already (item 872). */
+function chipsOf(args, said) {
   const named = [];
   if (typeof args.kind === "string") {
     named.push([args.kind, capital(kindWords(args.kind))]);
@@ -257,19 +258,38 @@ function technicalDetails(args, said) {
   }
   const fresh = new Set(unsaid(named.map(([, words]) => words), said));
   const chips = named.filter(([, words]) => fresh.has(words)).map(([title, words]) => el("span", { class: "chip", title }, words));
+  return chips.length === 0 ? null : el("div", { class: "cluster" }, chips);
+}
+
+/** What the step acts on or runs, whole, in the boxes of code the card keeps in view (the command is the card's one
+ * exhibit; the chips and the policy's words are folded away, item 22 of the 2026-11-26 review). */
+function targetBlocks(args) {
   const target = typeof args.target === "string" && args.target !== "" ? args.target : null;
   // What the step runs where its target says only where (a page's script, item 985): asked of the owner because the
   // review did not read it whole, so the card shows it whole.
   const body = typeof args.body === "string" && args.body !== "" ? args.body : null;
-  if (chips.length === 0 && target === null && body === null) {
+  if (target === null && body === null) {
     return null;
   }
   return el(
     "div",
     { class: "stack tight" },
-    chips.length > 0 ? el("div", { class: "cluster" }, chips) : null,
-    target === null ? null : targetBlock(target, args.kind === "shell" ? "Command" : "Target", "What the action acts on"),
-    body === null ? null : targetBlock(body, "Script", "What the action runs"),
+    target === null ? null : targetBlock(target, args.kind === "shell" ? t("approvals.command") : t("approvals.target"), t("approvals.whatTheActionActsOn")),
+    body === null ? null : targetBlock(body, t("approvals.script"), t("approvals.whatTheActionRuns")),
+  );
+}
+
+/** The fold under a card: what the step counts as, its risk and the policy's own words for asking; null when none. */
+function foldedDetails(chips, severity, policyWords) {
+  const risk = severity === "high" || severity === "medium" || severity === "low" ? t("approvals.riskLabel", { level: riskWords(severity) }) : null;
+  if (chips === null && risk === null && policyWords === null) {
+    return null;
+  }
+  return el(
+    "details",
+    { class: "approval-fold" },
+    el("summary", null, t("approvals.details")),
+    el("div", { class: "stack tight" }, chips, risk === null ? null : el("div", { class: "small muted" }, risk), policyWords === null ? null : el("div", { class: "small muted" }, t("approvals.whyPolicy", { reason: policyWords }))),
   );
 }
 
@@ -357,6 +377,12 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     const said = asks === INITIATIVE_LINE ? FIXED_REASONS.initiative : asks === OWNERS_LINE ? FIXED_REASONS.owners : "";
     const words = isQuestion ? null : cardWords(approval.summary, target, said);
     const text = isQuestion && typeof approval.args.question === "string" ? approval.args.question : words === null ? approval.summary : words.text;
+    // Why Dot asks, in one plain sentence when the policy's reason names a preset; its own words are folded under Details
+    // (item 22 of the 2026-11-26 review). Any other reason (a rule's, the review model's warning) is said as it is.
+    const reason = words === null ? "" : words.reason;
+    const plain = reason === "" ? null : plainReason(reason);
+    const why = reason === "" ? null : plain ?? reason;
+    const policyWords = plain === null ? null : reason;
     const choices = isQuestion ? questionOptions(approval.args) : [];
     // Several options may be chosen: each is ticked, and Send answer sends them with what was written.
     const several = choices.length > 0 && approval.args.multiple === true;
@@ -432,17 +458,17 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           "div",
           { class: "approval-head" },
           icon(iconOf(approval.severity)),
-          el("span", null, isKept ? "Kept for you" : isLeft ? "Dot asked you" : titleOf(approval.severity)),
-          isQuestion || isHandoff ? null : el("span", { class: `badge ${approval.severity === "high" ? "b-bad" : "b-warn"}` }, approval.severity),
+          el("span", null, isKept ? t("approvals.keptForYou") : isLeft ? t("approvals.dotAskedYou") : titleOf(approval.severity)),
           el("span", { class: "spacer" }),
           heading,
         ),
         text === "" ? null : el("div", { class: "approval-text" }, text),
-        words === null || words.reason === "" ? null : el("div", { class: "small muted approval-why" }, words.reason),
-        several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
+        why === null ? null : el("div", { class: "small muted approval-why" }, why),
+        several ? el("div", { class: "small muted" }, t("approvals.chooseOneOrMoreThen")) : null,
         isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(isHandoff, approval.keptUntil, approval.scopeCampaignId !== null || leftNote === LEFT_IN_CAMPAIGN) : leftNote) : null,
         // A chip is left out only when the words are the step's own, the command cut out of them, never a reason's.
-        isQuestion ? options : isBudget ? null : technicalDetails(approval.args, words?.cut ? text : ""),
+        isQuestion ? options : isBudget ? null : targetBlocks(approval.args),
+        isQuestion || isHandoff || isBudget ? null : foldedDetails(chipsOf(approval.args, words?.cut ? text : ""), approval.severity, policyWords),
         isQuestion || isHandoff || isBudget ? null : asks !== null ? el("div", { class: "small muted" }, asks) : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId, onUseHere) : null,
         el(
@@ -588,7 +614,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     const label = labelled ? approval.summary.slice(0, colon) : "";
     const timedOut = status === "expired" && (note === "" || EXPIRED_NOTES.has(note));
     const outcome = STATUS_LABEL[status] ?? status;
-    const why = timedOut ? "Nobody answered in time, so the step did not run." : "";
+    const why = timedOut ? t("approvals.nobodyAnsweredInTimeSo3") : "";
     // What the step does (the policy's brackets), and a reason of its own; the fixed sentences of why Dot asks are no
     // news once it is settled. A summary whose command could not be cut out of it (a folder, several lines, a long
     // one) is kept whole but for that sentence: its folder and its reasons are in it (the pre-push review).

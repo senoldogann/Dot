@@ -12308,3 +12308,19 @@ dialog.teach {
 .watch-status[hidden] {
   display: none;
 }
+
+/* What a card folds away (item 22 of the 2026-11-26 review): the chips for what the step counts as, its risk and the
+   policy's own words for asking. The command stays in view; these open on a click. */
+.approval-fold {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.approval-fold > summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.approval-fold > .stack {
+  margin-top: var(--space-2);
+}

@@ -18,6 +18,7 @@
 
 import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, sharedGet, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, setText, workingFor } from "./dom.js";
+import { withoutPolicyReason } from "./approvalwords.js";
 import { serviceFailure, serviceWords } from "./errors.js";
 import { t, tCount } from "./i18n.js";
 import { goTo } from "./hop.js";
@@ -232,7 +233,7 @@ function chatText(chat, agent, children, waits = null, right = null, unread = fa
   const dot = unread ? el("span", { class: "side-unread" }) : null;
   if (waits !== null) {
     const more = waits.length > 1 ? ` (+${waits.length - 1})` : "";
-    return el("span", { class: "side-chat-text" }, top, title, waitsLine(`${WAITS_WORDS}: ${waits[0].title}${more}`, ...marks));
+    return el("span", { class: "side-chat-text" }, top, title, waitsLine(`${WAITS_WORDS}: ${withoutPolicyReason(waits[0].title)}${more}`, ...marks));
   }
   // A chat its model service stopped says so in a few words of what stopped it (the service's sentence, a billing link
   // and all, stood here after item 1136); its own line stands in the chat. Any other chat ends on its last words.

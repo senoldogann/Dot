@@ -1904,6 +1904,15 @@ export const TR_APP = {
   "watcherspanel.theFileNameOfAn": "Dot'un \"checks\" klasöründeki çalıştırılabilir bir betiğin dosya adı. Son satırı {\"wake\": true} yazdırdığını size bildirir, {\"wake\": false} hiçbir şey bildirmez ve başka her şey başarısız bir bakış olarak görünür.",
   "workorders.forClip": "şunun için: {clip}",
   // Added by hand, for sentences that need their own word order.
+  "approvalwords.cautious": "Dot, yalnızca okumaktan ibaret olmayan her şeyden önce sorar.",
+  "approvalwords.asksBecause": "Dot soruyor, çünkü bu {what}.",
+  "approvalwords.destructiveOutside": "Dot'un kendi klasörünün dışında bir şeyi siler ya da değiştirir",
+  "approvalwords.highRisk": "yüksek risk taşır",
+  "approvalwords.riskHigh": "yüksek",
+  "approvalwords.riskMedium": "orta",
+  "approvalwords.riskLow": "düşük",
+  "approvals.riskLabel": "Risk: {level}",
+  "approvals.whyPolicy": "Politikanın sözleri: {reason}",
   // Added by hand, for sentences that need their own word order.
   // Added by hand, for sentences that need their own word order.
   // Added by hand, for sentences that need their own word order.

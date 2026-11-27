@@ -1903,6 +1903,15 @@ export const EN_APP = {
   "watcherspanel.theFileNameOfAn": "The file name of an executable script in Dot's \"checks\" folder. Its last line {\"wake\": true} tells you what it printed before it, {\"wake\": false} tells nothing, and anything else shows as a failed look.",
   "workorders.forClip": "for: {clip}",
   // Added by hand, for sentences that need their own word order.
+  "approvalwords.cautious": "Dot asks before anything that is not only reading.",
+  "approvalwords.asksBecause": "Dot asks because this {what}.",
+  "approvalwords.destructiveOutside": "deletes or changes something outside Dot's own folder",
+  "approvalwords.highRisk": "carries a high risk",
+  "approvalwords.riskHigh": "high",
+  "approvalwords.riskMedium": "medium",
+  "approvalwords.riskLow": "low",
+  "approvals.riskLabel": "Risk: {level}",
+  "approvals.whyPolicy": "The policy's words: {reason}",
   // Added by hand, for sentences that need their own word order.
   // Added by hand, for sentences that need their own word order.
   // Added by hand, for sentences that need their own word order.

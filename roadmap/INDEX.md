@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1979](1979.md) | done | 2026-11-27 | An approval card says what Dot wants to do and why it asks in plain words, with the policy's words folded |
 | [1978](1978.md) | done | 2026-11-27 | An English line is no longer capitals under a Turkish page: the question card's header is plain |
 | [1977](1977.md) | done | 2026-11-27 | The web UI speaks Turkish on every screen, and a check fails for a line of English that is not in the catalogue |
 | [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |

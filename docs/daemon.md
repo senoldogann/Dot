@@ -503,9 +503,12 @@ read-only calls, stays waiting until both are answered (item 1050).
 A waiting card says each thing once (item 872, after OpenMausBot's quiet approvals): the command or
 what the step acts on in its box alone, not in the words above it again, which keep what the step does ("Runs vercel;
 vercel puts a project's change live"); why Dot asks once: the line under the box says it for a chat of Dot's own
-initiative and for what yolo asks you, and the words above leave out only that sentence; any other reason (a payment's
-amount and caps, a guard's why) and what the review model passed on to you stay under the words; and no chip that the
-words say already, in whole words. On a phone the note has its row, and Deny and Approve share the
+initiative and for what yolo asks you, and the words above leave out only that sentence; a preset's reason ("aggressive
+preset still asks for: privilege") is one plain sentence under the words ("Dot asks because this needs administrator
+rights."), and any other reason (a payment's amount and caps, a guard's why) and what the review model passed on to you
+stay under the words as they are. The card's head has no badge of the step's risk (item 1979, after the 2026-11-26
+review): what the step counts as (its chips, with no chip that the words say already, in whole words), its risk and the
+policy's own words are folded under **Details**, closed until pressed, and the command stays in view. On a phone the note has its row, and Deny and Approve share the
 next one. While a note is written, Approve says **Send note** (item 1140): the step waits until Dot read the note, and
 is taken only if the note still calls for it ([Safety](safety.md#safety)).
 
