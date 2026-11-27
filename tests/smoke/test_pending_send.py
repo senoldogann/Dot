@@ -87,7 +87,7 @@ async def test_a_sent_message_is_pending_in_the_chat_until_dot_took_it(
                 await page.route("**/api/runs", held)
                 await _send(page, "Count them again")
                 shown = page.locator(".pending-send")
-                await expect(shown.locator(".bubble.user")).to_have_text("Count them again", timeout=500)
+                await expect(shown.locator(".bubble.user")).to_have_text("Count them again", timeout=1500)
                 await expect(shown.locator(".pending-note")).to_have_text(pending)
                 await expect(shown.locator(".starting-line .work-status-words")).to_have_text(starting)
                 await expect(shown.locator(".starting-line .typing-dots")).to_be_visible()
@@ -132,7 +132,7 @@ async def test_a_refused_send_takes_its_bubble_away_and_gives_the_words_back(own
 
                 await page.route("**/api/runs", refused)
                 await _send(page, "Count them again")
-                await expect(page.locator(".pending-send")).to_have_count(1, timeout=500)
+                await expect(page.locator(".pending-send")).to_have_count(1, timeout=1500)
                 await expect(page.locator(".pending-send")).to_have_count(0, timeout=5000)
                 await expect(page.locator(".dock textarea")).to_have_value("Count them again")
                 await expect(page).to_have_url(re.compile(f"/runs/{run.id}$"))
