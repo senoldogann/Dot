@@ -194,6 +194,14 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertLessThanOrEqual(abs(edit.frame.midX - app.windows.firstMatch.frame.midX), 1, "Edit sits under the avatar, centred")
         XCTAssertGreaterThanOrEqual(edit.frame.height, 44)
 
+        // Its Activity is the real page, scoped to its work (item 2022), not a "next version" placeholder.
+        app.buttons["profile.activity"].tap()
+        XCTAssertTrue(app.navigationBars["Activity"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Activity comes in the next version"].exists)
+        shot(app, "profile-activity")
+        app.navigationBars["Activity"].buttons.firstMatch.tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 10), "back on the profile")
+
         edit.tap()
         let nameField: XCUIElement = app.textFields["botEdit.name"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 10), "the edit page")

@@ -464,7 +464,7 @@ async def test_a_chat_at_rest_has_no_capsule_and_a_lost_stream_is_said_in_it(log
             await expect(_segment(page, "status")).to_contain_text("Working")
             # The daemon goes away: the page lost its stream and says so once, in the capsule.
             sc.stop_serving()
-            await expect(_segment(page, "status")).to_have_text("Reconnecting…", use_inner_text=True, timeout=30000)
+            await expect(_segment(page, "status")).to_have_text("Can't reach Dot", use_inner_text=True, timeout=30000)
             await expect(_segment(page, "status")).to_have_attribute("data-tone", "warn")
             # The note under the top bar is not drawn on a phone, and the Stop stays.
             await expect(page.locator(".connection-slot .note")).to_be_hidden()

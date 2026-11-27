@@ -88,7 +88,7 @@ func stepWords(tool: String, target: String) -> String {
 /// Whether a step starts or talks to a helper: Dot's `delegate` and `message_agent`, a CLI harness's `Task` or `Agent`.
 /// Named exactly: a tool that only has "agent" in its name (`agent_status`, an MCP tool) is no wait on a helper.
 func isHelperStep(_ tool: String) -> Bool {
-    ["delegate", "message_agent", "task", "agent"].contains(tool.lowercased())
+    helperWaitTools.contains(tool.lowercased())
 }
 
 /// The glyph of a tool call by its kind.

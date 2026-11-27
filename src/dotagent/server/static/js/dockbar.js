@@ -44,7 +44,7 @@ export function createDockBar({ onWork, onStop, onEnd, sheets }) {
     return button;
   }
 
-  const status = part("status", "circleDashed", () => onWork());
+  const status = part("status", "alert", () => onWork());
   const stop = part("stop", "stop", () => onStop());
   const plan = part("plan", "squareCheck", () => undefined);
   const helpers = part("helpers", "users", () => undefined);
@@ -63,7 +63,8 @@ export function createDockBar({ onWork, onStop, onEnd, sheets }) {
   const element = el("div", { class: "dockbar", hidden: true }, capsule, end);
 
   let endShown = false;
-  // The mark the status wears: a dashed circle that turns while the run works, a bell while it waits, an alert for a lost stream.
+  // The mark the status wears: none while the run works (no spinner: the words and the time say it, the owner's report of
+  // 2026-11-27), a bell while it waits for the owner, an alert for a lost stream.
   let markTone = "";
 
   /** Say less, step by step, until what the row holds fits the room it has. */
@@ -96,7 +97,8 @@ export function createDockBar({ onWork, onStop, onEnd, sheets }) {
       each.button.setAttribute("aria-label", segment.name);
       if (id === "status" && each.mark !== null && markTone !== segment.tone) {
         markTone = segment.tone;
-        each.mark.replaceChildren(icon(segment.tone === "waiting" ? "bell" : segment.tone === "warn" ? "alert" : "circleDashed"));
+        each.mark.replaceChildren(...(segment.tone === "waiting" ? [icon("bell")] : segment.tone === "warn" ? [icon("alert")] : []));
+        each.mark.hidden = segment.tone !== "waiting" && segment.tone !== "warn";
       }
     }
     capsule.hidden = segments.length === 0;

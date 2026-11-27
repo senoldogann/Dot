@@ -6,7 +6,7 @@
 
 import { api } from "./api.js";
 import { composerPill } from "./composer.js";
-import { el, modelName } from "./dom.js";
+import { el, modelName, switchRow } from "./dom.js";
 import { t } from "./i18n.js";
 import { allModels, levelLabel, offersChoice, ONE_MESSAGE, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
@@ -60,6 +60,16 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
     lead,
     el("span", { class: "pop-option-text" }, el("span", null, label), hint === "" ? null : el("span", { class: "pop-option-hint" }, hint)),
     icon("check"),
+  );
+}
+
+/** A switch as a row of the chat's settings, as the phone draws it: the title with its line under it on the left, the
+ * switch on the right; a tap anywhere on the row turns it. */
+function sheetSwitch({ label, hint, on, onToggle }) {
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(on), "aria-label": label, onclick: onToggle });
+  return switchRow(
+    el("div", { class: "sheet-row sheet-switch" }, el("span", { class: "sheet-row-text" }, el("span", null, label), el("span", { class: "sheet-row-hint" }, hint)), toggle),
+    toggle,
   );
 }
 
@@ -359,16 +369,21 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
 
   function pickSpeed(speed) {
     kept.speed.write(speed);
-    reasoningMenu.close();
     paintModel();
-    reasoningPill.element.focus();
     onChange();
   }
 
-  // The levels of a model that offers a choice, the choices for one message it offers (item 251), then the speeds of
-  // one with fast mode (item 223).
-  function reasoningRows() {
-    const info = selectedInfo();
+  // Fast mode as a switch row, as the phone's Chat settings draw it (the owner's report of 2026-11-27): only for a model
+  // that has it; a model without it has no row at all.
+  function fastRow(info) {
+    if (info?.fast_mode !== true) {
+      return null;
+    }
+    return sheetSwitch({ label: t("choices.fastMode"), hint: SPEED_HINTS.fast, on: fastOn(info), onToggle: () => pickSpeed(fastOn(info) ? "standard" : "fast") });
+  }
+
+  // The levels of a model that offers a choice in full words, then the choices for one message it offers (item 251).
+  function levelRows(info) {
     if (info === null) {
       return [];
     }
@@ -402,23 +417,14 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
         ),
       );
     }
-    if (info.fast_mode) {
-      const fast = fastOn(info);
-      rows.push(
-        el(
-          "div",
-          { class: "pop-group", role: "group", "aria-label": t("choices.speed") },
-          el("div", { class: "pop-heading", "aria-hidden": "true" }, t("choices.speed")),
-          el(
-            "div",
-            { role: "listbox", "aria-label": t("choices.speed") },
-            optionRow({ lead: null, label: t("choices.standard"), hint: SPEED_HINTS.standard, selected: !fast, onPick: () => pickSpeed("standard") }),
-            optionRow({ lead: null, label: t("choices.fast"), hint: SPEED_HINTS.fast, selected: fast, onPick: () => pickSpeed("fast") }),
-          ),
-        ),
-      );
-    }
     return rows;
+  }
+
+  // The Reasoning pill's menu on a desk: the levels, the choices for one message, then Fast mode as a switch.
+  function reasoningRows() {
+    const info = selectedInfo();
+    const fast = fastRow(info);
+    return [...levelRows(info), ...(fast === null ? [] : [el("div", { class: "pop-switches" }, fast)])];
   }
 
   // The daemon's default, made from the model's menu as from the Settings (item 209): told as made, or why it was not;
@@ -467,17 +473,27 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     return details;
   }
 
+  // The phone's Chat settings in the web (the owner's report of 2026-11-27): the models, then Options as one card in the
+  // phone's order and words (Reasoning with the levels in full words, Fast mode only for a model that has it, Approvals,
+  // Plan first), then the web's own Mode and how Dot works.
   function settingsParts() {
     const isChat = modeId === "chat";
     executionGroup.hidden = isChat;
-    executionGroup.replaceChildren(el("div", { class: "pop-heading" }, t("choices.howDotWorks")), ...executionItems.flatMap((build) => build()), goalMode.element, frame.picks.planRow());
-    const reasoning = reasoningRows();
+    executionGroup.replaceChildren(el("div", { class: "pop-heading" }, t("choices.howDotWorks")), ...executionItems.flatMap((build) => build()), goalMode.element);
+    const info = selectedInfo();
+    const levels = levelRows(info);
+    const fast = fastRow(info);
+    const level = info !== null && offersChoice(info) ? (kept.level.read(info) ?? null) : null;
+    const levelWords = level !== null ? levelLabel(level) : info?.default_effort ? t("choices.defaultOf", { level: levelLabel(info.default_effort) }) : t("choices.default");
     const mode = modes.find((option) => option.id === modeId);
     const modeRows = el(
       "div",
       { role: "listbox", "aria-label": t("choices.mode") },
       ...modes.map((option) => optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) })),
     );
+    const plan = isChat
+      ? null
+      : sheetSwitch({ label: t("options.planFirst"), hint: t("choices.planFirstNext"), on: frame.picks.planFirst(), onToggle: () => frame.picks.setPlanFirst(!frame.picks.planFirst()) });
     const models = sections.build(modelArgs());
     return {
       body: [
@@ -485,11 +501,13 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
         el("div", { class: "sheet-heading" }, t("choices.options")),
         el(
           "div",
-          { class: "sheet-card" },
-          ...(reasoning.length === 0 ? [] : [disclosure("reasoning", t("choices.reasoning"), reasoningShort, reasoning)]),
-          disclosure("mode", t("choices.mode"), mode === undefined ? "" : mode.label, [modeRows]),
+          { class: "sheet-card sheet-options" },
+          ...(levels.length === 0 ? [] : [disclosure("reasoning", t("choices.reasoning"), levelWords, levels)]),
+          ...(fast === null ? [] : [fast]),
           disclosure("approvals", t("options.approvals"), approvalsShown === null ? "" : approvalLabel(approvalsShown), [approvals.element]),
+          ...(plan === null ? [] : [plan]),
         ),
+        el("div", { class: "sheet-card" }, disclosure("mode", t("choices.mode"), mode === undefined ? "" : mode.label, [modeRows])),
         el("div", { class: "sheet-card sheet-groups" }, ...(isChat ? [] : [executionGroup]), ...more()),
       ],
       foot: [models.search],
