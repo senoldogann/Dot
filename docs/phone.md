@@ -66,7 +66,9 @@ campaign with its state, goal and last progress, and a campaign's page stops it 
 achieved, as the web's page does; deleting one is done on the Mac. Dot Next's composer records your voice (item 1802): the
 microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written
 down on the iPhone (Apple's Speech, on the device: no audio leaves the phone) or, when you choose it in its Settings ›
-Voice, on your Mac (`/api/voice/streams`, as the web page does). Settings › Voice also orders the microphones voice input
+Voice, on your Mac (`/api/voice/streams`, as the web page does). A pause while you speak loses nothing: Apple's
+recognizer closes what was said before it and starts the next words from empty, and the composer keeps both, in
+order (item 2048). Settings › Voice also orders the microphones voice input
 takes (a wired or Bluetooth one is named the first time it is used). The same by hand:
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
