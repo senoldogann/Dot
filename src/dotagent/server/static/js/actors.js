@@ -211,8 +211,6 @@ export function liveFace(id, state, look, size) {
 const GLANCE_EVERY_MS = [3600, 4800];
 const GLANCE_MS = 1200;
 const GLANCE = { yaw: 30, pitch: 0, mix: 1, spin: 0, wander: 0.2 };
-// The living face's turn (app.css `--motion-face`: ten bobs and a flip), in seconds.
-const FLIP_EVERY_S = 16;
 const living = new WeakMap();
 const onScreen = new IntersectionObserver((entries) => {
   for (const entry of entries) {
@@ -233,8 +231,11 @@ const onScreen = new IntersectionObserver((entries) => {
  */
 export function keepPhase(face) {
   const now = performance.now() / 1000;
+  // The turn's length is the style sheet's token (`--motion-face`, "16s", on the root, so a face not yet on the page
+  // reads it too): one fact, in one place.
+  const turn = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--motion-face"));
   const seed = Number(face.dataset.seed ?? "0") / 10;
-  face.style.setProperty("--live-delay", `${(-((now + seed) % FLIP_EVERY_S)).toFixed(3)}s`);
+  face.style.setProperty("--live-delay", `${(-((now + seed) % turn)).toFixed(3)}s`);
 }
 
 /**
@@ -263,7 +264,8 @@ export function liven(face, alive, seed) {
     return;
   }
   face.setAttribute("data-living", "");
-  face.dataset.seed = String(hashId(seed) % (FLIP_EVERY_S * 10));
+  // Its place in the turn, in tenths of a second of the 16 s turn.
+  face.dataset.seed = String(hashId(seed) % 160);
   keepPhase(face);
   let timer = 0;
   let side = hashId(seed) % 2 === 0 ? -1 : 1;
