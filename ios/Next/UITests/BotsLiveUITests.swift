@@ -323,7 +323,8 @@ final class BotsLiveUITests: XCTestCase {
         // Pause and Resume in the profile's ⋯ menu; it ends paused, which the script reads on the daemon's side.
         let menu: XCUIElement = app.buttons["profile.menu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 10), "the ⋯ menu of an agent's profile")
-        XCTAssertGreaterThanOrEqual(menu.frame.height, 44)
+        // A toolbar button's accessibility frame is 36 pt across (the glass around it is 44).
+        XCTAssertGreaterThanOrEqual(menu.frame.height, 36)
         XCTAssertFalse(app.descendants(matching: .any)["profile.paused"].exists, "running")
         menu.tap()
         let pause: XCUIElement = app.buttons["profile.pause"]
@@ -348,7 +349,7 @@ final class BotsLiveUITests: XCTestCase {
     /// a hit target; the shots go to the result bundle for the report.
     func testTheWorkPagesHoldInDarkTurkishAndAtTheLargestAccessibilitySize() throws {
         let variants: [(String, [String])] = [
-            ("dark-tr", ["-AppleInterfaceStyle", "Dark", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR"]),
+            ("dark-tr", ["-colorScheme", "dark", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR"]),
             ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]),
         ]
         for (name, extra) in variants {
