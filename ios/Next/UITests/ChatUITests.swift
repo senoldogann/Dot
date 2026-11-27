@@ -593,32 +593,98 @@ final class ChatUITests: XCTestCase {
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
         let app: XCUIApplication = launch("n2-asks")
-        XCTAssertTrue(app.staticTexts["Your answer is needed"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["1 of 2"].exists, "a count for several asks")
+        XCTAssertTrue(app.staticTexts["User input needed"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["1 / 2"].exists, "a count for several asks")
         XCTAssertTrue(app.buttons["Allow once"].exists)
         XCTAssertTrue(app.buttons["Always allow in this chat"].exists)
         XCTAssertFalse(app.textFields["composer.field"].exists, "the dock stands in the composer's place")
         app.buttons["Next ask"].tap()
-        XCTAssertTrue(app.staticTexts["2 of 2"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["2 / 2"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Which day suits you for the dentist?"].exists)
         XCTAssertTrue(app.buttons["Stop"].exists, "Stop stays reachable")
         app.buttons["Fold what Dot asked"].tap()
         XCTAssertTrue(app.textFields["composer.field"].waitForExistence(timeout: 3), "folded, the composer is back")
     }
 
-    func testQuestionsArePickedAndSentWithOneSubmit() {
+    /// Item 2001, after another coding agent's question card: three questions page in one card ("1 / 3", never wrapped);
+    /// a single-select pick rings its card, a multi-select one takes several and lets one go, an own answer is written;
+    /// one "Submit answers" waits until every question has an answer and keeps the picks while paging.
+    func testThreeQuestionsPageInOneCardWithSingleMultiAndWrittenAnswers() {
         let app: XCUIApplication = launch("n2-question")
         XCTAssertTrue(app.staticTexts["Fill in the pending answers"].waitForExistence(timeout: 10))
+        // The fixture's live picture floats over the card's arrows: folded first, so the taps reach them.
+        let hidePicture: XCUIElement = app.buttons["Hide the live picture"]
+        if hidePicture.waitForExistence(timeout: 3) { hidePicture.tap() }
+        let counter: XCUIElement = app.staticTexts["1 / 3"]
+        XCTAssertTrue(counter.exists, "the count")
+        XCTAssertLessThan(counter.frame.height, 30, "the count stays on one line: \(counter.frame)")
         let submit: XCUIElement = app.buttons["ask.submit"]
-        XCTAssertFalse(submit.isEnabled, "nothing picked yet")
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch.tap()
-        XCTAssertTrue(submit.isEnabled)
-        XCTAssertEqual(submit.label, "Submit answer")
+        XCTAssertEqual(submit.label, "Submit answers")
+        XCTAssertFalse(submit.isEnabled, "nothing answered yet")
+        // Single select: the pick is the selected card, a second pick moves it.
+        let close: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch
+        let keep: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Keep them on")).firstMatch
+        keep.tap()
+        close.tap()
+        XCTAssertTrue(close.isSelected)
+        XCTAssertFalse(keep.isSelected, "one answer for a single-select question")
+        XCTAssertFalse(submit.isEnabled, "two questions still wait")
+        // Multi select (the third question): two picks, then one let go; both stay selected until then.
         app.buttons["Next ask"].tap()
-        let tuesday: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Tuesday afternoon (Recommended)")).firstMatch
-        XCTAssertTrue(tuesday.waitForExistence(timeout: 3))
-        tuesday.tap()
-        XCTAssertEqual(submit.label, "Submit 2 answers", "the pick of the first question is kept while paging")
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 3))
+        app.buttons["Next ask"].tap()
+        XCTAssertTrue(app.staticTexts["3 / 3"].waitForExistence(timeout: 3))
+        let memory: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "#1199")).firstMatch
+        let webhook: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "#1188")).firstMatch
+        XCTAssertTrue(memory.waitForExistence(timeout: 3))
+        memory.tap()
+        webhook.tap()
+        XCTAssertTrue(memory.isSelected && webhook.isSelected, "several options at once")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "question-card-multi"
+        shot.lifetime = .keepAlways
+        add(shot)
+        webhook.tap()
+        XCTAssertFalse(webhook.isSelected, "a second tap lets an option go")
+        XCTAssertFalse(submit.isEnabled, "the second question still waits")
+        // Paging back keeps what was picked.
+        app.buttons["Previous ask"].tap()
+        app.buttons["Previous ask"].tap()
+        XCTAssertTrue(app.staticTexts["1 / 3"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch.isSelected)
+        // Free text: the second question is answered in words, the last answer Submit waited for.
+        app.buttons["Next ask"].tap()
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 3))
+        let written: XCUIElement = app.descendants(matching: .any).matching(identifier: "ask.written").firstMatch
+        XCTAssertTrue(written.waitForExistence(timeout: 3))
+        written.tap()
+        written.typeText("Friday at noon")
+        XCTAssertTrue(submit.isEnabled, "every question has an answer")
+    }
+
+    /// Item 2001: at AX3, in Turkish and dark, the card's options grow with their words (nothing cut) and the count
+    /// stays on one line.
+    func testTheQuestionCardGrowsAtAX3InTurkishAndDark() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-question", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-colorScheme", "dark",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
+        ]
+        app.launch()
+        let counter: XCUIElement = app.staticTexts["1 / 3"]
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertLessThan(counter.frame.height, 60, "the count stays on one line at AX3: \(counter.frame)")
+        let options: XCUIElementQuery = app.buttons.matching(identifier: "ask.option")
+        XCTAssertTrue(options.firstMatch.waitForExistence(timeout: 5))
+        for index in 0..<options.count {
+            let option: XCUIElement = options.element(boundBy: index)
+            XCTAssertGreaterThanOrEqual(option.frame.height.rounded(), 44)
+            XCTAssertLessThanOrEqual(option.frame.maxX, app.windows.firstMatch.frame.maxX, "nothing pushed off the edge")
+        }
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "question-card-ax3-tr-dark"
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 
     func testSlashOpensTheCommandsPanelFilteredAsTheOwnerTypes() {
