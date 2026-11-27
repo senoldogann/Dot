@@ -8517,7 +8517,7 @@
       }
     },
     "Nothing found": {
-      "comment": "Home search: no bot, chat or message holds the words",
+      "comment": "Home search: no bot, chat, message or file under the chosen chip holds the words",
       "localizations": {
         "tr": {
           "stringUnit": {

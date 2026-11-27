@@ -385,7 +385,7 @@ struct ChatScreen: View {
         .task(id: thread) {
             // Opened from a find of the search: Find in chat on its word, at its message (once the chat has drawn).
             guard let find else { return }
-            try? await Task.sleep(for: .milliseconds(120))
+            do { try await Task.sleep(for: .milliseconds(120)) } catch { return }
             findSnippet = find.snippet
             findIndex = 0
             finding = find.word

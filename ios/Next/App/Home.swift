@@ -515,7 +515,7 @@ struct HomeResults: View {
             if loading {
                 ProgressView().frame(maxWidth: .infinity).padding(Space.l)
             } else if finds.isEmpty {
-                Text(String(localized: "Nothing found", comment: "Home search: no bot, chat or message holds the words"))
+                Text(String(localized: "Nothing found", comment: "Home search: no bot, chat, message or file under the chosen chip holds the words"))
                     .textRole(.body).foregroundStyle(Tone.secondary).frame(maxWidth: .infinity).padding(Space.xl)
                     .accessibilityIdentifier("search.nothing")
             }
