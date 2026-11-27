@@ -208,13 +208,13 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                         await expect(watch).to_have_attribute("aria-current", "true")
                         await expect(scout).not_to_have_attribute("aria-current", "true")
                         await items.filter(has_text="All bots").click()
-                        # The page of every agent is Settings › Agents since item 1336: the sidebar is the settings' nav
+                        # The page of every bot is Settings › Bots since item 1336: the sidebar is the settings' nav
                         # while it is open, with Bots its marked row, and Back to chats gives the chats' sidebar back.
                         await expect(page).to_have_url(f"{address}/#/settings/agents")
                         settings: Locator = page.get_by_role("navigation", name="Settings")
                         await expect(settings.locator("[aria-current='page'] .snav-label")).to_have_text("Bots")
                         await settings.get_by_role("link", name="Back to chats").click()
-                        # An agent renamed from a page shows its new name at once, in the menu and on its chats' rows.
+                        # A bot renamed from a page shows its new name at once, in the menu and on its chats' rows.
                         await page.evaluate(
                             "async (id) => { const { api } = await import('/js/api.js');"
                             " await api.put(`/agents/${id}`, { name: 'Scout Two', role: 'Looks things up',"
@@ -227,7 +227,7 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                         await expect(items.filter(has_text="Scout Two")).to_be_visible()
                         await page.keyboard.press("Escape")
                         await page.close()
-                    # An agent deleted from its page leaves the menu at once; Dot stays (item 1245), All agents too.
+                    # A bot deleted from its page leaves the menu at once; Dot stays (item 1245), All bots too.
                     page = await _open_sidebar(browser, address, 1280, "light")
                     for agent_id in agents.values():
                         await page.evaluate(
