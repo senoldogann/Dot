@@ -717,6 +717,7 @@ const CORE = {
   // The lines of a conversation's messages (messages.js).
   "messages.pending": "Pending",
   "messages.starting": "Starting…",
+  "messages.routine": "Routine",
   "messages.scheduleRepeating": "on a repeating schedule",
   "messages.scheduleLabel": "Schedule made: {name}, {when}. Opens it on the Schedules page.",
   "messages.scheduleLabelBare": "Schedule made: {name}. Opens it on the Schedules page.",
@@ -998,6 +999,13 @@ const CORE = {
   "speed.stageModel": "Model calls, by model and purpose",
   "speed.stageFirstToken": "First word of a step's reply",
   "speed.stageTool": "Tool calls, their running time",
+  // A change opened in the Changes tab (changes.js, item 2017).
+  "change.formatted": "Formatted",
+  "change.formattedHint": "Show the Markdown formatted",
+  "change.source": "Source",
+  "change.sourceHint": "Show the Markdown as it is written",
+  "change.view": "View",
+  "change.noDiff": "This file has no diff to show.",
 };
 
 /** Every English key: the core words here, those of the screens in views/ and those of the other modules. */

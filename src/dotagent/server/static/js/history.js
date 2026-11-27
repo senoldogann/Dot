@@ -8,8 +8,9 @@ import { compact, el, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
-  needsAside, outcomeOf, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+  needsAside, outcomeOf, routineMessage, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { chatCardRenderer, POST_DRAFT_SETTLED } from "./chatcards.js";
+import { ROUTINE_SOURCES } from "./routinewords.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
@@ -492,7 +493,9 @@ function turn(past, editFromHereOf, known, signal, reactions) {
         ? backgroundNote(past.goal)
         : past.source === WORK_ORDER_SOURCE
           ? workOrderNote(past.goal)
-          : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
+          : ROUTINE_SOURCES.has(past.source)
+            ? routineMessage({ goal: past.goal, threadId: past.thread_id })
+            : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
   const element = el("section", { class: ended ? "turn" : "turn turn-working" }, asked, ops, answer);
   if (ended) {
     if (known !== undefined) {

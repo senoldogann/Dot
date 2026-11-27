@@ -440,3 +440,34 @@ async def test_messages_only_shows_no_step_a_failed_one_neither(own_home: Path, 
                 await page.close()
             finally:
                 await browser.close()
+
+
+async def test_a_routines_message_is_one_compact_row_that_unfolds_its_words(own_home: Path, tmp_path: Path) -> None:
+    """Owner 2026-11-27: the message a schedule, a watcher or a hook sent into a chat is one compact row, "Routine" and
+    its title, never the owner's bubble; a press unfolds the whole message. On a desktop's and a phone's width."""
+    goal: str = "A new mail from the bank came. Read it and tell me if it needs an answer today."
+    async with _served(own_home, _SILENT_TURNS) as (manager, address, port):
+        run: RunRecord = await manager.start(
+            goal, "task", SCRIPTED_MODEL, None, "watcher", None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(30):
+            assert (await manager.wait(run.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+            try:
+                for width in (1440, 390):
+                    page: Page = await _open(browser, port, address, run.id, "messages", width)
+                    row: Locator = page.locator(".routine")
+                    await expect(row.locator(".routine-label")).to_have_text("Routine")
+                    await expect(row.locator(".routine-title")).to_have_text("A new mail from the bank came")
+                    await expect(page.locator(".bubble.user")).to_have_count(0)
+                    head: Locator = row.locator(".routine-head")
+                    box = await head.bounding_box()
+                    assert box is not None and box["height"] >= 44, box
+                    await expect(row.locator(".routine-prompt")).to_be_hidden()
+                    await head.click()
+                    await expect(row.locator(".routine-prompt")).to_have_text(goal)
+                    await page.screenshot(path=str(tmp_path / f"routine-{width}.png"))
+                    await page.close()
+            finally:
+                await browser.close()

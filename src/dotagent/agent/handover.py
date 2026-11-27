@@ -188,6 +188,7 @@ async def tool_context(
         tainted=lambda: agent.gate.tainted,
         ever_tainted=lambda: agent.gate.ever_tainted,
         owner_words=owner_words,
+        unattended=agent.gate.unattended,
     )
 
 

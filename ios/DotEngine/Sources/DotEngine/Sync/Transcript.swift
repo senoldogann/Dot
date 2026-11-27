@@ -201,6 +201,9 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     /// The model's thinking of a step: `live` while it is being written.
     case thought(id: String, text: String, live: Bool)
     case tool(ToolEntry)
+    /// The message a routine sent into the chat (a schedule's, a watcher's or a hook's run, owner 2026-11-27): one compact
+    /// row, "Routine · <its title>", whose chevron shows the whole `prompt`; never an owner's bubble.
+    case automation(id: String, title: String, prompt: String)
     /// The helpers a run started, each with its current step (plan §18).
     case helpers(id: String, runId: String, helpers: [HelperView])
     /// The run's plan as a checklist, as it stands now.
@@ -215,7 +218,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .owner(let id, _, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
-            .limit(let id, _):
+            .limit(let id, _), .automation(let id, _, _):
             id
         case .tool(let entry): entry.id
         case .decision(let anchor): anchor.id
@@ -267,7 +270,7 @@ private func builtRuns(of chat: ChatProjection, streaming: Bool, context: Transc
         BuiltRun(
             rows: runItems(
                 run, timeline: chat.runs[run.id], writing: streaming ? chat.writing[run.id] : nil, thinking: streaming ? chat.thinking[run.id] : nil,
-                helpers: helpers.filter { $0.parentRunId == run.id }, context: context),
+                helpers: helpers.filter { $0.parentRunId == run.id }, schedules: chat.view?.schedules ?? [], context: context),
             finished: !run.isActive || hasEnded(chat.runs[run.id]))
     }
 }
@@ -366,11 +369,30 @@ private func hasEnded(_ timeline: RunTimeline?) -> Bool {
     timeline?.events.contains { $0.kind == "run_finished" } ?? false
 }
 
+/// The sources of the runs a routine started, not the owner: a schedule's firing (a hook's too) and a watcher's.
+let routineSources: Set<String> = ["schedule", "watcher"]
+
+/// The title of a routine's message: the name of the chat's schedule that sends these words, else of its one schedule,
+/// else the words' first sentence (`shortTitle`). Pure.
+func routineTitle(goal: String, schedules: [ChatSchedule]) -> String {
+    if let named = schedules.first(where: { $0.goal == goal }) ?? (schedules.count == 1 ? schedules.first : nil), !named.name.isEmpty {
+        return named.name
+    }
+    return shortTitle(goal)
+}
+
 private func runItems(
-    _ run: RunRecord, timeline: RunTimeline?, writing: String?, thinking: LiveThought?, helpers: [HelperView], context: TranscriptContext) -> [Built] {
-    // A run a helper's report started (item 1351) begins with Dot's note, not the owner's words.
+    _ run: RunRecord, timeline: RunTimeline?, writing: String?, thinking: LiveThought?, helpers: [HelperView], schedules: [ChatSchedule],
+    context: TranscriptContext
+) -> [Built] {
+    // A run a helper's report started (item 1351) begins with Dot's note, not the owner's words; one a routine started
+    // with the routine's row.
     let opening: TranscriptItem =
-        run.source == "helper_report" ? .note(id: "u:\(run.id)", text: run.goal) : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil, files: [])
+        run.source == "helper_report"
+        ? .note(id: "u:\(run.id)", text: run.goal)
+        : routineSources.contains(run.source)
+            ? .automation(id: "u:\(run.id)", title: routineTitle(goal: run.goal, schedules: schedules), prompt: run.goal)
+            : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil, files: [])
     // A run that follows the owner's reaction (item 844) draws no message of the owner's: the reaction stands on its message.
     // Nor does an agent's first meeting (item 993, source `welcome`): its goal is Dot's words to the agent, and the agent
     // speaks first (item 1881).

@@ -704,6 +704,7 @@ const CORE = {
   // The lines of a conversation's messages (messages.js).
   "messages.pending": "Bekliyor",
   "messages.starting": "Başlıyor…",
+  "messages.routine": "Rutin",
   "messages.scheduleRepeating": "tekrarlanan bir zamanlamayla",
   "messages.scheduleLabel": "Zamanlama kuruldu: {name}, {when}. Zamanlamalar sayfasında açar.",
   "messages.scheduleLabelBare": "Zamanlama kuruldu: {name}. Zamanlamalar sayfasında açar.",
@@ -972,6 +973,13 @@ const CORE = {
   "speed.stageModel": "Model çağrıları, model ve amaca göre",
   "speed.stageFirstToken": "Adım yanıtının ilk kelimesi",
   "speed.stageTool": "Araç çağrıları, çalışma süreleri",
+  // A change opened in the Changes tab (changes.js, item 2017).
+  "change.formatted": "Biçimli",
+  "change.formattedHint": "Markdown'ı biçimlenmiş göster",
+  "change.source": "Kaynak",
+  "change.sourceHint": "Markdown'ı yazıldığı gibi göster",
+  "change.view": "Görünüm",
+  "change.noDiff": "Bu dosyanın gösterilecek bir farkı yok.",
 };
 
 /** @type {Record<keyof typeof import("./en.js").EN, string>} */

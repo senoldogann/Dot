@@ -26,6 +26,7 @@ from dotagent.agent.manager import RunManager
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.config import AppConfig, load_default_config
+from dotagent.core.errors import ConfigError
 from dotagent.core.paths import vapid_path, workspace_dir
 from dotagent.evals.runner import eval_config, eval_environment, scratch_home
 from dotagent.runtime import Runtime, close_runtime, open_runtime
@@ -59,11 +60,20 @@ async def login_env() -> dict[str, str]:
     return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
 
 
+def _config(sandbox: bool, unattended: bool) -> AppConfig:
+    base: AppConfig = eval_config(load_default_config())
+    return base.model_copy(
+        update={"shell": base.shell.model_copy(update={"sandbox": sandbox, "sandbox_unattended": unattended})}
+    )
+
+
 @asynccontextmanager
 async def _daemon(login_env: dict[str, str], sandbox: bool) -> AsyncIterator[tuple[Runtime, str]]:
-    """The daemon in the home of the environment, its sandbox on or off at start, served at the address it yields."""
-    base: AppConfig = eval_config(load_default_config())
-    config: AppConfig = base.model_copy(update={"shell": base.shell.model_copy(update={"sandbox": sandbox})})
+    """The daemon in the home of the environment, its sandbox on or off at start, served at the address it yields. The
+    runs nobody started (item 2016) keep it as the switch says, so that a start with it off checks no profile, as
+    before; :func:`test_a_start_that_keeps_the_runs_nobody_started_in_a_sandbox_that_does_not_start_is_refused` holds
+    the start with ``[shell] sandbox_unattended`` on."""
+    config: AppConfig = _config(sandbox, sandbox)
     runtime: Runtime = await open_runtime(config, login_env)
     try:
         manager: RunManager = RunManager(runtime)
@@ -198,6 +208,17 @@ async def test_a_sandbox_that_does_not_start_is_not_switched_on(
                     encoding="utf-8"
                 )
                 assert KEY_HEAD in await _read_key(run)
+
+
+async def test_a_start_that_keeps_the_runs_nobody_started_in_a_sandbox_that_does_not_start_is_refused(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 2016: with the owner's sandbox off, the runs nobody started still keep it, so a start whose sandbox does not
+    start stops there rather than running them without it."""
+    with scratch_home() as home, eval_environment(home, {}):
+        monkeypatch.setattr(dotagent.policy.sandbox, "SANDBOX_EXEC", str(home / "no-sandbox-exec"))
+        with pytest.raises(ConfigError, match="cannot start"):
+            await open_runtime(_config(False, True), login_env)
 
 
 @pytest.mark.browser
