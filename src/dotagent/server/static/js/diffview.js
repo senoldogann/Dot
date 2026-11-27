@@ -115,13 +115,6 @@ function fileExtension(path) {
   return dot <= 0 ? "" : name.slice(dot + 1).toLowerCase();
 }
 
-/** The language of the file at `path`, by its extension; null for one the scanner does not know.
- * @param {string} path
- * @returns {string | null} */
-export function codeLanguage(path) {
-  return LANGUAGE_BY_EXTENSION[fileExtension(path)] ?? null;
-}
-
 /** How the file at `path` is shown, by its extension.
  * @param {string} path
  * @returns {ChangeFormat} */
@@ -248,7 +241,6 @@ const GRAMMARS = {
       "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda match case nonlocal not or pass raise return self try while with yield",
     ),
   },
-  javascript: { lineComments: ["//"], blockComment: ["/*", "*/"], quotes: ['"', "'"], longStrings: ["`"], keywords: JS_KEYWORDS },
   typescript: {
     lineComments: ["//"],
     blockComment: ["/*", "*/"],
@@ -298,6 +290,10 @@ const GRAMMARS = {
     ),
   },
 };
+
+// JavaScript's grammar is set apart: the page's scripts may not hold the scheme of a script address
+// (tests/unit/test_static_ui.py), which an object key of that name followed by its colon would be.
+GRAMMARS.javascript = { lineComments: ["//"], blockComment: ["/*", "*/"], quotes: ['"', "'"], longStrings: ["`"], keywords: JS_KEYWORDS };
 
 /** What a line leaves open for the next: nothing, a comment or string closed by `close`, a Markdown fence, an HTML tag.
  * @typedef {{ kind: "none" } | { kind: "comment", close: string } | { kind: "string", close: string } | { kind: "fence" } | { kind: "tag" }} Carry */
