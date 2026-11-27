@@ -1001,7 +1001,8 @@ async def _fit_context(
                 agent.run.id, "compacted", _compaction_event(compaction, len(head), ledger, before, estimated), True
             )
     if current != history:
-        await agent.runtime.store.replace_messages(agent.run.thread_id, current)
+        # Only what changed is written when the history kept its length (item 2005): an old result shortened.
+        await agent.runtime.store.rewrite_messages(agent.run.thread_id, history, current)
     return current, estimated, ledger
 
 
