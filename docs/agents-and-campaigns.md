@@ -16,14 +16,14 @@ wherever the bot shows, and until you choose one the shape and colour its id's h
 /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
 for every browser: its face and **Change**, which opens the picker and Save). **Bots** in the sidebar lists Dot first and then your bots, each with its newest chat; **New
 bot** opens the editor; a bot's page greets with its face and role, takes a message for it ("Message Scout") and
-keeps Edit and Delete in the bar, and under its box lists its schedules and what it learned (item 1266: the folds of
+keeps Edit and Delete in the bar, and under its box lists its routines and what it learned (item 1266: the folds of
 its chats, its actions, its orders and its messages left the page). A bot is one conversation (item 1233, the owner's word of
 2026-11-19 after Grok Bot, whose bots are each one ongoing chat: "a bot has one purpose, and its chat is used all the
 time"): its home chat is the newest of the chats that are its own — each chat a message to it reached, which the daemon
 binds to it (`threads.agent_id`), staying its own whichever run comes last in it, a message you send there going to
 that bot alone — or, for a bot the owner chatted with before that binding existed, the newest chat of yours with
 it, whose latest run is the bot's (the daemon names it, `home`
-in `GET /api/agents` and `GET /api/agents/{id}`, not one a schedule, a watcher, Dot's initiative, a lead's work order
+in `GET /api/agents` and `GET /api/agents/{id}`, not one a routine, a watcher, Dot's initiative, a lead's work order
 or the bots' work among themselves started, nor a team's or a campaign's), its row in the
 bots' menu of the sidebar opens that chat, and its page's box goes on in it
 (item 898): to the run at work while there is one, queued or steered as Settings › General › Messages says, and the
@@ -33,7 +33,7 @@ it starts the next message afresh (the way back hides until then); that chat is 
 from there on.
 Chats deleted in the sidebar may take the conversation with them: the menu's row and the open page then name the one left. With no chat yet, the row opens
 the page, whose first message starts the conversation. In a chat with a bot, its name in the bar opens its page
-(item 1234), where its role, schedules and what it learned are. The box of that page has the home's Mode, Model, Reasoning and Options
+(item 1234), where its role, routines and what it learned are. The box of that page has the home's Mode, Model, Reasoning and Options
 pickers (item 426), starting from the bot's own: its model, its reasoning level and its approvals, not what this
 browser has chosen for the home's box; the mode starts on Auto, as the home's does, the message's words settling it, and
 `/auto`, `/task`, `/chat` and `/research` name one (item 513); the mode, model, reasoning level and approvals chosen
@@ -58,9 +58,9 @@ message, and carries the bot's id (item 553). Ask the delegated run to end with 
 command or check it ran and the answer. A report without one, or with one that holds no check (a word or two,
 "none"), is marked as a claim (item 1065), so the sender does not close a plan
 step on trust alone. The run's page names the bot in the bar's breadcrumb, with its badge, the name a link to its page (items 1234 and 1329); its rows in
-the sidebar wear the badge (item 1327) and those on the home's Today strip the face. A schedule can run as one of your bots (its **Bot** in Settings › Scheduled tasks, item
+the sidebar wear the badge (item 1327) and those on the home's Today strip the face. A routine can run as one of your bots (its **Bot** in Settings › Scheduled tasks, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting a bot leaves its chats, its lessons and its
-learned skills to Dot, and switches its schedules off ("switched off: its agent was deleted"), as Dot's with no bot
+learned skills to Dot, and switches its routines off ("switched off: its agent was deleted"), as Dot's with no bot
 named, so that none goes on firing with every tool; one you switch on again runs as Dot, or as the bot you then pick
 in its form. The dialog says how many of them it switches off: the ones on. A message you queued for it goes with it
 (item 899): it would start as Dot. No bot takes Dot's name, made by you or by a run, nor is a run's bot made with
@@ -69,10 +69,10 @@ tools, its model, what it never does and its instructions, not its name and role
 as the page's heading, as the tab does ("Scout · Bots · Dot"), and holds one **…** (item 993) with **Edit**,
 **Export**, **Pause** (or **Resume**) and **Delete**. Edit opens the editor at the top of the page, not
 where the greeting stood. **Pause** (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the
-bot's schedules from starting anything by themselves until **Resume**: the list and the page say "Paused", and its
-schedules' rows "<name> is paused" on their one line (see [Memory and schedules](memory-and-schedules.md)). What you send the bot, **Run
-now** of one of its schedules and the messages of other bots still reach it, and runs already working go on, each with
-its Stop. Saving the bot in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
+bot's routines from starting anything by themselves until **Resume**: the list and the page say "Paused", and its
+routines' rows "<name> is paused" on their one line (see [Memory and schedules](memory-and-schedules.md)). What you send the bot, **Run
+now** of one of its routines and the messages of other bots still reach it, and runs already working go on, each with
+its Stop. Saving the bot in the editor, or a restart, keeps the pause; Dot is paused by switching its routines off.
 
 The Bots tab holds **Your bots**, with its count, and under it **Add ready-made bots**, which shows the teams or
 the single bots, one of the two at a time (**Teams** first; the one chosen last while the app is open); **Your
@@ -89,7 +89,7 @@ A bot can start from a template (item 315). **Single bots** shows fourteen: Sale
 Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of Staff, Reviewer, Research Desk,
 Competitor Watch, Release QA, Copy Editor and Design Critic, each with
 its face, its role, what it needs of the Mac and
-the schedule it suggests. **Use template** makes the bot and opens its page; it is then a bot like any other, to
+the routine it suggests. **Use template** makes the bot and opens its page; it is then a bot like any other, to
 change in the editor. Eleven templates first ask what their bot's first run would otherwise have to ask you (item
 876), three questions at most (Sales Outbound: whom you sell to, what you offer them, where; Release QA: which
 address, which test account by its name, which steps must always work): your answers go at the end of the bot's
@@ -106,17 +106,17 @@ web, Dot's Chrome, files, memory, plans, pages and `draft_message`, none of whic
 Send pressed on a web page is an external send, under your approvals. Copy Editor names the same without the web and
 Chrome. Chief of Staff and Account Health add `apple_script`, the way into Mail and Calendar. Expense Manager adds it
 with `shell` for the folders the receipts sit in; Bug Reproduction and Reviewer run things, so they name the shell and
-the terminal's tools, and the Reviewer names no web at all. Ten templates suggest a schedule (item 464): Sales Outbound
+the terminal's tools, and the Reviewer names no web at all. Ten templates suggest a routine (item 464): Sales Outbound
 and Account Health on weekdays at 9:00 and 8:30, Chief of Staff on weekdays at 7:30, Paid Media every day at 8:00,
 Talent Scout on Mondays at 10:00, Product Performance and Competitor Watch on Mondays at 9:00 and 8:00, and Expense
 Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers a switch, **Also add its
-schedule; you switch it on in Settings › Scheduled tasks after reading its goal**: on, **Use template** makes the bot and a
-schedule of it with the template's time (in your time zone) and its goal, the whole goal of one run, which the bot's
-instructions then guide; the schedule is added switched off, so nothing runs before you have read what it will do, and a
-schedule that could not be added leaves the bot made and says why. The switch is for that one Use, not a setting: the
-card is drawn with it off again. A bot's page lists the schedules its runs run as under **Schedules**, each with its
+routine; you switch it on in Settings › Scheduled tasks after reading its goal**: on, **Use template** makes the bot and a
+routine of it with the template's time (in your time zone) and its goal, the whole goal of one run, which the bot's
+instructions then guide; the routine is added switched off, so nothing runs before you have read what it will do, and a
+routine that could not be added leaves the bot made and says why. The switch is for that one Use, not a setting: the
+card is drawn with it off again. A bot's page lists the routines its runs run as under **Routines**, each with its
 goal in full, when it runs and its switch, and **Edit** in Settings › Scheduled tasks; a bot with the name of a template that
-suggests a schedule, and without that schedule (made before, kept by Use team, or its schedule deleted), is offered it
+suggests a routine, and without that routine (made before, kept by Use team, or its routine deleted), is offered it
 there, **Suggested by its template** with **Add it**, which adds it switched off (item 722). A bot's page has
 **Export** in its **…**: a file `<name>.dot-agent.json` with the bot's name, role, instructions, what it never does,
 model, reasoning level, approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An
@@ -125,9 +125,9 @@ Dot holds (any value of the home's `.env`, and a key the daemon has read from th
 password by its form, as the masking of secrets finds them. **Import a bot**, under the "…" of the Bots page, makes
 the same bot from such a file, in this home or another, and opens it; a file that names a tool this home lacks is
 refused with the tool's name.
-The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one that suggests no schedule, and its
+The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one that suggests no routine, and its
 `questions`), `POST /api/agent-templates/{id}/use` (with `answers`, in the questions' order, 500 characters each), `GET /api/agents/{id}/export` and `POST /api/agents/import` (422 for Dot, for a secret,
-and for a file that is not a bot's or names tools not here); a template's schedule is `POST /api/schedules` with
+and for a file that is not a bot's or names tools not here); a template's routine is `POST /api/schedules` with
 `"enabled": false`.
 
 **Teams** (item 504) shows four teams, each a few templates whose bots work side by side: the Content team (Research
@@ -140,10 +140,10 @@ that names its tools without `message_agent` is given it, so that it can hand it
 says so; a team one of whose bots this home cannot make (a tool it lacks) makes none of them and says why. It then
 makes the team itself, a record under **Your teams** (item 610, below); used again, it finds that record, whatever you
 have named it since, and brings back a bot it lacks (one you took out of the team, or deleted) at its end, and the
-toast says which; the card of a ready team you have says **In your teams**. A team whose bots suggest schedules offers
-**Also add their schedules**, switched off, for every bot of the team: the ones it makes and the ones of yours it
+toast says which; the card of a ready team you have says **In your teams**. A team whose bots suggest routines offers
+**Also add their routines**, switched off, for every bot of the team: the ones it makes and the ones of yours it
 keeps (item 722: those were left without, and the switch read as if it had not taken), but for one that has that
-schedule already (its bot and its goal), so that a second Use adds none twice; the toast says how many were added and
+routine already (its bot and its goal), so that a second Use adds none twice; the toast says how many were added and
 which bots had theirs. Every template names `message_agent` beside
 `delegate`, and a member's run is told its team (item 512): the prompt's Team section says "You are in the Growth team",
 lists its teammates first, each bot with the team it is in, and says that a part a bot's role fits goes to that
@@ -229,7 +229,7 @@ of what a role needs), it names the actions the bot may use that none of them ca
 run has (finishing, asking) and `message_agent`, its way to its team. An action a role never needs is a way for the
 bot to go astray, so the fold named it and `POST /api/agents/{id}/trim-tools` took them away (422 before three runs
 ended, and when nothing would go or nothing would be left). The page's fold is gone (item 1266): `usage` gives
-`window`, `runs`, `tokens`, `newest`, `calls`, `enough` and `unused`, and the page keeps its schedules and what it
+`window`, `runs`, `tokens`, `newest`, `calls`, `enough` and `unused`, and the page keeps its routines and what it
 learned.
 
 **How its work went** (item 1066), `work` of `GET /api/agents/{id}`, reads how the work orders went rather than how much the
@@ -259,7 +259,7 @@ what they gave. So "go and help the bot of the Engineer team" is a run that find
 and sends it what it needs with `message_agent`. The chats know of each other too (item 953, the owner's ask of 2026-11-03,
 as another app's threads do): `chats` lists the chats of this Mac, yours, the bots' and Dot's own (not a helper's, which
 its parent's chat shows), the newest activity first, or those whose titles hold the words given, each with its id,
-whose it is (yours, a bot's by its name, Dot's own work, a schedule's, a watcher's, iMessage's) and where it stands
+whose it is (yours, a bot's by its name, Dot's own work, a routine's, a watcher's, iMessage's) and where it stands
 (at work, waiting for you, done, failed) and when it last moved; `read_chat` reads one by its id as `read_agent_chat`
 reads a bot's. So "what did we decide about the Gistsmith launch" is a run that finds that chat and reads it. When the
 words of the title are not the words of the thing, `search_chats` (item 1740) finds it by what was said: a full-text
@@ -280,7 +280,7 @@ the list) is a third party's words, and `chats` lists it in a fence too.
 **Hand-offs have a depth limit** (item 1741). Whatever one bot hands to another counts: a delegated run, a message to an
 bot, a work order's attempt, the lead's run woken by its bot's answer (a hand-back keeps the count of what it reads,
 it does not begin again) and a thing on Dot's list that a run put there for its own initiative. Each is one hop further
-than the run it came from (`runs.hops`, set by Dot and never by a model), and a message of yours, a schedule's firing or
+than the run it came from (`runs.hops`, set by Dot and never by a model), and a message of yours, a routine's firing or
 a watcher's alert starts a chain at 0. Past `[agent] max_hops` (8): in yolo and free mode nothing is refused, the hand-off is made and you are told once; for
 a run that asks, the hand-off is not made, the run that asked is told and goes on, a thing on the list is let go with that
 reason and you are told, and otherwise you get one card, **Allow once** (the run's count goes back to 0) or **Stop**, on
