@@ -233,9 +233,10 @@ export function showMessagePicks(message, picks) {
  * the start of the run is not known; `href` leads to the run itself (null when the reader is there). `readNow` says the
  * answer has just come in, to be read aloud as it appears when Settings › General says so. `stoppedWords` are the words a
  * run the owner stopped had streamed and not finished: they stay as its answer, with a note that it was stopped.
- * `errored` says the run's end carried an error of the daemon's, whose words then stand under Details.
+ * `errored` says the run's end carried an error of the daemon's, whose words then stand under Details (true), or did not (false);
+ * null, the default, when the page does not know (a run read again), and the shape of the words tells (`runFailure`).
  */
-export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null, stoppedWords = "", errored = false }) {
+export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null, stoppedWords = "", errored = null }) {
   const outcome = OUTCOMES[status] ?? null;
   // A run the owner stopped has the harness's own words for a result ("The run was stopped."): they say nothing the note
   // under the words it had streamed does not, so those words stay and the note says it (item 23 of the 2026-11-26 review).
