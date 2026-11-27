@@ -45,6 +45,7 @@ from dotagent.core.paths import (
     ensure_layout,
     env_file_path,
     failsafe_path,
+    hooks_path,
     log_dir,
     mcp_sign_ins_dir,
     meetings_profile_dir,
@@ -359,7 +360,8 @@ def _phone(config: AppConfig) -> PhoneDesk | None:
 
 def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     """What the agent must neither read nor change: secrets and the lock of their file, the paired phones' keys' hashes
-    (item 670: a row written there would be a key the guard takes), what signing in to an MCP server
+    (item 670: a row written there would be a key the guard takes), the hooks' file and its lock (its secrets sign a
+    call that starts work), what signing in to an MCP server
     gave Dot (its tokens), the browser profiles (Dot's own, the Chrome of the user, and the one of its meetings, where
     Dot's own Google account is signed in: item 1138), the settings that decide what it
     may do (policy, rules, MCP servers), its own database and its copies (item 526: a copy is the whole database, and
@@ -382,6 +384,8 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         env_lock_path(env_file_path()),
         token_path(),
         phones_path(),
+        hooks_path(),
+        hooks_path().with_name(f"{hooks_path().name}.lock"),
         vapid_path(),
         mcp_sign_ins_dir(),
         browser_profile_dir(),

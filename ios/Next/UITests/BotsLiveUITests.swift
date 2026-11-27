@@ -7,12 +7,16 @@ import XCTest
 @MainActor
 final class BotsLiveUITests: XCTestCase {
     private func launch() throws -> XCUIApplication {
+        try launch(extra: ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"])
+    }
+
+    private func launch(extra: [String]) throws -> XCUIApplication {
         let environment: [String: String] = ProcessInfo.processInfo.environment
         guard let host = environment["DOTNEXT_E2E_HOST"], let key = environment["DOTNEXT_E2E_KEY"] else {
             throw XCTSkip("run by scripts/e2e_bots.sh against a throwaway daemon")
         }
         let app: XCUIApplication = XCUIApplication()
-        app.launchArguments = ["-DotNextScene", "home", "-DotNextHost", host, "-DotNextKey", key, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-DotNextScene", "home", "-DotNextHost", host, "-DotNextKey", key] + extra
         app.launch()
         return app
     }
@@ -222,5 +226,158 @@ final class BotsLiveUITests: XCTestCase {
         shot(app, "settings-sheet")
         app.buttons["settings.close"].tap()
         XCTAssertTrue(app.buttons["home.bot.dot"].waitForExistence(timeout: 10))
+    }
+
+    // MARK: A bot's work (items 87, 907, 908 on the phone; the daemon seeds Scribe with `--seed-work`)
+
+    /// Opens Scribe's profile from the home: its chat, then the pill in the header.
+    private func openScribeProfile(_ app: XCUIApplication) {
+        let scribe: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "home.bot.", "Scribe")).firstMatch
+        XCTAssertTrue(scribe.waitForExistence(timeout: 60), "Scribe, the seeded bot, on the home")
+        scribe.tap()
+        let pill: XCUIElement = app.buttons["botChat.pill"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 30), "Scribe's chat header")
+        pill.tap()
+        XCTAssertTrue(app.buttons["profile.workOrders"].waitForExistence(timeout: 20), "the profile's Work group")
+    }
+
+    private func waitForLabel(_ element: XCUIElement, containing text: String, timeout: TimeInterval) {
+        let expectation: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", text), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed, "\(element.identifier): \(element.label)")
+    }
+
+    /// Rows of one kind sit at the same left edge and width, and none is under the 44 pt hit floor or off the screen.
+    private func assertAligned(_ rows: [XCUIElement], in app: XCUIApplication, _ name: String) {
+        let window: CGRect = app.windows.firstMatch.frame
+        guard let first = rows.first else { return XCTFail("\(name): no rows") }
+        for row in rows {
+            XCTAssertEqual(row.frame.minX, first.frame.minX, accuracy: 1, "\(name): one left edge")
+            XCTAssertEqual(row.frame.width, first.frame.width, accuracy: 1, "\(name): one width")
+            XCTAssertGreaterThanOrEqual(row.frame.height, 44, "\(name): a hit target")
+            XCTAssertLessThanOrEqual(row.frame.maxX, window.maxX, "\(name): inside the screen")
+        }
+        XCTAssertEqual(first.frame.minX + first.frame.width / 2, window.midX, accuracy: 1, "\(name): equal insets left and right")
+    }
+
+    func testABotsWorkIsReadInItsProfileAndTheMenuPausesAndResumesIt() throws {
+        let app: XCUIApplication = try launch()
+        openScribeProfile(app)
+        let orders: XCUIElement = app.buttons["profile.workOrders"]
+        let objectives: XCUIElement = app.buttons["profile.objectives"]
+        let handoffs: XCUIElement = app.buttons["profile.handoffs"]
+        waitForLabel(orders, containing: "1 open", timeout: 15)
+        waitForLabel(objectives, containing: "1 active", timeout: 15)
+        waitForLabel(handoffs, containing: "2 today", timeout: 15)
+        assertAligned([orders, objectives, handoffs], in: app, "the Work rows")
+        XCTAssertLessThanOrEqual(abs(orders.frame.height - objectives.frame.height), 1, "rows of one kind are identical")
+        XCTAssertLessThanOrEqual(abs(objectives.frame.height - handoffs.frame.height), 1, "rows of one kind are identical")
+        shot(app, "work-profile")
+
+        // Work orders: the open one first, then the accepted one; a row opens to the brief and what done means.
+        orders.tap()
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "work.order")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertTrue(rows.element(boundBy: 0).label.contains("Draft the weekly note") && rows.element(boundBy: 0).label.contains("Handed out"), rows.element(boundBy: 0).label)
+        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Accepted"), rows.element(boundBy: 1).label)
+        XCTAssertTrue(app.staticTexts["Open"].exists && app.staticTexts["Finished"].exists, "the two sections")
+        assertAligned([rows.element(boundBy: 0), rows.element(boundBy: 1)], in: app, "work orders")
+        shot(app, "work-orders")
+        rows.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["Collect the week's highlights and write the note."].waitForExistence(timeout: 10), "the brief")
+        XCTAssertTrue(app.staticTexts["A note under 200 words, ready to send."].exists, "what done means")
+        shot(app, "work-order")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        // Objectives.
+        XCTAssertTrue(objectives.waitForExistence(timeout: 10))
+        objectives.tap()
+        let objective: XCUIElement = app.buttons["work.objective"]
+        XCTAssertTrue(objective.waitForExistence(timeout: 20))
+        XCTAssertTrue(objective.label.contains("Keep the weekly note short") && objective.label.contains("Active"), objective.label)
+        shot(app, "work-objectives")
+        objective.tap()
+        XCTAssertTrue(app.staticTexts["Under 200 words, every Friday."].waitForExistence(timeout: 10), "how progress is judged")
+        XCTAssertTrue(app.staticTexts["Draft this Friday's note"].exists, "the next step")
+        shot(app, "work-objective")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        // Hand-offs: what Dot asked of Scribe (received, answered) and what Scribe asked of Dot (sent, waiting).
+        XCTAssertTrue(handoffs.waitForExistence(timeout: 10))
+        handoffs.tap()
+        let hands: XCUIElementQuery = app.buttons.matching(identifier: "work.handoff")
+        XCTAssertTrue(hands.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertEqual(hands.count, 2)
+        XCTAssertTrue(hands.element(boundBy: 0).label.contains("Which topics fit this week?") && hands.element(boundBy: 0).label.contains("Reply"), hands.element(boundBy: 0).label)
+        XCTAssertTrue(hands.element(boundBy: 1).label.contains("Is the offsite date final?") && hands.element(boundBy: 1).label.contains("Waiting for a reply"), hands.element(boundBy: 1).label)
+        assertAligned([hands.element(boundBy: 0), hands.element(boundBy: 1)], in: app, "hand-offs")
+        shot(app, "work-handoffs")
+        hands.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["Launch, the offsite and the new price list."].waitForExistence(timeout: 10), "the reply")
+        shot(app, "work-handoff")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        // Pause and Resume in the profile's ⋯ menu; it ends paused, which the script reads on the daemon's side.
+        let menu: XCUIElement = app.buttons["profile.menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10), "the ⋯ menu of an agent's profile")
+        // A toolbar button's accessibility frame is 36 pt across (the glass around it is 44).
+        XCTAssertGreaterThanOrEqual(menu.frame.height, 36)
+        XCTAssertFalse(app.descendants(matching: .any)["profile.paused"].exists, "running")
+        menu.tap()
+        let pause: XCUIElement = app.buttons["profile.pause"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 10), "the menu opens with Pause bot")
+        pause.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["profile.paused"].waitForExistence(timeout: 20), "the paused notice")
+        shot(app, "work-paused")
+        menu.tap()
+        let resume: XCUIElement = app.buttons["profile.resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 10), "the menu opens with Resume bot")
+        XCTAssertFalse(app.buttons["profile.pause"].exists, "Pause becomes Resume")
+        resume.tap()
+        let gone: NSPredicate = NSPredicate(format: "exists == false")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: gone, object: app.descendants(matching: .any)["profile.paused"])], timeout: 20), .completed, "resumed")
+        menu.tap()
+        XCTAssertTrue(pause.waitForExistence(timeout: 10), "the menu opens with Pause bot again")
+        pause.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["profile.paused"].waitForExistence(timeout: 20), "paused again: the script reads it on the daemon")
+    }
+
+    /// Dark with Turkish words, and the largest accessibility size: the three pages keep every row inside the screen and
+    /// a hit target; the shots go to the result bundle for the report.
+    func testTheWorkPagesHoldInDarkTurkishAndAtTheLargestAccessibilitySize() throws {
+        let variants: [(String, [String])] = [
+            ("dark-tr", ["-colorScheme", "dark", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR"]),
+            ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]),
+        ]
+        for (name, extra) in variants {
+            let app: XCUIApplication = try launch(extra: extra)
+            openScribeProfile(app)
+            let window: CGRect = app.windows.firstMatch.frame
+            for id in ["profile.workOrders", "profile.objectives", "profile.handoffs"] {
+                let row: XCUIElement = app.buttons[id]
+                for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+                XCTAssertGreaterThanOrEqual(row.frame.height, 44, "\(name) \(id)")
+                XCTAssertLessThanOrEqual(row.frame.maxX, window.maxX, "\(name) \(id): inside the screen")
+            }
+            shot(app, "work-profile-\(name)")
+            for (id, rowId) in [("profile.workOrders", "work.order"), ("profile.objectives", "work.objective"), ("profile.handoffs", "work.handoff")] {
+                let entry: XCUIElement = app.buttons[id]
+                for _ in 0..<6 where !entry.isHittable { app.swipeUp() }
+                entry.tap()
+                let rows: XCUIElementQuery = app.buttons.matching(identifier: rowId)
+                XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20), "\(name) \(rowId)")
+                for index in 0..<rows.count {
+                    XCTAssertGreaterThanOrEqual(rows.element(boundBy: index).frame.height, 44, "\(name) \(rowId)")
+                    XCTAssertLessThanOrEqual(rows.element(boundBy: index).frame.maxX, window.maxX, "\(name) \(rowId): inside the screen")
+                }
+                shot(app, "\(rowId)-\(name)")
+                app.navigationBars.buttons.element(boundBy: 0).tap()
+                XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 10))
+            }
+            app.terminate()
+        }
     }
 }

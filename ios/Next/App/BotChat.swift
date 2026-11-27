@@ -287,7 +287,7 @@ func findMatches(_ items: [TranscriptItem], words: String) -> [String] {
 /// Whether an item, or an item a fold holds, has the words.
 private func holds(_ item: TranscriptItem, _ wanted: String) -> Bool {
     switch item {
-    case .owner(_, let text, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
+    case .owner(_, let text, _, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
     case .work(let fold): fold.items.contains { holds($0, wanted) }
     default: false
     }

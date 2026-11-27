@@ -306,7 +306,7 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
  * `options`, `head` (a row over the box that the page fills, hidden until it shows it),
  * `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs `watcher()` after
  * every change of the text, a clear among them, and returns what stops it; item 259), `clear()` (the text and the
- * files; the picks wait for `picks.sent()`), `pauseDraft()` and `resumeDraft()` (while the box holds what is not the
+ * files; the picks wait for `picks.sent()`), `takeWords()` and `giveBack(words)` (a send on its way), `pauseDraft()` and `resumeDraft()` (while the box holds what is not the
  * draft, a queued message being edited, item 376, the draft stays as it was) and `dispose()`.
  */
 export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: ownCommands, send, sendLabel, draftKey, listener, threadId = null }) {
@@ -326,6 +326,8 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
   const key = draftKey === null ? null : `${DRAFT_PREFIX}${draftKey}`;
 
   let drafting = true;
+  // The words a send on its way took from the box (`takeWords`), which the draft keeps until the send went or failed.
+  let taken = false;
 
   // What is typed besides a quote at the start (item 1972): a quote alone is no message.
   function typedWords() {
@@ -535,12 +537,36 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
     clear: () => {
       // A message was sent: what is still being heard is not for the next one.
       microphone?.abort();
+      // The words a send took went with it: the draft forgets them now.
+      if (taken) {
+        taken = false;
+        drafting = true;
+      }
       textarea.value = "";
       edited();
       wired.autosize();
       attachments.clear();
       // What the draft keeps now: nothing, or the picks a steer left for the next message.
       keep();
+    },
+    /** A send is on its way (item 1999): the words leave the box at once, as they will once it went, and the draft
+     * keeps them until `clear()`; returns them. `giveBack(words)` puts them back when the send did not go, before what
+     * was typed meanwhile. */
+    takeWords: () => {
+      const words = textarea.value;
+      taken = true;
+      drafting = false;
+      textarea.value = "";
+      edited();
+      wired.autosize();
+      return words;
+    },
+    giveBack: (words) => {
+      textarea.value = textarea.value.trim() === "" ? words : `${words}\n${textarea.value}`;
+      taken = false;
+      drafting = true;
+      edited();
+      wired.autosize();
     },
     pauseDraft: () => {
       drafting = false;

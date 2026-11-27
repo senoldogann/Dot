@@ -441,6 +441,22 @@ async def test_a_chat_keeps_its_limit_of_sessions_and_an_idle_session_is_closed(
         await terminals.aclose()
 
 
+async def test_a_session_whose_program_ended_leaves_room_for_another(runtime: Runtime) -> None:
+    """Item 1990: the limit counts programs that run. A short command left unread after its end kept its session, and
+    three of them refused a fourth for half an hour; the ended one stays to be read, its exit status with it."""
+    terminals: Terminals = Terminals(1, 60.0, runtime.shell_env)
+    try:
+        done: TerminalSession = await terminals.open("chat", "echo built", (), workspace_dir(), False, "run_test")
+        await asyncio.wait_for(done.finished.wait(), 10.0)
+        server: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), False, "run_test")
+        with pytest.raises(ToolInputError, match=f"1 terminal sessions running \\({server.id}\\)"):
+            await terminals.open("chat", "sleep 30", (), workspace_dir(), False, "run_test")
+        assert [session.id for session in terminals.sessions("chat")] == [done.id, server.id]
+        assert (await done.read(0.0)).strip() == "built" and await done.exit_code() == 0
+    finally:
+        await terminals.aclose()
+
+
 async def test_the_emergency_stop_closes_every_terminal_and_drops_what_waits_to_be_typed(runtime: Runtime) -> None:
     """Item 683: what a run sent a program that has not read it yet would be typed after the stop, and what it left
     running would go on; the stop closes every session of every chat."""

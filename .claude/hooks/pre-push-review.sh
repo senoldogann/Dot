@@ -101,15 +101,18 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   # A change under src/dotagent can alter what the model is told (a tool's description, a prompt), and then the checked-in
   # prompt surface must be written again with it (item 1971). Its test runs on macOS only, so a pull request's Linux jobs
   # never see a stale one and main went red twice in a day: it is checked here, in seconds, before the model review. The
-  # check reads the working tree, so it is made for the branch that is checked out.
-  if [[ -f "$repo_root/scripts/prompt_surface.py" ]] && git diff --name-only "$base..$local_sha" | grep -q '^src/dotagent/'; then
+  # check reads the working tree, so it is made for the branch that is checked out. A push of the surface or the first
+  # step's budget alone is checked too (item 1997).
+  if [[ -f "$repo_root/scripts/prompt_surface.py" ]] && git diff --name-only "$base..$local_sha" |
+    grep -qE '^(src/dotagent/|tests/fixtures/prompt_surface/|tests/smoke/test_context_budget\.py$)'; then
     if [[ "$(git rev-parse HEAD)" == "$local_sha" ]]; then
       # What is checked is the commit that is pushed: with uncommitted changes in what the render reads, a fixture written
       # and not committed would pass, and a source edit not committed would fail a commit that is fine.
-      if [[ -n "$(git status --porcelain -- src/dotagent scripts/prompt_surface.py tests/fixtures/prompt_surface)" ]]; then
-        echo "claude-review: push stopped; src/dotagent, scripts/prompt_surface.py or tests/fixtures/prompt_surface has" \
-          "changes that are not committed, so the prompt surface cannot be checked for what is pushed: commit or stash" \
-          "them first" >&2
+      if [[ -n "$(git status --porcelain -- src/dotagent scripts/prompt_surface.py tests/fixtures/prompt_surface \
+        tests/smoke/test_context_budget.py)" ]]; then
+        echo "claude-review: push stopped; src/dotagent, scripts/prompt_surface.py, tests/fixtures/prompt_surface or" \
+          "tests/smoke/test_context_budget.py has changes that are not committed, so the prompt surface and the first" \
+          "step's budget cannot be checked for what is pushed: commit or stash them first" >&2
         exit 1
       fi
       status=0
@@ -122,6 +125,26 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       elif ((status != 0)); then
         echo "claude-review: push stopped; the prompt surface could not be checked (exit $status): $surface" >&2
         exit 1
+      fi
+      # The first step's budget (item 1997): its test is a macOS smoke test a pull request never runs, and main went red
+      # on it four times in a day. The surface just checked is written from what the first step carries, so a change
+      # to it (or to the budget) is what can move the numbers; the test is run then, in its own throwaway home.
+      if git diff --name-only "$base..$local_sha" | grep -qE '^(tests/fixtures/prompt_surface/|tests/smoke/test_context_budget\.py$)'; then
+        scratch=$(mktemp -d)
+        trap 'rm -rf "$scratch"' EXIT
+        status=0
+        budget=$(DOT_HOME="$scratch/home" DOT_LOG_DIR="$scratch/logs" DOT_CHROME_DIR="$scratch/chrome" uv run pytest -q \
+          -p no:warnings -p no:cacheprovider \
+          "tests/smoke/test_context_budget.py::test_a_fresh_homes_first_step_stays_within_its_budget" 2>&1) || status=$?
+        rm -rf "$scratch"
+        trap - EXIT
+        if ((status != 0)); then
+          echo "claude-review: push stopped; the first step is over its budget, or its test failed (exit $status):" >&2
+          grep -E '^E +(AssertionError|assert )' <<<"$budget" >&2 || tail -n 20 <<<"$budget" >&2
+          echo "claude-review: take back what grew, or raise the budget in tests/smoke/test_context_budget.py with the" \
+            "measured reason, and push again" >&2
+          exit 1
+        fi
       fi
     else
       echo "claude-review: $local_ref is not checked out, so its prompt surface is not checked here" >&2

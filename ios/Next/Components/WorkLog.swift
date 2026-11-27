@@ -288,7 +288,7 @@ struct WorkFoldView: View {
     init(fold: WorkFold, row: @escaping (TranscriptItem) -> AnyView) {
         self.fold = fold
         self.row = row
-        _open = State(initialValue: fold.hasFailure)
+        _open = State(initialValue: fold.startsOpen)
     }
 
     var body: some View {

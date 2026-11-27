@@ -1,7 +1,7 @@
 // Files attached to a message: picked, dropped or pasted, uploaded at once, and listed with their state until the message goes.
 // A long text pasted goes as a file of its own (item 269), and a file listed opens beside the conversation once uploaded.
 
-import { api, blobUrl } from "./api.js";
+import { api, blobUrl, partialBlob, uploadFile } from "./api.js";
 import { clip, el, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { readsAsMarkdown } from "./markdown.js";
@@ -19,6 +19,10 @@ const FLIGHT_MS = 520;
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_MEDIA_BYTES = 200 * 1024 * 1024;
 // A video or a sound by its name when its type is empty or generic, as the daemon tells one (`_MEDIA_SUFFIXES`).
+const VIDEO_SUFFIX = /\.(mov|mp4|m4v|3gp|webm|mkv)$/i;
+// The most of a video's start read for its tile (its first frame and its length), and the longest side of the frame kept.
+const TILE_BYTES = 4 * 1024 * 1024;
+const FRAME_EDGE = 240;
 const MEDIA_SUFFIX = /\.(mov|mp4|m4v|3gp|webm|mkv|caf|m4a|mp3|aac|amr|wav)$/i;
 // A file above this size goes as the raw body of `PUT /attachments/stream`, written to disk as it arrives; a smaller
 // one as base64 in JSON, which every daemon takes.
@@ -66,6 +70,115 @@ export function goesStreamed(file) {
   return isMedia(file) || file.size > STREAM_FROM_BYTES;
 }
 
+/** Whether `file` is a video (not a sound): it stands as a tile with its first frame and its length (item 1992). */
+export function isVideo(file) {
+  return file.type.startsWith("video/") || (!file.type.startsWith("audio/") && VIDEO_SUFFIX.test(file.name));
+}
+
+/** A length as the tiles say it, on the phone too: "0:14", "12:03". */
+export function lengthWords(seconds) {
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+/**
+ * The first frame (a JPEG data URL) and the length in seconds of the video in `blob`, read by a `<video>` that is never
+ * shown; both `null` when the browser cannot read it (a codec it lacks, the index of the file past what was given).
+ */
+function videoFrame(blob) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.preload = "auto";
+    video.playsInline = true;
+    const done = (frame, length) => {
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      video.load();
+      resolve({ frame, length });
+    };
+    video.addEventListener("error", () => done(null, null));
+    video.addEventListener("loadedmetadata", () => {
+      video.currentTime = Number.isFinite(video.duration) ? Math.min(0.1, video.duration / 2) : 0;
+    });
+    video.addEventListener("seeked", () => {
+      const scale = Math.min(1, FRAME_EDGE / Math.max(video.videoWidth, video.videoHeight, 1));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      done(canvas.toDataURL("image/jpeg", 0.7), Number.isFinite(video.duration) ? video.duration : null);
+    });
+    video.src = url;
+  });
+}
+
+/** The play glyph, the length and the ring a video's tile wears over its picture; the ring fills as the file goes (0 to 1). */
+function tileOverlay() {
+  const play = el("span", { class: "media-play", "aria-hidden": "true" }, icon("play"));
+  const length = el("span", { class: "media-length", hidden: true });
+  const ring = el("span", { class: "media-ring", hidden: true, role: "progressbar", "aria-label": "Uploading" });
+  return { play, length, ring, nodes: [play, length, ring] };
+}
+
+function showLength(overlay, seconds) {
+  if (seconds !== null) {
+    overlay.length.textContent = lengthWords(seconds);
+    overlay.length.hidden = false;
+  }
+}
+
+/**
+ * Play `source` (a `blob:` address, or the promise of one) full screen over the page with the browser's controls, from a
+ * button that stays where it was: Escape, the × and a click outside close it, and the video stops (item 1992).
+ */
+function playVideo(name, source) {
+  const before = document.activeElement;
+  const video = el("video", { class: "player-video", controls: true, autoplay: true, playsinline: true, "aria-label": `Video ${name}` });
+  const status = el("p", { class: "player-status muted" }, "Loading…");
+  const close = el("button", { class: "btn ghost player-close", type: "button", "aria-label": "Close", onclick: () => finish() }, icon("x"));
+  const overlay = el("div", { class: "player-overlay", role: "dialog", "aria-modal": "true", "aria-label": `Video ${name}` }, close, status, video);
+  let url = null;
+  const keys = (event) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      finish();
+    }
+  };
+  function finish() {
+    document.removeEventListener("keydown", keys, true);
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    overlay.remove();
+    if (url !== null && typeof source !== "string") {
+      URL.revokeObjectURL(url);
+    }
+    if (before instanceof HTMLElement) {
+      before.focus();
+    }
+  }
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) {
+      finish();
+    }
+  });
+  document.addEventListener("keydown", keys, true);
+  document.body.append(overlay);
+  close.focus();
+  Promise.resolve(source).then(
+    (address) => {
+      url = address;
+      status.hidden = true;
+      video.src = address;
+    },
+    (error) => {
+      status.textContent = `The video could not be read: ${error.message}`;
+    },
+  );
+}
+
 function readBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -81,7 +194,7 @@ function readBase64(file) {
 /** The files a message carried that are no pictures, as chips (used by the timeline for sent messages); a chip shows
  * its file beside the conversation. Null when every file is a picture, which `sentPictures` shows. */
 export function sentFiles(files) {
-  const others = files.filter((file) => file.kind !== "image");
+  const others = files.filter((file) => file.kind !== "image" && file.kind !== "video");
   if (others.length === 0) {
     return null;
   }
@@ -167,11 +280,50 @@ function sentPicture(file) {
   return tile;
 }
 
-/** The pictures a message carried, side by side as small squares: they stand over the message, as a chat shows them.
- * Null when it carried none. */
+/** The first frame and the length of the video kept as attachment `id`, read from the start of its file; both `null` when
+ * they cannot be (the tile is then a plain one, which plays all the same). */
+async function readTile(id) {
+  try {
+    return await videoFrame(await partialBlob(`/attachments/${encodeURIComponent(id)}/media`, TILE_BYTES));
+  } catch {
+    return { frame: null, length: null };
+  }
+}
+
+/** One video a message carried: a tile of its first frame with a play glyph and its length, which plays it full screen (item
+ * 1992). The frame and the length are read from the start of the file the daemon keeps; when they cannot be, the tile is
+ * a plain one that plays all the same. */
+function sentVideo(file) {
+  const overlay = tileOverlay();
+  const picture = el("img", { class: "sent-picture-image", alt: "", hidden: true });
+  const tile = el(
+    "button",
+    {
+      class: "sent-picture sent-video",
+      type: "button",
+      title: `Play video ${file.name}`,
+      "aria-label": `Play video ${file.name}`,
+      dataset: { attachment: file.id, name: file.name },
+      onclick: () => playVideo(file.name, blobUrl(`/attachments/${encodeURIComponent(file.id)}/media`)),
+    },
+    picture,
+    ...overlay.nodes,
+  );
+  readTile(file.id).then(({ frame, length }) => {
+    if (frame !== null) {
+      picture.src = frame;
+      picture.hidden = false;
+    }
+    showLength(overlay, length);
+  });
+  return tile;
+}
+
+/** The pictures and videos a message carried, side by side as small squares: they stand over the message, as a chat
+ * shows them. Null when it carried none. */
 export function sentPictures(files) {
-  const pictures = files.filter((file) => file.kind === "image");
-  return pictures.length === 0 ? null : el("div", { class: "attach-list sent pictures" }, pictures.map(sentPicture));
+  const tiles = files.filter((file) => file.kind === "image" || file.kind === "video");
+  return tiles.length === 0 ? null : el("div", { class: "attach-list sent pictures" }, tiles.map((file) => (file.kind === "video" ? sentVideo(file) : sentPicture(file))));
 }
 
 /**
@@ -219,6 +371,11 @@ export function createAttachments({ dropTarget, input, onChange }) {
     entry.node.className = entry.picture ? `attach-chip ${state} picture` : `attach-chip ${state}`;
   }
 
+  // A video's tile plays it full screen: from the file on the page while it is there, else from the daemon's copy.
+  function playEntry(entry) {
+    playVideo(entry.name, entry.file !== null ? URL.createObjectURL(entry.file) : blobUrl(`/attachments/${encodeURIComponent(entry.id)}/media`));
+  }
+
   // The chip's file, uploaded, opens beside the conversation as a sent file's does.
   function opens(entry) {
     entry.open.dataset.attachment = entry.id;
@@ -238,19 +395,21 @@ export function createAttachments({ dropTarget, input, onChange }) {
   // A photo shows the picture itself, its name its tooltip; another file shows an icon, its name and its size. `preview`
   // is the picture's address once there is one.
   function chip(name, preview, status, entry) {
-    entry.picture = preview !== null || entry.kind === "image";
+    entry.picture = preview !== null || entry.kind === "image" || entry.kind === "video";
     entry.thumb = entry.picture ? el("img", { class: "attach-thumb", src: preview, alt: "" }) : icon("file");
+    entry.overlay = entry.kind === "video" ? tileOverlay() : null;
     entry.open = el(
       "button",
       {
         class: "attach-open",
         type: "button",
-        title: `Show ${name}`,
-        "aria-label": entry.picture ? `Show ${name}` : null,
+        title: entry.kind === "video" ? `Play video ${name}` : `Show ${name}`,
+        "aria-label": entry.kind === "video" ? `Play video ${name}` : entry.picture ? `Show ${name}` : null,
         disabled: true,
-        onclick: (event) => requestFile(event.currentTarget),
+        onclick: (event) => (entry.kind === "video" ? playEntry(entry) : requestFile(event.currentTarget)),
       },
       entry.thumb,
+      ...(entry.overlay === null ? [] : entry.overlay.nodes),
       entry.picture ? null : el("span", null, clip(name, NAME_CHARS)),
       entry.picture ? null : status,
     );
@@ -277,7 +436,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
         throw new Error(`larger than ${sizeLabel(limitOf(sent))}`);
       }
       const stored = goesStreamed(sent)
-        ? await api.put(`/attachments/stream?${new URLSearchParams({ name: sent.name, media_type: sent.type })}`, sent)
+        ? await uploadFile(`/attachments/stream?${new URLSearchParams({ name: sent.name, media_type: sent.type })}`, sent, (share) => ring(entry, share))
         : await api.post("/attachments", { name: sent.name, media_type: sent.type, data_b64: await readBase64(sent) });
       entry.id = stored.id;
       opens(entry);
@@ -293,15 +452,35 @@ export function createAttachments({ dropTarget, input, onChange }) {
     }
   }
 
+  // The ring of a video's tile fills with the share of the file sent, and goes when it is all there.
+  function ring(entry, share) {
+    if (entry.overlay === null) {
+      return;
+    }
+    entry.overlay.ring.hidden = share >= 1;
+    entry.overlay.ring.style.setProperty("--progress", String(share));
+    entry.overlay.ring.setAttribute("aria-valuenow", String(Math.round(share * 100)));
+  }
+
   // `file` listed and uploaded; `pasted` is the text it was made of (item 269), else null.
   function addOne(file, pasted) {
-    const kind = file.type.startsWith("image/") ? "image" : "file";
+    const kind = file.type.startsWith("image/") ? "image" : isVideo(file) ? "video" : "file";
     const preview = kind === "image" ? URL.createObjectURL(file) : null;
     const status = el("span", { class: "muted" }, "Uploading…");
     const entry = { file, id: null, name: file.name, size: file.size, kind, state: "uploading", preview, pasted, status, open: null, node: null, picture: false, thumb: null };
     entry.node = chip(file.name, preview, status, entry);
     entries.push(entry);
     list.append(entry.node);
+    if (entry.overlay !== null) {
+      // The tile is on show at once; its frame and its length come when the browser has read the start of the file.
+      ring(entry, 0);
+      videoFrame(file).then(({ frame, length }) => {
+        if (frame !== null) {
+          entry.thumb.src = frame;
+        }
+        showLength(entry.overlay, length);
+      });
+    }
     upload(entry);
   }
 
@@ -399,8 +578,16 @@ export function createAttachments({ dropTarget, input, onChange }) {
       const entry = { file: null, id, name, size, kind: kind ?? "file", state: "ready", preview: null, pasted: null, status, open: null, node: null, picture: false, thumb: null };
       entry.node = chip(name, null, status, entry);
       mark(entry, "ready");
-      // A draft's photo is read from the daemon again, to show itself where a file shows its name.
-      if (entry.picture) {
+      // A draft's video is read from the daemon again for its first frame and its length.
+      if (entry.kind === "video") {
+        readTile(id).then(({ frame, length }) => {
+          if (frame !== null) {
+            entry.thumb.src = frame;
+          }
+          showLength(entry.overlay, length);
+        });
+      } else if (entry.picture) {
+        // A draft's photo is read from the daemon again, to show itself where a file shows its name.
         blobUrl(`/attachments/${encodeURIComponent(id)}/image`).then(
           (url) => {
             // A chip taken away before its picture came lets the picture go at once.

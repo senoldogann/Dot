@@ -21,10 +21,10 @@ from dotagent.cli_commands import (
     ResumeCommand,
     RunCommand,
 )
-from dotagent.cli_handoff import DaemonLink, daemon_of_this_home, hand_run
+from dotagent.cli_handoff import DaemonLink, daemon_of_this_home, hand_run, in_a_new_chat
 from dotagent.cli_ui import RuntimeDesk, TerminalUi, UiOptions, print_result, read_line
 from dotagent.config import AppConfig, load_user_config
-from dotagent.core.errors import ConfigError, InvalidValueError
+from dotagent.core.errors import ConfigError, InvalidValueError, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.events import Subscription
 from dotagent.llm.types import Effort
@@ -224,6 +224,15 @@ async def cmd_run(command: RunCommand) -> int:
     return await run_here(config, command, goal, options)
 
 
+async def _chat_kept(runtime: Runtime, thread_id: str) -> bool:
+    """Whether the store keeps the chat ``thread_id``: the owner may have deleted it."""
+    try:
+        await runtime.store.get_thread(thread_id)
+    except NotFoundError:
+        return False
+    return True
+
+
 async def run_here(config: AppConfig, command: RunCommand, goal: str, options: UiOptions) -> int:
     """Carry out the goal of ``command`` in this process, its runtime and its run its own (no daemon of this home runs);
     0 when the run ended done."""
@@ -233,6 +242,8 @@ async def run_here(config: AppConfig, command: RunCommand, goal: str, options: U
     try:
         _say_left_out_servers(runtime)
         manager.leave_queues()
+        if command.review and command.thread is not None and not await _chat_kept(runtime, command.thread):
+            command = in_a_new_chat(command)
         ui: TerminalUi = TerminalUi(RuntimeDesk(runtime), runtime.config.server, options)
         run: RunRecord = (
             await follow_run(

@@ -216,13 +216,13 @@ final class SyncTests: XCTestCase {
         }
         let items: [TranscriptItem] = transcript(
             of: delivered.chats["thr_1"]!, pending: delivered.pending(in: "thr_1"), mode: .showAll, streaming: true, context: .none)
-        XCTAssertTrue(items.contains { if case .owner(_, "Also check the logs", .readsAfterStep) = $0 { true } else { false } })
+        XCTAssertTrue(items.contains { if case .owner(_, "Also check the logs", .readsAfterStep, _) = $0 { true } else { false } })
         daemon.say("run_1", "tool_result", ["call_id": .string("w1"), "ok": .bool(true)])
         let read: EngineSnapshot = try await snapshot(of: rig.store, "the step ended") {
             $0.chats["thr_1"]?.runs["run_1"]?.events.contains { $0.kind == "tool_result" } == true
         }
         let after: [TranscriptItem] = transcript(of: read.chats["thr_1"]!, pending: [], mode: .showAll, streaming: true, context: .none)
-        XCTAssertTrue(after.contains { if case .owner(_, "Also check the logs", nil) = $0 { true } else { false } })
+        XCTAssertTrue(after.contains { if case .owner(_, "Also check the logs", nil, _) = $0 { true } else { false } })
     }
 
     // MARK: Plan §9 paths
@@ -379,7 +379,7 @@ final class SyncTests: XCTestCase {
             $0.outbox.isEmpty && $0.accepted.isEmpty && $0.chats["thr_1"]?.view?.runs.contains { $0.goal == "And add it to my calendar" } == true
         }
         let items: [TranscriptItem] = transcript(of: shown.chats["thr_1"]!, pending: shown.pending(in: "thr_1"), mode: .showAll, streaming: true, context: .none)
-        XCTAssertEqual(items.filter { if case .owner(_, "And add it to my calendar", _) = $0 { true } else { false } }.count, 1, "shown once")
+        XCTAssertEqual(items.filter { if case .owner(_, "And add it to my calendar", _, _) = $0 { true } else { false } }.count, 1, "shown once")
     }
 
     // MARK: The cache

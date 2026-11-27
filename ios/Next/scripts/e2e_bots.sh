@@ -4,10 +4,14 @@
 # the settings sheet on the simulator, and this script reads on the daemon's side that the agent was made and greeted.
 # Nothing touches the owner's Dot; no model is called. The test's shots land in <derived data>/bots.xcresult.
 #
-# Usage: ios/Next/scripts/e2e_bots.sh <simulator udid> <derived data folder>
+# The daemon is seeded with an agent, Scribe, that has work (``--seed-work``): the profile's Work group reads its orders,
+# objectives and hand-offs, and the profile's menu pauses it.
+#
+# Usage: ios/Next/scripts/e2e_bots.sh <simulator udid> <derived data folder> [<test, as DotNextUITests/BotsLiveUITests/testX>]
 set -eu
 udid=${1:?usage: e2e_bots.sh <simulator udid> <derived data>}
 derived=${2:?derived data folder}
+only=${3:-DotNextUITests/BotsLiveUITests}
 here=$(cd "$(dirname "$0")" && pwd)
 ios=$(dirname "$(dirname "$here")")
 daemon=$(dirname "$ios")
@@ -15,7 +19,7 @@ port=$(python3 -c "import socket; s=socket.socket(); s.bind((\"127.0.0.1\", 0));
 t=$(mktemp -d)
 log="$t/daemon.log"
 DOT_HOME="$t/home" DOT_LOG_DIR="$t/logs" DOT_CHROME_DIR="$t/chrome" \
-    uv run --project "$daemon" python "$here/e2e_daemon.py" "$port" >"$log" 2>&1 &
+    uv run --project "$daemon" python "$here/e2e_daemon.py" "$port" --seed-work >"$log" 2>&1 &
 pid=$!
 trap 'kill $pid 2>/dev/null || true' EXIT
 tries=0
@@ -33,7 +37,7 @@ rm -rf "$derived/bots.xcresult"
 fail=0
 if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
     -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
-    -only-testing:DotNextUITests/BotsLiveUITests -resultBundlePath "$derived/bots.xcresult" >"$t/xcodebuild.log" 2>&1; then
+    -only-testing:"$only" -resultBundlePath "$derived/bots.xcresult" >"$t/xcodebuild.log" 2>&1; then
     echo "FAIL  BotsLiveUITests (xcodebuild test failed; its log: $t/xcodebuild.log)" >&2
     fail=1
 fi
@@ -42,19 +46,30 @@ grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" "$t/xcodebuild.log" | 
 check() {
     if python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($2) else 1)"; then echo "ok    $1"; else echo "FAIL  $1" >&2; fail=1; fi
 }
-curl -fsS -H "$main" "$base/api/agents" | check "the bot Scout was made with its job as its role" \
-    'any(a["record"]["name"] == "Scout" and a["record"]["role"].startswith("Watch the market") for a in d)'
-curl -fsS -H "$main" "$base/api/threads?limit=20" | check "Scout's first meeting has a chat" \
-    'any(t["title"] == "Scout" for t in d)'
-# The new chat of the bot's menu carries the bot: its first message is a run of Scout's own.
-curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the new chat's first message went to Scout" \
-    'any(r["goal"] == "Hello from a new chat" and r["agent_id"] is not None for r in d)'
-# The swiped message went out with its quote in front, the words the model reads (item 1972).
-curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the quote rides on the message" \
-    'any(r["goal"] == "> Hello from a new chat\n\nSay it again" for r in d)'
-# Edit's avatar page changed the look on the Mac; the first meeting asks for one answer, no tool (item 1962).
-curl -fsS -H "$main" "$base/api/agents" | check "Scout's new look was kept" \
-    'any(a["record"]["name"] == "Scout" and a["record"]["look"] is not None and a["record"]["look"]["shape"] == "cloud" and a["record"]["look"]["colour"] == "teal" for a in d)'
-curl -fsS -H "$main" "$base/api/runs?limit=20" | check "Scout's first meeting asks for a message of its own and no tool" \
-    'any(r["source"] == "welcome" and "Call no tool" in r["goal"] for r in d)'
+case "$only" in
+*/BotsLiveUITests | *testABotMade*)
+    curl -fsS -H "$main" "$base/api/agents" | check "the bot Scout was made with its job as its role" \
+        'any(a["record"]["name"] == "Scout" and a["record"]["role"].startswith("Watch the market") for a in d)'
+    curl -fsS -H "$main" "$base/api/threads?limit=20" | check "Scout's first meeting has a chat" \
+        'any(t["title"] == "Scout" for t in d)'
+    # The new chat of the bot's menu carries the bot: its first message is a run of Scout's own.
+    curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the new chat's first message went to Scout" \
+        'any(r["goal"] == "Hello from a new chat" and r["agent_id"] is not None for r in d)'
+    # The swiped message went out with its quote in front, the words the model reads (item 1972).
+    curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the quote rides on the message" \
+        'any(r["goal"] == "> Hello from a new chat\n\nSay it again" for r in d)'
+    # Edit's avatar page changed the look on the Mac; the first meeting asks for one answer, no tool (item 1962).
+    curl -fsS -H "$main" "$base/api/agents" | check "Scout's new look was kept" \
+        'any(a["record"]["name"] == "Scout" and a["record"]["look"] is not None and a["record"]["look"]["shape"] == "cloud" and a["record"]["look"]["colour"] == "teal" for a in d)'
+    curl -fsS -H "$main" "$base/api/runs?limit=20" | check "Scout's first meeting asks for a message of its own and no tool" \
+        'any(r["source"] == "welcome" and "Call no tool" in r["goal"] for r in d)'
+    ;;
+esac
+# The profile's menu paused Scribe, the agent the daemon was seeded with.
+case "$only" in
+*/BotsLiveUITests | *testABotsWork*)
+    curl -fsS -H "$main" "$base/api/agents" | check "the profile's menu paused Scribe" \
+        'any(a["record"]["name"] == "Scribe" and a["record"]["paused_at"] is not None for a in d)'
+    ;;
+esac
 exit $fail
