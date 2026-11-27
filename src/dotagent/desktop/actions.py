@@ -1149,6 +1149,16 @@ def _background_click(env: StepEnv, step: Step, inspection: Inspection, count: i
             pressed: Effect | None = _pressed(env, inspection, number, element, state)
             if pressed is not None:
                 return pressed
+    if step.ref is not None:
+        number, element = _element_for(env, step.ref)
+        role: str = _state_of(env, number, element).role
+        if role in _MENU_ROLES:
+            # A menu is a window of its own above the ordinary ones, which the driver's clicks do not reach.
+            raise DesktopStepNotSent(
+                f"a{number} is in a menu, which the background driver cannot click; nothing was sent. Press it, or "
+                "choose it with menu and its path",
+                {"ref": f"a{number}", "role": role},
+            )
     driver: BackgroundDriver = _driver(env)
     point: Point = _background_point(env, step)
     window: WindowInfo = _window_holding(env, point)
@@ -1160,8 +1170,10 @@ def _background_click(env: StepEnv, step: Step, inspection: Inspection, count: i
 
 
 def _background_text(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
-    """A type or a paste step: the text goes into the field at once, through accessibility where the field takes it
-    and as the driver's own key events where it does not; the clipboard is left alone."""
+    """A type or a paste step: the text goes into the field through accessibility where the field takes it and as the
+    driver's own key events where it does not; the clipboard is left alone. It goes in pieces of
+    :data:`cua.TEXT_CHUNK_CHARS`, the emergency stop checked before each, so that a stop ends it within one piece as it
+    ends the Mac's own typing between keys (item 683)."""
     text: str = _required(step.text, "text")
     _check_secure(env, inspection, "typing" if step.action == "type" else "pasting")
     aim: Point | None = _aim_at_ref(env, step.ref)
@@ -1169,9 +1181,16 @@ def _background_text(env: StepEnv, step: Step, inspection: Inspection) -> Effect
         _focus(env, step.ref)
     field: _Field | None = _field_in(env, step.ref, lambda: env.app.pid)
     window: WindowInfo = _focused_window(env)
-    result: CuaResult = _driver(env).call("type_text", cua.type_args(env.app.pid, window.window_id, text))
+    driver: BackgroundDriver = _driver(env)
+    results: list[CuaResult] = []
+    for piece in cua.chunks_of(text, cua.TEXT_CHUNK_CHARS):
+        check_failsafe(env)
+        results.append(driver.call("type_text", cua.type_args(env.app.pid, window.window_id, piece)))
     verb: str = "typed" if step.action == "type" else "pasted"
-    written: Effect = _effect(f"{verb} {len(text)} chars into {inspection.target} {_through(result)}", None, False, aim)
+    weakest: CuaResult = next((result for result in results if result.effect != "confirmed"), results[-1])
+    written: Effect = _effect(
+        f"{verb} {len(text)} chars into {inspection.target} {_through(weakest)}", None, False, aim
+    )
     return replace(written, checks=_written_checks(field, text))
 
 

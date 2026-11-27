@@ -63,6 +63,9 @@ SESSION: str = "dot"
 # the most notches one call takes.
 PX_PER_NOTCH: int = 20
 MAX_NOTCHES: int = 50
+# How many characters one call of type_text carries: the emergency stop is checked between calls, so that a stop ends
+# a long text within one piece (about 3 s on the driver's key-event route, 30 ms a character).
+TEXT_CHUNK_CHARS: int = 100
 # The keys the driver names (its press_key's vocabulary), as Dot's chords name them.
 KEYS: frozenset[str] = frozenset(
     {
@@ -115,10 +118,11 @@ class CuaFrame:
 
 @dataclass(frozen=True, slots=True)
 class CuaBinary:
-    """A cua-driver found on this Mac: where, its version and the team that signed it (``None``: not signed)."""
+    """A cua-driver found on this Mac: where, the team whose signature of it verifies (``None``: none does) and its
+    version, read only from one signed by Cua AI (``None`` otherwise: an unchecked binary is never run)."""
 
     path: Path
-    version: str
+    version: str | None
     team_id: str | None
 
 
@@ -138,6 +142,11 @@ class RunningDriver(BackgroundDriver, Protocol):
 
 
 # --------------------------------------------------------------------------------------------- what it reads and says
+
+
+def chunks_of(text: str, size: int) -> list[str]:
+    """``text`` in pieces of at most ``size`` characters, in order."""
+    return [text[start : start + size] for start in range(0, len(text), size)]
 
 
 def notches_of(amount_px: int) -> int:
@@ -225,18 +234,29 @@ def team_of(codesign_report: str) -> str | None:
 
 
 def refusal_of(binary: CuaBinary) -> str | None:
-    """Why Dot does not use ``binary`` (another version than the one measured, another signer), ``None`` when it may."""
+    """Why Dot does not use ``binary`` (another signer, another version than the one measured), ``None`` when it may."""
+    if binary.team_id != TEAM_ID:
+        return f"cua-driver at {binary.path} is not signed by Cua AI (team {TEAM_ID}): its team is {binary.team_id}"
     if binary.version != PINNED_VERSION:
         return (
             f"cua-driver {binary.version} is at {binary.path}, and Dot is measured with {PINNED_VERSION} only; install "
             f"that one: {INSTALL_COMMAND}"
         )
-    if binary.team_id != TEAM_ID:
-        return f"cua-driver at {binary.path} is not signed by Cua AI (team {TEAM_ID}): its team is {binary.team_id}"
     return None
 
 
 # ------------------------------------------------------------------------------------------------- the binary on disk
+
+
+def _child_env() -> dict[str, str]:
+    """The driver's environment: Dot's own without what holds a secret (as a command of a run is given it, items 555
+    and 1293), embedded mode, its telemetry and its update check off."""
+    return {
+        **{name: value for name, value in os.environ.items() if not hides_secret(name, value)},
+        "CUA_DRIVER_EMBEDDED": "1",
+        "CUA_DRIVER_RS_TELEMETRY_ENABLED": "false",
+        "CUA_DRIVER_RS_UPDATE_CHECK": "0",
+    }
 
 
 def _signed_path(path: Path) -> Path:
@@ -258,14 +278,15 @@ def _run(command: Sequence[str], timeout_s: float) -> subprocess.CompletedProces
         raise DesktopError(f"{command[0]} could not be run: {error}", {"command": list(command)}) from error
 
 
-def version_at(path: Path, timeout_s: float) -> str:
-    """The version of the cua-driver at ``path``, from its manifest. Raises when it is not there or does not answer."""
-    if not path.is_file() or not os.access(path, os.X_OK):
-        raise DesktopError(
-            f"cua-driver is not installed at {path}; install it with: {INSTALL_COMMAND}",
-            {"path": str(path), "fix": INSTALL_COMMAND},
+def _version_at(path: Path, timeout_s: float) -> str:
+    """The version of the cua-driver at ``path``, from its manifest, run with the driver's own environment. Only for a
+    binary whose signature was checked first."""
+    try:
+        manifest: subprocess.CompletedProcess[str] = subprocess.run(
+            [str(path), "manifest"], capture_output=True, text=True, timeout=timeout_s, check=False, env=_child_env()
         )
-    manifest: subprocess.CompletedProcess[str] = _run([str(path), "manifest"], timeout_s)
+    except (subprocess.TimeoutExpired, OSError) as error:
+        raise DesktopError(f"cua-driver did not report its version: {error}", {"path": str(path)}) from error
     if manifest.returncode != 0:
         raise DesktopError(
             "cua-driver did not report its version",
@@ -287,23 +308,19 @@ def signer_at(path: Path, timeout_s: float) -> str | None:
 
 
 def find_binary(path: Path, timeout_s: float) -> CuaBinary:
-    """The cua-driver at ``path``: its version and the team of its verified signature."""
-    version: str = version_at(path, timeout_s)
-    return CuaBinary(path=path, version=version, team_id=signer_at(path, timeout_s))
+    """The cua-driver at ``path``: the team of its verified signature, then, for one signed by Cua AI alone, its version
+    (reading it runs the binary). Raises when it is not there or does not answer."""
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise DesktopError(
+            f"cua-driver is not installed at {path}; install it with: {INSTALL_COMMAND}",
+            {"path": str(path), "fix": INSTALL_COMMAND},
+        )
+    team: str | None = signer_at(path, timeout_s)
+    version: str | None = _version_at(path, timeout_s) if team == TEAM_ID else None
+    return CuaBinary(path=path, version=version, team_id=team)
 
 
 # ------------------------------------------------------------------------------------------------------- the adapter
-
-
-def _child_env() -> dict[str, str]:
-    """The driver's environment: Dot's own without what holds a secret (as a command of a run is given it, items 555
-    and 1293), embedded mode, its telemetry and its update check off."""
-    return {
-        **{name: value for name, value in os.environ.items() if not hides_secret(name, value)},
-        "CUA_DRIVER_EMBEDDED": "1",
-        "CUA_DRIVER_RS_TELEMETRY_ENABLED": "false",
-        "CUA_DRIVER_RS_UPDATE_CHECK": "0",
-    }
 
 
 class CuaDriver:
@@ -483,12 +500,7 @@ class CuaDriver:
 
 def open_driver(path: Path, start_timeout_s: float, call_timeout_s: float) -> CuaDriver:
     """The cua-driver at ``path``, started, once it is the pinned version signed by Cua AI; raises otherwise."""
-    version: str = version_at(path, CHECK_TIMEOUT_S)
-    if version != PINNED_VERSION:
-        # Another version is refused before its signature is read, which takes seconds.
-        unread: CuaBinary = CuaBinary(path=path, version=version, team_id=None)
-        raise DesktopError(str(refusal_of(unread)), {"path": str(path), "version": version})
-    binary: CuaBinary = CuaBinary(path=path, version=version, team_id=signer_at(path, CHECK_TIMEOUT_S))
+    binary: CuaBinary = find_binary(path, CHECK_TIMEOUT_S)
     refusal: str | None = refusal_of(binary)
     if refusal is not None:
         raise DesktopError(refusal, {"path": str(path), "version": binary.version, "team": binary.team_id})
