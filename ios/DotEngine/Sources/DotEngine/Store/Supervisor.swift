@@ -366,7 +366,7 @@ public actor Supervisor {
 
     private func warnAboutMalformedPage(_ event: EventRecord) {
         if event.kind == "page_shown", ShownPage(event: event) == nil {
-            logger.warning("Malformed shown-page reference event_id=\(event.id)")
+            logger.warning("Malformed shown-page reference event_id=\(event.id, privacy: .public)")
         }
     }
 
