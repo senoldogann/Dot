@@ -1221,6 +1221,9 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "Default (%@)": "Varsayılan (%@)",
+        "Favourite": "Favori",
+        "Can't reach %@": "%@ cihazına ulaşılamıyor",
         "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
         "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
         "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
@@ -1690,6 +1693,7 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+# Chat settings as inset groups, the capsule without a spinner (the owner's report of 2026-11-27).
 
 # HS1 (2026-11-27): empty states in the app's own type.
 TR.update(

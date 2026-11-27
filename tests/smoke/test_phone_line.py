@@ -232,7 +232,7 @@ async def test_a_daemon_that_cannot_be_reached_on_a_link_that_is_there_is_reconn
             resting.stop_serving()
             for (width, height, scheme, context, page), was in zip(pages, before, strict=True):
                 line = page.locator(".link-line:not([hidden])")
-                await expect(line).to_have_text("Reconnecting…", timeout=30_000)
+                await expect(line).to_have_text("Can't reach Dot", timeout=30_000)
                 await asyncio.sleep(0.4)
                 seen: dict[str, Any] = await page.evaluate(_MEASURE)
                 _fits(seen, f"reconnecting {width}x{height} {scheme}", 2 if width <= 320 else 1, floating=True)

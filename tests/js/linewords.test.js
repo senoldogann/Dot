@@ -48,10 +48,10 @@ test("with no link and nothing kept it says only that it is offline", () => {
 });
 
 test("a daemon that cannot be reached for more than a moment, on a link that is there, is reconnecting", () => {
-  assert.deepEqual(lineOf(facts({ reconnecting: true }), english), { kind: "reconnecting", text: "Reconnecting…", action: null });
-  assert.equal(lineOf(facts({ reconnecting: true }), turkish)?.text, "Yeniden bağlanıyor…");
-  assert.equal(lineOf(facts({ reconnecting: true, waiting: 3 }), english)?.text, "Reconnecting… 3 waiting to send");
-  assert.equal(lineOf(facts({ reconnecting: true, waiting: 3 }), turkish)?.text, "Yeniden bağlanıyor… 3 gönderilmeyi bekliyor");
+  assert.deepEqual(lineOf(facts({ reconnecting: true }), english), { kind: "reconnecting", text: "Can't reach Dot", action: null });
+  assert.equal(lineOf(facts({ reconnecting: true }), turkish)?.text, "Dot'a ulaşılamıyor");
+  assert.equal(lineOf(facts({ reconnecting: true, waiting: 3 }), english)?.text, "Can't reach Dot · 3 waiting to send");
+  assert.equal(lineOf(facts({ reconnecting: true, waiting: 3 }), turkish)?.text, "Dot'a ulaşılamıyor · 3 gönderilmeyi bekliyor");
 });
 
 test("no link comes before reconnecting: a phone with no link is offline, not reconnecting", () => {
