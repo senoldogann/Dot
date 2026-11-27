@@ -461,7 +461,10 @@ async def test_a_card_of_several_fields_takes_each_in_its_own_box_and_a_key_file
             card = page.locator(".approval.secret-fields")
             await expect(card).to_be_visible()
             await expect(card.locator(".secret-field-name")).to_have_text(["$ASC_ISSUER_ID", "$ASC_KEY_ID", "$ASC_KEY"])
-            issuer = card.get_by_role("textbox", name="Issuer ID")
+            # Every box shows no letter at first, the id's too, which Show reveals (the security review of item 2040).
+            issuer = card.get_by_label("Issuer ID")
+            await expect(issuer).to_have_attribute("type", "password")
+            await card.get_by_role("button", name="Show").click()
             await expect(issuer).to_have_attribute("type", "text")
             await expect(card.get_by_label("Key ID")).to_have_attribute("type", "password")
             save = card.get_by_role("button", name="Save securely")

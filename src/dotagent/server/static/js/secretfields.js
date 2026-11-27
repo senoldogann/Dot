@@ -9,7 +9,12 @@ const SECRET_LEAST_CHARS = 8;
  * least, most}`; `[]` for a card of one value, as cards were before.
  */
 export function secretFields(args) {
-  if (!Array.isArray(args.fields) || args.fields.length < 2) {
+  // A card of one field keeps its one box, unless that field is no plain secret (an id, a key file): then it is drawn
+  // as a card of fields, a key file in its picker (the security review of item 2040).
+  if (!Array.isArray(args.fields) || args.fields.length === 0) {
+    return [];
+  }
+  if (args.fields.length === 1 && args.fields[0].kind !== "text" && args.fields[0].kind !== "file") {
     return [];
   }
   return args.fields.map((field) => ({

@@ -600,7 +600,22 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     const why = typeof approval.args.why === "string" ? approval.args.why : "";
     const values = new Map();
     const save = el("button", { class: "btn primary", type: "button", disabled: true }, t("approvals.saveSecurely"));
-    const decline = el("button", { class: "btn ghost", type: "button", onclick: () => decide(false, "") }, t("approvals.decline"));
+    // Declined, nothing typed stays on the page.
+    const decline = el(
+      "button",
+      {
+        class: "btn ghost",
+        type: "button",
+        onclick: () => {
+          values.clear();
+          node.querySelectorAll("input").forEach((input) => {
+            input.value = "";
+          });
+          decide(false, "");
+        },
+      },
+      t("approvals.decline"),
+    );
     function paint() {
       save.disabled = busy || !secretFieldsReady(fields, values);
     }
@@ -609,7 +624,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       const head = el("div", { class: "secret-field-head" }, el("span", null, field.label), el("code", { class: "secret-field-name" }, `$${field.name}`));
       if (field.kind === "file") {
         const said = el("span", { class: "small muted secret-file-said", role: "status" }, t("approvals.noFileChosen"));
-        const input = el("input", { type: "file", class: "secret-file", accept: ".p8,.pem,.key,.json,.txt", "aria-label": field.label });
+        const input = el("input", { type: "file", class: "secret-file", accept: ".p8,.pem,.key", "aria-label": field.label });
         input.addEventListener("change", async () => {
           const file = input.files?.[0];
           values.set(field.name, "");
@@ -619,7 +634,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
             said.textContent = t("approvals.fileTooLarge", { name: file.name });
           } else {
             const text = await file.text();
-            if (text.includes("\u0000") || text.includes("�")) {
+            // A key in PEM alone (the daemon refuses any other): a JSON or an .env holds its secret in a form no mask reaches.
+            if (text.includes("\u0000") || text.includes("�") || !/-----BEGIN [A-Z0-9 ]+-----/.test(text)) {
               said.textContent = t("approvals.fileNotText", { name: file.name });
             } else {
               values.set(field.name, text);
@@ -630,9 +646,11 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         });
         return el("label", { class: "secret-field" }, head, input, said);
       }
+      // Every box shows no letter at first, an id's too: the run chose the kind, and an injected one could ask for a
+      // password as an "id". An id's box has Show, which the owner presses (the security review of item 2040).
       const input = el("input", {
-        class: `input${field.kind === "secret" ? " mono" : ""}`,
-        type: field.kind === "secret" ? "password" : "text",
+        class: "input mono",
+        type: "password",
         autocomplete: "off",
         autocapitalize: "off",
         spellcheck: "false",
@@ -643,7 +661,17 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         values.set(field.name, input.value);
         paint();
       });
-      return el("label", { class: "secret-field" }, head, input);
+      if (field.kind !== "text") {
+        return el("label", { class: "secret-field" }, head, input);
+      }
+      const show = el("button", { class: "btn ghost sm", type: "button", "aria-pressed": "false" }, t("approvals.showValue"));
+      show.addEventListener("click", () => {
+        const shown = input.type === "password";
+        input.type = shown ? "text" : "password";
+        show.textContent = shown ? t("approvals.hideValue") : t("approvals.showValue");
+        show.setAttribute("aria-pressed", String(shown));
+      });
+      return el("div", { class: "secret-field" }, head, el("div", { class: "secret-entry" }, input, show));
     });
     async function give() {
       if (busy || !secretFieldsReady(fields, values)) {

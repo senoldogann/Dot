@@ -30,13 +30,17 @@ SECRET_SEVERITY: str = "secret"
 HOLD_S: float = 24 * 3600.0
 # The longest secret a card takes: a token, a key, a password, a service account's file in one line.
 MOST_VALUE_CHARS: int = 8192
-# The longest file a card's field takes (item 2040): a private key (.p8, .pem) or a small JSON, as text.
+# The longest file a card's field takes (item 2040): a private key in PEM (.p8, .pem, .key), as text.
 MOST_FILE_CHARS: int = 16384
 # How a card's field is typed (item 2040): `secret` in a box that shows no letter, `text` in one that shows them (an
 # id the owner copies), `file` picked from the phone or the computer. Every kind is held and masked the same.
 SecretKind = Literal["secret", "text", "file"]
 # A line of a key file that is no secret: a PEM's first and last, which every key of the kind shares.
 _PEM_EDGE: re.Pattern[str] = re.compile(r"-----(?:BEGIN|END) [A-Z0-9 ]{1,60}-----")
+# A key in PEM: its first line, base64 lines, its last.
+_PEM_BLOCK: re.Pattern[str] = re.compile(
+    r"-----BEGIN [A-Z0-9 ]{1,60}-----\s+[A-Za-z0-9+/=\s]+-----END [A-Z0-9 ]{1,60}-----"
+)
 # The shortest line of a file's text masked on its own: a base64 line of a key, never a short word of a JSON.
 _FILE_LINE_MIN_CHARS: int = 16
 _NAME: re.Pattern[str] = re.compile(r"[A-Z][A-Z0-9_]{1,63}")
@@ -291,6 +295,11 @@ def _checked_value(answer: SecretAnswer) -> str:
         raise InvalidValueError(
             "a secret is one line of text (a file's field takes a file's lines)", {"name": answer.name}
         )
+    # A file's field takes a key in PEM alone: its body is base64 lines, each masked on its own. A JSON or an .env holds
+    # its secret in a form a command decodes (an escaped key, a short value after `=`) that no mask of its lines reaches
+    # (the security review of item 2040).
+    if answer.kind == "file" and _PEM_BLOCK.fullmatch(value.strip()) is None:
+        raise InvalidValueError("a file's field takes a key in PEM (.p8, .pem, .key)", {"name": answer.name})
     return value
 
 

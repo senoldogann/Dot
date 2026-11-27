@@ -24,6 +24,11 @@ test("a card of several fields is read with each field's kind and limits; one of
   );
   assert.deepEqual(secretFields({ name: "DEMO_TOKEN", label: "Demo" }), []);
   assert.deepEqual(secretFields({ name: "DEMO_TOKEN", fields: [{ name: "DEMO_TOKEN", label: "Demo", kind: "secret" }] }), []);
+  // One field left that is no plain secret (a key file, an id) is still a card of fields: its picker, its Show.
+  assert.deepEqual(
+    secretFields({ name: "ASC_KEY", fields: [{ name: "ASC_KEY", label: "Key file", kind: "file" }] }).map((field) => field.kind),
+    ["file"],
+  );
 });
 
 test("Save securely waits until every field holds a value long enough and not too long", () => {

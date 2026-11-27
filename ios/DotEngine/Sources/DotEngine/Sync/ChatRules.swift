@@ -184,7 +184,9 @@ public func secretFields(of args: [String: JSONValue]) -> [SecretField] {
             name: name, label: label, kind: SecretFieldKind(rawValue: field["kind"]?.string ?? "") ?? .secret,
             least: field["min_chars"]?.int ?? secretLeastCharacters, most: field["max_chars"]?.int ?? 8192)
     }
-    return fields.count > 1 ? fields : []
+    // A card of one field keeps its one box, unless that field is no plain secret (an id, a key file): then it is drawn
+    // as a card of fields, a key file in its picker (the security review of item 2040).
+    return fields.count > 1 || fields.first.map { $0.kind != .secret } == true ? fields : []
 }
 
 /// The dock's entries (plan §13 B1): the asks waiting, oldest first (a stable order: a new ask never moves the one the

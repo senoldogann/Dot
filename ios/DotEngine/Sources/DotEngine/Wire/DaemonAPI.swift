@@ -428,7 +428,6 @@ extension DaemonAPI {
         try await get("/api/approvals/\(id)", query: [])
     }
 
-    /// Gives the secret a card asks for (item 857); the value is sent once and kept nowhere on the phone.
     /// Gives every field of a card of several secrets at once (item 2040), in the card's order.
     public func giveSecrets(approval: String, answers: [(name: String, value: String)]) async throws(DaemonRequestError) -> ApprovalRecord {
         try await send(
@@ -436,6 +435,7 @@ extension DaemonAPI {
             body: Self.json(SecretAnswersBody(answers: answers.map { SecretAnswer(name: $0.name, value: $0.value) })))
     }
 
+    /// Gives the secret a card asks for (item 857); the value is sent once and kept nowhere on the phone.
     public func giveSecret(approval: String, value: String) async throws(DaemonRequestError) -> ApprovalRecord {
         try await send("POST", "/api/approvals/\(approval)/secret", body: Self.json(SecretBody(value: value)))
     }

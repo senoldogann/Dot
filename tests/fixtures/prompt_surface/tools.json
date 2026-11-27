@@ -68,19 +68,19 @@
     }
   },
   {
-    "description": "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's commands read it as $name for 24 hours. Several that go together (an id, a key, a key file) go on one card with fields. Never ask for a secret in a message or with ask_user. A short code may come back in words.",
+    "description": "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's commands read it as $name for 24 hours. Never ask for a secret in a message or with ask_user. A short code may come back in words.",
     "name": "ask_secret",
     "parameters": {
       "additionalProperties": false,
       "properties": {
         "fields": {
-          "description": "Several on one card, instead of name: e.g. an Issuer ID, a Key ID and the .p8 key file.",
+          "description": "Instead of name: 2-4 that go together.",
           "items": {
             "additionalProperties": false,
             "properties": {
               "kind": {
                 "default": "secret",
-                "description": "secret (a box that shows no letter), text (an id the user copies, shown as typed), file (a key file the user picks; $name holds its text).",
+                "description": "text: an id; file: a PEM key, as text.",
                 "enum": [
                   "secret",
                   "text",
@@ -89,13 +89,13 @@
                 "type": "string"
               },
               "label": {
-                "description": "What it is, as the card says it: Issuer ID.",
-                "maxLength": 80,
+                "description": "Its words: Issuer ID.",
+                "maxLength": 120,
                 "minLength": 1,
                 "type": "string"
               },
               "name": {
-                "description": "The environment variable your commands read it as: APP_STORE_ISSUER_ID.",
+                "description": "Its env var.",
                 "type": "string"
               }
             },
@@ -106,6 +106,7 @@
             "type": "object"
           },
           "maxItems": 4,
+          "minItems": 0,
           "type": "array"
         },
         "label": {
@@ -116,7 +117,7 @@
         },
         "name": {
           "default": "",
-          "description": "One secret: the environment variable your commands read it as: CLOUDFLARE_API_TOKEN.",
+          "description": "The env var your commands read it as: CLOUDFLARE_API_TOKEN.",
           "type": "string"
         },
         "replace": {

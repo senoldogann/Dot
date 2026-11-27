@@ -255,3 +255,15 @@ def test_a_card_is_answered_by_its_fields_alone() -> None:
     # A card asked before item 2040: one name, answered with one value.
     old = card_answers({"name": "DEMO_TOKEN", "label": "Demo"}, VALUE, None)
     assert [(one.name, one.kind, one.value) for one in old] == [("DEMO_TOKEN", "secret", VALUE)]
+
+
+def test_a_file_field_takes_a_key_in_pem_alone(home: Path) -> None:
+    """The security review of item 2040: a JSON's escaped key, or an .env's short values, escape the line masks."""
+    for text in (
+        '{"type": "service_account", "private_key": "-----BEGIN PRIVATE KEY-----\\nMIIEv..."}',
+        "API_KEY=abc123456\n",
+    ):
+        answer = SecretAnswer(name="GCP_KEY", label="Key file", kind="file", value=text)
+        with pytest.raises(InvalidValueError, match="key in PEM"):
+            save_secrets(THREAD, [answer], now=1000.0)
+    assert held_values(THREAD, now=1001.0) == {}

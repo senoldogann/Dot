@@ -687,9 +687,11 @@ final class ChatUITests: XCTestCase {
         let app: XCUIApplication = launch("n2-secrets")
         XCTAssertTrue(app.staticTexts["App Store Connect API key"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["$ASC_ISSUER_ID"].exists && app.staticTexts["$ASC_KEY"].exists, "each field's name")
-        let issuer: XCUIElement = app.textFields["secret.field.ASC_ISSUER_ID"]
+        // Every box shows no letter at first, the id's too, which the eye reveals (the security review of item 2040).
+        let issuer: XCUIElement = app.secureTextFields["secret.field.ASC_ISSUER_ID"]
         let keyId: XCUIElement = app.secureTextFields["secret.field.ASC_KEY_ID"]
-        XCTAssertTrue(issuer.exists, "the Issuer ID shows its letters")
+        XCTAssertTrue(issuer.exists, "the Issuer ID hidden at first")
+        XCTAssertTrue(app.buttons["secret.reveal.ASC_ISSUER_ID"].exists, "with an eye to show it")
         XCTAssertTrue(keyId.exists, "the Key ID shows none")
         XCTAssertTrue(app.buttons["secret.file.ASC_KEY"].exists, "the key file is picked")
         let save: XCUIElement = app.buttons["ask.primary"]

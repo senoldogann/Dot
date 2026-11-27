@@ -165,6 +165,8 @@ struct AskCard: View {
     @State private var fileWords: [String: String] = [:]
     /// The file field whose picker is open.
     @State private var choosingFile: String?
+    /// The id fields the owner chose to see as they type.
+    @State private var revealed: Set<String> = []
 
     private var ask: Ask { entry.ask }
 
@@ -318,7 +320,11 @@ struct AskCard: View {
                     secrets = [:]
                     fileWords = [:]
                 }, extra: nil,
-                deny: (String(localized: "Decline", comment: "Ask dock: refuses to give a secret"), { actions.decide(ask, false, "", false) }),
+                deny: (String(localized: "Decline", comment: "Ask dock: refuses to give a secret"), {
+                    secrets = [:]
+                    fileWords = [:]
+                    actions.decide(ask, false, "", false)
+                }),
                 primaryEnabled: secretFieldsReady(ask.secretFields, values: secrets))
         }
         .fileImporter(
@@ -340,10 +346,31 @@ struct AskCard: View {
                 .textRole(.body).padding(Space.s).frame(minHeight: Metric.hit).background(Tone.nested, in: rounded(Radius.inner))
                 .accessibilityLabel(field.label).accessibilityIdentifier("secret.field." + field.name)
         case .text:
-            TextField(field.label, text: binding)
+            // An id's box shows no letter at first either: the run chose the kind, and an injected one could ask for a
+            // password as an "id"; the owner reveals it with the eye (the security review of item 2040).
+            HStack(spacing: Space.xs) {
+                Group {
+                    if revealed.contains(field.name) {
+                        TextField(field.label, text: binding)
+                    } else {
+                        SecureField(field.label, text: binding)
+                    }
+                }
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .textRole(.body).padding(Space.s).frame(minHeight: Metric.hit).background(Tone.nested, in: rounded(Radius.inner))
                 .accessibilityLabel(field.label).accessibilityIdentifier("secret.field." + field.name)
+                Button {
+                    if revealed.contains(field.name) { revealed.remove(field.name) } else { revealed.insert(field.name) }
+                } label: {
+                    Image(systemName: revealed.contains(field.name) ? "eye.slash" : "eye").frame(width: Metric.hit, height: Metric.hit)
+                }
+                .buttonStyle(.plain).foregroundStyle(Tone.secondary)
+                .accessibilityLabel(
+                    revealed.contains(field.name)
+                        ? String(localized: "Hide", comment: "Ask dock: hides an id typed on a card of secrets")
+                        : String(localized: "Show", comment: "Ask dock: shows an id typed on a card of secrets"))
+                .accessibilityIdentifier("secret.reveal." + field.name)
+            }
         case .file:
             HStack(spacing: Space.s) {
                 Button {
@@ -374,8 +401,9 @@ struct AskCard: View {
             fileWords[field.name] = String(localized: "\(url.lastPathComponent) is too large for a card: a key file is a few KB at most.", comment: "Ask dock: a picked file larger than a card's field holds; the argument is its name")
             return
         }
-        guard let text = String(data: data, encoding: .utf8), !text.contains("\u{0}") else {
-            fileWords[field.name] = String(localized: "\(url.lastPathComponent) is not a text file: pick the key file itself (.p8, .pem, .json).", comment: "Ask dock: a picked file that is no text; the argument is its name")
+        // A key in PEM alone (the daemon refuses any other): a JSON or an .env holds its secret in a form no mask reaches.
+        guard let text = String(data: data, encoding: .utf8), !text.contains("\u{0}"), text.contains("-----BEGIN ") else {
+            fileWords[field.name] = String(localized: "\(url.lastPathComponent) is not a key in PEM: pick the key file itself (.p8, .pem, .key).", comment: "Ask dock: a picked file that is no key in PEM; the argument is its name")
             return
         }
         secrets[field.name] = text

@@ -636,25 +636,17 @@ def _use_tools_tool() -> RegisteredTool:
 
 
 class SecretField(FrozenModel):
-    name: str = Field(description="The environment variable your commands read it as: APP_STORE_ISSUER_ID.")
-    label: str = Field(min_length=1, max_length=80, description="What it is, as the card says it: Issuer ID.")
-    kind: SecretKind = Field(
-        default="secret",
-        description="secret (a box that shows no letter), text (an id the user copies, shown as typed), file (a key "
-        "file the user picks; $name holds its text).",
-    )
+    name: str = Field(description="Its env var.")
+    label: str = Field(min_length=1, max_length=120, description="Its words: Issuer ID.")
+    kind: SecretKind = Field(default="secret", description="text: an id; file: a PEM key, as text.")
 
 
 class AskSecretArgs(ToolArgs):
-    name: str = Field(
-        default="", description="One secret: the environment variable your commands read it as: CLOUDFLARE_API_TOKEN."
-    )
+    name: str = Field(default="", description="The env var your commands read it as: CLOUDFLARE_API_TOKEN.")
     label: str = Field(min_length=1, max_length=120, description="The card's title: what it is and its least access.")
     why: str = Field(min_length=1, max_length=1500, description="Why you need it, and how to make it, step by step.")
     fields: list[SecretField] = Field(
-        default_factory=list,
-        max_length=4,
-        description="Several on one card, instead of name: e.g. an Issuer ID, a Key ID and the .p8 key file.",
+        default_factory=list, max_length=4, min_length=0, description="Instead of name: 2-4 that go together."
     )
     replace: bool = Field(default=False, description="True to ask again for one this chat holds that is wrong.")
 
@@ -662,6 +654,8 @@ class AskSecretArgs(ToolArgs):
     def _one_shape(self) -> Self:
         if (self.name == "") == (not self.fields):
             raise ValueError("give either name (one secret) or fields (several), not both")
+        if len(self.fields) == 1:
+            raise ValueError("fields are for 2 to 4 that go together; one secret takes name")
         return self
 
 
@@ -758,9 +752,8 @@ def _ask_secret_tool() -> RegisteredTool:
         name=ASK_SECRET_TOOL,
         description=(
             "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's "
-            "commands read it as $name for 24 hours. Several that go together (an id, a key, a key file) go on one "
-            "card with fields. Never ask for a secret in a message or with ask_user. A short code may come back in "
-            "words."
+            "commands read it as $name for 24 hours. Never ask for a secret in a message or with ask_user. A short "
+            "code may come back in words."
         ),
         args_model=AskSecretArgs,
         modes=ALL_MODES,

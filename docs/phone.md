@@ -890,7 +890,7 @@ skipped, and a step kept for you whose time is over has lapsed and is no longer 
 | ------ | ------ |
 | `approval` | `POST /api/approvals/{id}/decision` with `{"approve": true}` or `{"approve": false}`; `"note"` (text, optional), `"remember": true` (with a yes: do not ask again in this chat), `"by": "ui"` or `"cli"` are the other keys. 200, the approval as it is stored; 409 when it was answered already. |
 | `question` | The same route; `"note"` carries the answer: the label of the option chosen (several joined with `"; "` when the question takes several), then what was written on a line of its own. `{"approve": false}` skips it. |
-| `secret` | `POST /api/approvals/{id}/secret` with `{"value": "<the secret>"}` (1 to 8192 characters), which the daemon holds for the chat's commands for 24 hours and writes nowhere else; `{"approve": false}` on the decision route skips it (a yes there is a 422). |
+| `secret` | `POST /api/approvals/{id}/secret` with `{"value": "<the secret>"}` (1 to 8192 characters) for a card of one field, or `{"answers": [{"name": "<NAME>", "value": "…"}]}` with every field of a card of several (item 2040; a file's field takes a key in PEM, up to 16384 characters; `{"value"}` on such a card is a 422 that says to update the app), which the daemon holds for the chat's commands for 24 hours and writes nowhere else; `{"approve": false}` on the decision route skips it (a yes there is a 422). |
 | `handoff` | The decision route: `{"approve": true}` says you did it and the run goes on, `{"approve": false}` skips it. |
 
 **Hand-offs** (item 1423). A step only you can do is a hand-off: the policy hands a credential (a password or a code the

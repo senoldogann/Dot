@@ -111,13 +111,13 @@
         }
       }
     },
-    "%@ is not a text file: pick the key file itself (.p8, .pem, .json).": {
-      "comment": "Ask dock: a picked file that is no text; the argument is its name",
+    "%@ is not a key in PEM: pick the key file itself (.p8, .pem, .key).": {
+      "comment": "Ask dock: a picked file that is no key in PEM; the argument is its name",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ bir metin dosyası değil: anahtar dosyasının kendisini seç (.p8, .pem, .json)."
+            "value": "%@ PEM biçiminde bir anahtar değil: anahtar dosyasının kendisini seç (.p8, .pem, .key)."
           }
         }
       }
@@ -6246,6 +6246,17 @@
         }
       }
     },
+    "Hide": {
+      "comment": "Ask dock: hides an id typed on a card of secrets",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gizle"
+          }
+        }
+      }
+    },
     "Hide %@": {
       "comment": "VoiceOver: hides a model from the list; the argument is its name",
       "localizations": {
@@ -11912,6 +11923,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekim'deki iki taslağı da ekleyeyim mi?"
+          }
+        }
+      }
+    },
+    "Show": {
+      "comment": "Ask dock: shows an id typed on a card of secrets",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Göster"
           }
         }
       }
