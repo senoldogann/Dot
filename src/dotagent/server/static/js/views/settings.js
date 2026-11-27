@@ -57,6 +57,7 @@ const LOADED = {
   agents: { load: () => import("./agents.js"), params: ([, id]) => [id] },
   campaigns: { load: () => import("./campaigns.js"), params: ([, id]) => [id] },
   diagnostics: { load: () => import("./diagnostics.js") },
+  speed: { load: () => import("./speed.js") },
   hooks: { load: () => import("./hooks.js") },
   licences: { load: () => import("./licences.js") },
 };

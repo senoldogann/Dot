@@ -107,7 +107,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
-   Work (Work orders, Objectives and Hand-offs, each to read: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
+   Work (Work orders, Objectives, with those done or let go below the active ones, and Hand-offs with the two faces and "From → To", each to read, and
+   laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
    and writes none, so the phone only reads, and scopes them to the bot itself: an agent's page has the orders given to it,
    the objectives those serve and the messages to or from it; Dot's own has every order and objective and the messages it sent
    or was sent, not those between two other agents; all within the newest 60 orders and 60 objectives the daemon sends), a ⋯ menu with Pause bot and Resume bot for an agent (`POST /api/agents/{id}/pause|resume`, item 465), then
@@ -326,7 +327,7 @@ On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-
 of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General,
 Appearance, Rules, Memory, Vault and Snapshots, then the groups Agents (Agents, Models, Browser, Web search, Scheduled tasks,
 Campaigns, Self-improvement; the sidebar has no Schedules icon, so its page is a row here), Connections (Connectors, Plugins,
-Skills, AI services, Phone, Channels, Hooks), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
+Skills, AI services, Phone, Channels, Hooks), Maintenance (System, Self-repair, Diagnostics, Speed) and About (Open source licences), and under them the first
 steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its
@@ -357,10 +358,10 @@ agent's page wear the same bar (item 1123). An agent's page
 is its conversation (item 1272): it loads as a chat does, Dot's three dots in the middle, its face, name and box stand
 in the middle of the room under the bar, and its way back is the list of chats, or the agents' page it was opened from.
 Over the composer there is one row and nothing stacked (item 1383, which ended the bar of item 401, the line that waited
-on the subagents, the queue, the loops and the commands at work, five panes one upon the other at different widths): a
+on the helpers, the queue, the loops and the commands at work, five panes one upon the other at different widths): a
 capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
-never a layer over it. Its segments are the run's status with its Stop (**Working · 36 s**, **Waiting for you**,
+never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Reconnecting…**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
@@ -401,13 +402,13 @@ that say their value and open in place, and How Dot works with its switches; the
 sheet's foot. A pick keeps the sheet open; Done, Close, a tap on the dim above it or a drag of its head down puts it
 away. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
-tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A subagent's row, in the card of the group it belongs to, is two lines at this width, as on a wide window (items
+tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A helper's row, in the card of the group it belongs to, is two lines at this width, as on a wide window (items
 1281 and 1331; item 401 made it one, which left the name the line and the goal three letters): its face, the job as its
 title, then what it does now, each cut by an ellipsis rather than wrapped, with the word of its state over its time at the
 right and the chevron; the way to its own page shows on the row once it is open, not as a second icon on every closed one. The
 group's own head is one line. The details rise from the foot
 as a sheet with a grabber, and a drag of its head down closes it; its Agents tab opens on the Lineage (item 1332: the
-task and its subagents, each with how long it has worked and a dot for how it stands) and says of each agent its state,
+task and its helpers, each with how long it has worked and a dot for how it stands) and says of each agent its state,
 its model and what it does now, or did last for one that ended (on a wide window too). The Screen tab with nothing yet says in the same empty panel as the
 other tabs that Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the
 setting that turns it on. Dot's computer opens over the whole screen, with the page's address and who has control (Take
@@ -637,6 +638,18 @@ key, read from a file as it is sent and written to the Mac's disk as it arrives,
 goes as base64 in JSON (`POST /api/attachments`), up to 20 MiB. Only a video over 200 MiB (about 15 minutes) gets
 **Trim video** on its chip, to choose a shorter part. Files show their name, type and size. Up to 10 attachments go
 with a message.
+
+In the composer a photo or a video stands as a tile: the picture (a video's first frame), its length at the foot, a play
+glyph over a video and a × at the corner; while a video is re-encoded its tile is already there with a ring that fills
+(item 1992). In the chat the owner's message shows what it carried above its words: a photo as its picture, a video as a
+tile with its length that plays full screen on a tap, a sound or any other file as a chip with its name and size. The
+files come from the run's `attachments` event (the first message) and the `steer` event (a message sent into a run),
+and a video is played from `GET /api/attachments/{id}/media`, which serves it in ranges so that it starts at once and
+can be moved through. The chat of a run older than the newest the phone holds shows no tiles until it is opened. The
+web page shows the same tiles in its box and over a sent message ([Runs](runs.md#tools)). The model button in the
+composer wears the provider's mark; a DeepSeek, Kimi, GLM, Qwen or MiniMax model that a gateway
+(OpenCode Go, OpenRouter, Ollama) hosts wears a neutral symbol instead of the gateway's, which for OpenCode Go is a
+plain block.
 
 After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
 The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer

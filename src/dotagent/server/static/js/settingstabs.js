@@ -32,6 +32,7 @@ export const TABS = [
   { id: "system", label: t("settingstabs.system"), icon: "monitor", words: t("settingstabs.daemonHealthEmergencyStopVersion") },
   { id: "repair", label: t("settingstabs.selfRepair"), icon: "wrench", words: t("settingstabs.problemsFixesClaudeCodeSessions") },
   { id: "diagnostics", label: t("settingstabs.diagnostics"), icon: "terminal", words: t("settingstabs.processesLogsDiskUsage") },
+  { id: "speed", label: t("settingstabs.speed"), icon: "clock", words: t("settingstabs.performanceLatencySlowPercentilesP95") },
   { id: "licences", label: t("settingstabs.openSourceLicences"), icon: "file", words: t("settingstabs.aboutNoticesLicencesSoftware") },
 ];
 
@@ -81,6 +82,7 @@ export const SETTINGS_GROUPS = [
       { tab: "system", line: t("settingstabs.dotSHealthVersionAnd") },
       { tab: "repair", line: t("settingstabs.dotMendsItsOwnProblems") },
       { tab: "diagnostics", line: t("settingstabs.theProgramsDotRunsAnd") },
+      { tab: "speed", line: t("settingstabs.whereTheSecondsOfDotS") },
     ],
   },
   {

@@ -636,6 +636,11 @@ ROWS: tuple[Row, ...] = (
     ),
     _row("meta: mark a plan step", "mark_plan_step", {"step": 1, "status": "done"}),
     _row("meta: turn a tool group on", "use_tools", {"group": "browser"}),
+    _row(
+        "meta: show cards",
+        "show_cards",
+        {"cards": [{"kind": "choice", "prompt": "Which color?", "options": ["Blue", "Green"]}]},
+    ),
     _row("meta: show a page", "show_page", {"title": "A chart", "html": "<p>hi</p>"}),
     _row("meta: draw a picture", "generate_image", {"path": "logo.png", "svg": "<svg viewBox='0 0 1 1'/>"}),
     _row("meta: a photo from Google's picture model", "generate_image", {"path": "fox.png", "photo": "a red fox"}),
@@ -929,6 +934,27 @@ async def test_no_rule_of_the_owners_brings_a_question_back_into_yolo_or_free_mo
     failures, asked = await _table(room, way, rules=True)
     assert failures == [], "\n".join(failures)
     assert asked == {row.tool for row in ROWS if row.asks & way.asks}
+
+
+async def test_the_background_driver_changes_how_a_desktop_step_goes_never_what_the_gate_answers(
+    room: Room, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``[desktop] background_driver = "cua"`` (item 2007) sends a step through cua-driver instead of the Mac's own
+    pointer and keyboard: every desktop row is classified alike with it on, and the table holds as it does off, so a
+    yolo or free run asks nothing new and is refused nothing it was allowed."""
+    desktop_rows: list[Row] = [row for row in ROWS if row.id.startswith("desktop:")]
+    off: list[PreparedCall] = [await _prepared(room, row) for row in desktop_rows]
+    on: AppConfig = CONFIG.model_copy(
+        update={"desktop": CONFIG.desktop.model_copy(update={"background_driver": "cua"})}
+    )
+    monkeypatch.setitem(globals(), "CONFIG", on)
+    monkeypatch.setitem(globals(), "TOOLS", {**TOOLS, **build_registry(_tool_groups(on, True)).tools})
+    for row, before in zip(desktop_rows, off, strict=True):
+        after: PreparedCall = await _prepared(room, row)
+        assert (after.action, after.weighed) == (before.action, before.weighed), row.id
+    failures, asked = await _table(room, WAYS[0])
+    assert failures == [], "\n".join(failures)
+    assert asked == {row.tool for row in ROWS if row.asks & WAYS[0].asks}
 
 
 def test_every_row_that_names_an_ask_is_a_row_the_contract_lists() -> None:
@@ -1387,6 +1413,7 @@ SHELL_FILES_BROWSER: tuple[ScriptedTurn, ...] = (
     _turn("shell", command="echo freedom-contract"),
     _turn("write_file", path="note.txt", content="hi"),
     _turn("browser_act", label="Save"),
+    _turn("show_cards", cards=[{"kind": "post_draft", "platform": "X", "account": "@owner", "text": "Draft text."}]),
     _turn("browser_act", label="Post"),
     _turn("browser_act", label="Pay now"),
 )
@@ -1408,7 +1435,8 @@ async def test_a_free_run_of_shell_files_and_a_browser_ends_done_asking_nothing_
     assert "approval_requested" not in kinds and "question_left" not in kinds, kinds
     assert await loop.runtime.store.list_approvals("pending", 10) == []
     called: list[str] = [str(event.data["tool"]) for event in events if event.kind == "tool_call"]
-    assert called == ["shell", "write_file", "browser_act", "browser_act", "browser_act", "finish"]
+    assert called == ["shell", "write_file", "browser_act", "show_cards", "browser_act", "browser_act", "finish"]
+    assert kinds.count("cards_shown") == 1
     assert "ask_user" not in called and "ask_secret" not in called
     assert (loop.runtime.workspace / "note.txt").read_text(encoding="utf-8") == "hi"
     recorded: list[ApprovalRecord] = [
@@ -1432,8 +1460,13 @@ async def test_a_yolo_run_that_is_not_free_asks_about_a_post_and_nothing_before_
     question: ApprovalRecord = await _pending(loop)
     assert (question.run_id, question.tool) == (run.id, "browser_act")
     assert OWNERS_REASON in question.summary, question.summary
-    before: list[str] = [str(event.data["tool"]) for event in await _events(loop, run) if event.kind == "tool_call"]
-    assert before == ["shell", "write_file", "browser_act", "browser_act"], before
+    events: list[EventRecord] = await _events(loop, run)
+    before: list[str] = [str(event.data["tool"]) for event in events if event.kind == "tool_call"]
+    assert before == ["shell", "write_file", "browser_act", "show_cards", "browser_act"], before
+    assert [event.kind for event in events if event.kind in {"cards_shown", "approval_requested"}] == [
+        "cards_shown",
+        "approval_requested",
+    ]
     # The owner says no: the run goes on, and the payment is theirs too.
     await loop.runtime.approvals.resolve(question.id, False, "test", "")
     payment: ApprovalRecord = await _pending(loop)

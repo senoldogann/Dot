@@ -155,5 +155,6 @@
   "use ${approval.tool}: ${clip(action, 300)}": "the words a card hands the rules page to draft a rule from; the model reads them",
   "⌘Enter": "the name of a key or a browser's error, compared by the program",
   "title, pull_request.title": "An example of dotted field paths in the Hooks form's placeholder: names of JSON fields, not words",
-  "{name}": "The literal `{name}` the Hooks form's help names as a place of the template, passed into the sentence as a value"
+  "{name}": "The literal `{name}` the Hooks form's help names as a place of the template, passed into the sentence as a value",
+  "the upload could not be sent": "the cause kept in an ApiError's context for the log, not a line of the screen"
 }

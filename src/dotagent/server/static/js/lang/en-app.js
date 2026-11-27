@@ -2021,4 +2021,17 @@ export const EN_APP = {
   // Added by hand, for sentences that need their own word order.
   "errors.refusedShort": "Stopped: the model declined the task",
   "errors.refusedNext": "The model declined this task and held to it. Choose another model to restart it on.",
+  "attachments.playVideoName": "Play video {name}",
+  "settingstabs.speed": "Speed",
+  "settingstabs.performanceLatencySlowPercentilesP95": "performance latency slow percentiles p95 p99 model tools hiz",
+  "settingstabs.whereTheSecondsOfDotS": "Where the seconds of Dot's work go",
+  "attachments.videoName": "Video {name}",
+  "attachments.loading": "Loading…",
+  "attachments.close": "Close",
+  "attachments.videoUnreadable": "The video could not be read: {reason}",
+  "workorders.next": "Next: {step}",
+  "workorders.finishedObjectives": "Finished objectives",
+  "workwords.active": "Active",
+  "workwords.done": "Done",
+  "workwords.letGo": "Let go",
 };

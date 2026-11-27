@@ -32,9 +32,20 @@ const STATES = {
   cancelled: { label: t("workwords.cancelled"), tone: "b-muted" },
 };
 
+const OBJECTIVE_STATES = {
+  active: { label: t("workwords.active"), tone: "b-info" },
+  done: { label: t("workwords.done"), tone: "b-ok" },
+  dropped: { label: t("workwords.letGo"), tone: "b-muted" },
+};
+
 /** The words and the colour of a status; an unknown one is shown as it is. */
 export function stateOf(status) {
   return STATES[status] ?? { label: status, tone: "b-muted" };
+}
+
+/** Where an objective stands, in words: the owner and Dot are on it, it is done, or it was let go; an unknown one as it is. */
+export function objectiveState(status) {
+  return OBJECTIVE_STATES[status] ?? { label: status, tone: "b-muted" };
 }
 
 /** Whether an order is still open: somebody has something to do or to decide about it. */

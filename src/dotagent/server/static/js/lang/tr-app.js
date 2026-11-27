@@ -2022,4 +2022,17 @@ export const TR_APP = {
   // Added by hand, for sentences that need their own word order.
   "errors.refusedShort": "Durdu: model görevi reddetti",
   "errors.refusedNext": "Model bu görevi reddetti ve ısrar etti. Yeniden başlatmak için başka bir model seçin.",
+  "attachments.playVideoName": "{name} videosunu oynat",
+  "settingstabs.speed": "Hız",
+  "settingstabs.performanceLatencySlowPercentilesP95": "performans gecikme yavaş yüzdelikler p95 p99 model araçlar hız",
+  "settingstabs.whereTheSecondsOfDotS": "Dot'un işinde saniyelerin nereye gittiği",
+  "attachments.videoName": "Video {name}",
+  "attachments.loading": "Yükleniyor…",
+  "attachments.close": "Kapat",
+  "attachments.videoUnreadable": "Video okunamadı: {reason}",
+  "workorders.next": "Sıradaki: {step}",
+  "workorders.finishedObjectives": "Biten hedefler",
+  "workwords.active": "Etkin",
+  "workwords.done": "Bitti",
+  "workwords.letGo": "Bırakıldı",
 };

@@ -122,6 +122,17 @@
         }
       }
     },
+    "%@ is working on it": {
+      "comment": "Hand-off: the bot asked has not answered yet; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ üzerinde çalışıyor"
+          }
+        }
+      }
+    },
     "%@ late": {
       "comment": "Work order: how late it is; the argument is a span such as 2 h",
       "localizations": {
@@ -6598,6 +6609,17 @@
         }
       }
     },
+    "Judged by: %@": {
+      "comment": "Objective: how progress is judged; the argument is the measure",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ölçüt: %@"
+          }
+        }
+      }
+    },
     "Keep the file changes": {
       "comment": "Edit from here: rewinds the chat and leaves the files as they are",
       "localizations": {
@@ -9313,6 +9335,17 @@
         }
       }
     },
+    "Photo %@": {
+      "comment": "VoiceOver: a photo the owner's message carried; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotoğraf %@"
+          }
+        }
+      }
+    },
     "Photos and videos": {
       "comment": "Composer + menu: opens the photo library",
       "localizations": {
@@ -9452,6 +9485,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plan, %lld / %lld adım bitti"
+          }
+        }
+      }
+    },
+    "Play video %@": {
+      "comment": "VoiceOver: a video the owner's message carried; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ videosunu oynat"
           }
         }
       }
@@ -11736,6 +11780,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Daha fazla not göster"
+          }
+        }
+      }
+    },
+    "Show cards": {
+      "comment": "Tool row of Dot's own tool: cards shown in the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kart göster"
           }
         }
       }
@@ -14359,6 +14414,28 @@
         }
       }
     },
+    "Video %@": {
+      "comment": "VoiceOver: a video in the composer that is being prepared; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video %@"
+          }
+        }
+      }
+    },
+    "Video %@, %@": {
+      "comment": "VoiceOver: a video in the composer; the arguments are its name and its length",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video %@, %@"
+          }
+        }
+      }
+    },
     "View profile": {
       "comment": "Bot chat menu: opens the bot's profile",
       "localizations": {
@@ -14498,17 +14575,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir yardımcıyı bekliyor"
-          }
-        }
-      }
-    },
-    "Waiting for a reply": {
-      "comment": "Hand-off: the bot asked has not answered yet",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yanıt bekleniyor"
           }
         }
       }
@@ -15345,13 +15411,13 @@
         }
       }
     },
-    "Written after Dot read content from outside.": {
+    "Written after Dot read content from outside": {
       "comment": "Work order and objective: written by a run that read pages or mail others can write",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dot dışarıdan içerik okuduktan sonra yazıldı."
+            "value": "Dot dışarıdan içerik okuduktan sonra yazıldı"
           }
         }
       }
@@ -15975,6 +16041,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "zemin"
+          }
+        }
+      }
+    },
+    "handed out %@": {
+      "comment": "Work order: when it was handed out; the argument is a span such as 2 hours ago",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ verildi"
           }
         }
       }

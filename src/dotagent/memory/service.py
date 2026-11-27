@@ -35,6 +35,7 @@ from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar,
 from dotagent.memory.words import lowercase, search_terms
 from dotagent.secrets import mask_filled
 from dotagent.store.db import Store
+from dotagent.store.kinds import REVIEW_PLAN, KindPlan, kind_rank
 from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryRewrite, MemoryScore
 
 log = get_logger("dotagent.memory")
@@ -546,6 +547,10 @@ class Remembered(FrozenModel):
     # How close in meaning each note taken is to the goal (rounded; item 1715), for a note found by meaning; empty when
     # the notes were found by their words alone.
     similarities: dict[str, float]
+    # The kind plan the notes were ranked by (item 1975, :func:`dotagent.store.kinds.kind_plan`), ``None`` when the
+    # run's source has none, and how many of the notes taken had no kind told yet (ranked after every kind).
+    plan: str | None
+    untold: int
 
 
 class LiveNotes(FrozenModel):
@@ -638,18 +643,43 @@ def any_note(record: MemoryRecord) -> bool:
 
 async def review_memories(index: MemoryIndex, query: str, budget: int, agent_id: str | None) -> Remembered:
     """The notes a code review starts with: :func:`prompt_memories` of the notes tagged as about code alone
-    (:func:`about_code`), the standing ones among them. A review reads a diff, and the owner's other notes, their
-    business and Dot's character, tell it nothing about the code."""
-    return await _starting_notes(index, query, budget, agent_id, about_code)
+    (:func:`about_code`), the standing ones among them, ranked by :data:`REVIEW_PLAN`. A review reads a diff, and the
+    owner's other notes, their business and Dot's character, tell it nothing about the code."""
+    return await _starting_notes(index, query, budget, agent_id, about_code, REVIEW_PLAN)
 
 
 async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id: str | None) -> Remembered:
-    """:func:`_starting_notes` of every note (:func:`any_note`)."""
-    return await _starting_notes(index, query, budget, agent_id, any_note)
+    """:func:`_starting_notes` of every note (:func:`any_note`), in the order they were before kinds."""
+    return await _starting_notes(index, query, budget, agent_id, any_note, None)
+
+
+async def planned_memories(
+    index: MemoryIndex, query: str, budget: int, agent_id: str | None, plan: KindPlan
+) -> Remembered:
+    """:func:`_starting_notes` of every note (:func:`any_note`), ranked by kind as ``plan`` says (item 1975)."""
+    return await _starting_notes(index, query, budget, agent_id, any_note, plan)
+
+
+def _stands_in(record: MemoryRecord, plan: KindPlan | None) -> bool:
+    """Whether a standing or owner-written note is handed whatever the goal under ``plan``: always without a plan,
+    and with one when its kind is one the plan keeps standing, or is not told yet (it is not left out unread)."""
+    return plan is None or record.kind is None or record.kind in plan.standing
+
+
+def _by_kind(notes: Sequence[MemoryRecord], plan: KindPlan | None) -> list[MemoryRecord]:
+    """``notes`` in ``plan``'s order of kinds, keeping their order within a kind; as they are without a plan."""
+    if plan is None:
+        return list(notes)
+    return sorted(notes, key=lambda record: kind_rank(record.kind, plan))
 
 
 async def _starting_notes(
-    index: MemoryIndex, query: str, budget: int, agent_id: str | None, admits: Callable[[MemoryRecord], bool]
+    index: MemoryIndex,
+    query: str,
+    budget: int,
+    agent_id: str | None,
+    admits: Callable[[MemoryRecord], bool],
+    plan: KindPlan | None,
 ) -> Remembered:
     """The notes a run of the agent ``agent_id`` (``None`` for Dot) starts with, of those ``admits`` takes, without
     repeats, as many as fit
@@ -664,13 +694,16 @@ async def _starting_notes(
     counted (``tainted_left_out``).
 
     A goal is full of everyday words that match unrelated notes, so when embeddings are on only the notes whose
-    meaning clearly fits the query are taken; ``memory_search`` still finds the others, and the resting ones."""
+    meaning clearly fits the query are taken; ``memory_search`` still finds the others, and the resting ones.
+
+    With a ``plan`` (item 1975), the standing and owner-written notes of a kind the plan does not keep standing are
+    handed only when they fit the goal, as Dot's other notes are, and each group is in the plan's order of kinds."""
     config: MemoryConfig = index.config
     now: float = time.time()
     standing: list[MemoryRecord] = [
         record
         for record in await index.store.memories_with_tag(CORE_TAG, _FETCH_NOTES)
-        if stands(record) and visible_to(record, agent_id) and not expired(record, now)
+        if stands(record) and visible_to(record, agent_id) and not expired(record, now) and _stands_in(record, plan)
     ]
     candidates: list[MemoryHit] = await recall_for(index, query, config.candidate_pool, agent_id)
     similarities: dict[str, float] = {hit.record.id: hit.similarity for hit in candidates if hit.similarity is not None}
@@ -680,7 +713,10 @@ async def _starting_notes(
         [
             record
             for record in written
-            if record.id not in known and visible_to(record, agent_id) and not expired(record, now)
+            if record.id not in known
+            and visible_to(record, agent_id)
+            and not expired(record, now)
+            and _stands_in(record, plan)
         ],
         similarities,
         _FETCH_NOTES,
@@ -703,7 +739,7 @@ async def _starting_notes(
     own: list[MemoryRecord] = [record for record in fresh if record.agent_id is not None]
     shared: list[MemoryRecord] = [record for record in fresh if record.agent_id is None]
     groups: tuple[list[MemoryRecord], ...] = (standing, users, own, shared)
-    groups = tuple([record for record in group if admits(record)] for group in groups)
+    groups = tuple(_by_kind([record for record in group if admits(record)], plan) for group in groups)
     tainted: int = sum(1 for group in groups for record in group if record.tainted)
     taken, spent = fit_groups(tuple([record for record in group if not record.tainted] for group in groups), budget)
     return Remembered(
@@ -711,6 +747,8 @@ async def _starting_notes(
         tokens=spent,
         tainted_left_out=tainted,
         similarities={note.id: round(similarities[note.id], 3) for note in taken if note.id in similarities},
+        plan=None if plan is None else plan.name,
+        untold=sum(1 for note in taken if note.kind is None),
     )
 
 

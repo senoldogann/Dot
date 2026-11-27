@@ -66,6 +66,7 @@ from dotagent.core.paths import (
     web_research_dir,
     workspace_dir,
 )
+from dotagent.desktop.cua import starter_of
 from dotagent.desktop.pointer import PointerOverlay
 from dotagent.desktop.presence import mac_presence
 from dotagent.dot_app import app_path, build_path, runtime_path
@@ -108,6 +109,7 @@ from dotagent.tools.appearance import build_appearance_tools
 from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.campaign import build_campaign_tools
+from dotagent.tools.cards import build_cards_tool
 from dotagent.tools.codes import build_code_tools
 from dotagent.tools.coding_work import build_coding_work_tool
 from dotagent.tools.consult import build_consult_tools
@@ -322,6 +324,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_recon_tool(), build_security_tool()),
         build_meta_tools(),
         build_page_tools(),
+        (build_cards_tool(),),
         build_image_tools(),
         build_appearance_tools(),
         (build_coding_work_tool(),),
@@ -676,6 +679,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
                 browsers.chrome_pids,
                 PointerOverlay(config.desktop.show_pointer),
                 mac_presence(config.desktop.away_after_s),
+                starter_of(config.desktop),
             ),
             safari=SafariDesk(),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),

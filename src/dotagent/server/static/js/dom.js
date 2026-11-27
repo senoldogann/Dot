@@ -430,6 +430,20 @@ export function workingFor(ts) {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+/** "12s", "3m 05s", "2h 10m": how long something has worked, in whole seconds, as a clock that ticks once a second
+ * says it (the capsule's, item 2000, as DotNext's pill says it). */
+export function elapsed(seconds) {
+  const whole = Math.max(0, Math.floor(seconds));
+  if (whole < 60) {
+    return `${whole}s`;
+  }
+  const minutes = Math.floor(whole / 60);
+  if (minutes < 60) {
+    return `${minutes}m ${String(whole % 60).padStart(2, "0")}s`;
+  }
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
 /** "850 ms", "12.4 s", "3m 05s", "2h 10m" */
 /** The milliseconds of a motion token of the stylesheet ("--motion-base"), for a script that waits for a slide to end. */
 export function motionMs(token) {

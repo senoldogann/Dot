@@ -1073,6 +1073,60 @@ export async function blobUrl(path) {
   return URL.createObjectURL(await response.blob());
 }
 
+/**
+ * The first `bytes` of the file the daemon answers at `path` as a `Blob` (a `Range` read, token in the header): a video's
+ * tile reads its first frame and its length from the start of the file without fetching all of it (item 1992).
+ */
+export async function partialBlob(path, bytes) {
+  await proven();
+  let response;
+  try {
+    response = await fetch(`/api${path}`, { headers: { ...authHeaders(), Range: `bytes=0-${bytes - 1}` }, cache: "no-store" });
+  } catch (cause) {
+    throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
+  }
+  if (!response.ok) {
+    throw await errorOf(response, path);
+  }
+  return response.blob();
+}
+
+/**
+ * Send `file` as the raw body of `PUT /api{path}` and tell `progress` (0 to 1) how much has gone, which `fetch` cannot:
+ * the tile of a video fills its ring with it (item 1992). Answers what the daemon answers, as `api.put` does.
+ */
+export async function uploadFile(path, file, progress) {
+  await proven();
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", `/api${path}`);
+    for (const [name, value] of Object.entries(authHeaders())) {
+      request.setRequestHeader(name, value);
+    }
+    request.setRequestHeader("Content-Type", file.type === "" ? "application/octet-stream" : file.type);
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) {
+        progress(event.loaded / event.total);
+      }
+    });
+    request.addEventListener("error", () => {
+      noteUnreachable();
+      reject(new ApiError(0, UNREACHABLE, { path, cause: "the upload could not be sent" }));
+    });
+    request.addEventListener("load", async () => {
+      const answer = new Response(request.responseText, { status: request.status, headers: { "Content-Type": request.getResponseHeader("Content-Type") ?? "application/json" } });
+      if (!answer.ok) {
+        reject(await errorOf(answer, path));
+        return;
+      }
+      sharedReads.clear();
+      flights.clear();
+      resolve(JSON.parse(request.responseText));
+    });
+    request.send(file);
+  });
+}
+
 /** A `blob:` URL for a frame of a screencast, a JPEG sent in base64, which the caller revokes. A plain loop decodes it
  * (item 674): `Uint8Array.from` with a mapping function calls it once a byte, twenty times as slow, and a watched
  * browser sends several frames a second. */
