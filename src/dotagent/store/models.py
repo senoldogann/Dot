@@ -709,6 +709,9 @@ class QueuedMessage(FrozenModel):
     # The question card this message answers (item 1984): the answer to a question whose run's thread had another run
     # at work then waits here for it, and starts as the continuation of the run that asked (``RunManager._carry_on``).
     answers: str | None = None
+    # The run whose words this message is carried from (item 2012): the fast model sent it to a task, so it starts that
+    # task's next run as carried words, which clear nothing, not as the owner's own message.
+    carried_from: str | None = None
 
 
 class ReactionRecord(FrozenModel):

@@ -22,7 +22,7 @@ from dotagent.agent.attachments import (
     load_attachments,
     steer_event,
 )
-from dotagent.agent.busy import is_separate
+from dotagent.agent.busy import OpenTask, RouteVerdict, is_separate, route_message
 from dotagent.agent.campaign import (
     BRIEF_ENTRIES,
     BRIEF_QUESTIONS,
@@ -54,6 +54,18 @@ from dotagent.agent.helper_reports import (
     plan_limit_of,
 )
 from dotagent.agent.keep_going import keep_going_ask
+from dotagent.agent.lanes import (
+    OPEN_TASK_S,
+    ChatTask,
+    RoutedMessage,
+    SplitMessage,
+    TaskWords,
+    is_stop_only,
+    new_task_words,
+    prose_question,
+    quoted_task,
+    split_quote,
+)
 from dotagent.agent.learning_health import (
     LearningOutcome,
     LearningWork,
@@ -393,6 +405,20 @@ def run_way(provider: str) -> Callable[[AgentRun], Awaitable[RunEnd]]:
             return run_agent
 
 
+def _said_of(run: RunRecord) -> str:
+    """What a run of a chat said, as a new lane is told it (item 1984): its reply, or how it stands when it has none."""
+    if run.status in WORKING_STATUSES:
+        return "(still at work)"
+    if run.result.strip() != "":
+        return truncate_middle(run.result, _LANE_CONTEXT_CHARS)
+    return {"cancelled": "(stopped)", "failed": "(failed)", "blocked": "(blocked)"}.get(run.status, "(no reply)")
+
+
+def _task_words(tasks: list[ChatTask]) -> tuple[TaskWords, ...]:
+    """The words of each task's messages a quote may name (item 2012)."""
+    return tuple(TaskWords(thread_id=task.thread_id, texts=task.texts) for task in tasks)
+
+
 def thread_title(goal: str) -> str:
     lines: list[str] = goal.strip().splitlines()
     first_line: str = lines[0] if lines else "Untitled"
@@ -693,6 +719,10 @@ class RunManager:
             # A clean shutdown leaves the queue to the run that goes on from it. A crash holds it until that
             # resumed run ends done. Anything else waits for the owner (:func:`hold_reason_for_cutoff`).
             reason: str | None = hold_reason_for_cutoff(None if not newest else cut_off_by(newest[0]))
+            # A queue held for a free task of its chat (item 2012) waits for the owner once the daemon has stopped:
+            # the tasks it waited on were cut, and `chat_tasks` may have changed since.
+            if await store.release_hold(thread_id, "tasks"):
+                reason = "owner"
             if reason is not None:
                 await store.hold_queue(thread_id, reason)
         await asyncio.to_thread(clear_gone_owners, directory)
@@ -2624,6 +2654,51 @@ class RunManager:
         the run at work is held by a ✋ lets it go on: the owner has written, and their message waits in the queue as
         any does."""
         store: Store = self._runtime.store
+        newest: RunRecord = await self._check_queued(
+            thread_id, text, mode, model, speed, once, picks, approvals, agent_id, source
+        )
+        message: QueuedMessage = await store.add_queued(
+            thread_id,
+            text,
+            [file.id for file in files],
+            mode,
+            model,
+            effort,
+            speed,
+            once,
+            picks,
+            approvals,
+            goal_mode,
+            agent_id,
+            source,
+            follow_up,
+        )
+        await self._queue_changed(thread_id, None, None, None)
+        holder: RunHandle | None = self._active_on(thread_id)
+        if holder is not None and holder.inbox.holding and follow_up is None:
+            # A run whose end is being recorded reads nothing more, and needs no letting go.
+            with suppress(RunConflict):
+                self.tell(holder.run_id, RELEASE_NOTE, "release")
+        await self._drain(thread_id, newest.id)
+        return message
+
+    async def _check_queued(
+        self,
+        thread_id: str,
+        text: str,
+        mode: RunMode,
+        model: str | None,
+        speed: Speed,
+        once: OneMessage | None,
+        picks: RunPicks,
+        approvals: ApprovalMode | None,
+        agent_id: str | None,
+        source: str,
+    ) -> RunRecord:
+        """Refuse a message the chat ``thread_id`` could not start as its next run (:meth:`queue`): fast mode or a level
+        for one message its model does not offer, a model that cannot answer, picks the run could not start with, a
+        chat with no run yet, a campaign's chat and a delegated run's thread. Returns the chat's newest run."""
+        store: Store = self._runtime.store
         thread: ThreadRecord = await store.get_thread(thread_id)
         chosen_agent: str | None = thread.agent_id if agent_id is None else agent_id
         agent: AgentRecord | None = None if chosen_agent is None else await store.get_agent(chosen_agent)
@@ -2650,30 +2725,7 @@ class RunManager:
                 "the thread of a delegated run takes no queue: the run that delegated it decides what follows",
                 {"thread_id": thread_id, "parent_run_id": newest[0].parent_run_id},
             )
-        message: QueuedMessage = await store.add_queued(
-            thread_id,
-            text,
-            [file.id for file in files],
-            mode,
-            model,
-            effort,
-            speed,
-            once,
-            picks,
-            approvals,
-            goal_mode,
-            agent_id,
-            source,
-            follow_up,
-        )
-        await self._queue_changed(thread_id, None, None, None)
-        holder: RunHandle | None = self._active_on(thread_id)
-        if holder is not None and holder.inbox.holding and follow_up is None:
-            # A run whose end is being recorded reads nothing more, and needs no letting go.
-            with suppress(RunConflict):
-                self.tell(holder.run_id, RELEASE_NOTE, "release")
-        await self._drain(thread_id, newest[0].id)
-        return message
+        return newest[0]
 
     async def start_beside(
         self,
@@ -2784,6 +2836,12 @@ class RunManager:
             )
         except BaseException:
             await _uncancelled(store.drop_unstarted_lane(lane.id))
+            # Its place may have held a message back (item 2012): one of the chat's is free again. A failure to free
+            # it is logged, so that the lane's own failure is what the caller is told.
+            try:
+                await _uncancelled(self._free_tasks(chat_id))
+            except DotError as freeing:
+                log.warning("tasks_not_freed", thread_id=chat_id, error=freeing.message, context=freeing.context)
             raise
 
     async def _chat_so_far(self, chat_id: str) -> str:
@@ -2803,14 +2861,524 @@ class RunManager:
         ]
         for run in newest:
             lines.append(f"- The owner: {truncate_middle(run.goal, _LANE_CONTEXT_CHARS)}")
-            said: str = (
-                "(still at work)"
-                if run.status in WORKING_STATUSES
-                else truncate_middle(run.result, _LANE_CONTEXT_CHARS)
-            )
-            lines.append(f"  Dot: {said}")
+            lines.append(f"  Dot: {_said_of(run)}")
         lines.append("The new task, the owner's words:")
         return "\n".join(lines)
+
+    async def route_message(
+        self,
+        thread_id: str,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+    ) -> RoutedMessage | None:
+        """Send ``text``, sent to the chat (or the lane) ``thread_id`` of a chat with several tasks (item 2012, slice 2
+        of item 1982's design), where it belongs; ``None`` when it goes where it went before (the caller queues it
+        there): ``[agent] chat_tasks`` is 1, the chat is an agent's, a team's, a campaign's or a delegated run's, or
+        nothing settles it. In order:
+
+        1. Words that are only a stop ("dur") while a task works stop every task of the chat, or, quoting one task's
+           message, that task alone.
+        2. A quote of a task's message goes to that task, as the owner's word: steered into its run at work, else its
+           next message.
+        3. ``/new <words>`` starts a new task.
+        4. With no task at work and none waiting on the owner, the message goes here, as before.
+        5. Else the fast model is asked which open task it belongs to, shown the owner's words alone
+           (:func:`~dotagent.agent.busy.route_message`). The thread the message was sent to takes it as before: the
+           owner wrote there. Any other task's verdict never vouches: a task at work gets the message in its queue,
+           never as a steer; a task that ended asking starts its next run with the words as carried ones, as tainted
+           as that task ended. ``0`` starts a new task, as ``/new`` does. A doubt goes where the message went
+           before.
+
+        A task that would start while the chat has ``chat_tasks`` at work waits for a free one (:meth:`_queue_in_task`).
+        """
+        if self._runtime.config.agent.chat_tasks <= 1:
+            return None
+        store: Store = self._runtime.store
+        thread: ThreadRecord = await store.get_thread(thread_id)
+        if thread.team_id is not None or thread.agent_id is not None:
+            return None
+        chat_id: str = thread_id if thread.lane_of is None else thread.lane_of
+        newest: list[RunRecord] = await store.list_runs(1, chat_id)
+        if not newest or newest[0].campaign_id is not None or newest[0].parent_run_id is not None:
+            return None
+        tasks: list[ChatTask] = await self._chat_tasks_of(chat_id)
+        split: SplitMessage = split_quote(text)
+        named: str | None = None if split.quote is None else quoted_task(split.quote, _task_words(tasks))
+        if is_stop_only(split.words) and any(task.at_work for task in tasks):
+            return await self._stop_routed(chat_id, named, tasks)
+        if named is not None:
+            return await self._send_quoted(
+                chat_id, named, text, files, mode, model, effort, speed, approvals, goal_mode, source
+            )
+        words: str | None = new_task_words(split.words)
+        if words is not None:
+            return await self._start_routed(
+                chat_id, thread_id, words, files, mode, model, effort, speed, approvals, goal_mode, source
+            )
+        open_tasks: list[ChatTask] = [task for task in tasks if task.at_work or task.asked is not None]
+        if not open_tasks:
+            return None
+        stops: int = self._chat_stops.get(chat_id, 0)
+        verdict: RouteVerdict = await route_message(
+            self._runtime.router,
+            self._runtime.roles.fast(),
+            _BESIDE_JUDGE_S,
+            f"{chat_id}:route",
+            tuple(
+                OpenTask(words=task.goal, at_work=task.at_work, question=task.asked if task.shown else None)
+                for task in open_tasks
+            ),
+            text,
+        )
+        # A Stop of the chat while the fast model answered: the message goes where it went before, to a held queue.
+        if verdict.task is None or self._chat_stops.get(chat_id, 0) != stops:
+            return None
+        log.info("message_routed", thread_id=chat_id, task=verdict.task, tasks=len(open_tasks))
+        if verdict.task == 0:
+            return await self._start_routed(
+                chat_id, thread_id, text, files, mode, model, effort, speed, approvals, goal_mode, source
+            )
+        chosen: ChatTask = open_tasks[verdict.task - 1]
+        if chosen.thread_id == thread_id:
+            return None
+        if chosen.at_work:
+            message: QueuedMessage = await self._queue_carried(
+                chat_id, chosen, text, files, mode, model, effort, speed, approvals, goal_mode, source
+            )
+            return RoutedMessage(kind="queued", thread_id=chosen.thread_id, run_id=None, message_id=message.id)
+        return await self._continue_task(
+            chat_id, chosen, text, files, mode, model, effort, speed, approvals, goal_mode, source
+        )
+
+    async def _chat_tasks_of(self, chat_id: str) -> list[ChatTask]:
+        """The tasks of the chat ``chat_id`` (item 2012): the chat's own and each lane's, each with its newest run of
+        the owner's, whether it works, the question it waits on (a card left unanswered, or a reply ending with a
+        question within ``OPEN_TASK_S``) and whether that question's words may be shown to the router."""
+        store: Store = self._runtime.store
+        now: float = time.time()
+        tasks: list[ChatTask] = []
+        for thread_id in (chat_id, *await store.lanes_of(chat_id)):
+            runs: list[RunRecord] = [
+                run for run in await store.list_runs(_LANE_CONTEXT_RUNS, thread_id) if run.parent_run_id is None
+            ]
+            if not runs:
+                continue
+            newest: RunRecord = runs[0]
+            # The words the router is shown are the owner's own: the newest run of the task that they set going.
+            owners: RunRecord | None = next((run for run in runs if run.source not in _NOT_THE_OWNERS_WORDS), None)
+            at_work: bool = newest.status in WORKING_STATUSES
+            cards: list[ApprovalRecord] = await store.left_questions(thread_id)
+            recent: bool = newest.finished_at is not None and now - newest.finished_at < OPEN_TASK_S
+            in_prose: str | None = prose_question(newest.result) if newest.status == "done" and recent else None
+            asked: str | None = cards[-1].summary if cards else in_prose
+            tasks.append(
+                ChatTask(
+                    thread_id=thread_id,
+                    newest_run_id=newest.id,
+                    goal="" if owners is None else owners.goal,
+                    at_work=at_work,
+                    asked=asked,
+                    shown=not await self._task_tainted(newest, at_work),
+                    texts=(
+                        *(text for run in runs for text in (run.goal, run.result) if text),
+                        *(card.summary for card in cards),
+                    ),
+                )
+            )
+        return tasks
+
+    async def _task_tainted(self, newest: RunRecord, at_work: bool) -> bool:
+        """Whether the task's newest run read content a third party wrote: its gate's mark while it works in this
+        process (one of another process counts as tainted), its end's mark once it ended."""
+        if not at_work:
+            return await self._ended_tainted(newest.id)
+        handle: RunHandle | None = self._handles.get(newest.id)
+        return True if handle is None else handle.gate.tainted
+
+    async def _stop_routed(self, chat_id: str, named: str | None, tasks: list[ChatTask]) -> RoutedMessage:
+        """A stop sent as words (item 2012): of the task a quote names, which stops nothing when that task does not
+        work; with no quote that names one, of every task of the chat."""
+        if named is None:
+            await self.stop_chat(chat_id)
+            return RoutedMessage(kind="stopped", thread_id=chat_id, run_id=None, message_id=None)
+        quoted: ChatTask | None = next((task for task in tasks if task.thread_id == named and task.at_work), None)
+        if quoted is None:
+            log.info("task_stop_quoted_at_rest", thread_id=named)
+            return RoutedMessage(kind="stopped", thread_id=named, run_id=None, message_id=None)
+        await self.stop(quoted.newest_run_id)
+        log.info("task_stopped_by_words", thread_id=quoted.thread_id, run_id=quoted.newest_run_id)
+        return RoutedMessage(kind="stopped", thread_id=quoted.thread_id, run_id=quoted.newest_run_id, message_id=None)
+
+    async def _send_quoted(
+        self,
+        chat_id: str,
+        task_thread: str,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+    ) -> RoutedMessage:
+        """A message that quotes a task's message, the owner's own word for that task (item 2012): steered into its run
+        at work, else its next message (:meth:`_queue_in_task`)."""
+        holder: RunHandle | None = self._active_on(task_thread)
+        if holder is not None and not holder.inbox.holding:
+            try:
+                self.steer(holder.run_id, text, files)
+            except RunConflict:
+                log.info("quoted_task_ended", thread_id=task_thread, run_id=holder.run_id)
+            else:
+                return RoutedMessage(kind="steered", thread_id=task_thread, run_id=holder.run_id, message_id=None)
+        message: QueuedMessage = await self._queue_in_task(
+            chat_id, task_thread, text, files, mode, model, effort, speed, approvals, goal_mode, source
+        )
+        started: RunHandle | None = self._active_on(task_thread)
+        return RoutedMessage(
+            kind="queued",
+            thread_id=task_thread,
+            run_id=None if started is None else started.run_id,
+            message_id=message.id,
+        )
+
+    async def _start_routed(
+        self,
+        chat_id: str,
+        thread_id: str,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+    ) -> RoutedMessage:
+        """A new task of the chat (item 2012); with ``chat_tasks`` at work, the message waits in the queue of the thread
+        it was sent to until one ends."""
+        run: RunRecord | None = await self._start_lane(
+            chat_id, text, files, mode, model, effort, speed, approvals, goal_mode, source
+        )
+        if run is not None:
+            return RoutedMessage(kind="new", thread_id=run.thread_id, run_id=run.id, message_id=None)
+        message: QueuedMessage = await self._queue_in_task(
+            chat_id, thread_id, text, files, mode, model, effort, speed, approvals, goal_mode, source
+        )
+        return RoutedMessage(kind="queued", thread_id=thread_id, run_id=None, message_id=message.id)
+
+    async def _continue_task(
+        self,
+        chat_id: str,
+        task: ChatTask,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+    ) -> RoutedMessage:
+        """The fast model's word that ``text`` belongs to ``task``, which ended asking the owner (item 2012): the task's
+        next run, its words carried from the task's last run, so that they clear nothing and the run starts as tainted
+        as that run ended. A task whose queue holds messages or is held, or a chat with ``chat_tasks`` at work, takes it
+        in its queue instead."""
+        store: Store = self._runtime.store
+        busy: bool = (
+            self._active_on(task.thread_id) is not None
+            or bool(await store.list_queued(task.thread_id))
+            or await store.queue_held(task.thread_id)
+            or await store.chat_tasks_at_work(chat_id) >= self._runtime.config.agent.chat_tasks
+        )
+        if busy:
+            message: QueuedMessage = await self._queue_carried(
+                chat_id, task, text, files, mode, model, effort, speed, approvals, goal_mode, source
+            )
+            return RoutedMessage(kind="queued", thread_id=task.thread_id, run_id=None, message_id=message.id)
+        run, _ = await self._launch(
+            text,
+            mode,
+            model,
+            task.thread_id,
+            source,
+            None,
+            effort,
+            speed,
+            approvals,
+            goal_mode_asked(text, mode, goal_mode),
+            RunOpening(text=text, files=files, resumed=None, once=None, carried=(task.newest_run_id,), picks=NO_PICKS),
+            None,
+            None,
+        )
+        return RoutedMessage(kind="continued", thread_id=task.thread_id, run_id=run.id, message_id=None)
+
+    async def _queue_in_task(
+        self,
+        chat_id: str,
+        task_thread: str,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+    ) -> QueuedMessage:
+        """Put ``text`` in the queue of the task ``task_thread`` of the chat ``chat_id`` (item 2012): it starts as the
+        task's next run, at once when the task is free, unless the chat has ``[agent] chat_tasks`` at work: then the
+        queue is held for a free task (``tasks``), which a task's end releases (:meth:`_free_tasks`)."""
+        await self._hold_if_full(chat_id, task_thread)
+        return await self.queue(
+            task_thread,
+            text,
+            files,
+            mode,
+            model,
+            effort,
+            speed,
+            None,
+            NO_PICKS,
+            approvals,
+            goal_mode,
+            None,
+            source,
+        )
+
+    async def _queue_carried(
+        self,
+        chat_id: str,
+        task: ChatTask,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+    ) -> QueuedMessage:
+        """Put ``text``, which the fast model said belongs to ``task``, in that task's queue as words carried from its
+        newest run (item 2012): it starts the task's next run with them carried (:meth:`_start_queued`), so that a
+        verdict of the model clears nothing, whenever it starts. Held for a free task as :meth:`_queue_in_task` is."""
+        store: Store = self._runtime.store
+        newest: RunRecord = await self._check_queued(
+            task.thread_id, text, mode, model, speed, None, NO_PICKS, approvals, None, source
+        )
+        await self._hold_if_full(chat_id, task.thread_id)
+        message: QueuedMessage = await store.add_queued_carried(
+            task.thread_id,
+            text,
+            [file.id for file in files],
+            mode,
+            model,
+            effort,
+            speed,
+            approvals,
+            goal_mode,
+            source,
+            task.newest_run_id,
+        )
+        await self._queue_changed(task.thread_id, None, None, None)
+        holder: RunHandle | None = self._active_on(task.thread_id)
+        if holder is not None and holder.inbox.holding:
+            # The owner has written: a run held by a ✋ goes on, as for any message queued (:meth:`queue`).
+            with suppress(RunConflict):
+                self.tell(holder.run_id, RELEASE_NOTE, "release")
+        await self._drain(task.thread_id, newest.id)
+        return message
+
+    async def hold_for_free_task(self, thread_id: str) -> None:
+        """Hold the queue of ``thread_id`` for a free task (item 2012) when a message put there would start a task of a
+        chat that has ``[agent] chat_tasks`` at work: the way a message goes where it was sent, as before."""
+        if self._runtime.config.agent.chat_tasks <= 1:
+            return
+        await self._hold_if_full(await self._chat_of(thread_id), thread_id)
+
+    async def _hold_if_full(self, chat_id: str, task_thread: str) -> None:
+        """Hold the queue of the task ``task_thread`` for a free task (``tasks``) when nothing works there and the chat
+        ``chat_id`` has ``[agent] chat_tasks`` at work, so that what it is given waits for one of them to end."""
+        store: Store = self._runtime.store
+        if (
+            self._active_on(task_thread) is None
+            and await store.chat_tasks_at_work(chat_id) >= self._runtime.config.agent.chat_tasks
+        ):
+            await store.hold_queue(task_thread, "tasks")
+
+    async def _free_tasks(self, thread_id: str) -> None:
+        """A task of a chat with several ended (item 2012): let the queues held for a free task go on, the chat's own
+        first and then its lanes, oldest first, while the chat has fewer than ``[agent] chat_tasks`` at work."""
+        store: Store = self._runtime.store
+        chat_id: str = await self._chat_of(thread_id)
+        cap: int = self._runtime.config.agent.chat_tasks
+        for task_thread in (chat_id, *await store.lanes_of(chat_id)):
+            if await store.queue_hold_reason(task_thread) != "tasks":
+                continue
+            if await store.chat_tasks_at_work(chat_id) >= cap:
+                return
+            await store.release_hold(task_thread, "tasks")
+            await self._queue_changed(task_thread, None, None, None)
+            newest: list[RunRecord] = await store.list_runs(1, task_thread)
+            if newest:
+                await self._drain(task_thread, newest[0].id)
+
+    async def move_queued(self, message_id: str, to_thread: str | None) -> RoutedMessage:
+        """Move a message the router put in a task's queue (item 2012, **Move**) to the task ``to_thread`` of the same
+        chat, or to a new task (``None``): the owner's own word, as a quote is. One starting as its task's next run is
+        refused, as an edit is."""
+        store: Store = self._runtime.store
+        message: QueuedMessage = await store.get_queued(message_id)
+        if (
+            message.answers is not None
+            or message.picks != NO_PICKS
+            or message.once is not None
+            or message.agent_id is not None
+            or message.follow_up is not None
+        ):
+            raise InvalidValueError(
+                "only a plain message moves to another task: an answer, a message for one level, for an agent, with "
+                "picks or following a reaction stays where it is",
+                {"message_id": message_id, "thread_id": message.thread_id},
+            )
+        chat_id: str = await self._chat_of(message.thread_id)
+        if to_thread is not None and await self._chat_of(to_thread) != chat_id:
+            raise InvalidValueError(
+                "a message moves to a task of its own chat", {"message_id": message_id, "to_thread_id": to_thread}
+            )
+        await self._check_queued(
+            chat_id if to_thread is None else to_thread,
+            message.text,
+            message.mode,
+            message.model,
+            message.speed,
+            None,
+            NO_PICKS,
+            message.approvals,
+            None,
+            message.source,
+        )
+        files: tuple[StoredAttachment, ...] = await load_attachments(self._runtime.workspace, message.attachments)
+        taken: QueuedMessage = await store.take_queued(message_id)
+        try:
+            moved: RoutedMessage = await self._move_taken(chat_id, taken, files, to_thread)
+        except BaseException:
+            await _uncancelled(self._put_back(taken))
+            raise
+        await self._queue_changed(taken.thread_id, None, None, None)
+        log.info("message_moved", message_id=message_id, from_thread=taken.thread_id, to_thread=to_thread)
+        return moved
+
+    async def _move_taken(
+        self, chat_id: str, taken: QueuedMessage, files: tuple[StoredAttachment, ...], to_thread: str | None
+    ) -> RoutedMessage:
+        """Send a message taken out of its queue to the task ``to_thread`` (a new one for ``None``), as the owner's word
+        (:meth:`move_queued`)."""
+        if to_thread is None:
+            return await self._start_routed(
+                chat_id,
+                taken.thread_id,
+                taken.text,
+                files,
+                taken.mode,
+                taken.model,
+                taken.effort,
+                taken.speed,
+                taken.approvals,
+                taken.goal_mode,
+                taken.source,
+            )
+        return await self._send_quoted(
+            chat_id,
+            to_thread,
+            taken.text,
+            files,
+            taken.mode,
+            taken.model,
+            taken.effort,
+            taken.speed,
+            taken.approvals,
+            taken.goal_mode,
+            taken.source,
+        )
+
+    async def move_run(self, run_id: str, to_thread: str | None) -> RoutedMessage:
+        """Move a task's run at work (item 2012, **Move**: the router sent its words to the wrong task) to the task
+        ``to_thread`` of the same chat or to a new task (``None``): the run is stopped and its goal goes there as the
+        owner's own word, as a quote does. The files it was started with are not sent again."""
+        store: Store = self._runtime.store
+        run: RunRecord = await store.get_run(run_id)
+        if run.parent_run_id is not None or run.status not in WORKING_STATUSES:
+            raise RunConflict("only a task's run at work can be moved", {"run_id": run_id, "status": run.status})
+        chat_id: str = await self._chat_of(run.thread_id)
+        if to_thread is not None and (await self._chat_of(to_thread) != chat_id or to_thread == run.thread_id):
+            raise InvalidValueError(
+                "a run moves to another task of its own chat", {"run_id": run_id, "to_thread_id": to_thread}
+            )
+        # Checked before the run is stopped, so that a move that could not start leaves the run as it was.
+        await self._check_queued(
+            chat_id if to_thread is None else to_thread,
+            run.goal,
+            run.mode,
+            run.model,
+            run.speed,
+            None,
+            NO_PICKS,
+            run.approvals,
+            None,
+            run.source,
+        )
+        await self.stop(run_id)
+        # Its end is waited for, so that its place in the chat is free for the task its words start.
+        stopped: RunHandle | None = self._handles.get(run_id)
+        if stopped is not None:
+            await stopped.finished.wait()
+        log.info("run_moved", run_id=run_id, from_thread=run.thread_id, to_thread=to_thread)
+        if to_thread is None:
+            return await self._start_routed(
+                chat_id,
+                run.thread_id,
+                run.goal,
+                (),
+                run.mode,
+                run.model,
+                run.effort,
+                run.speed,
+                run.approvals,
+                run.goal_mode,
+                run.source,
+            )
+        return await self._send_quoted(
+            chat_id,
+            to_thread,
+            run.goal,
+            (),
+            run.mode,
+            run.model,
+            run.effort,
+            run.speed,
+            run.approvals,
+            run.goal_mode,
+            run.source,
+        )
+
+    async def _chat_of(self, thread_id: str) -> str:
+        """The chat of the thread ``thread_id``: itself, or the chat it is a lane of."""
+        thread: ThreadRecord = await self._runtime.store.get_thread(thread_id)
+        return thread_id if thread.lane_of is None else thread.lane_of
 
     async def edit_queued(self, message_id: str, text: str) -> str:
         """Change the text of a queued message; returns its chat. One starting as the chat's next run is refused."""
@@ -3025,6 +3593,9 @@ class RunManager:
         self._chat_stops[chat_id] = self._chat_stops.get(chat_id, 0) + 1
         stopped: list[str] = []
         for task_thread in (chat_id, *await store.lanes_of(chat_id)):
+            # A task waiting for a free one (item 2012) waits for the owner now: a task's end must not start it.
+            if await store.release_hold(task_thread, "tasks"):
+                await store.hold_queue(task_thread, "owner")
             newest: list[RunRecord] = await store.list_runs(1, task_thread)
             if not newest or newest[0].status not in WORKING_STATUSES:
                 continue
@@ -4854,6 +5425,8 @@ class RunManager:
         elif await store.list_queued(run.thread_id):
             await store.hold_queue(run.thread_id)
             await self._queue_changed(run.thread_id, None, None, None)
+        if self._runtime.config.agent.chat_tasks > 1:
+            await self._free_tasks(run.thread_id)
 
     async def _drain(self, thread_id: str, after_run_id: str) -> None:
         """Start the first message of a chat's queue as the chat's next run, unless the queue is held or a run of any
@@ -4923,6 +5496,31 @@ class RunManager:
         if message.answers is not None:
             return await self._start_answer(message, message.answers)
         files: tuple[StoredAttachment, ...] = await load_attachments(self._runtime.workspace, message.attachments)
+        if message.carried_from is not None:
+            # Words the fast model sent to this task (item 2012): carried, so that they clear nothing.
+            run, _ = await self._launch(
+                message.text,
+                message.mode,
+                message.model,
+                message.thread_id,
+                message.source,
+                None,
+                message.effort,
+                message.speed,
+                message.approvals,
+                goal_mode_asked(message.text, message.mode, message.goal_mode),
+                RunOpening(
+                    text=message.text,
+                    files=files,
+                    resumed=None,
+                    once=None,
+                    carried=(message.carried_from,),
+                    picks=NO_PICKS,
+                ),
+                None,
+                None,
+            )
+            return run
         return await self._start_in_chat(
             message.thread_id,
             message.text,

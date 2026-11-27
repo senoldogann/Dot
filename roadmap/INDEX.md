@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2012](2012.md) | built | 2026-11-27 | Several tasks in one chat, slice 2: where a message goes |
 | [2000](2000.md) | done | 2026-11-27 | The capsule's clock says whole seconds, as DotNext's pill does |
 | [1999](1999.md) | done | 2026-11-27 | A message sent in a chat is in it at once, with a quiet "Pending" and "Starting…", as DotNext does it |
 | [1998](1998.md) | in progress | 2026-11-27 | The web chat takes DotNext's decisions: what it already has, what differs, what is missing |

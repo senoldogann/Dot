@@ -31,6 +31,10 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_chat_routing.py::test_a_routed_message_is_checked_as_a_queued_one_and_move_keeps_what_it_cannot_move` — words the router queued for a task skipped a queued message's checks, and Move took out a message it could not
+  move (item 2012's review).
+- `tests/smoke/test_chat_routing.py::test_a_move_that_fails_loses_nothing` — a move that failed after the message was
+  taken out lost it, and a run was stopped before its move was checked (item 2012's review).
 - `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
   on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
   chat deleted (item 1962's review).

@@ -1157,6 +1157,7 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
         created_at=row["created_at"],
         follow_up=None if follow_up is None else FollowUpOf.model_validate_json(follow_up),
         answers=row["answers"],
+        carried_from=row["carried_from"],
     )
 
 
@@ -1466,6 +1467,8 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("follow_up", "TEXT"),
     # The question card a message answers (item 1984; NULL for any other message).
     ("answers", "TEXT"),
+    # The run whose words a message the router queued is carried from (item 2012; NULL for any other message).
+    ("carried_from", "TEXT"),
 )
 # Columns of ``harness_probes`` added later (item 589): the approvals the attempt's run asked, and how many of the
 # task's checks held of how many; an attempt recorded before holds none of the three.
@@ -1946,6 +1949,20 @@ _MOVING_SQL: str = ", ".join(f"'{status}'" for status in sorted(get_args(Working
 _OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATUSES))
 # Whether the run of the bound id works (item 1047).
 _RUN_WORKS_SQL: str = f"EXISTS (SELECT 1 FROM runs WHERE runs.id = ? AND runs.status IN ({_WORKING_SQL}))"
+
+
+# How long a lane with no run yet counts as a task at work (item 2012): its first run starts within moments of it, and a
+# lane a crash left without one stops taking a place of its chat's after this.
+LANE_START_GRACE_S: float = 60.0
+# How many tasks of a chat work (items 1984 and 2012): the chat and each of its lanes with a run of its own (not a
+# helper's) at work, and a lane made in the last LANE_START_GRACE_S with no run yet. Its marks: the chat twice, then
+# the time before which an empty lane no longer counts.
+_CHAT_TASKS_AT_WORK_SQL: str = (
+    "SELECT COUNT(*) FROM threads AS t WHERE (t.id = ? OR t.lane_of = ?) AND ("
+    " EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id AND runs.parent_run_id IS NULL"
+    f" AND runs.status IN ({_WORKING_SQL}))"
+    " OR (t.lane_of IS NOT NULL AND t.created_at > ? AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id)))"
+)
 
 
 def _thread_summaries_sql(where: str, order: str) -> str:
@@ -2854,11 +2871,7 @@ class Store:
         cursor: aiosqlite.Cursor = await self._db.execute(
             "INSERT INTO threads(id, title, source, created_at, updated_at, team_id, agent_id, lane_of)"
             " SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE ("
-            " SELECT COUNT(*) FROM threads AS t WHERE (t.id = ? OR t.lane_of = ?) AND ("
-            " EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id AND runs.parent_run_id IS NULL"
-            f" AND runs.status IN ({_WORKING_SQL}))"
-            " OR (t.lane_of IS NOT NULL AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id)))"
-            ") < ?",
+            f" {_CHAT_TASKS_AT_WORK_SQL}) < ?",
             (
                 record.id,
                 record.title,
@@ -2870,6 +2883,7 @@ class Store:
                 record.lane_of,
                 chat_id,
                 chat_id,
+                now - LANE_START_GRACE_S,
                 cap,
             ),
         )
@@ -2886,6 +2900,24 @@ class Store:
             (lane_id,),
         )
         await self._db.commit()
+
+    async def chat_tasks_at_work(self, chat_id: str) -> int:
+        """How many tasks of the chat ``chat_id`` work now, as :meth:`create_lane` counts them (item 2012)."""
+        row: aiosqlite.Row | None = await self._one(
+            f"SELECT ({_CHAT_TASKS_AT_WORK_SQL}) AS working", (chat_id, chat_id, time.time() - LANE_START_GRACE_S)
+        )
+        return 0 if row is None else int(row["working"])
+
+    async def left_questions(self, thread_id: str) -> list[ApprovalRecord]:
+        """The question cards the runs of the thread ``thread_id`` left and nobody answered yet, oldest first (item
+        2012): the questions its task waits on."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT approvals.* FROM approvals JOIN runs ON runs.id = approvals.run_id"
+            " WHERE approvals.status = 'left' AND approvals.kept_until IS NULL AND runs.thread_id = ?"
+            " ORDER BY approvals.created_at",
+            (thread_id,),
+        )
+        return [_approval(row) for row in rows]
 
     async def lanes_of(self, chat_id: str) -> list[str]:
         """The lanes of the chat ``chat_id`` (item 1984), oldest first."""
@@ -6106,12 +6138,57 @@ class Store:
         await self._db.commit()
         return record
 
+    @_writing
+    async def add_queued_carried(
+        self,
+        thread_id: str,
+        text: str,
+        attachments: Sequence[str],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+        carried_from: str,
+    ) -> QueuedMessage:
+        """Put a message the router sent to a task (item 2012) at the end of that task's queue, carried from the run
+        ``carried_from``: it starts the task's next run as carried words, not as the owner's own message."""
+        row = await self._one(
+            "SELECT COALESCE(MAX(position), 0) AS top FROM queued_messages WHERE thread_id = ?", (thread_id,)
+        )
+        record: QueuedMessage = QueuedMessage(
+            id=new_id("que"),
+            thread_id=thread_id,
+            position=(0 if row is None else int(row["top"])) + 1,
+            text=text,
+            attachments=tuple(attachments),
+            mode=mode,
+            model=model,
+            effort=effort,
+            speed=speed,
+            once=None,
+            picks=NO_PICKS,
+            approvals=approvals,
+            goal_mode=goal_mode,
+            agent_id=None,
+            source=source,
+            created_at=time.time(),
+            follow_up=None,
+            answers=None,
+            carried_from=carried_from,
+        )
+        await self._insert_queued(record)
+        await self._db.commit()
+        return record
+
     async def _insert_queued(self, record: QueuedMessage) -> None:
         """Store ``record`` in its chat's queue; the caller commits."""
         await self._db.execute(
             "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, speed, once,"
-            " picks, approvals, goal_mode, agent_id, source, created_at, follow_up, answers)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " picks, approvals, goal_mode, agent_id, source, created_at, follow_up, answers, carried_from)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -6131,6 +6208,7 @@ class Store:
                 record.created_at,
                 None if record.follow_up is None else record.follow_up.model_dump_json(),
                 record.answers,
+                record.carried_from,
             ),
         )
 
@@ -6296,10 +6374,13 @@ class Store:
     @_writing
     async def hold_queue(self, thread_id: str, reason: str = "owner") -> None:
         """Keep a chat's queue from starting its next message until :meth:`release_queue`. ``reason`` is ``owner``
-        (the owner resumes it) or ``crash`` (the run that goes on from a cut-off releases it when that run ends
-        done). A queue already held keeps the reason it has."""
-        if reason not in ("owner", "crash"):
-            raise InvalidValueError("a queue is held for the owner or for a crash", {"reason": reason})
+        (the owner resumes it), ``crash`` (the run that goes on from a cut-off releases it when that run ends
+        done) or ``tasks`` (its chat has as many tasks at work as it may, item 2012: one ending releases it). A queue
+        already held keeps the reason it has."""
+        if reason not in ("owner", "crash", "tasks"):
+            raise InvalidValueError(
+                "a queue is held for the owner, for a crash or for a free task of its chat", {"reason": reason}
+            )
         await self._db.execute(
             "INSERT OR IGNORE INTO queue_holds(thread_id, held_at, reason) VALUES(?, ?, ?)",
             (thread_id, time.time(), reason),
