@@ -1,7 +1,7 @@
 """A helper that starts late joins the group of its siblings (item 285), on the pages of a daemon in Chrome. A run
 delegates five helpers in one step while four tool calls run at a time, so the fifth starts only once one of the
 first four has ended: here the delegate tool's time limit, cut to a few seconds, stops the four, which wait in a
-shell command. The fifth joins their group, whose head says "5 subagents" and "1 working · 4 stopped", and the rings of
+shell command. The fifth joins their group, whose head says "5 helpers" and "1 working · 4 stopped", and the rings of
 the four stopped rows stand still; once the limit stops the fifth too, the head says "5 stopped", no ring spins, and
 the page loaded again shows the same. Before, the fifth opened a group of its own and the head kept saying "4
 helpers". The run is YOLO and a rule asks before each helper, so each call is a question the mode waives and draws no
@@ -147,10 +147,10 @@ async def test_a_helper_that_starts_late_joins_the_group_and_stopped_ones_stand_
                 title: Locator = group.locator(".helpers-head .helpers-title")
                 state: Locator = group.locator(".helpers-head .helpers-state")
                 rings: Locator = group.locator("details.child .status-ring")
-                await expect(title).to_have_text("4 subagents")
+                await expect(title).to_have_text("4 helpers")
                 await expect(state).to_have_text("4 working")
                 # The limit stops the four; the fifth starts and joins their group.
-                await expect(title).to_have_text("5 subagents", timeout=WAIT_S * 1000)
+                await expect(title).to_have_text("5 helpers", timeout=WAIT_S * 1000)
                 await expect(state).to_have_text("1 working · 4 stopped")
                 await expect(group).to_have_count(1)
                 await expect(rings).to_have_count(len(PARTS))
@@ -169,7 +169,7 @@ async def test_a_helper_that_starts_late_joins_the_group_and_stopped_ones_stand_
                 # Loaded again, the page shows the same group from the stored events.
                 page = await _open_run(browser, address, parent.id, 390, "dark")
                 await expect(page.locator(".helpers")).to_have_count(1)
-                await expect(page.locator(".helpers .helpers-title")).to_have_text("5 subagents")
+                await expect(page.locator(".helpers .helpers-title")).to_have_text("5 helpers")
                 await expect(page.locator(".helpers .helpers-state")).to_have_text("5 stopped")
                 await expect(page.locator(".status-ring.s-running, .status-ring.s-queued")).to_have_count(0)
                 await page.screenshot(path=str(tmp_path / "late-helper-loaded-again.png"))

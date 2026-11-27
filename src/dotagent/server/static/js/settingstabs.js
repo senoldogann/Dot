@@ -30,6 +30,7 @@ export const TABS = [
   { id: "system", label: "System", icon: "monitor", words: "daemon health emergency stop version update restart" },
   { id: "repair", label: "Self-repair", icon: "wrench", words: "problems fixes claude code sessions" },
   { id: "diagnostics", label: "Diagnostics", icon: "terminal", words: "processes logs disk usage" },
+  { id: "speed", label: "Speed", icon: "clock", words: "performance latency slow percentiles p95 p99 model tools hiz" },
   { id: "licences", label: "Open source licences", icon: "file", words: "about notices licences software" },
 ];
 
@@ -79,6 +80,7 @@ export const SETTINGS_GROUPS = [
       { tab: "system", line: "Dot's health, version and emergency stop" },
       { tab: "repair", line: "Dot mends its own problems" },
       { tab: "diagnostics", line: "The programs Dot runs and its logs" },
+      { tab: "speed", line: "Where the seconds of Dot's work go" },
     ],
   },
   {

@@ -70,6 +70,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "teach.py:draft_taught_skill": (True,),
     # An agent a run makes, its words masked before they are stored (the review of 2026-11-01).
     "tools/team.py:_create_agent_tool.run": (True,),
+    # The cards a run shows, masked before they are stored.
+    "tools/cards.py:build_cards_tool.run": (True,),
     # The words of a work order and of an objective, masked before they are stored (items 907, 908).
     "tools/work_orders.py:_assign_tool.run": (True,),
     "tools/work_orders.py:_review_tool.run": (True,),

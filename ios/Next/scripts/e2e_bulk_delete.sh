@@ -1,7 +1,8 @@
 #!/bin/sh
 # Deleting many chats at once end to end (items 1964 and 1965): a throwaway daemon (e2e_daemon.py, its scripted model)
 # in three mktemp folders, a phone paired with a code, 20 chats with Dot, then BulkDeleteLiveUITests deletes them all
-# from Dot's profile › All chats (Select › Select all › Delete) and times it, and the profile empties; this script reads
+# from Dot's profile › All chats (Select › Select all › Delete) and times it, and the profile empties, while the Mac
+# takes 8 s to answer the delete (`--slow-deletes`), and Dot's own chat opens at once meanwhile; this script reads
 # on the daemon's side that no chat is left. Nothing touches the owner's Dot; no model is called. The app must be built
 # for testing in <derived data> first (xcodebuild build-for-testing).
 #
@@ -16,7 +17,7 @@ port=$(python3 -c "import socket; s=socket.socket(); s.bind((\"127.0.0.1\", 0));
 t=$(mktemp -d)
 log="$t/daemon.log"
 DOT_HOME="$t/home" DOT_LOG_DIR="$t/logs" DOT_CHROME_DIR="$t/chrome" \
-    uv run --project "$daemon" python "$here/e2e_daemon.py" "$port" >"$log" 2>&1 &
+    uv run --project "$daemon" python "$here/e2e_daemon.py" "$port" --slow-deletes 8 >"$log" 2>&1 &
 pid=$!
 trap 'kill $pid 2>/dev/null || true' EXIT
 tries=0
@@ -44,6 +45,7 @@ if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xco
     fail=1
 fi
 grep -E "error:|Executed|took|TEST EXECUTE (SUCCEEDED|FAILED)|skipped" "$t/xcodebuild.log" | sort -u
+sleep 2  # the test waits out the 8 s the Mac takes to delete (`--slow-deletes 8`)
 left=$(curl -fsS -H "$main" "$base/api/threads?limit=50" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
 if [ "$left" = "0" ]; then echo "ok    no chat is left on the Mac"; else echo "FAIL  $left chats left on the Mac" >&2; fail=1; fi
 exit $fail

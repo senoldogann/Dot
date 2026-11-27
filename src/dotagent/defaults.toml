@@ -1024,6 +1024,11 @@ every_steps = 8
 embed_provider = "ollama"
 embed_model = "bge-m3"
 embed_enabled = true
+# How long a run's start waits for its notes, and then for its skills, to be found by meaning, in seconds each (item
+# 2004): past it, the run starts with them found by their words, as when the embedding service fails, and says so. The
+# local server answers in well under a second, and loads its model in about 13 s after keep_alive; a local chat model it
+# serves at the same time held a start for 304 s.
+start_recall_s = 15.0
 # Every run starts with the standing notes (a note tagged "core" you wrote or pinned, newest first; a run's "core" note
 # stands once you pin it), the notes you wrote yourself in Settings › Memory or with `dotx memory` (the ones that fit
 # the goal first) and the agent's notes that fit the goal (by fit and score), in that order, as many as fit a budget of

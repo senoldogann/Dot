@@ -733,6 +733,9 @@ class MemoryConfig(FrozenModel):
     embed_provider: EmbedProvider
     embed_model: str
     embed_enabled: bool
+    # How long a run's start waits for its notes, and for its skills, by meaning before it takes them by their words
+    # (item 2004).
+    start_recall_s: float = Field(gt=0, allow_inf_nan=False)
     # The tokens a run's starting notes may take: inject_share of the model's context window, at most inject_tokens.
     inject_tokens: int = Field(ge=0)
     inject_share: float = Field(gt=0, le=1)
