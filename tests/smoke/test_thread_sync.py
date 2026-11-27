@@ -250,7 +250,7 @@ async def test_a_chats_view_holds_the_drafts_that_still_take_an_answer(served: S
     await store.claim_draft(failed.id, ["b@example.com"], [], "Failed", "Hello")
     await store.settle_draft(failed.id, "Mail is not set up")
     dropped = await store.add_draft(root.id, "message", ["+358401234567"], [], "", "Hi", None)
-    await store.discard_draft(dropped.id)
+    await store.discard_draft(dropped.id, None)
 
     view: dict[str, object] = (await served.http.get(f"/api/threads/{chat.id}/view")).json()
     shown: list[tuple[str, str]] = [(one["id"], one["status"]) for one in view["drafts"]]  # type: ignore[attr-defined]

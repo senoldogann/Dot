@@ -186,7 +186,13 @@ class AccountApi:
                 once, _refused_for_now, _wait_of, _RETRY, f"{service.lower().replace(' ', '_')}_{method.lower()}"
             )
         except _Busy as busy:
-            raise refused(service, url, busy.response) from busy
+            if busy.response.status_code == 429:
+                raise refused(service, url, busy.response) from busy
+            # A 5xx may come after the provider took the call: a draft may be made, or a mail sent.
+            failed: AccountApiError = refused(service, url, busy.response)
+            raise AccountApiError(
+                f"{failed.message}; whether it took the call is not known", {**failed.context, "method": method}
+            ) from busy
         except httpx.HTTPError as error:
             raise AccountApiError(
                 f"{service} could not be reached; whether it took the call is not known",

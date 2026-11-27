@@ -134,7 +134,11 @@ struct DraftCard: View {
 
     private var decidedLine: some View {
         Label {
-            Text([stateWord, draft?.subject ?? record.subject].filter { !$0.isEmpty }.joined(separator: " · ")).textRole(.footnote).foregroundStyle(Tone.secondary)
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text([stateWord, draft?.subject ?? record.subject].filter { !$0.isEmpty }.joined(separator: " · ")).textRole(.footnote).foregroundStyle(Tone.secondary)
+                // A discarded draft its mailbox could not delete says it stays there (item 2047).
+                if status == "discarded", let note = draft?.error { Text(note).textRole(.footnote).foregroundStyle(Tone.failure) }
+            }
         } icon: {
             Symbol(name: mail ? "envelope" : "bubble.left", context: .tool).foregroundStyle(Tone.secondary)
         }

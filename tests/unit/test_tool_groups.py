@@ -269,8 +269,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "and next step, every mail or message begun before it goes out and ended with what showed it, and what came "
         "of them (pipeline_view, pipeline_client, pipeline_begin, pipeline_end, pipeline_outcome)",
         "- drafts: an email or a message you write for the owner, who sends it from the conversation (draft_message)",
-        "- accounts: the owner's mail and calendars in the Google and Microsoft accounts they signed in: read, and "
-        "drafts there the owner sends (mail_search, mail_read, calendar_events, mail_draft)",
+        "- accounts: the owner's mail and calendars in the Google and Microsoft accounts they signed in (mail_search, "
+        "mail_read, calendar_events, mail_draft)",
         "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, "
         "schedule_delete)",
         "- proof: a check (a test run, a command) that must exit 0 before the run counts as done, when the owner "

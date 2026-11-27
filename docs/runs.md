@@ -1124,14 +1124,19 @@ An email for you to send from one of these accounts is a `mail_draft` (item 2047
 gets the thread and the `In-Reply-To` and `References` headers, Graph's `createReply` makes it) or a new mail. Its card
 is the one of [Drafts](#drafts), with the account it goes from and **Open in Gmail** or **Open in Outlook**, the
 draft's own address there, so you can change it and send it in the mailbox too. **Send email** on the card writes the
-card's words into that draft and sends it through the account (Gmail's `drafts.send`, Graph's `send`); **Discard**
-deletes it from the mailbox (one already gone from it, sent or deleted there, is dropped all the same). As with
+card's words into that draft and sends it through the account (Gmail's `drafts.send`, Graph's `send`), so send from
+one place: an edit made in the mailbox is replaced by the card's words when you press Send on the card. **Discard**
+deletes it from the mailbox; one already gone from it (sent or deleted there) is dropped all the same, and so is one
+the mailbox could not be asked to delete (the account signed out, the provider refused), whose card then says it stays
+in that account's Drafts. As with
 `draft_message`, nothing goes out before your press, whatever the run's approvals, a `yolo` run's too: the policy sees a
 draft (`notes_write`, `safe`) and a key in it is refused. A run writes again a draft of its chat that still waits by
-calling `mail_draft` with `draft`, its id. Only tasks and chats have the tool, in the `accounts` group. A write to the
-mailbox is made again only after a 429, the provider's word that it did not take it: after a 5xx or a lost connection
-it may have, and a second call could make the draft twice or send it twice, so the card says "Not sent" with
-"whether it took the call is not known" and you look in the Sent folder first. An account signed in before item 2047
+calling `mail_draft` with `draft`, its id; it is read again under the draft's lock, which Send and Discard hold too, so
+a draft you sent or discarded meanwhile is a conflict before anything is written to the mailbox, and the run's words
+never go out in place of the card's. Only tasks and chats have the tool, in the `accounts` group (a research run's
+prompt does not name it). A write to the mailbox is made again only after a 429, the provider's word that it did not
+take it: after a 5xx or a lost connection it may have, and a second call could make the draft twice or send it twice,
+so the card says "Not sent" with "whether it took the call is not known" and you look in the Sent folder first. An account signed in before item 2047
 was asked only to read: its drafts are refused (403) with what to do, sign in to it again in Settings › Connectors ›
 Accounts. The tests run against a stand-in of both APIs (`tests/smoke/test_mail_drafts.py`). Another address's email is
 still a `draft_message`.

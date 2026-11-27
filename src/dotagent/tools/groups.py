@@ -113,10 +113,7 @@ _PURPOSES: dict[str, str] = {
     "replies": "handing a reply to a mail Dot sent to the chat that sent it, where that work goes on",
     "pages": "showing structured cards or HTML in the conversation",
     "images": "making a picture as a PNG: drawn from an SVG or HTML you write, or a photo from Google's picture model",
-    "accounts": (
-        "the owner's mail and calendars in the Google and Microsoft accounts they signed in: read, and drafts there "
-        "the owner sends"
-    ),
+    "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in",
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
     "todos": "your own list of work to do for the owner later, on your own while the Mac is idle, and their objectives",
     "waits": "waiting in code until a file is there, an address answers or a check passes",

@@ -6,6 +6,7 @@ An email draft may also be in the owner's own Gmail or Outlook (item 2047), made
 the owner opens it there too, and may send it there. Its Send on the card writes the card's words into that draft and
 sends it through the account; its Discard deletes it from the mailbox. Without an account, Mail sends it."""
 
+import asyncio
 import re
 from collections.abc import Sequence
 
@@ -15,7 +16,7 @@ from dotagent.channels.handles import names_a_handle, paired_handles
 from dotagent.connectors import google, graph
 from dotagent.connectors.http import AccountApi
 from dotagent.connectors.types import MailboxDraft, OutgoingMail
-from dotagent.core.errors import AccountApiError, DesktopError, DotError, InvalidValueError, SignInError
+from dotagent.core.errors import AccountApiError, DesktopError, DotError, InvalidValueError, RunConflict, SignInError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.script import run_osascript
@@ -41,6 +42,14 @@ STOPPED_WHILE_SENDING: str = (
 )
 _EMAIL: re.Pattern[str] = re.compile(r"[^@\s<>\",;:()]+@[^@\s<>\",;:()]+\.[^@\s<>\",;:()]+")
 _PHONE: re.Pattern[str] = re.compile(r"\+?[0-9][0-9 ().\-]{4,30}")
+# One writer at a time of a draft in a mailbox (item 2047): a run writing it again, the owner's Send and Discard. A run
+# and the daemon's routes are one process, so the run's write cannot land between Send's write of the card's words and
+# the send itself.
+_MAILBOX_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _mailbox_lock(draft_id: str) -> asyncio.Lock:
+    return _MAILBOX_LOCKS.setdefault(draft_id, asyncio.Lock())
 
 
 class DraftWords(FrozenModel):
@@ -230,23 +239,28 @@ async def create_mailbox_draft(
 
 
 async def rewrite_mailbox_draft(
-    store: Store, bus: EventBus, accounts: Accounts, draft: DraftRecord, mail: OutgoingMail
+    store: Store, bus: EventBus, accounts: Accounts, draft_id: str, mail: OutgoingMail
 ) -> DraftRecord:
-    """``draft``, a mailbox's draft that still takes an answer, with ``mail`` in place of its words, in the mailbox and
-    on its card."""
-    mailbox: DraftMailbox | None = draft.mailbox
-    if mailbox is None:
-        raise InvalidValueError(
-            "this draft is not in a mailbox: write a new one", {"draft_id": draft.id, "channel": draft.channel}
+    """The mailbox's draft ``draft_id``, which must still take an answer, with ``mail`` in place of its words, in the
+    mailbox and on its card. It is read again under the draft's lock, so that a draft the owner sent or discarded
+    meanwhile is a conflict before anything is written to the mailbox."""
+    async with _mailbox_lock(draft_id):
+        draft: DraftRecord = await store.get_draft(draft_id)
+        mailbox: DraftMailbox | None = draft.mailbox
+        if mailbox is None:
+            raise InvalidValueError(
+                "this draft is not in a mailbox: write a new one", {"draft_id": draft.id, "channel": draft.channel}
+            )
+        if draft.status not in ("waiting", "failed"):
+            raise RunConflict(f"the draft is {draft.status}, not waiting", {"draft_id": draft.id})
+        api: AccountApi = await _mailbox_api(accounts, mailbox)
+        try:
+            made: MailboxDraft = await write_mailbox_draft(api, mail, mailbox.reply_to, mailbox.remote_id)
+        except AccountApiError as failure:
+            raise AccountApiError(mailbox_problem(failure, mailbox.account), failure.context) from failure
+        rewritten: DraftRecord = await store.rewrite_draft(
+            draft.id, mail.to, mail.cc, mail.subject, mail.body, mailbox.model_copy(update={"link": made.link})
         )
-    api: AccountApi = await _mailbox_api(accounts, mailbox)
-    try:
-        made: MailboxDraft = await write_mailbox_draft(api, mail, mailbox.reply_to, mailbox.remote_id)
-    except AccountApiError as failure:
-        raise AccountApiError(mailbox_problem(failure, mailbox.account), failure.context) from failure
-    rewritten: DraftRecord = await store.rewrite_draft(
-        draft.id, mail.to, mail.cc, mail.subject, mail.body, mailbox.model_copy(update={"link": made.link})
-    )
     await bus.emit(rewritten.run_id, DRAFT_DECIDED_EVENT, rewritten.model_dump(mode="json"), True)
     return rewritten
 
@@ -269,13 +283,14 @@ async def send_draft(
         problems.append(paired_problem(paired))
     if problems:
         raise InvalidValueError(f"the draft cannot be sent: {'; '.join(problems)}", {"draft_id": draft_id})
-    claimed: DraftRecord = await store.claim_draft(draft_id, to, cc, words.subject.strip(), words.body)
-    error: str | None = (
-        await _send_through_mailbox(accounts, claimed, claimed.mailbox)
-        if claimed.mailbox is not None
-        else await _send_through_application(claimed, timeout_s)
-    )
-    settled: DraftRecord = await store.settle_draft(draft_id, error)
+    async with _mailbox_lock(draft_id):
+        claimed: DraftRecord = await store.claim_draft(draft_id, to, cc, words.subject.strip(), words.body)
+        error: str | None = (
+            await _send_through_mailbox(accounts, claimed, claimed.mailbox)
+            if claimed.mailbox is not None
+            else await _send_through_application(claimed, timeout_s)
+        )
+        settled: DraftRecord = await store.settle_draft(draft_id, error)
     if error is None:
         log.info("draft_sent", draft_id=draft_id, channel=settled.channel, recipients=len(to) + len(cc))
     await bus.emit(settled.run_id, DRAFT_DECIDED_EVENT, settled.model_dump(mode="json"), True)
@@ -283,22 +298,33 @@ async def send_draft(
 
 
 async def discard_draft(store: Store, bus: EventBus, accounts: Accounts, draft_id: str) -> DraftRecord:
-    """The owner's press of Discard: the draft is dropped and nothing goes out; one in the owner's mailbox is deleted
-    from it first (one already gone from it, sent or deleted there, is dropped all the same)."""
-    draft: DraftRecord = await store.get_draft(draft_id)
-    if draft.mailbox is not None and draft.status in ("waiting", "failed"):
-        api: AccountApi = await _mailbox_api(accounts, draft.mailbox)
-        try:
-            if api.provider == "google":
-                await google.delete_gmail_draft(api, draft.mailbox.remote_id)
-            else:
-                await graph.delete_outlook_draft(api, draft.mailbox.remote_id)
-        except AccountApiError as failure:
-            if failure.context.get("status") != 404:
-                raise
-    discarded: DraftRecord = await store.discard_draft(draft_id)
+    """The owner's press of Discard: the draft is dropped and nothing goes out. One in the owner's mailbox is deleted
+    from it first; one already gone from it (sent or deleted there) is dropped all the same, and so is one the mailbox
+    could not be asked to delete (the account signed out, the provider's refusal): the card says it stays there."""
+    async with _mailbox_lock(draft_id):
+        draft: DraftRecord = await store.get_draft(draft_id)
+        left: str | None = None
+        if draft.mailbox is not None and draft.status in ("waiting", "failed"):
+            left = await _delete_from_mailbox(accounts, draft.mailbox)
+        discarded: DraftRecord = await store.discard_draft(draft_id, left)
     await bus.emit(discarded.run_id, DRAFT_DECIDED_EVENT, discarded.model_dump(mode="json"), True)
     return discarded
+
+
+async def _delete_from_mailbox(accounts: Accounts, mailbox: DraftMailbox) -> str | None:
+    """Delete the mailbox's draft; why it stays there, None when it is gone."""
+    try:
+        api: AccountApi = await _mailbox_api(accounts, mailbox)
+        if api.provider == "google":
+            await google.delete_gmail_draft(api, mailbox.remote_id)
+        else:
+            await graph.delete_outlook_draft(api, mailbox.remote_id)
+    except (AccountApiError, SignInError) as failure:
+        if failure.context.get("status") == 404:
+            return None
+        log.warning("mailbox_draft_kept", provider=mailbox.provider, error=failure.message)
+        return f"The draft stays in the Drafts of {mailbox.account}: {mailbox_problem(failure, mailbox.account)}"
+    return None
 
 
 async def fail_unsettled_drafts(store: Store, bus: EventBus) -> int:

@@ -20,16 +20,23 @@ import httpx
 import pytest
 import pytest_asyncio
 
-from dotagent.core.errors import AccountApiError
+from dotagent.connectors.types import OutgoingMail
+from dotagent.core.errors import AccountApiError, RunConflict
 from dotagent.core.types import JsonObject
-from dotagent.drafts.service import DRAFT_CREATED_EVENT, DraftWords, discard_draft, send_draft
+from dotagent.drafts.service import (
+    DRAFT_CREATED_EVENT,
+    DraftWords,
+    discard_draft,
+    rewrite_mailbox_draft,
+    send_draft,
+)
 from dotagent.events import EventBus
 from dotagent.oauth.accounts import Accounts, CameBack
 from dotagent.oauth.keychain import Keychain
 from dotagent.oauth.providers import GOOGLE, MICROSOFT, ProviderId
 from dotagent.oauth.tokens import Tokens
 from dotagent.store.db import Store
-from dotagent.store.models import DraftRecord, EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import DraftMailbox, DraftRecord, EventRecord, RunRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.groups import ACCOUNTS_GROUP, group_of
@@ -64,6 +71,8 @@ class _Mailboxes:
         self.calls: list[tuple[str, str, JsonObject | None]] = []
         # The status Graph answers a draft's creation with: 403 for a sign-in made before item 2047.
         self.graph_create_status: int = 201
+        # The status Gmail answers a draft's send with: a 503 may come after it took the call.
+        self.gmail_send_status: int = 200
 
     def _token(self, request: httpx.Request, mark: str) -> httpx.Response:
         return httpx.Response(
@@ -94,6 +103,8 @@ class _Mailboxes:
         if request.method == "PUT" and path == f"{_GMAIL}/drafts/r-7":
             return httpx.Response(200, json={"id": "r-7", "message": {"id": "17b", "threadId": "t-1"}})
         if request.method == "POST" and path == f"{_GMAIL}/drafts/send":
+            if self.gmail_send_status == 503:
+                return httpx.Response(503, json={"error": {"code": 503, "message": "Backend Error"}})
             return httpx.Response(200, json={"id": "17b", "threadId": "t-1", "labelIds": ["SENT"]})
         raise AssertionError(f"a Gmail call the stand-in does not take: {request.method} {path}")
 
@@ -313,3 +324,50 @@ async def test_an_outlook_draft_is_deleted_by_the_owners_discard_and_an_old_sign
     with pytest.raises(AccountApiError, match=r"sign in to it again in Settings › Connectors › Accounts"):
         await _call(store, accounts, run, arguments)
     assert await store.thread_drafts(run.thread_id) == []
+
+
+async def test_a_send_answered_5xx_is_not_known_a_sent_draft_is_not_written_again_and_a_signed_out_one_is_dropped(
+    store: Store, clients: None
+) -> None:
+    mailboxes: _Mailboxes = _Mailboxes()
+    accounts: Accounts = await _accounts(store, mailboxes)
+    run: RunRecord = await _chat_run(store)
+    arguments: JsonObject = {"account": "ada@gmail.com", "to": ["bob@example.com"], "subject": "Hi", "body": "Hello."}
+    await _call(store, accounts, run, arguments)
+    [draft] = await store.thread_drafts(run.thread_id)
+    words: DraftWords = DraftWords(to=draft.to, cc=(), subject=draft.subject, body=draft.body)
+
+    # A 5xx on the send may come after Gmail sent it: the card says so, and nothing is sent again by itself.
+    mailboxes.gmail_send_status = 503
+    failed: DraftRecord = await send_draft(store, EventBus(store), accounts, 30.0, draft.id, words)
+    assert failed.status == "failed" and failed.error is not None
+    assert "whether it took the call is not known" in failed.error, failed.error
+    assert [call[1] for call in mailboxes.calls].count(f"{_GMAIL}/drafts/send") == 1
+
+    # Sent on a second press, it is no longer written again by a run: a conflict before any call to the mailbox.
+    mailboxes.gmail_send_status = 200
+    assert (await send_draft(store, EventBus(store), accounts, 30.0, draft.id, words)).status == "sent"
+    before: int = len(mailboxes.calls)
+    with pytest.raises(RunConflict, match="the draft is sent"):
+        await rewrite_mailbox_draft(
+            store,
+            EventBus(store),
+            accounts,
+            draft.id,
+            OutgoingMail(to=("bob@example.com",), cc=(), subject="Hi", body="Other words."),
+        )
+    assert len(mailboxes.calls) == before
+
+    # A draft whose account was signed out since: Discard drops the card and says the draft stays in that mailbox.
+    gone: DraftRecord = await store.add_draft(
+        run.id,
+        "mail",
+        ["bob@example.com"],
+        [],
+        "Hi",
+        "Hello.",
+        DraftMailbox(provider="google", account="gone@gmail.com", remote_id="r-9", reply_to=None, link=""),
+    )
+    dropped: DraftRecord = await discard_draft(store, EventBus(store), accounts, gone.id)
+    assert dropped.status == "discarded" and dropped.error is not None
+    assert dropped.error.startswith("The draft stays in the Drafts of gone@gmail.com: no account"), dropped.error

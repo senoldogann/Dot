@@ -5968,11 +5968,13 @@ class Store:
         return await self.get_draft(draft_id)
 
     @_writing
-    async def discard_draft(self, draft_id: str) -> DraftRecord:
-        """Drop a draft that waits, or whose last send failed: nothing goes out."""
+    async def discard_draft(self, draft_id: str, note: str | None) -> DraftRecord:
+        """Drop a draft that waits, or whose last send failed: nothing goes out. ``note`` (kept as its ``error``) says
+        what the owner should know, as a mailbox's draft that could not be deleted there (item 2047)."""
         cursor: aiosqlite.Cursor = await self._db.execute(
-            "UPDATE drafts SET status = 'discarded', decided_at = ? WHERE id = ? AND status IN ('waiting', 'failed')",
-            (time.time(), draft_id),
+            "UPDATE drafts SET status = 'discarded', decided_at = ?, error = ? WHERE id = ?"
+            " AND status IN ('waiting', 'failed')",
+            (time.time(), note, draft_id),
         )
         await self._db.commit()
         record: DraftRecord = await self.get_draft(draft_id)

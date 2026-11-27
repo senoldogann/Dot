@@ -107,7 +107,9 @@ def build_mail_draft_tool() -> RegisteredTool:
                     f"{MAIL_DRAFT_TOOL}: the draft {args.draft} is not in the mailbox of {args.account}",
                     {"draft": args.draft, "account": args.account},
                 )
-            draft = await rewrite_mailbox_draft(ctx.runtime.store, ctx.runtime.bus, ctx.runtime.accounts, found, mail)
+            draft = await rewrite_mailbox_draft(
+                ctx.runtime.store, ctx.runtime.bus, ctx.runtime.accounts, found.id, mail
+            )
         else:
             draft = await create_mailbox_draft(
                 ctx.runtime.store,

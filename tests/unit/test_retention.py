@@ -236,7 +236,7 @@ async def test_a_prune_keeps_the_drafts_the_owner_has_not_sent_or_discarded(tmp_
             await store.claim_draft(draft.id, ["a@example.com"], [], draft.subject, draft.body)
         await store.settle_draft(failed.id, "no network")
         await store.settle_draft(sent.id, None)
-        await store.discard_draft(discarded.id)
+        await store.discard_draft(discarded.id, None)
         await store.delete_events_of_runs_ended_before(time.time() + 60, TAINT_EVENTS)
         for status, draft in (("waiting", waiting), ("failed", failed), ("sending", sending)):
             assert [kept.id for kept in await store.list_drafts(status, 10)] == [draft.id]

@@ -202,7 +202,8 @@ export function draftCard(initial, changed) {
     const parts = [
       head(),
       ...(editing && OPEN.has(draft.status) ? form() : shown()),
-      draft.status === "failed" && draft.error !== null ? el("div", { class: "draft-error" }, icon("alert"), el("span", null, draft.error)) : null,
+      // A failed send says why; a discarded draft its mailbox could not delete says it stays there (item 2047).
+      (draft.status === "failed" || draft.status === "discarded") && draft.error !== null ? el("div", { class: "draft-error" }, icon("alert"), el("span", null, draft.error)) : null,
       actions(),
     ];
     // The DOM's replaceChildren writes a null as the word "null".
