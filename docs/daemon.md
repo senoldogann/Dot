@@ -82,7 +82,7 @@ does not go on in since item 1350; item 1233 for an agent:
 its home chat, where a message to it goes on, the chat bound to it ever after; its page while it has none), and under them
 **All agents** (the page of every agent and team), **New agent** and **Campaigns** (Settings › Campaigns since item 1336). Until item
 1328 Dot and the agents stood as faces under the search, and Campaigns and Schedules as icons in the head (item 855); there is
-no **Schedules** icon now: its page is **Scheduled tasks** (item 1337), a row of Settings under Agents (`#/settings/schedules`; a
+no **Routines** icon now: its page is **Scheduled tasks** (item 1337), a row of Settings under Bots (`#/settings/schedules`; a
 Mac's nav and a phone's sheet), and the links to it in the Agents page, the teach toast and the notifications lead there. An agent made, changed or
 deleted on a page shows in the menu at once, and one a run made once that run ends. In the foot stand four small icon buttons
 (item 1328): **Settings** (item 999; named with your name for a screen reader), **Connect apps** ([Connect
@@ -1034,7 +1034,7 @@ search of the settings (item 1336: `/` takes the focus while the settings are op
 first match; it reads each page's name, its line and its words), then the settings' groups of rows (item 999, the phone's
 sheet), and at its foot **Back to chats**, to the chat last open (item 852). Every page that configures Dot is a row:
 **General**, **Appearance**, **Rules**, **Memory**, **Vault** and **Snapshots**; under **Agents**
-Agents, Models, Browser, Web search, **Scheduled tasks** (item 1337: what was the Schedules page), Campaigns and
+Bots, Models, Browser, Web search, **Scheduled tasks** (item 1337: what was the Schedules page), Campaigns and
 Self-improvement; under **Connections** Connectors, Plugins, Skills, AI services, Phone, Channels and Hooks; under
 **Maintenance** System, Self-repair, Diagnostics and Speed; under **About** Open source licences. A row is a small mark and its
 name, with what it holds at its right (how many notes Dot keeps, how many items the vault holds, how many schedules are

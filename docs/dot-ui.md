@@ -51,7 +51,7 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | One team | `teams.js` | A team's bots, its name and purpose, and a box to message it. |
 | Watch | `watch.js` | The Mac's screen, live, whether a task works or not. |
 | Campaigns | `campaigns.js` | Goals Dot keeps working on in sessions until a check confirms the outcome. |
-| Scheduled tasks | `schedules.js` | Settings › Scheduled tasks: goals once or on a cron routine while the daemon runs, a list of rows and a page for the form. |
+| Scheduled tasks | `schedules.js` | Settings › Scheduled tasks: goals once or on a cron schedule while the daemon runs, a list of rows and a page for the form. |
 | Rules | `rules.js` | What Dot may do on its own, what it asks first, and what it leaves to the owner. |
 | Settings | `settings.js` | The settings shell: the breadcrumb in the bar, the page of the open tab (the nav is in the sidebar, `settingsnav.js`), and on a phone the sheet of the pages. |
 | Appearance | `appearance.js` | Colour schemes as miniatures of Dot's window. |
