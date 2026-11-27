@@ -196,6 +196,20 @@ final class AppModel {
     var stepsOverrides: [String: Bool] = (UserDefaults.standard.dictionary(forKey: "stepsOverrides") as? [String: Bool]) ?? [:] {
         didSet { UserDefaults.standard.set(stepsOverrides, forKey: "stepsOverrides") }
     }
+    /// The chat that started each helper's chat this phone has seen listed, by the helper's chat: a helper's chat shows
+    /// its steps as its parent does unless it chose itself (`showsSteps(of:everywhere:)`). Kept in memory: a helper's chat
+    /// is opened from its parent's, which lists it first.
+    private(set) var helperParents: [String: String] = [:]
+
+    /// Notes that `helpers` work for `parent`; a helper already known is not written again (no redraw for nothing).
+    func noteHelpers(_ helpers: [String], of parent: String) {
+        for helper in helpers where helper != parent && helperParents[helper] != parent { helperParents[helper] = parent }
+    }
+
+    /// Whether `thread` shows its steps: its own choice, else its parent chat's, else Settings › Chat's (item 1915).
+    func showsSteps(of thread: String, everywhere: Bool) -> Bool {
+        DotEngine.showsSteps(of: thread, overrides: stepsOverrides, parents: helperParents, everywhere: everywhere)
+    }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
