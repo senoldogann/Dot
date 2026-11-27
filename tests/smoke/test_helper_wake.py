@@ -615,7 +615,7 @@ async def _served(login_env: dict[str, str], model: _Roles) -> AsyncIterator[tup
 async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_blocked_on_its_helpers(
     login_env: dict[str, str],
 ) -> None:
-    """While the run waits, the line says "Waiting on 1 subagent"; once a message released it, the same line says the
+    """While the run waits, the line says "Waiting on 1 helper"; once a message released it, the same line says the
     subagent keeps working in the background, and a page loaded again says the same."""
     roles: _Roles = _Roles(
         main=[ScriptedTurn(text="", calls=(_delegate("slow"),)), _turn("shell", {"command": "sleep 60"})],
@@ -634,11 +634,11 @@ async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_bl
                 await page.goto(f"{address}/#/runs/{parent.id}")
                 line = page.locator(".wait-line-text")
                 if width == 1280:
-                    await expect(line).to_have_text("Waiting on 1 subagent", timeout=WAIT_S * 1000)
+                    await expect(line).to_have_text("Waiting on 1 helper", timeout=WAIT_S * 1000)
                     manager.steer(parent.id, "Stop waiting.", ())
-                await expect(line).to_have_text("1 subagent keeps working in the background", timeout=WAIT_S * 1000)
+                await expect(line).to_have_text("1 helper keeps working in the background", timeout=WAIT_S * 1000)
                 await expect(page.locator(".wait-line")).to_have_attribute(
-                    "aria-label", "Subagents work in the background"
+                    "aria-label", "Helpers work in the background"
                 )
                 await page.close()
             await manager.stop(parent.id)
