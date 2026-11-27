@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2044](2044.md) | done | 2026-11-27 | Keep the Mac awake for an upcoming routine or watcher |
 | [2043](2043.md) | done | 2026-11-27 | Show when the Mac was last reachable |
 | [2034](2034.md) | done | 2026-11-27 | The web says "routine", as the phone does |
 | [2033](2033.md) | done | 2026-11-27 | The web says "bot", as the phone does |

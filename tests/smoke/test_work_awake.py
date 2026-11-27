@@ -40,9 +40,11 @@ async def test_caffeinate_i_is_held_while_dot_works_and_let_go_after_the_grace(
     awake: KeepAwake = KeepAwake("-i")
     works: list[bool] = [False]
     stopping: asyncio.Event = asyncio.Event()
-    keeping: asyncio.Task[None] = asyncio.create_task(
-        keep_awake_while_working(awake, lambda: works[0], 0.5, 0.05, stopping)
-    )
+
+    async def working() -> bool:
+        return works[0]
+
+    keeping: asyncio.Task[None] = asyncio.create_task(keep_awake_while_working(awake, working, 0.5, 0.05, stopping))
     try:
         await asyncio.sleep(0.2)
         assert not awake.on
