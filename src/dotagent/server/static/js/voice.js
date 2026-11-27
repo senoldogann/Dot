@@ -45,19 +45,40 @@ export function canListen() {
 }
 
 /**
- * What the engine has heard of a dictation, as two texts: the words it is sure of and the words it may still change. A
- * recognition keeps every result of its session in `results`, the ones it settled with `isFinal`.
+ * What a dictation heard, as `heardOf` keeps it: the settled words of the result lists before this one, and those of this
+ * one by place (null for a result not settled).
+ * @typedef {{ readonly kept: readonly string[], readonly settled: readonly (string | null)[] }} Heard
  */
-export function transcriptOf(results) {
-  const final = [];
+
+/** What a dictation heard before its first result. @type {Heard} */
+export const NOTHING_HEARD = Object.freeze({ kept: [], settled: [] });
+
+/**
+ * What the engine has heard of a dictation, after a result event with `results`, on top of `before`, what it had heard
+ * until then (item 2048): `heard` to pass to the next event, and two texts, the words it is sure of and the words it may
+ * still change. A recognition keeps every result of its session in `results`, the ones it settled with `isFinal`, and a
+ * settled one never changes. A list whose settled results are not those of the one before began again (a browser that
+ * hands each utterance after a pause in a list of its own): the settled words of the old list stay, in `kept`, and the
+ * new list's words come after them. A pause never takes a word away.
+ * @param {Heard} before
+ * @param {{ readonly length: number, [index: number]: SpeechRecognitionResultLike }} results
+ * @returns {{ heard: Heard, final: string, interim: string }}
+ */
+export function heardOf(before, results) {
+  /** @type {(string | null)[]} */
+  const settled = [];
   const interim = [];
   for (let index = 0; index < results.length; index += 1) {
     const said = String(results[index][0]?.transcript ?? "").trim();
-    if (said !== "") {
-      (results[index].isFinal ? final : interim).push(said);
+    settled.push(results[index].isFinal ? said : null);
+    if (!results[index].isFinal && said !== "") {
+      interim.push(said);
     }
   }
-  return { final: final.join(" "), interim: interim.join(" ") };
+  const began = before.settled.some((said, index) => said !== null && settled[index] !== said);
+  const kept = began ? [...before.kept, ...before.settled.filter((said) => said !== null && said !== "")] : before.kept;
+  const final = [...kept, ...settled.filter((said) => said !== null && said !== "")];
+  return { heard: { kept, settled }, final: final.join(" "), interim: interim.join(" ") };
 }
 
 /**
@@ -317,6 +338,8 @@ export function sendProblem(error) {
 export function createDictation({ language, text, show, settled, state, problem, began = () => {}, sound = (/** @type {boolean} */ _loud) => {} }) {
   let recognition = null;
   let base = "";
+  // What the engine heard of this dictation, across its result lists (`heardOf`).
+  let said = NOTHING_HEARD;
   let timer = null;
   // Whether this dictation heard a word, and whether the owner ended it: one that ends by itself having heard nothing
   // says so (item 593), where it ended without a word before.
@@ -372,6 +395,7 @@ export function createDictation({ language, text, show, settled, state, problem,
     engine.interimResults = true;
     engine.maxAlternatives = 1;
     base = text();
+    said = NOTHING_HEARD;
     heard = false;
     byOwner = false;
     started = false;
@@ -406,9 +430,10 @@ export function createDictation({ language, text, show, settled, state, problem,
       }
       opened();
       sound(true);
-      const said = transcriptOf(event.results);
-      heard = heard || said.final !== "" || said.interim !== "";
-      const next = dictated(base, said.final, said.interim);
+      const now = heardOf(said, event.results);
+      said = now.heard;
+      heard = heard || now.final !== "" || now.interim !== "";
+      const next = dictated(base, now.final, now.interim);
       show(next.value, next.interimFrom);
       arm();
     };

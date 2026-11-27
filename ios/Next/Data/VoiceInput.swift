@@ -12,7 +12,8 @@ import os
 ///
 /// What makes it hold up on a real phone: each go has a fresh audio engine, recognizer and request, and gives the audio
 /// session back at its end (the web's recognizer went deaf after one go; this one starts clean each time); a long
-/// dictation goes on across the recognizer's own pauses (a segment that ends is kept and a new one begins); a call or
+/// dictation goes on across the recognizer's own pauses (an utterance a pause closes is kept, and so is a task that ends,
+/// a new one beginning: `DictationTranscript`); a call or
 /// Siri (an interruption), the app leaving the screen or the Mac's five minutes end the go with the words heard so far,
 /// never losing them; a microphone plugged in or out mid-go (the engine's configuration change) is taken up again.
 @MainActor
@@ -47,9 +48,9 @@ final class VoiceInput {
     @ObservationIgnored private var recognizer: SFSpeechRecognizer?
     @ObservationIgnored private var request: SFSpeechAudioBufferRecognitionRequest?
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
-    /// The segments the recognizer finished in this go, and the one it is writing.
-    @ObservationIgnored private var segments: [String] = []
-    @ObservationIgnored private var current: String = ""
+    /// What this phone's recognizer heard in this go: the utterances it closed, across its tasks, and the one it is
+    /// writing (item 2048: a pause closes an utterance inside the task, and the next words start from empty).
+    @ObservationIgnored private var transcript: DictationTranscript = .empty
     @ObservationIgnored private var feed: MacVoiceFeed?
     @ObservationIgnored private var deliver: ((String) -> Void)?
     @ObservationIgnored private var learned: ((MicPort) -> Void)?
@@ -77,8 +78,7 @@ final class VoiceInput {
         deliver = start.deliver
         learned = start.learned
         heard = ""
-        segments = []
-        current = ""
+        transcript = .empty
         levels = []
         blocked = nil
         notice = nil
@@ -251,33 +251,31 @@ final class VoiceInput {
         request.taskHint = .dictation
         self.request = request
         tap?.request = request
-        current = ""
         let segment: ObjectIdentifier = ObjectIdentifier(request)
-        task = Self.recognize(with: recognizer, request: request) { @Sendable [weak self] words, final, error in
-            Task { @MainActor in self?.took(words: words, final: final, error: error, segment: segment) }
+        task = Self.recognize(with: recognizer, request: request) { @Sendable [weak self] words, final, closes, error in
+            Task { @MainActor in self?.took(words: words, final: final, closesUtterance: closes, error: error, segment: segment) }
         }
     }
 
     private nonisolated static func recognize(
         with recognizer: SFSpeechRecognizer, request: SFSpeechAudioBufferRecognitionRequest,
-        deliver: @escaping @Sendable (String?, Bool, RecognizerError?) -> Void
+        deliver: @escaping @Sendable (String?, Bool, Bool, RecognizerError?) -> Void
     ) -> SFSpeechRecognitionTask {
         recognizer.recognitionTask(with: request) { result, error in
-            deliver(result?.bestTranscription.formattedString, result?.isFinal ?? false, error.map(RecognizerError.init))
+            // A result with metadata closes its utterance (a pause) though the task goes on and it is not final.
+            let closes: Bool = result.map { $0.isFinal || $0.speechRecognitionMetadata != nil } ?? false
+            deliver(result?.bestTranscription.formattedString, result?.isFinal ?? false, closes, error.map(RecognizerError.init))
         }
     }
 
-    private func took(words: String?, final: Bool, error: RecognizerError?, segment: ObjectIdentifier) {
+    private func took(words: String?, final: Bool, closesUtterance: Bool, error: RecognizerError?, segment: ObjectIdentifier) {
         // A late answer of a segment already closed.
         guard let request, ObjectIdentifier(request) == segment else { return }
-        if let words, !words.isEmpty {
-            current = words
-            quietRuns = 0
-        }
-        heard = (segments + [current]).filter { !$0.isEmpty }.joined(separator: " ")
+        if let words, !words.isEmpty { quietRuns = 0 }
+        transcript = transcript.taking(words: words ?? "", closesUtterance: closesUtterance)
+        heard = transcript.text
         guard final || error != nil else { return }
-        if !current.isEmpty { segments.append(current) }
-        current = ""
+        transcript = transcript.closingLive()
         if phase == .transcribing {
             finalWait?.resume()
             finalWait = nil
@@ -337,8 +335,7 @@ final class VoiceInput {
         do {
             if let recognizer {
                 request?.endAudio()
-                if !current.isEmpty { segments.append(current) }
-                current = ""
+                transcript = transcript.closingLive()
                 self.request = nil
                 tap?.request = nil
                 try openEngine()
@@ -383,8 +380,7 @@ final class VoiceInput {
                         self?.finalWait = nil
                     }
                 }
-                if !current.isEmpty { segments.append(current) }
-                words = segments.joined(separator: " ")
+                words = transcript.closingLive().text
             } else if let feed {
                 do {
                     words = try await feed.end()
@@ -401,8 +397,7 @@ final class VoiceInput {
         request = nil
         recognizer = nil
         feed = nil
-        segments = []
-        current = ""
+        transcript = .empty
         startedAt = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         let spoken: String = (words ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

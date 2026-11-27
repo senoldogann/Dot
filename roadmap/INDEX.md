@@ -14,6 +14,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2073](2073.md) | done | 2026-11-28 | A run is told that the mail and calendar tools take no address but the accounts signed in |
 | [2066](2066.md) | done | 2026-11-28 | A code_run that cannot open a file is told that its code opens only its scratch folder |
 | [2065](2065.md) | done | 2026-11-28 | A code review whose chat has a run under way starts in a new chat instead of failing |
+| [2048](2048.md) | done | 2026-11-28 | A pause in a dictation loses no word, on the phone and the web |
 | [2046](2046.md) | done | 2026-11-27 | A coding helper hands its pull request checks to the chat's background watcher |
 | [2045](2045.md) | done | 2026-11-27 | Measure the character line against the injection evals |
 | [2044](2044.md) | done | 2026-11-27 | Keep the Mac awake for an upcoming routine or watcher |
