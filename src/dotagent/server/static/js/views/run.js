@@ -2225,7 +2225,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     const { text, preserveDraft } = /** @type {CustomEvent<{ text: string, preserveDraft?: boolean }>} */ (event).detail;
     if (preserveDraft === true && input.value.trim() !== "") {
-      toast("error", "Finish the message in the composer first.");
+      toast("error", t("cards.finishMessage"));
     } else {
       frame.fill(text);
     }

@@ -588,7 +588,8 @@ at most and counts the rest; a fetch that failed and a search read none.
 
 Dot can place cards in the conversation with `show_cards`. The web UI displays charts with a data table, ordinary
 tables, image galleries and choices, whose tap writes the chosen words into the message box for you to send, as a page's
-choice does. Post drafts show the platform, account and text together, and related drafts scroll sideways. You can copy,
+choice does; while a message is half-written the tap is refused ("Finish the message in the composer first"), so your
+draft is never lost. A channel's step line for the call says "showed cards in the web view": the channel draws none. Post drafts show the platform, account and text together, and related drafts scroll sideways. You can copy,
 edit or cancel a draft in the current view. Cancelled drafts stay visible in muted colours. **Prepare to publish** puts
 a text-only draft in the composer for you to review and send as a request. The resulting run goes through the existing
 post policy. The renderer can show a confirmed X result as a collapsed **Shared** row that opens to the post text and

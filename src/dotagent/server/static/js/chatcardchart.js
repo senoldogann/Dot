@@ -1,4 +1,5 @@
 import { el, svg } from "./dom.js";
+import { t } from "./i18n.js";
 
 /** @typedef {{name: string, values: number[]}} Series */
 /** @typedef {{kind: "chart", title: string, chart_type: "line"|"bar"|"area"|"pie"|"scatter", x: (string|number)[], series: Series[], x_label: string|null, y_label: string|null, unit: string|null}} Chart */
@@ -112,9 +113,9 @@ export function cardChart(card, table) {
   return el("section", { class: "chat-card chat-chart" },
     el("h3", null, card.title),
     axes === "" ? null : el("p", { class: "muted" }, axes),
-    svg("svg", { viewBox: `0 0 ${WIDTH} ${HEIGHT}`, role: "img", "aria-label": `${card.title}, ${card.chart_type} chart` }, isPie ? pie(card) : cartesian(card)),
+    svg("svg", { viewBox: `0 0 ${WIDTH} ${HEIGHT}`, role: "img", "aria-label": t("cards.chartLabel", { title: card.title, type: t(`cards.type.${card.chart_type}`) }) }, isPie ? pie(card) : cartesian(card)),
     legend,
-    el("details", null, el("summary", null, "Chart data"), table(
+    el("details", null, el("summary", null, t("cards.chartData")), table(
       [card.x_label ?? "X", ...card.series.map((series) => series.name)],
       card.x.map((value, index) => [value, ...card.series.map((series) => series.values[index])]),
     )),

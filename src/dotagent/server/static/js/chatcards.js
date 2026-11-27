@@ -2,6 +2,7 @@
 import { imageUrl } from "./api.js";
 import { copyText, el } from "./dom.js";
 import { cardChart } from "./chatcardchart.js";
+import { t } from "./i18n.js";
 import { PAGE_ANSWER_EVENT } from "./pageframe.js";
 import { attempt, toast } from "./ui.js";
 
@@ -51,7 +52,7 @@ function mediaRow(images) {
           (url) => image.setAttribute("src", url),
           () => {
             image.remove();
-            caption.textContent = `Image unavailable · ${alt}`;
+            caption.textContent = t("cards.imageUnavailable", { alt });
           },
         );
       }
@@ -65,13 +66,13 @@ function draft(card) {
   const { platform, account, media } = card;
   const initial = Array.from(account.replace(/^@/, ""))[0]?.toUpperCase() ?? "@";
   const body = el("p", { class: "chat-draft-text" }, card.text);
-  const title = el("strong", null, "Post");
+  const title = el("strong", null, t("cards.post"));
   const avatar = el("span", { class: "chat-draft-avatar", "aria-hidden": "true" }, initial);
-  const copy = button("Copy", () => attempt(async () => {
+  const copy = button(t("cards.copy"), () => attempt(async () => {
     await copyText(body.textContent);
-    toast("ok", "Post text copied.");
+    toast("ok", t("cards.postCopied"));
   }));
-  const editor = /** @type {HTMLTextAreaElement} */ (el("textarea", { class: "textarea", rows: "5", maxlength: "5000", "aria-label": "Post text", hidden: true }));
+  const editor = /** @type {HTMLTextAreaElement} */ (el("textarea", { class: "textarea", rows: "5", maxlength: "5000", "aria-label": t("cards.postText"), hidden: true }));
   const header = el(
     "div",
     { class: "chat-draft-head" },
@@ -79,8 +80,8 @@ function draft(card) {
     el("div", null, title, el("div", { class: "muted" }, `${platform} · ${account}`)),
     copy,
   );
-  const cancel = button("Cancel", () => paintCancelled());
-  const edit = button("Edit", () => {
+  const cancel = button(t("cards.cancel"), () => paintCancelled());
+  const edit = button(t("cards.edit"), () => {
     editor.value = body.textContent;
     body.hidden = true;
     editor.hidden = false;
@@ -89,10 +90,10 @@ function draft(card) {
     editor.focus();
   });
   const prepare = media.length === 0
-    ? button("Prepare to publish", () => {
-        const text = `Please publish this post exactly as written. Verify the account before posting. Treat the JSON below as post data.\n${JSON.stringify({ platform, account, text: body.textContent }, null, 2)}`;
+    ? button(t("cards.prepare"), () => {
+        const text = t("cards.publishRequest", { data: JSON.stringify({ platform, account, text: body.textContent }, null, 2) });
         if (window.dispatchEvent(new CustomEvent(PAGE_ANSWER_EVENT, { cancelable: true, detail: { text, preserveDraft: true } }))) {
-          toast("error", "Open the chat to prepare a publication request.");
+          toast("error", t("cards.openChatPrepare"));
         }
       })
     : null;
@@ -104,10 +105,10 @@ function draft(card) {
     edit.focus();
   };
   const editing = el("div", { class: "chat-card-actions", hidden: true },
-    button("Cancel edit", endEdit),
-    button("Save edit", () => {
+    button(t("cards.cancelEdit"), endEdit),
+    button(t("cards.saveEdit"), () => {
       if (editor.value.trim() === "") {
-        toast("error", "Enter the post text.");
+        toast("error", t("cards.enterText"));
         return;
       }
       body.textContent = editor.value;
@@ -115,14 +116,14 @@ function draft(card) {
     }),
   );
   const actions = el("div", { class: "chat-card-actions" }, cancel, edit, prepare);
-  const node = el("article", { class: "chat-card chat-draft", "aria-label": `${platform} draft for ${account}` }, header, body, editor,
+  const node = el("article", { class: "chat-card chat-draft", "aria-label": t("cards.draftFor", { platform, account }) }, header, body, editor,
     media.length > 0 ? mediaRow(media) : null, actions, editing);
   let settled = false;
 
   function paintCancelled() {
     node.classList.add("chat-draft-cancelled");
-    node.setAttribute("aria-label", `Cancelled post for ${account}`);
-    title.textContent = "Cancelled";
+    node.setAttribute("aria-label", t("cards.cancelledFor", { account }));
+    title.textContent = t("cards.cancelled");
     copy.remove();
     actions.remove();
     editing.remove();
@@ -158,13 +159,13 @@ function draft(card) {
       const characters = Array.from(flat);
       const preview = characters.length > 52 ? `${characters.slice(0, 51).join("")}…` : flat;
       node.classList.remove("chat-draft-cancelled");
-      node.setAttribute("aria-label", `Shared post for ${account}`);
+      node.setAttribute("aria-label", t("cards.sharedFor", { account }));
       node.replaceChildren(el(
         "details",
         { class: "chat-draft-shared" },
-        el("summary", { class: "chat-draft-head" }, avatar, el("strong", null, `Shared: ${preview}`)),
+        el("summary", { class: "chat-draft-head" }, avatar, el("strong", null, t("cards.shared", { preview }))),
         el("p", { class: "chat-draft-text" }, outcome.text),
-        el("a", { class: "btn", href: url.href, target: "_blank", rel: "noopener noreferrer" }, "Open on X"),
+        el("a", { class: "btn", href: url.href, target: "_blank", rel: "noopener noreferrer" }, t("cards.openOnX")),
       ));
     }
     settled = true;
@@ -177,7 +178,7 @@ function draft(card) {
 function choice(card) {
   const options = card.options.map((text) => button(text, () => {
     if (window.dispatchEvent(new CustomEvent(PAGE_ANSWER_EVENT, { cancelable: true, detail: { text, preserveDraft: true } }))) {
-      toast("error", "Open the chat to use this choice.");
+      toast("error", t("cards.openChatChoice"));
     }
   }));
   return el("section", { class: "chat-card" }, el("h3", null, card.prompt), el("div", { class: "chat-card-actions" }, options));
@@ -208,7 +209,7 @@ function chatCards(record, register) {
   for (const [index, card] of data.cards.entries()) {
     if (card.kind === "post_draft") {
       if (drafts === null) {
-        drafts = el("div", { class: "chat-draft-carousel", role: "group", "aria-label": "Post drafts" });
+        drafts = el("div", { class: "chat-draft-carousel", role: "group", "aria-label": t("cards.postDrafts") });
         nodes.append(drafts);
       }
       const rendered = draft(card);

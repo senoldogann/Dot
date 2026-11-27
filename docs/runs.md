@@ -885,7 +885,8 @@ image gallery. The call is a `meta` action of no risk, so it asks nothing in any
 markup and no approval, and nothing is sent or published by it. Images are workspace rasters named by a relative path,
 read through a held path under the rules of `show_page`'s files and stored with the other images. A choice, like a
 page's, writes its words into your message box and sends nothing: the words are the run's own, which a run that read
-untrusted pages can word, so only your send makes them your message. The phone's app and the channels do not draw cards
+untrusted pages can word, so only your send makes them your message; while the box holds a half-written message the tap
+is refused, so that draft is never lost. The phone's app and the channels do not draw cards
 yet (the system prompt does not ask for them until they do); the run's answer must not depend on one.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
