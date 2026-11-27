@@ -6,6 +6,12 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1997](1997.md) | done | 2026-11-27 | The pre-push hook measures the first step's budget when the prompt surface changes |
+| [1996](1996.md) | done | 2026-11-27 | DotNext: Show steps off hides every step, an answer the finish says again stands once, the live caption speaks as the work log, no Plan in This chat |
+| [1990](1990.md) | done | 2026-11-27 | A terminal session whose program ended leaves room for another |
+| [1988](1988.md) | done | 2026-11-27 | A search pattern ripgrep cannot read is told as the call's own error, with the syntax it reads |
+| [1986](1986.md) | done | 2026-11-27 | A code review whose chat was deleted starts in a new chat instead of failing |
+| [1984](1984.md) | built | 2026-11-27 | Several tasks in one chat, slice 1: lanes, the answer's queue, Stop for the whole chat |
 | [1983](1983.md) | done | 2026-11-27 | DotNext's Memory: add a note, pin it, and bring a forgotten one back from the trash |
 | [1982](1982.md) | design | 2026-11-27 | Several tasks at once in one chat: design |
 | [1976](1976.md) | done | 2026-11-27 | A chat told as a conversation: Dot's short messages of what it turns to, and the live line with its face and time |
@@ -13,6 +19,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |
 | [1972](1972.md) | done | 2026-11-26 | Swipe a message to quote it |
 | [1971](1971.md) | done | 2026-11-26 | The pre-push hook checks the prompt surface before it asks a model |
+| [1970](1970.md) | built | 2026-11-26 | Inbound webhooks start work: a signed call to a hook starts its schedule or agent, tainted |
 | [1969](1969.md) | done | 2026-11-26 | Dot makes pictures: `generate_image` draws a logo, diagram or card in its own browser, or asks Google's picture model for a photo, with no key of its own |
 | [1968](1968.md) | done | 2026-11-26 | A voice call with a bot is designed, and its first slice, a local speech prototype with measurements, is in |
 | [1967](1967.md) | partial | 2026-11-26 | Show rich cards in the conversation |

@@ -136,7 +136,7 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    every 8 seconds as long as one is live, and keeps the last count, dimmed, with no link),
    the chat's loops and the queue, each a button that opens its own sheet (the queue's has an up and a down arrow, Send now and Remove for each message,
    and Resume when a stop held it), never stacked and not drawn when there is nothing to say,
-   a run inspector (plan, helpers with the ones at work first, each group newest first with its count, item 1467, the chat's schedules and loops with switches), the Schedules list and the models; the
+   a run inspector (no plan: the pill's Plan n/m opens it, item 1996; helpers with the ones at work first, each group newest first with its count, item 1467, the chat's schedules and loops with switches), the Schedules list and the models; the
    web UI stays as it is and opens full screen from Settings › Open web UI. The second slice (item 1361) adds a new chat
    (the pencil of the list: a message starts a chat of its own on the model and reasoning level picked, as the web's home
    does since item 1350, `POST /api/runs`; a model that cannot answer is refused by name with a button that sends the
@@ -322,7 +322,7 @@ On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-
 of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General,
 Appearance, Rules, Memory, Vault and Snapshots, then the groups Agents (Agents, Models, Browser, Web search, Scheduled tasks,
 Campaigns, Self-improvement; the sidebar has no Schedules icon, so its page is a row here), Connections (Connectors, Plugins,
-Skills, AI services, Phone, Channels), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
+Skills, AI services, Phone, Channels, Hooks), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
 steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its
@@ -437,8 +437,8 @@ the code is for pairing a phone, which it takes too): Settings ›
 Phone, on the Mac or in Safari where Dot is open with the Mac's own key, shows one with **Show code**, eight characters
 in two groups (Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a
 new code takes the place of the one before, and five wrong tries use a code up. The app trades it for a key of the
-phone's own (`POST /api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host
-and Origin checks hold for it as for any other; item 670): `phone.<id>.<secret>`, which the daemon keeps nowhere: it
+phone's own (`POST /api/phone/pair`, one of the routes that take no token, beside the health check, the proof and a signed
+call to a [hook](hooks.md); the Host and Origin checks hold for it as for any other; item 670): `phone.<id>.<secret>`, which the daemon keeps nowhere: it
 keeps the key's SHA-256, the phone's name (iPhone, iPad, Android phone, read from its browser), and when it was paired
 and last used, in `<home>/phones.json`, readable by you only. The phone proves the daemon with its key as with any token
 (the proof is keyed with the key's hash, the one thing the daemon holds of it). The daemon is not proven before a code
@@ -1145,9 +1145,10 @@ web uses:
   Screen Recording on the Mac) is said in the daemon's words with Try again.
 - **Following a run** (a chat): while the chat's run uses its browser (`browser_*` tools) or the desktop (`desktop_*`),
   a mini player floats at the top of the chat with the picture (`GET /api/runs/{id}/screencast` for the browser, the
-  Mac's screen for the desktop) and what the run does now, read from the run's newest unanswered call ("Typing “Ada”",
-  "Opening example.com", "Clicking · 3 steps"; a ref such as `e12` is not shown); between steps, the chat capsule's
-  words. A tap opens it full screen (zoom with two fingers or a double tap, landscape), and the header's Watch live does
+  Mac's screen for the desktop) and what the run does now, read from the run's newest unanswered call with the mark and
+  the words of that call's row in the chat's work log (item 1996: a page's call wears the globe and reads "Browsed
+  example.com", as in the chat); while the run makes another call (a command, a file), that call's row the same way;
+  between calls, Thinking or Writing. A tap opens it full screen (zoom with two fingers or a double tap, landscape), and the header's Watch live does
   too. Folded into a Live pill, nothing is read. No click point is drawn: a step names its element by a ref, whose place
   on the picture the phone does not know.
 - **Taking over** (full screen, a run's browser): Take over is `POST /takeover/screen` (nothing comes to the front of

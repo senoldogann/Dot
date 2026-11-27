@@ -26,7 +26,7 @@ from dotagent.cli_commands import RunCommand
 from dotagent.cli_daemon import probe_daemon, prove_daemon
 from dotagent.cli_ui import TerminalUi, UiOptions, print_result
 from dotagent.config import ServerConfig
-from dotagent.core.errors import ConfigError, RunConflict, ServiceError
+from dotagent.core.errors import ConfigError, NotFoundError, RunConflict, ServiceError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import token_path
 from dotagent.core.text import stream_lines
@@ -45,6 +45,7 @@ _CALL_TIMEOUT_S: float = 15.0
 _STREAM_QUIET_S: float = 60.0
 _BODY_CHARS: int = 300
 _CONFLICT: int = 409
+_NOT_FOUND: int = 404
 _FINISHED: str = "run_finished"
 _DECIDED: str = "approval_decided"
 _DATA: str = "data:"
@@ -108,6 +109,16 @@ def handed_request(command: RunCommand, goal: str) -> StartRunRequest:
         ) from exc
 
 
+def in_a_new_chat(command: RunCommand) -> RunCommand:
+    """``command``, a code review (``--review``) whose ``--thread`` chat is gone, started in a new chat (item 1986).
+    The pre-push hook keeps each branch's review chat and continues it in the branch's next review; a chat the owner
+    deleted since (the Code reviews they cleared) is no reason to refuse the review, which reads the change from its
+    files, not from the chat. Any other run whose ``--thread`` is gone is refused, as it asked for that chat."""
+    log.warning("review_chat_gone", thread_id=command.thread)
+    sys.stderr.write(f"the chat {command.thread} is gone; the review starts in a new chat\n")
+    return command.model_copy(update={"thread": None})
+
+
 class DaemonApi:
     """The calls ``dotx run`` makes of the daemon's API for a run it handed to it."""
 
@@ -127,6 +138,11 @@ class DaemonApi:
         if response.status_code == _CONFLICT:
             raise RunConflict(
                 "the Dot daemon refused the call in the state the run is in",
+                {"method": method, "path": path, "body": _clip(response.text)},
+            )
+        if response.status_code == _NOT_FOUND:
+            raise NotFoundError(
+                "the Dot daemon has nothing that the call names",
                 {"method": method, "path": path, "body": _clip(response.text)},
             )
         if response.status_code >= 300:
@@ -149,6 +165,14 @@ class DaemonApi:
 
     async def start(self, request: StartRunRequest) -> RunRecord:
         return self._read(_RUN, await self._call("POST", "/api/runs", request))
+
+    async def has_thread(self, thread_id: str) -> bool:
+        """Whether the daemon keeps the chat ``thread_id``: the owner may have deleted it."""
+        try:
+            await self._call("GET", f"/api/threads/{thread_id}/view?tail=1", None)
+        except NotFoundError:
+            return False
+        return True
 
     async def detail(self, run_id: str) -> RunDetail:
         return self._read(TypeAdapter(RunDetail), await self._call("GET", f"/api/runs/{run_id}", None))
@@ -267,7 +291,6 @@ async def hand_run(link: DaemonLink, server: ServerConfig, command: RunCommand, 
     what it needs of the user, the questions it left and its campaign, as ``dotx run`` does for a run of its own; 0 when
     it ended done. ``server`` is the ``[server]`` the link was found at. The run is the daemon's from its start: Ctrl-C
     asks the daemon to stop it (a second one quits), as do SIGHUP and SIGTERM, after which nothing follows it."""
-    request: StartRunRequest = handed_request(command, goal)
     async with httpx.AsyncClient(
         base_url=base_url(link.host, link.port),
         headers={"Authorization": f"Bearer {link.token}"},
@@ -275,7 +298,9 @@ async def hand_run(link: DaemonLink, server: ServerConfig, command: RunCommand, 
         trust_env=False,
     ) as client:
         api: DaemonApi = DaemonApi(client)
-        run: RunRecord = await api.start(request)
+        if command.review and command.thread is not None and not await api.has_thread(command.thread):
+            command = in_a_new_chat(command)
+        run: RunRecord = await api.start(handed_request(command, goal))
         log.info("run_handed_to_daemon", run_id=run.id, thread_id=run.thread_id, port=link.port)
         desk: DaemonDesk = DaemonDesk(api)
         ui: TerminalUi = TerminalUi(desk, server, options)

@@ -177,17 +177,6 @@
         }
       }
     },
-    "%@ · %lld steps": {
-      "comment": "Live caption: a batch of steps; the arguments are the first step and the count",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · %lld adım"
-          }
-        }
-      }
-    },
     "%@ · %lld tasks": {
       "comment": "Usage: a day's tokens and tasks",
       "localizations": {
@@ -2633,28 +2622,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "“Perş 15:30”a tıkladı"
-          }
-        }
-      }
-    },
-    "Clicking": {
-      "comment": "Live caption: the run clicks",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tıklıyor"
-          }
-        }
-      }
-    },
-    "Clicking %@": {
-      "comment": "Live caption: the run clicks; the argument is what",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tıklıyor: %@"
           }
         }
       }
@@ -6679,17 +6646,6 @@
         }
       }
     },
-    "Looking at the page": {
-      "comment": "Live caption: the run reads the page or screen",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sayfaya bakıyor"
-          }
-        }
-      }
-    },
     "Looks every %lld minutes": {
       "comment": "Watcher: how often it looks",
       "localizations": {
@@ -8601,28 +8557,6 @@
         }
       }
     },
-    "Opening %@": {
-      "comment": "Live caption: the run opens a page or app; the argument is which",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Açıyor: %@"
-          }
-        }
-      }
-    },
-    "Opening a page": {
-      "comment": "Live caption: the run opens a page",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bir sayfa açıyor"
-          }
-        }
-      }
-    },
     "Opens its chat": {
       "comment": "VoiceOver: a schedule's run opens its chat",
       "localizations": {
@@ -9148,28 +9082,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekler hazırlanıyor…"
-          }
-        }
-      }
-    },
-    "Pressing %@": {
-      "comment": "Live caption: the run presses a key; the argument is the key",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Basıyor: %@"
-          }
-        }
-      }
-    },
-    "Pressing a key": {
-      "comment": "Live caption: the run presses a key",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bir tuşa basıyor"
           }
         }
       }
@@ -10479,17 +10391,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "En yeni mesaja kaydır"
-          }
-        }
-      }
-    },
-    "Scrolling": {
-      "comment": "Live caption: the run scrolls the page",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kaydırıyor"
           }
         }
       }
@@ -13615,17 +13516,6 @@
         }
       }
     },
-    "Typing “%@”": {
-      "comment": "Live caption: the run types; the argument is the text",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yazıyor: “%@”"
-          }
-        }
-      }
-    },
     "Undo": {
       "comment": "Component gallery (debug builds): a heading or sample text\nInspector: takes a file's change back\nToast action: takes the last change back",
       "localizations": {
@@ -14100,7 +13990,7 @@
       }
     },
     "Waiting for the page": {
-      "comment": "Live caption: the run waits for text on the page\nLive picture: the first frame of the run's browser has not come (web computer.js)",
+      "comment": "Live picture: the first frame of the run's browser has not come (web computer.js)",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14740,17 +14630,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'te çalışıyor"
-          }
-        }
-      }
-    },
-    "Working on the page": {
-      "comment": "Live caption: another browser or desktop step",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sayfada çalışıyor"
           }
         }
       }

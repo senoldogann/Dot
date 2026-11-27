@@ -33,6 +33,7 @@ from dotagent.server.thread_sync import (
 )
 from dotagent.server.views import (
     ChatSearchQuery,
+    ChatStopped,
     DeletedThreads,
     DeleteThreadsRequest,
     HelpersQuery,
@@ -89,6 +90,12 @@ def threads_router(ctx: ServerContext) -> APIRouter:
         cursors: dict[str, int] = parse_cursors(query.cursors)
         await check_cursors(store, thread_id, cursors)
         return event_stream(follow_thread(ctx, thread_id, cursors))
+
+    @router.post("/threads/{thread_id}/stop", status_code=202)
+    async def stop_chat(thread_id: str) -> ChatStopped:
+        """Stop every task of the chat (item 1984): its own run and its lanes', each as its Stop would; a lane names its
+        chat. 404 for no chat; a chat with nothing at work stops nothing."""
+        return ChatStopped(stopped=await ctx.manager.stop_chat(thread_id))
 
     @router.get("/threads/{thread_id}/helpers")
     async def list_helpers(thread_id: str, query: Annotated[HelpersQuery, Query()]) -> list[RunRecord]:

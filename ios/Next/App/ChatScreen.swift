@@ -829,7 +829,7 @@ func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
         switch item {
         case .plan: return nil
         case .work(let fold):
-            return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
+            return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items), startsOpen: fold.startsOpen))
         default: return item
         }
     }

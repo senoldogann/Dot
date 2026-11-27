@@ -104,6 +104,12 @@ type ContextTokens = Annotated[int | Literal["most"], AfterValidator(_context_to
 type PageAppearance = Literal["system", "light", "dark"]
 
 
+# A Host header's value: a DNS name, with a port or none.
+_HOST_HEADER: re.Pattern[str] = re.compile(
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*(?::[0-9]{1,5})?"
+)
+
+
 class ServerConfig(FrozenModel):
     """``host`` and ``port`` are where the daemon listens, a loopback address only. ``reach`` names the hosts a reverse
     proxy on the owner's own network presents the daemon as (``tailscale serve`` gives ``<mac>.<tailnet>.ts.net``); a
@@ -112,8 +118,20 @@ class ServerConfig(FrozenModel):
     host: str
     port: int = Field(ge=1, le=65535)
     reach: list[str]
+    # The hosts a call to a hook may come in under besides those (``docs/hooks.md``): a name a tunnel open to the
+    # internet presents the daemon as, which reaches ``POST /api/hooks/<id>`` and nothing else. Empty: none.
+    hook_hosts: list[str]
     # Whether the daemon keeps the Mac awake while it charges (item 271), for a phone that reaches it from away.
     keep_awake: bool
+
+    @field_validator("hook_hosts")
+    @classmethod
+    def _hook_hosts_are_hosts(cls, hosts: list[str]) -> list[str]:
+        # Each is compared with a request's Host header as it stands: a name, with its port when it is not 443.
+        bad: list[str] = [host for host in hosts if _HOST_HEADER.fullmatch(host) is None]
+        if bad:
+            raise ValueError(f"[server] hook_hosts takes host names such as mac.tailnet.ts.net:8443, not {bad}")
+        return hosts
 
 
 class DaemonConfig(FrozenModel):
@@ -411,6 +429,10 @@ class AgentConfig(FrozenModel):
     checkpoint_steps: int = Field(ge=0)
     # A message the owner sends a chat at work, a request of its own, starts at once in a chat of its own (item 915).
     busy_parallel: bool
+    # How many tasks work at once in one chat, the chat itself included (item 1984): above 1, a request of its own sent
+    # while the chat works starts in a lane of the chat (a thread the sidebar does not list) instead of a chat of its
+    # own; 1 is one run at a time, and a request of its own goes to a chat of its own (item 915).
+    chat_tasks: int = Field(ge=1)
     finish_nudges: int = Field(ge=0)
     questions: QuestionMode
     parallel_tools: int = Field(ge=1)
