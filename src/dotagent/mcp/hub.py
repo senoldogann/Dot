@@ -165,7 +165,12 @@ async def _connect_server(
             await connection.discover_catalogue()
         except McpError as error:
             # Resources and prompts are an optional extra: a server that cannot list them keeps the tools it served.
-            log.warning("mcp_catalogue_unavailable", server=config.name, error=str(error), context=error.context)
+            log.warning(
+                "mcp_catalogue_unavailable",
+                server=config.name,
+                error=error.message,
+                context=masked_context(error.context),
+            )
         instructions: str = (connection.instructions() or "")[:READ_CHARS]
         cleanup.pop_all()
     log.info("mcp_server_ready", server=config.name, tools=len(tools), offered=len(listed))

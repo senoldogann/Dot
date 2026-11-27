@@ -7,10 +7,13 @@ from mcp.server.context import ServerRequestContext
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
+    CallToolRequestParams,
+    CallToolResult,
     GetPromptRequestParams,
     GetPromptResult,
     ListPromptsResult,
     ListResourcesResult,
+    ListToolsResult,
     PaginatedRequestParams,
     Prompt,
     PromptArgument,
@@ -20,6 +23,7 @@ from mcp.types import (
     Resource,
     TextContent,
     TextResourceContents,
+    Tool,
 )
 
 RESOURCE_URI: str = "notes://weekly"
@@ -63,13 +67,25 @@ async def get_prompt(ctx: ServerRequestContext[None], params: GetPromptRequestPa
     )
 
 
+async def list_tools(ctx: ServerRequestContext[None], params: PaginatedRequestParams | None) -> ListToolsResult:
+    return ListToolsResult(tools=[Tool(name="ping", description="Answer pong", inputSchema={"type": "object"})])
+
+
+async def call_tool(ctx: ServerRequestContext[None], params: CallToolRequestParams) -> CallToolResult:
+    return CallToolResult(content=[TextContent(type="text", text="pong")])
+
+
 async def main() -> None:
+    tools: dict[str, object] = (
+        {"on_list_tools": list_tools, "on_call_tool": call_tool} if "--fail-lists" in sys.argv else {}
+    )
     server: Server[None] = Server(
         "dot-catalogue-fixture",
         on_list_resources=list_resources,
         on_read_resource=read_resource,
         on_list_prompts=list_prompts,
         on_get_prompt=get_prompt,
+        **tools,
     )
     async with stdio_server() as (incoming, outgoing):
         await server.run(incoming, outgoing, server.create_initialization_options())

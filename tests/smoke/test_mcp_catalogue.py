@@ -155,6 +155,9 @@ async def test_a_server_that_cannot_list_resources_stays_connected_without_them(
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, {})
         try:
+            assert "notes" in runtime.mcp.connected()
+            assert not [failure for failure in runtime.mcp.failures if failure.server == "notes"]
+            assert [tool.remote_name for tool in runtime.mcp.tools] == ["ping"]
             assert runtime.mcp.catalogue("notes").resources == ()
             with pytest.raises(McpError, match="has not listed this resource"):
                 await runtime.mcp.read_resource("notes", _URI)
