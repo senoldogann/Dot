@@ -1,6 +1,7 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
 extracts them (`%@` a text argument, `%lld` a count).
@@ -1227,6 +1228,19 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
+        "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
+        "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
+        "Deleted for good %@.": "Kalıcı olarak silinecek: %@.",
+        "Dot already had a note with these words.": "Dot'ta bu sözlerle bir not zaten vardı.",
+        "Forgotten %@": "Unutuldu: %@",
+        "It goes to the trash, where it can be restored for a while.": "Çöp kutusuna gider; orada bir süre geri getirilebilir.",
+        "New note": "Yeni not",
+        "Restore": "Geri getir",
+        "The trash is empty": "Çöp kutusu boş",
+        "Trash": "Çöp kutusu",
+        "What should Dot remember?": "Dot neyi hatırlasın?",
+        "notes remember lessons proposals pin trash restore forget": "notlar hatırla dersler öneriler sabitle çöp geri getir unut",
         "A helper of another task": "Başka bir işin yardımcısı",
         "A lesson": "Bir ders",
         "A line may come from content others can write: %@. Read it before you use it.": "Bir satır başkalarının yazabildiği içerikten gelmiş olabilir: %@. Kullanmadan önce oku.",
@@ -1400,7 +1414,6 @@ TR.update(
         "Optional, separated by commas.": "İsteğe bağlı, virgülle ayrılır.",
         "Forget": "Unut",
         "Forget this note?": "Bu not unutulsun mu?",
-        "It goes to the trash on your Mac, where it can be restored for a while.": "Mac'indeki çöp kutusuna gider; bir süre oradan geri getirilebilir.",
         "Ask Dot for a big job and it hands parts to them. New agents are made on your Mac.": "Dot'a büyük bir iş ver, parçalarını onlara dağıtsın. Yeni ajanlar Mac'inde oluşturulur.",
         "Leads every task": "Her görevi yönetir",
         "No role yet": "Henüz rolü yok",

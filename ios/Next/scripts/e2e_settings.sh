@@ -61,6 +61,9 @@ curl -fsS -H "$main" "$base/api/code-review" | check "Models: the code review's 
 curl -fsS -H "$main" "$base/api/policy/free" | check "Rules: free mode switched off from the phone" 'd["free"] is False'
 curl -fsS -H "$main" "$base/api/agents" | check "Agents: the agent's first chat opened from the phone" 'any(a["record"]["name"] == "E2E Scout" and a["home"] is not None for a in d)'
 curl -fsS -H "$main" "$base/api/memories?limit=50" | check "Memory: the note edited from the phone" 'any("Edited." in m["content"] for m in d["items"])'
+curl -fsS -H "$main" "$base/api/memories?limit=50" | check "Memory: a note added from the phone, with its tags, restored from the trash" \
+    'any(m["content"] == "Phone note about the invoices." and m["tags"] == ["phone", "e2e"] for m in d["items"])'
+curl -fsS -H "$main" "$base/api/memories/trash" | check "Memory: the trash is empty again" 'd["total"] == 0'
 curl -fsS -H "$main" "$base/api/memories/proposed" | check "Memory: no proposal waits" 'd == []'
 curl -fsS -H "$main" "$base/api/memories?limit=10" | check "Memory: the proposed words were used" \
     'any("commands written out in full" in (m.get("content") or m.get("record", {}).get("content", "")) for m in (d if isinstance(d, list) else d.get("items", [])))'

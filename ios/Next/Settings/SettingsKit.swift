@@ -15,6 +15,7 @@ enum SettingsPage: Hashable, Sendable {
     case schedules
     case rules
     case memory
+    case memoryTrash
     case agents
     case system
     case usage
