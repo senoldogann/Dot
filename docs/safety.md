@@ -601,7 +601,7 @@ judged as after a page until you write in its chat. A note starts nothing; a run
 a run marked untrusted, which a note marks too, so that no chain of notes carries a page's words, or a note's, on past
 the rules each run keeps (item 963); none goes to a run whose approval mode asks you less than its sender's; and a run
 of Dot's own initiative, which asks before a message, a post or a release in every mode, sends none to a run that does
-not ask them, but for a run of a chat you opened (an agent's chat among them, item 963), which asks a payment, a
+not ask them, but for a run of a chat you opened (a bot's chat among them, item 963), which asks a payment, a
 message, a mail and a post itself or has the review model judge them (item 860), a release there being checked by the
 review model (item 962) as after a page; in yolo with `[policy] yolo_taint_check = false` nothing would check it, so it
 sends none there then. A `preapproved` rule of yours lets a step through in a run a note marked as it does after a page
@@ -614,7 +614,7 @@ as your instruction, not the question the run wrote, which a page it read may ha
 run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off, a run that goes on
 in a chat of recurring work (an agent's one chat, a run of Dot's own initiative in the chat of the same name, a look
 for work's among them, a campaign's sessions', item 952) as that chat's last run ended, whoever sent it, since it reads that run's words: once such a chat read outside content, its runs stay
-marked until you write in it yourself, and an agent's chat keeps that mark when the chat that sent it the work is
+marked until you write in it yourself, and a bot's chat keeps that mark when the chat that sent it the work is
 deleted, whose runs go with it, and the run that
 tells a chat that its command in the background ended as the chat's last run ended: that message is Dot's, not yours,
 and so is the note that tells a run at work of such an end, which clears nothing. The report of a helper the run
