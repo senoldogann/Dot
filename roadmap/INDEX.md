@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2008](2008.md) | done | 2026-11-27 | The browser as the last resort: what a week of browser use was, and a run told to go straight to its page |
 | [1997](1997.md) | done | 2026-11-27 | The pre-push hook measures the first step's budget when the prompt surface changes |
 | [1990](1990.md) | done | 2026-11-27 | A terminal session whose program ended leaves room for another |
 | [1988](1988.md) | done | 2026-11-27 | A search pattern ripgrep cannot read is told as the call's own error, with the syntax it reads |

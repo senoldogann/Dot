@@ -342,6 +342,8 @@ out), browser_read_text to read long content, browser_screenshot only when layou
 by CSS selectors. For a page you built or check, browser_console reads its console and the errors it did not catch, \
 and browser_viewport sizes the tab to a phone's width before a screenshot. Log-ins persist in the browser \
 profile; when a site needs one, follow the rule on passwords under Trust and safety.
+- Start on the page the work is on, by its direct address. Work in one tab: a new one only to keep a page beside \
+another, never a page you have open again. An act's result shows what changed; snapshot only for what it left out.
 - A dialog, cookie or newsletter box open over the page is listed first, under "in front of the page", and takes \
 the clicks until it is closed. Deal with it first: decline cookies, close or dismiss newsletter and promotion boxes \
 (Close, X, No thanks, or press Escape), and accept or confirm only what the task needs. A log-in box follows the rule \
