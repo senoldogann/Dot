@@ -3,7 +3,7 @@
 ## Memory
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
-`memory_search` and `memory_forget` are tools of the agent (`memory_save` and `memory_update` name the longest note,
+`memory_search` and `memory_forget` are tools of the bot (`memory_save` and `memory_update` name the longest note,
 `[memory] max_chars`, 600, in their description: item 1690); you manage the same notes with `dotx memory` and in the web
 UI, where Settings › Memory (items 373 and 566) is the box that adds a note at its head (its tags beside it, one fact
 per note, **Remember** or ⌘Enter; on a phone the tags have a line of their own and **Remember** stands at the right of
@@ -26,7 +26,7 @@ it is doing**, the default, the line stands with the steps, out of the conversat
 line of a saved or corrected note opens Settings ›
 Memory with that note first, to read, correct or forget (`#/settings/memory?note=ID`, `GET /api/memories/{id}`); a note
 forgotten since is said to be gone. A note saved again, or a call that failed, changed nothing and leaves no line. The
-line names no agent: a note a run saves is Dot's, for every run (item 94). The notes a run is handed at its start leave
+line names no bot: a note a run saves is Dot's, for every run (item 94). The notes a run is handed at its start leave
 a line too, "Recalled 3 memories", not in the conversation but under Set up in the side panel's Task tab (item 365), and
 only when its chat had not been handed one of them before: a follow-up handed the same notes says nothing, and one
 handed a new note says how many are new, "(1 new)" (item 335). The notes themselves go under the message that recalled
@@ -51,7 +51,7 @@ notes" and has **Undo the merge** in its **…**: the notes it took in wake apar
 (90): each note with **Keep** (it wakes, and is proposed again only after as long a rest) and **Forget**, and
 **Forget all N**, which asks first and forgets the notes the card lists, all in sight in a box that scrolls. Nothing
 is forgotten before you press one of them. A note you forget (there, in the list, with `dotx memory forget`, or by
-the agent's `memory_forget`) is not deleted: it waits in the trash for `[memory] trash_days` (30), listed as
+the bot's `memory_forget`) is not deleted: it waits in the trash for `[memory] trash_days` (30), listed as
 **Forgotten notes** under the notes with when each is deleted for good, **Restore** (it comes back awake, with its
 vector when it is of the embedding model in use, else embedded again: item 796) and
 **Delete for good**; the nightly reflection deletes the notes that stayed longer, and no others.
@@ -91,11 +91,11 @@ dotx memory reindex      # embed every note again, for example after changing [m
   **Always, once pinned** until you do, and until then it is handed when it fits the goal, rests and may be proposed to be
   forgotten as any of a run's (item 613: notes runs had marked core, of a thesis and a job search, went to every run of
   a week). Then the notes you wrote yourself (the ones
-  closest to the goal first), then the agent's notes close enough to the goal and the earlier goals of the conversation
+  closest to the goal first), then the bot's notes close enough to the goal and the earlier goals of the conversation
   (`inject_min_similarity`; by fit and score), as many as fit a budget of tokens: `inject_share` (2%) of the model's
   context window, at most `inject_tokens` (1500; the cap alone when the provider does not say the window). Each of
   these groups first gets its own share, a quarter of the budget, and what is left then goes to them in the same order,
-  so many notes of yours do not crowd out the agent's lessons. A note that does not fit is passed over, a shorter one
+  so many notes of yours do not crowd out the bot's lessons. A note that does not fit is passed over, a shorter one
   after it may still fit, and `memory_search` finds the rest. A lesson is also tagged with the sites and applications
   of its run that it names (`site-amazon-com`, `site-notes`; item 308), and when a run first reaches a site or drives
   an application, its next step is handed the lessons tagged with it that it was not handed yet (at most five) and the
@@ -155,9 +155,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   the chat is deleted) as echoed (1) when its answer or the arguments of its calls name the note's id or carry two of
   its words of five letters or more (one, for a note that has only one), else 0. A rough signal: a run may follow a
   note in words of its own. Nothing reads it to rank notes yet.
-- Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
+- Use decides what is recalled: a note handed to a run counts as used, and a search lifts the bot's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
-  30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
+  30), so the notes that help overtake the ones first written. A bot's note that no run was handed for `rest_days`
   (90), counted from when it was last handed or written, rests: the Memory page lists it under "Resting", a search
   still finds it, but runs no longer start with it on its own. Your notes and the ones you pinned (the standing ones
   among them) never rest that way.
@@ -191,7 +191,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
   the ones that failed. Once `score_min_uses` (3) runs were handed it, the balance lifts or lowers the note in a search
   as much as a fresh use would, and a negative balance rests it at once, before the nightly reflection retires it.
 - A note saved or changed while a run works reaches that run at its next step, when the run would be handed it at its
-  start: not another agent's lesson, not a resting note, and only as many as fit the budget of the starting notes (the
+  start: not another bot's lesson, not a resting note, and only as many as fit the budget of the starting notes (the
   run is told how many more changed; `memory_search` finds them). A note the run itself just saved or rewrote is not
   handed again, since that tool's answer already says it. An edit you make on the Memory page of a note that run saved
   still reaches it, and the note keeps the run as its author (item 1141). A change of tags alone, such as the nightly `rest` or
@@ -207,7 +207,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - The night merges notes that say the same in other words (item 584). Besides the fold of two lessons that say the
   same the same way round, which asks no model, the reflection shows the review model the notes of Dot's that are
   awake and not pinned, not yours and not a journal, whose embeddings are at least `merge_similarity` (0.80) close
-  to each other, of one agent, both saved while reading outside content or neither, both saying yes or both saying
+  to each other, of one bot, both saved while reading outside content or neither, both saying yes or both saying
   no (a note and its correction stay for the outdated check, which now asks about the closest pairs first); it says
   which say the same thing and whose words say it best, at most `merges_per_night` (20) a night, the closest groups
   first. The groups of notes saved while reading outside content are asked about in a question of their own, apart from
@@ -239,7 +239,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
   many notes the trash holds in all), `POST /api/memories/trash/{id}/restore` and `dotx memory restore` bring it
   back awake, `DELETE /api/memories/trash/{id}` and `dotx memory purge` delete it at once, and the reflection
   deletes the notes that stayed longer, and none else. A note in the trash is in no search, list or count.
-- `memory_update` lets the agent correct a note in place, and the note is then the agent's: the prompt no longer shows
+- `memory_update` lets the bot correct a note in place, and the note is then the bot's: the prompt no longer shows
   the model's words as yours. A note that is yours, one you wrote, pinned or corrected on the Memory page, is not
   rewritten by a run (item 1711): it keeps your words, its author, its time and its mark, every run is still handed
   it as it stands, and the run's words wait beside it, the newest of a run's in place of an older, under **Changes
@@ -256,7 +256,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
   wrote each note and how often runs used it.
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings, each
   cut to the best `candidate_pool` (30) notes among the ones that may be found: resting and expired notes, and the
-  lessons of an agent in the search of another run, take none of those places (item 557).
+  lessons of a bot in the search of another run, take none of those places (item 557).
   `embed_enabled = false` searches by words only. An answer of Ollama that says its model runner broke off is asked
   again, as a broken connection is; when the embedding service still fails at the start of a run, the run recalls its
   notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Task tab, under Set
@@ -419,10 +419,10 @@ tool calls, their results, the thinking or the screenshots of those runs, which 
 hundred characters). A goal the chat repeats word for word is kept as its last copy only, and Dot's own notes in the
 chat (a command's end, a helper's report) and the opening of an earlier firing are left out. Either way it reads earlier runs' words without a message of yours,
 so it starts tainted (asking before outward-facing actions) when one of the runs it reads ended so. The digest counts
-the firings since item 257: a firing from before names no schedule. The agent can create schedules too
+the firings since item 257: a firing from before names no schedule. The bot can create schedules too
 (`schedule_create`): such a schedule goes on in the chat it was made in, with that chat's choices as its composer shows
 them (the ones its first run started with until you picked others: its mode, model, reasoning level, speed, approval
-mode and goal mode; item 291). A firing whose saved reasoning level its model (an agent's schedule: the model its run takes, the schedule's own, else the agent's) does not offer runs at the nearest one
+mode and goal mode; item 291). A firing whose saved reasoning level its model (a bot's schedule: the model its run takes, the schedule's own, else the bot's) does not offer runs at the nearest one
 it does, the lower of two as near, the cheaper (`medium` on a model of low, high and max runs at low, as a chat's run on that model
 does; on a model with only a thinking switch, `medium` is on and `minimal` is off): the schedule keeps that level from then on, the run's timeline
 says so once ("This schedule asked for medium reasoning, which its model does not offer; it now runs at low."), and the log has
@@ -504,7 +504,7 @@ you care about.
 
 **Scheduled tasks** (Settings › Scheduled tasks, `#/settings/schedules`; item 1337: it was the Schedules page of the
 sidebar, `#/schedules`, which leads there) is a list of rows in a card: a schedule's name with its badges (Brief, Loop,
-Taught task, its agent), one line of when it runs, when next and how the last went, and at the right **Run now**,
+Taught task, its bot), one line of when it runs, when next and how the last went, and at the right **Run now**,
 **Edit**, its switch (it is active, or paused) and a **…** that holds **Delete**; **Details** under a row hold how its tasks
 start, its goal and its history. The loops of chats (item 281) are a section of their own (**Loops**), and
 `#/settings/schedules?thread=<chat>` shows the loops of that one chat alone. The rows are the page's own, however many (item
@@ -517,13 +517,13 @@ created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task or research: a chat that only talks
 schedules tasks), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat, when its failures switch it
-off, how the end of its runs is told, the agent it runs as and whether it is on (`history_runs`, `same_chat`,
+off, how the end of its runs is told, the bot it runs as and whether it is on (`history_runs`, `same_chat`,
 `stop_after_failures`, `notify`, `agent_id` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
-configured ones and the standard speed; a `PATCH` that leaves `agent_id` out keeps the schedule's agent, and `null`
+configured ones and the standard speed; a `PATCH` that leaves `agent_id` out keeps the schedule's bot, and `null`
 makes it Dot's; `precheck`, its check, likewise: left out of a `PATCH` it stays, `null` removes it, item 1855).
-Options left on "default" take the configured value when the schedule fires. A schedule the agent creates takes its
-chat's choices, which are yours: the model of a run cannot pick another approval mode for it, nor an agent; one made
-in a chat with one of your agents runs as that agent (item 463), and one made in Dot's chat as Dot. The editor's page asks
+Options left on "default" take the configured value when the schedule fires. A schedule the bot creates takes its
+chat's choices, which are yours: the model of a run cannot pick another approval mode for it, nor a bot; one made
+in a chat with one of your bots runs as that bot (item 463), and one made in Dot's chat as Dot. The editor's page asks
 first (*Discard your changes?*, with **Keep editing**) when you changed a field and then leave it by any change of the
 address inside Dot: a link (**Cancel**, the settings' nav, the breadcrumb), **Back** in a phone's bar, Enter in the
 settings' search, **Connect apps**, the New chat and Appearance shortcuts, the browser's own Back and Forward, and **Run
@@ -535,7 +535,7 @@ walk in the history, so that no entry is added or lost and a second Back after *
 gone; where it does not, or for an entry that was replaced, the page's address is written over the entry the change made
 (no new entry), and a held browser Back then leaves the page's address in the entry it walked to, so that the next Back
 goes one entry further than it should. The browser asks before the tab closes or reloads; a form you did not change, once
-the models and agents it lists are read, leaves without a question, and so does one that was saved or whose schedule was
+the models and bots it lists are read, leaves without a question, and so does one that was saved or whose schedule was
 deleted. Not held: an address typed in the bar that loads the page again (the browser's own question for a reload is the
 only one), and a redirect of an old address, which asks nothing because the page it leaves has gone already. A
 schedule the daemon refuses (a cron that fires every minute) is said on the page, above its foot, with what you typed still
@@ -555,7 +555,7 @@ started (409), in a daemon that runs no scheduler either; a repeating schedule's
 skipped as for a run still going, and a one-time schedule waits, still due, and fires once that run has ended. A start
 the daemon refuses leaves no chat behind and is no missed firing. A schedule's row is its name and one line of when it
 runs, when next and last, and how it last went (item 1136); **Details** at the end of that line opens how its tasks
-start (its mode, agent, approvals, model, reasoning and the rest), its goal and its **History**, which lists its last runs, at
+start (its mode, bot, approvals, model, reasoning and the rest), its goal and its **History**, which lists its last runs, at
 its time and by hand, newest first, one at work among them, each with how it went, when, its chat and the first line of
 its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing's digest counts a run by hand among its
 earlier runs.
@@ -595,14 +595,14 @@ earlier runs.
   rather than going on from the cut task's last step, which a half-done call would invite it to repeat.
   A task is never tried again when it, or a helper it delegated, already sent something out or handed work on: a step
   whose action the policy flagged as a message or mail, a post, an upload, a payment or a release (whether or
-  not it went through), a work order or a task handed to another agent, a call the cut left unfinished that may have
+  not it went through), a work order or a task handed to another bot, a call the cut left unfinished that may have
   been one (or that cannot be told), or a helper's call without a result. A try is never tried again either, nor a
   task the plan's limit stopped without saying when it resets or for longer than 12 hours. Each of those is told to
   you (a notification whose tap opens the task, whatever the schedule's level of notices), and the schedule says
   `not tried again: …`; so is a try that could not start, one that Dot was off for longer than `catch_up_s` past its
   time, and one due while the emergency stop is engaged. A firing of the schedule (on time, late, by hand or by the
   market) replaces a try still waiting, and a try waiting while a run of the schedule works, or for a schedule
-  switched off, deleted or whose agent is paused, is dropped. A try is claimed in the store before its run starts, so a
+  switched off, deleted or whose bot is paused, is dropped. A try is claimed in the store before its run starts, so a
   crash loses it rather than starting it twice. Its failure counts in the schedule's row of failures as any run's.
   Your stop, the emergency stop, a run's limit of minutes or tokens, its own report of failure and a lasting error (a
   key, credits, a message the model's safeguards flagged, which the same model declines again: item 1761) are not
@@ -631,7 +631,7 @@ earlier runs.
 - A one-time schedule that fired has no run left: its row says **ran once**, in grey beside how its run ended, and has
   no switch to press (item 723); it read "switched off", as one you had switched off, and switching it on was refused.
   **Edit** gives it a new time. One you switched off before its time still says "switched off". A one-time schedule due
-  and still waiting (its agent paused, the emergency stop, a start tried again) can have its goal or name edited, and
+  and still waiting (its bot paused, the emergency stop, a start tried again) can have its goal or name edited, and
   keeps waiting.
 - Saving a schedule's form keeps it switched on or off as it is then, unless you moved the form's own switch (item
   723): the form sent the switch as it was when it opened, so a schedule switched on in the list meanwhile went off
@@ -644,7 +644,7 @@ earlier runs.
   firing in a chat of its own never waits for another. A firing that started no run for another reason says "failed to
   start", in red.
 - A schedule counts the firings skipped one after the other (item 1401, `skipped_in_row` in its record): a task still
-  going, a paused agent's, the emergency stop's and a late one (a firing that waits for its chat is none), as the loop
+  going, a paused bot's, the emergency stop's and a late one (a firing that waits for its chat is none), as the loop
   that merges pull requests was skipped 27 times in a day with no trace but its last status. The first task that starts (a firing's, or one you start
   with Run now) or firing that fails to start ends the count, and switching the schedule on again or changing it starts
   it afresh. From two on, and while the last status is a skip, its row on the Schedules page and its line in a chat's
@@ -661,15 +661,15 @@ earlier runs.
   what needs you; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **History** and
   the run's page still show. A run started with **Run now** is told at every level, whatever it found, as are a question, an approval, a
   draft and the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
-- A schedule runs as Dot or as one of your agents (item 462): **Agent** in its form, Dot by default. Its runs carry the
-  agent, as a chat with it does (see [Agents and campaigns](agents-and-campaigns.md)): its instructions, its tools only,
+- A schedule runs as Dot or as one of your bots (item 462): **Bot** in its form, Dot by default. Its runs carry the
+  bot, as a chat with it does (see [Bots and campaigns](agents-and-campaigns.md)): its instructions, its tools only,
   its face on the row and an "As <name>" chip under its Details. Its model, reasoning level and approvals are the schedule's own where it
-  chose them, else the agent's, else the configured ones: a yolo schedule of an agent that asks runs yolo, and one left
-  on Default takes the agent's mode, which the form's Default names ("Default (the agent's: …)") and the row's Details
-  show. An
-  agent that does not exist is refused (404), and Dot is named by no agent (422). Deleting the agent switches its
-  schedules off, as Dot's ("switched off: its agent was deleted"). While you have paused the agent (item 465), its
+  chose them, else the bot's, else the configured ones: a yolo schedule of a bot that asks runs yolo, and one left
+  on Default takes the bot's mode, which the form's Default names ("Default (the bot's: …)") and the row's Details
+  show. A
+  bot that does not exist is refused (404), and Dot is named by no bot (422). Deleting the bot switches its
+  schedules off, as Dot's ("switched off: its agent was deleted"). While you have paused the bot (item 465), its
   schedules fire nothing by themselves: a repeating one is skipped to its next time ("skipped: <name> is paused") and a
   one-time one waits, still due ("waiting: <name> is paused"), and fires once you resume it; a pause counts no failed
-  run and tells nothing, and **Run now** still starts a run. An agent that cannot be read fires nothing.
+  run and tells nothing, and **Run now** still starts a run. A bot that cannot be read fires nothing.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.

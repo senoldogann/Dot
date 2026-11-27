@@ -445,7 +445,7 @@ async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_lea
 
 
 @pytest.mark.parametrize(
-    ("source", "channel", "label"), [("team", "agents", "Agents' work 1"), ("review", "reviews", "Code reviews 1")]
+    ("source", "channel", "label"), [("team", "agents", "Bots' work 1"), ("review", "reviews", "Code reviews 1")]
 )
 async def test_the_agents_chats_and_the_reviews_stand_folded_at_the_foot_in_a_section_of_their_own(
     runtime: Runtime,
