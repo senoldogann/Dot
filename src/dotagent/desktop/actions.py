@@ -6,6 +6,7 @@ minutes between the two, refuses a step whose target is no longer the one that w
 that moves the pointer or presses keys.
 """
 
+import tempfile
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -13,6 +14,7 @@ from dataclasses import dataclass, replace
 from functools import partial
 from math import hypot
 from pathlib import Path
+from typing import Literal
 
 from dotagent.config import DesktopConfig
 from dotagent.core.errors import (
@@ -25,10 +27,11 @@ from dotagent.core.errors import (
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.outcomes import OutcomeCheck, judge_added, still_on_its_way
-from dotagent.desktop import apps, ax, screen
+from dotagent.desktop import apps, ax, cua, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.ax import ElementState
-from dotagent.desktop.chords import parse_chord
+from dotagent.desktop.chords import key_of, parse_chord
+from dotagent.desktop.cua import BackgroundDriver, CuaResult
 from dotagent.desktop.input import EventSource
 from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, enters_text, step_role
 from dotagent.desktop.types import (
@@ -39,6 +42,7 @@ from dotagent.desktop.types import (
     Point,
     Rect,
     Step,
+    WindowInfo,
     parse_ref,
 )
 from dotagent.policy.elements import Element, typing_reasons
@@ -131,7 +135,8 @@ class StepEnv:
     ``expected_front`` is the application that held the keyboard focus after the previous step and ``expected_pointer``
     where the previous pointer step left the pointer; a difference means that something else interfered.
     ``secure_field`` decides what a step does at a secure text field. ``owner_here`` is whether the owner is at the Mac
-    as the step begins (item 1890): a step that would take the pointer or the keyboard is then not sent.
+    as the step begins (item 1890): a step that would take the pointer or the keyboard is then not sent, unless it goes
+    through ``background`` (item 2007), which takes neither.
     """
 
     app: AppInfo
@@ -149,6 +154,9 @@ class StepEnv:
     preferred: frozenset[int]
     secure_field: SecureFieldCheck
     owner_here: bool
+    # The background driver the steps that would take the pointer or the keyboard go through (item 2007), ``None``
+    # when ``[desktop] background_driver`` is off: they then take the Mac's own, as before.
+    background: BackgroundDriver | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -471,6 +479,25 @@ def _keyboard_target(env: StepEnv, presses_return: bool = False) -> Target:
         )
     owner: AppInfo = env.app if pid == env.app.pid else _app_for(env, pid, "")
     root: AXElement = env.app_element if pid == env.app.pid else ax.app_element(pid, env.config.ax_timeout_s)
+    return _focused_target(owner, root, presses_return)
+
+
+def _app_keyboard_target(env: StepEnv, presses_return: bool) -> Target:
+    """The focused field of the batch's own application, in front or not: where the background driver's keys go
+    (item 2007), so that the review judges the field they reach."""
+    return _focused_target(env.app, env.app_element, presses_return)
+
+
+def _keyboard_target_of(env: StepEnv, step: Step, presses_return: bool) -> Target:
+    """Where a keyboard step without a ref goes: the field in front, or the batch's own application's in the
+    background."""
+    if in_background(env, step):
+        return _app_keyboard_target(env, presses_return)
+    return _keyboard_target(env, presses_return)
+
+
+def _focused_target(owner: AppInfo, root: AXElement, presses_return: bool) -> Target:
+    pid: int = owner.pid
     focused: AXElement | None = ax.focused_element(root, pid)
     state: ElementState | None = None if focused is None else ax.read_state(focused, pid)
     return Target(
@@ -541,9 +568,9 @@ def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspecti
         case "type" | "paste":
             if step.ref is not None:
                 return _inspection(env, lines, _peek_ref(env, step.ref, presses_return))
-            return _inspection(env, lines, _keyboard_target(env, presses_return))
+            return _inspection(env, lines, _keyboard_target_of(env, step, presses_return))
         case "key":
-            return _inspection(env, lines, _keyboard_target(env, presses_return))
+            return _inspection(env, lines, _keyboard_target_of(env, step, presses_return))
         case "menu" | "wait":
             return _inspection(
                 env,
@@ -722,6 +749,34 @@ def takes_input(step: Step) -> bool:
     return step.action in INPUT_ACTIONS
 
 
+def in_background(env: StepEnv, step: Step) -> bool:
+    """Whether ``step`` goes through the batch's background driver (item 2007): one runs and the step is one it
+    sends (:func:`goes_in_background`)."""
+    return env.background is not None and goes_in_background(step)
+
+
+def goes_in_background(step: Step) -> bool:
+    """Whether a background driver sends ``step`` (item 2007): a click, a double and a right click with no key held
+    (a held key needs the Mac's own keyboard state), typing, a paste, a scroll and a key the driver names. A hover, a
+    drag, a click with a key held and activate stay on the Mac's own pointer and keyboard, and so wait while the owner
+    is at the Mac (item 1890); press, focus, set_value and menu go through accessibility as before."""
+    match step.action:
+        case "click" | "double_click" | "right_click":
+            return not step.modifiers
+        case "type" | "paste" | "scroll":
+            return True
+        case "key":
+            return step.key is not None and key_of(step.key) in cua.KEYS
+        case _:
+            return False
+
+
+def takes_mac_input(env: StepEnv, step: Step) -> bool:
+    """Whether ``step`` takes the Mac's own pointer, keyboard or front as ``env`` sends it: :func:`takes_input`, unless
+    it goes through the background driver."""
+    return takes_input(step) and not in_background(env, step)
+
+
 def _claim_input(env: StepEnv, step: Step) -> None:
     """Refuse, before anything of it goes, a step that would take the pointer, the keyboard or the front while the owner
     is at the Mac (item 1890)."""
@@ -737,20 +792,12 @@ def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effe
         number, element = _element_for(env, step.ref)
         state: ElementState = _state_of(env, number, element)
         if pressed_on_click(step, state.role, state.enabled):
-            aim: Point | None = _aim_at(env, number, element, state)
-            try:
-                ax.press(element, env.app.pid)
-            except DesktopError as error:
-                code: object = error.context.get("code")
-                if not (isinstance(code, int) and code in _ACTION_UNSUPPORTED):
-                    raise
-                # It takes no press: the click is a real one, with its window in front, as any click is.
-                _claim_input(env, step)
-                apps.activate(env.app, env.config.activate_timeout_s)
-            else:
-                return _effect(
-                    f"clicked {inspection.target} (through accessibility: the pointer did not move)", None, True, aim
-                )
+            pressed: Effect | None = _pressed(env, inspection, number, element, state)
+            if pressed is not None:
+                return pressed
+            # It takes no press: the click is a real one, with its window in front, as any click is.
+            _claim_input(env, step)
+            apps.activate(env.app, env.config.activate_timeout_s)
         else:
             _claim_input(env, step)
             if apps.frontmost_pid() != env.app.pid:
@@ -762,6 +809,21 @@ def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effe
     hid.post(hid.left_click_events(env.source, point, count, step.modifiers or ()))
     verb: str = "clicked" if count == 1 else "double-clicked"
     return _effect(f"{verb} {inspection.target}", point, True)
+
+
+def _pressed(
+    env: StepEnv, inspection: Inspection, number: int, element: AXElement, state: ElementState
+) -> Effect | None:
+    """A click on a ref done as a press through accessibility (item 862); ``None`` when the element takes no press."""
+    aim: Point | None = _aim_at(env, number, element, state)
+    try:
+        ax.press(element, env.app.pid)
+    except DesktopError as error:
+        code: object = error.context.get("code")
+        if not (isinstance(code, int) and code in _ACTION_UNSUPPORTED):
+            raise
+        return None
+    return _effect(f"clicked {inspection.target} (through accessibility: the pointer did not move)", None, True, aim)
 
 
 def _right_click(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
@@ -846,10 +908,15 @@ def _field_of(env: StepEnv, ref: str | None) -> _Field | None:
     """The field a ``type`` or ``paste`` step writes into (item 1146): the element its ref names, or the one that has
     the keyboard in the application in front. ``None`` when there is none, or it cannot be read: the step is then not
     checked, and goes as before."""
+    return _field_in(env, ref, apps.frontmost_pid)
+
+
+def _field_in(env: StepEnv, ref: str | None, holder: Callable[[], int | None]) -> _Field | None:
+    """:func:`_field_of`, with ``holder`` saying which application has the keyboard when the step names no ref."""
     try:
         if ref is not None:
             return _field(_element_for(env, ref)[1], env.app.pid)
-        pid: int | None = apps.frontmost_pid()
+        pid: int | None = holder()
         if pid is None:
             return None
         root: AXElement = env.app_element if pid == env.app.pid else ax.app_element(pid, env.config.ax_timeout_s)
@@ -991,6 +1058,180 @@ def _activate(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     return Effect(detail=f"{app.name} is in front", pointer=None, opens_ui=True, switched_to=app)
 
 
+# -- the background driver (item 2007) -------------------------------------------------------------------------------
+
+
+def _driver(env: StepEnv) -> BackgroundDriver:
+    if env.background is None:
+        raise DesktopError("no background driver is running for this batch", {})
+    return env.background
+
+
+def _through(result: CuaResult) -> str:
+    """How a step went through the driver, as its line says: the route it took and what it confirmed."""
+    return (
+        f"in the background through cua-driver, the pointer and the front left alone (route {result.route or 'unknown'}"
+        f", {result.effect or 'not confirmed'})"
+    )
+
+
+def _sized_window_of(window: WindowInfo, pid: int) -> bool:
+    return window.pid == pid and window.layer == 0 and window.bounds.width > 1 and window.bounds.height > 1
+
+
+def _window_holding(env: StepEnv, point: Point) -> WindowInfo:
+    """The batch's application's own window that holds ``point``, the frontmost of them, covered or not."""
+    for window in screen.windows_on_screen():
+        if _sized_window_of(window, env.app.pid) and window.bounds.contains(point):
+            return window
+    raise DesktopStepNotSent(
+        f"no window of {env.app.name} on this screen holds the point, so the background driver has nowhere to send the "
+        "step; nothing was sent. Take a new desktop_snapshot",
+        {"x": point.x, "y": point.y, "pid": env.app.pid},
+    )
+
+
+def _focused_window(env: StepEnv) -> WindowInfo:
+    """The batch's application's focused window, which holds the field the review judged: the window of this screen
+    whose place is the one accessibility gives it."""
+    focused: AXElement | None = ax.focused_window(env.app_element, env.app.pid)
+    frame: Rect | None = None if focused is None else ax.frame_of(focused, env.app.pid)
+    if frame is not None:
+        for window in screen.windows_on_screen():
+            if _sized_window_of(window, env.app.pid) and _same_place(window.bounds, frame):
+                return window
+    raise DesktopStepNotSent(
+        f"{env.app.name}'s focused window is not on this screen, so the background driver has nowhere to send keys; "
+        "nothing was sent",
+        {"pid": env.app.pid},
+    )
+
+
+def _same_place(bounds: Rect, frame: Rect) -> bool:
+    return all(
+        abs(a - b) < 1.0
+        for a, b in zip(
+            (bounds.x, bounds.y, bounds.width, bounds.height),
+            (frame.x, frame.y, frame.width, frame.height),
+            strict=True,
+        )
+    )
+
+
+def _pixel_in(env: StepEnv, driver: BackgroundDriver, window: WindowInfo, point: Point) -> tuple[int, int]:
+    """``point`` in the pixels of a fresh capture of ``window``: the driver reads a step's x and y in the frame of the
+    window's last capture (measured on 0.28.2), so the capture is taken right before the step."""
+    with tempfile.TemporaryDirectory(prefix="dot-cua-") as folder:
+        shot: CuaResult = driver.call(
+            "get_window_state", cua.capture_args(env.app.pid, window.window_id, window.bounds, Path(folder) / "w.png")
+        )
+    return cua.pixel_of(point, cua.frame_of(shot.structured))
+
+
+def _background_point(env: StepEnv, step: Step) -> Point:
+    """Where a pointer step goes in the background: the press point of its ref, scrolled into view but not required
+    to be uncovered (the event goes to the window, not to what is in front of it), the given point, or the window's
+    centre."""
+    if step.ref is not None:
+        number, element = _element_for(env, step.ref)
+        frame: Rect = _bring_into_view(env, number, element)
+        return _press_point(frame, _state_of(env, number, element))
+    if step.x is not None and step.y is not None:
+        return _to_points(env, step.x, step.y)
+    return _window_frame(env).center()
+
+
+def _background_click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effect:
+    if count == 1 and step.ref is not None and step.action == "click":
+        number, element = _element_for(env, step.ref)
+        state: ElementState = _state_of(env, number, element)
+        if pressed_on_click(step, state.role, state.enabled):
+            pressed: Effect | None = _pressed(env, inspection, number, element, state)
+            if pressed is not None:
+                return pressed
+    driver: BackgroundDriver = _driver(env)
+    point: Point = _background_point(env, step)
+    window: WindowInfo = _window_holding(env, point)
+    pixel: tuple[int, int] = _pixel_in(env, driver, window, point)
+    button: Literal["left", "right"] = "right" if step.action == "right_click" else "left"
+    result: CuaResult = driver.call("click", cua.click_args(env.app.pid, window.window_id, pixel, button, count))
+    verb: str = {"click": "clicked", "double_click": "double-clicked", "right_click": "right-clicked"}[step.action]
+    return _effect(f"{verb} {inspection.target} {_through(result)}", None, True, point)
+
+
+def _background_text(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    """A type or a paste step: the text goes into the field at once, through accessibility where the field takes it
+    and as the driver's own key events where it does not; the clipboard is left alone."""
+    text: str = _required(step.text, "text")
+    _check_secure(env, inspection, "typing" if step.action == "type" else "pasting")
+    aim: Point | None = _aim_at_ref(env, step.ref)
+    if step.ref is not None:
+        _focus(env, step.ref)
+    field: _Field | None = _field_in(env, step.ref, lambda: env.app.pid)
+    window: WindowInfo = _focused_window(env)
+    result: CuaResult = _driver(env).call("type_text", cua.type_args(env.app.pid, window.window_id, text))
+    verb: str = "typed" if step.action == "type" else "pasted"
+    written: Effect = _effect(f"{verb} {len(text)} chars into {inspection.target} {_through(result)}", None, False, aim)
+    return replace(written, checks=_written_checks(field, text))
+
+
+def _background_key(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    key: str = _required(step.key, "key")
+    chord = parse_chord(key)
+    if enters_text(chord):
+        _check_secure(env, inspection, "typing")
+    window: WindowInfo = _focused_window(env)
+    result: CuaResult = _driver(env).call(
+        "press_key", cua.key_args(env.app.pid, window.window_id, chord.key, chord.modifiers)
+    )
+    return _effect(f"pressed {key} in {inspection.context.app} {_through(result)}", None, True)
+
+
+def _background_scroll(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    driver: BackgroundDriver = _driver(env)
+    direction: str = _required(step.direction, "direction")
+    point: Point = _background_point(env, step)
+    window: WindowInfo = _window_holding(env, point)
+    pixel: tuple[int, int] = _pixel_in(env, driver, window, point)
+    notches: int = cua.notches_of(step.amount or DEFAULT_SCROLL_PX)
+    result: CuaResult = driver.call("scroll", cua.scroll_args(env.app.pid, window.window_id, pixel, direction, notches))
+    return _effect(
+        f"scrolled {direction} {notches} notches (about {notches * cua.PX_PER_NOTCH} px) over {inspection.target} "
+        f"{_through(result)}",
+        None,
+        False,
+    )
+
+
+def _in_background(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    """Perform a step through the background driver: to the batch's own application's window, whether it is in front
+    or not, with the Mac's pointer and keyboard left to the owner, so it goes while they are at the Mac. The step was
+    judged as any other; one whose target the review found in another application (a point covered by its window) is
+    not sent, as the driver would reach the batch's application under it instead."""
+    if inspection.pid != env.app.pid:
+        raise DesktopStepNotSent(
+            f"{inspection.target} is not {env.app.name}'s, and in the background a step goes to {env.app.name}'s own "
+            "window, under whatever covers it; nothing was sent. Use a ref of its snapshot, or activate the "
+            "application the point is in",
+            {"pid": inspection.pid, "app_pid": env.app.pid},
+        )
+    match step.action:
+        case "click":
+            return _background_click(env, step, inspection, 1)
+        case "double_click":
+            return _background_click(env, step, inspection, 2)
+        case "right_click":
+            return _background_click(env, step, inspection, 1)
+        case "type" | "paste":
+            return _background_text(env, step, inspection)
+        case "key":
+            return _background_key(env, step, inspection)
+        case "scroll":
+            return _background_scroll(env, step, inspection)
+        case _:
+            raise DesktopError(f"{step.action} does not go through the background driver", {"action": step.action})
+
+
 def _changed_since(reviewed: Inspection, fresh: Inspection) -> bool:
     """Whether a step would touch something else than the review judged: another application, kind of window, control
     or label, a default button that is another, a field that turned secret, or for a drag another place it lets go
@@ -1042,6 +1283,8 @@ def execute_step(env: StepEnv, step: Step, reviewed: Inspection) -> Effect:
     555)."""
     check_failsafe(env)
     inspection: Inspection = _reviewed_again(env, step, reviewed)
+    if in_background(env, step):
+        return _in_background(env, step, inspection)
     if takes_input(step):
         _claim_input(env, step)
     match step.action:

@@ -70,6 +70,13 @@ _KEY_NAMES: dict[str, str] = {
 }
 
 
+def key_of(chord: str) -> str:
+    """The key ``chord`` ends with, named as :func:`parse_chord` names it, without checking that it is one (item 2007:
+    which keys the background driver takes)."""
+    last: str = chord.strip().split("+")[-1].strip().lower()
+    return _KEY_NAMES.get(last, last)
+
+
 def parse_chord(chord: str) -> Chord:
     """``cmd+shift+4`` as a key and its modifiers; raises ``DesktopError`` for names it does not know."""
     parts: list[str] = [part.strip().lower() for part in chord.strip().split("+")]
