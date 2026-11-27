@@ -618,6 +618,12 @@ class QueueView(FrozenModel):
     beside_thread_id: str | None = None
 
 
+class ChatStopped(FrozenModel):
+    """The runs a Stop of a whole chat asked to stop (item 1984): the chat's own and its lanes' that were at work."""
+
+    stopped: list[str]
+
+
 class AttachmentUpload(FrozenModel):
     """A file to attach to a message, base64-encoded (see ``agent.attachments``)."""
 

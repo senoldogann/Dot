@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1984](1984.md) | built | 2026-11-27 | Several tasks in one chat, slice 1: lanes, the answer's queue, Stop for the whole chat |
 | [1983](1983.md) | done | 2026-11-27 | DotNext's Memory: add a note, pin it, and bring a forgotten one back from the trash |
 | [1982](1982.md) | design | 2026-11-27 | Several tasks at once in one chat: design |
 | [1976](1976.md) | done | 2026-11-27 | A chat told as a conversation: Dot's short messages of what it turns to, and the live line with its face and time |
