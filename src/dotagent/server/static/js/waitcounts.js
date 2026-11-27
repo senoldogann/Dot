@@ -14,3 +14,19 @@ export function waitCounts(statuses, released) {
   const letGo = Math.min(released.filter((each) => LIVE.has(each)).length, live);
   return { live, letGo, waitedFor: live - letGo };
 }
+
+// The tools whose open call holds a run until a helper ends: `delegate` (unless it asked for no wait) and the agent tools
+// of the coding CLIs. The phone's `helperWaitTools` (DotEngine) is the same list.
+const HELPER_WAITS = new Set(["delegate", "message_agent", "task", "agent"]);
+
+/**
+ * Whether a run has stopped and only waits for its helpers, from the calls of its newest step that have no result yet
+ * (`open`, each `{ tool, args }`): there is one, and every one waits on a helper. While any other call runs, or none is
+ * open, the run works: its capsule says "Working" and the helpers keep their own segment (the owner's report of
+ * 2026-11-27; the phone's `waitsOnHelpers` is the same rule).
+ * @param {{ tool: string, args: Record<string, unknown> }[]} open
+ * @returns {boolean}
+ */
+export function waitsOnHelpers(open) {
+  return open.length > 0 && open.every((call) => HELPER_WAITS.has(call.tool.toLowerCase()) && call.args.wait !== false);
+}

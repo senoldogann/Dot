@@ -546,18 +546,6 @@
   display: none;
 }
 
-.wait-line-mark {
-  display: inline-grid;
-  flex: none;
-}
-
-.wait-line-mark .icon {
-  width: 14px;
-  height: 14px;
-  animation: spin var(--motion-spin) linear infinite;
-  animation-play-state: var(--endless);
-}
-
 .wait-line-main {
   flex: 1;
   min-width: 0;
@@ -593,12 +581,6 @@
 @media (hover: hover) {
   .wait-line-button:hover {
     background: var(--surface-2);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wait-line-mark .icon {
-    animation: none;
   }
 }
 
@@ -1059,6 +1041,10 @@
     display: inline-grid;
   }
 
+  .dock-mark[hidden] {
+    display: none;
+  }
+
   .dock-seg .icon,
   .dock-end .icon {
     width: 14px;
@@ -1070,11 +1056,6 @@
     width: 18px;
     height: 18px;
     color: var(--text-2);
-  }
-
-  .dock-seg[data-tone="work"] .dock-mark .icon {
-    animation: spin var(--motion-spin) linear infinite;
-    animation-play-state: var(--endless);
   }
 
   .dock-seg[data-tone="waiting"],
@@ -1146,10 +1127,9 @@
     flex: 1 1 0;
   }
 
-  /* Reduced motion: the capsule does not rise into place and the dashed circle of a run at work stands still. */
+  /* Reduced motion: the capsule does not rise into place. */
   @media (prefers-reduced-motion: reduce) {
-    .dockbar-capsule,
-    .dock-seg[data-tone="work"] .dock-mark .icon {
+    .dockbar-capsule {
       animation: none;
     }
   }
@@ -4285,6 +4265,35 @@ dialog.computer-full::backdrop {
 .sheet-row-value {
   color: var(--muted);
   font-size: var(--text-sm);
+}
+
+/* A switch as a row of the chat's settings (Fast mode, Plan first), as the phone draws it: the title and its line on
+   the left, the switch on the right, a little more height for the line under the title. */
+.sheet-switch {
+  padding-block: var(--space-2);
+}
+
+.sheet-switch > .switch {
+  flex: none;
+}
+
+/* `.sheet-row` draws no border of its own: the card's hairline between two rows is drawn again for a switch row. */
+.sheet-card > * + .sheet-switch {
+  border-top: 1px solid var(--border);
+}
+
+/* The same row at the foot of the Reasoning pill's menu on a desk, under a hairline, as compact as the levels above it. */
+.pop-switches {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+}
+
+.pop-switches > .sheet-row {
+  min-height: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: inherit;
 }
 
 .model-sheet-row {

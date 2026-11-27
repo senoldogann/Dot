@@ -1361,17 +1361,6 @@
         }
       }
     },
-    "Activity comes in the next version": {
-      "comment": "Activity page: placeholder until the view is built",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Etkinlik bir sonraki sürümde geliyor"
-          }
-        }
-      }
-    },
     "Add": {
       "comment": "New schedule toolbar: makes it\nOwn initiative: adds a thing to the list",
       "localizations": {
@@ -2424,6 +2413,17 @@
         }
       }
     },
+    "Can't reach %@": {
+      "comment": "Chat capsule: the link to the Mac broke a while ago and has not come back; the argument is the Mac's name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ cihazına ulaşılamıyor"
+          }
+        }
+      }
+    },
     "Can't reach your Mac": {
       "comment": "Connect apps: no answer from the Mac and nothing to show\nEmpty chat when offline with nothing saved",
       "localizations": {
@@ -2508,17 +2508,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "CarPlay"
-          }
-        }
-      }
-    },
-    "Catalog": {
-      "comment": "Chat settings section: hidden models",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Katalog"
           }
         }
       }
@@ -2673,6 +2662,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaporayı Finance ile kontrol et"
+          }
+        }
+      }
+    },
+    "Check the spelling or try a new search.": {
+      "comment": "Search: what to do when nothing matches",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazımı kontrol edin ya da yeni bir arama deneyin."
           }
         }
       }
@@ -3565,6 +3565,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Varsayılan"
+          }
+        }
+      }
+    },
+    "Default (%@)": {
+      "comment": "Chat settings: the reasoning choice that leaves the level to the model; the argument is the model's own level",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan (%@)"
           }
         }
       }
@@ -5333,6 +5344,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hızlı model"
+          }
+        }
+      }
+    },
+    "Favourite": {
+      "comment": "VoiceOver: a starred model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favori"
           }
         }
       }
@@ -8044,7 +8066,7 @@
       }
     },
     "No results for “%@”": {
-      "comment": "Connect apps: a search found nothing; the argument is the query",
+      "comment": "Search: nothing matches the words; the argument is what was searched",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10251,17 +10273,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alıcılar, virgülle ayrılmış"
-          }
-        }
-      }
-    },
-    "Reconnecting to %@…": {
-      "comment": "Chat pill: the link to the Mac broke and is being opened again; the argument is the Mac's name",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ cihazına yeniden bağlanılıyor…"
           }
         }
       }
@@ -12551,17 +12562,6 @@
         }
       }
     },
-    "Syncing messages…": {
-      "comment": "Chat pill: the chat is being brought up to date",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mesajlar eşitleniyor…"
-          }
-        }
-      }
-    },
     "Syncing…": {
       "comment": "Chat subtitle: the chat is being brought up to date",
       "localizations": {
@@ -13746,17 +13746,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu iPhone'un ağı"
-          }
-        }
-      }
-    },
-    "This model has no fast mode.": {
-      "comment": "Chat settings: fast mode is off for a model without it",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bu modelin hızlı modu yok."
           }
         }
       }
@@ -15007,17 +14996,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un yapacağı"
-          }
-        }
-      }
-    },
-    "What Dot does on its own (schedules, helpers, drafts that wait) will show here.": {
-      "comment": "Activity page: what it will show",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un kendi başına yaptıkları (zamanlanmış görevler, yardımcılar, bekleyen taslaklar) burada görünecek."
           }
         }
       }

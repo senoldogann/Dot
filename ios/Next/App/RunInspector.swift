@@ -65,7 +65,7 @@ struct RunInspector: View {
                     costSection
                 } else {
                     EmptyState(
-                        title: String(localized: "Nothing ran yet", comment: "Inspector: the chat has no run"), systemImage: "circle.dotted",
+                        title: String(localized: "Nothing ran yet", comment: "Inspector: the chat has no run"), systemImage: "list.bullet.rectangle",
                         detail: String(localized: "What a run did and cost shows here once one started.", comment: "Inspector empty state detail"), actionTitle: nil, action: {})
                 }
                 helpersSection

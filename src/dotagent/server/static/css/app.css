@@ -11925,9 +11925,8 @@ button.attach-chip {
   display: inline-grid;
 }
 
-.capsule-work[data-state="working"] .capsule-mark .icon {
-  animation: spin var(--motion-spin) linear infinite;
-  animation-play-state: var(--endless);
+.capsule-mark:empty {
+  display: none;
 }
 
 .capsule-work[data-state="waiting"],
@@ -11943,8 +11942,7 @@ button.attach-chip {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .capsule:not([hidden]),
-  .capsule-work[data-state="working"] .capsule-mark .icon {
+  .capsule:not([hidden]) {
     animation: none;
   }
 }
