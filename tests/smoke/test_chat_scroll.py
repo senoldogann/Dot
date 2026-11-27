@@ -11,6 +11,7 @@ from typing import Literal
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -250,6 +251,12 @@ async def test_the_composer_stands_at_the_foot_of_what_is_seen_while_the_convers
             await browser.close()
 
 
+_AT_THE_FOOT_NOW: str = """() => {
+  const thread = document.querySelector('.run-thread');
+  const box = thread !== null && thread.scrollHeight > thread.clientHeight + 4 ? thread : document.scrollingElement;
+  return box.scrollHeight - box.clientHeight - box.scrollTop <= 2;
+}"""
+
 _AT_THE_FOOT: str = """() => {
   const thread = document.querySelector('.run-thread');
   const box = thread !== null && thread.scrollHeight > thread.clientHeight + 4 ? thread : document.scrollingElement;
@@ -445,7 +452,8 @@ async def test_the_way_down_comes_when_the_reader_scrolls_up_in_a_chat_that_is_o
                     assert box["width"] == box["height"] == 44, box
                 await page.screenshot(path=str(tmp_path / f"way-down-{width}-{scheme}.png"), animations="disabled")
                 await arrow.click()
-                await page.wait_for_timeout(1200)
+                # The scroll is smooth; a loaded machine takes its time.
+                await page.wait_for_function(_AT_THE_FOOT_NOW, timeout=8000)
                 where = await page.evaluate(_AT_THE_FOOT)
                 assert where["max"] - where["top"] <= 2, ("a press leads to the end", width, where)
                 await expect(arrow).to_be_hidden()
@@ -519,9 +527,95 @@ async def test_the_way_down_follows_the_reader_while_a_run_is_at_work(
                 await page.evaluate(to_top)
                 await expect(arrow).to_be_visible(timeout=4000)
                 await arrow.click()
-                await page.wait_for_timeout(1200)
+                # The scroll is smooth; a loaded machine takes its time.
+                await page.wait_for_function(_AT_THE_FOOT_NOW, timeout=8000)
                 where = await page.evaluate(_AT_THE_FOOT)
                 assert where["max"] - where["top"] <= 2, ("a press leads to the end", width, where)
+                await expect(arrow).to_be_hidden()
+                assert errors == []
+                await context.close()
+        finally:
+            await browser.close()
+
+
+async def test_the_way_down_follows_the_reader_while_a_run_is_at_work(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
+) -> None:
+    """Item 1991, as the iPhone: while a run works the chat follows its end and the arrow is not there; the reader's
+    scroll up stops the follow and brings the arrow, their scroll back to the end starts the follow again and takes it
+    away, and a press on it leads to the end. 1440 by 900 in the light and the dark, and 390 by 844."""
+    manager, address = served
+    first: RunRecord = await manager.start(
+        _GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        assert (await manager.wait(first.id)).status == "done"
+    second: RunRecord = await manager.start(
+        "Pick a colour",
+        "task",
+        SCRIPTED_MODEL,
+        first.thread_id,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "yolo",
+        False,
+        (),
+    )
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            shots: tuple[tuple[int, int, Literal["light", "dark"]], ...] = (
+                (1440, 900, "light"),
+                (1440, 900, "dark"),
+                (390, 844, "light"),
+            )
+            for width, height, scheme in shots:
+                context: BrowserContext = await browser.new_context(
+                    viewport={"width": width, "height": height}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                page: Page = await context.new_page()
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"{address}/#/runs/{second.id}")
+                await page.wait_for_selector(".run-main", timeout=15000)
+                await page.wait_for_timeout(1500)
+                phone: bool = width < 720
+                arrow: Locator = page.locator(".dock-end" if phone else ".status-bar .jump")
+                to_top: str = (
+                    "document.querySelector('.run-thread').scrollTop = 0" if phone else "window.scrollTo(0, 0)"
+                )
+                to_end: str = (
+                    "const t = document.querySelector('.run-thread'); t.scrollTop = t.scrollHeight"
+                    if phone
+                    else "window.scrollTo(0, document.documentElement.scrollHeight)"
+                )
+                await expect(arrow).to_be_hidden()
+                await page.evaluate(to_top)
+                await expect(arrow).to_be_visible(timeout=4000)
+                await page.screenshot(path=str(tmp_path / f"working-{width}-{scheme}.png"), animations="disabled")
+                await page.evaluate(to_end)
+                await expect(arrow).to_be_hidden(timeout=4000)
+                await page.evaluate(to_top)
+                await expect(arrow).to_be_visible(timeout=4000)
+                await arrow.click()
+                samples: list[object] = []
+                for _ in range(8):
+                    await page.wait_for_timeout(250)
+                    samples.append(
+                        await page.evaluate(
+                            "[Math.round(window.scrollY), document.documentElement.scrollHeight, window.innerHeight, !!document.querySelector('.run-thread') && document.querySelector('.run-thread').scrollHeight > document.querySelector('.run-thread').clientHeight + 4]"
+                        )
+                    )
+                # The scroll is smooth; a loaded machine takes its time.
+                try:
+                    await page.wait_for_function(_AT_THE_FOOT_NOW, timeout=8000)
+                except PlaywrightTimeoutError:
+                    where = await page.evaluate(_AT_THE_FOOT)
+                    raise AssertionError(("a press leads to the end", width, scheme, where)) from None
                 await expect(arrow).to_be_hidden()
                 await context.close()
         finally:

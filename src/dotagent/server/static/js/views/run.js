@@ -1572,7 +1572,24 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       return;
     }
     following = true;
+    leadingDown = true;
     toEnd("smooth");
+    // The smooth scroll aims at the end as it was when it began; what grew meanwhile (older turns drawn above, a card) leaves
+    // it short, and the page's own shift of the scroll must not read as the reader leaving the end, so the end is reached
+    // again once the scroll is over (item 1991).
+    const settle = () => {
+      if (signal.aborted || !leadingDown) {
+        return;
+      }
+      if (!nearBottom()) {
+        toEnd("auto");
+      }
+      setTimeout(() => {
+        leadingDown = false;
+      }, 150);
+    };
+    (PHONE.matches && threadBox !== null ? threadBox : window).addEventListener("scrollend", settle, { once: true });
+    setTimeout(settle, 900);
   }
 
   // What scrolls the conversation (item 352): on a phone the conversation itself, between the top bar and the composer,
@@ -1601,9 +1618,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     return box.clientHeight + box.scrollTop >= box.scrollHeight - NEAR_BOTTOM_PX;
   }
 
-  /** Whether the answer's start is still below the window. */
+  /** Whether the answer's start is still below the window. A run at work has no answer yet: the one drawn is an earlier
+   * turn's, and the way down leads to the end of the conversation. */
   function answerBelow() {
-    return answerNode !== null && answerNode.getBoundingClientRect().top > seenEnd();
+    return !active && answerNode !== null && answerNode.getBoundingClientRect().top > seenEnd();
   }
 
   /**
@@ -1612,7 +1630,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
    * or past the start of a long answer, is offered the way back too; a live run's is the follow the reader left.
    */
   function paintJump() {
-    const below = answerNode === null && active ? !following : answerBelow() || !nearBottom();
+    const below = active ? !following : answerBelow() || !nearBottom();
     // The arrow shows while the end, or the answer, is below the window and the answer is not on its way into view.
     const show = below && !landing;
     jumpVisible = show;
@@ -1629,9 +1647,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // moved (item 274).
   let lastScrollY = scroller().scrollTop;
 
+  // A press on the way down is leading the reader to the end: the scrolls of that are no leaving it (item 1991).
+  let leadingDown = false;
+
   function onScroll() {
     const y = scroller().scrollTop;
-    following = y < lastScrollY ? nearBottom() : following || nearBottom();
+    if (!leadingDown) {
+      following = y < lastScrollY ? nearBottom() : following || nearBottom();
+    }
     lastScrollY = y;
     paintJump();
   }

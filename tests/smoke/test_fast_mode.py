@@ -309,12 +309,20 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 value: Locator = model_pill.locator(".composer-pill-value")
                 extra: Locator = model_pill.locator(".composer-pill-extra")
                 await box.fill("")
+                short_pill = await model_pill.bounding_box()
                 short = await value.bounding_box()
                 assert short is not None and short["width"] <= 2, ("short: the mark alone", short)
                 await box.fill("a message of more than thirty-two characters")
                 await expect(extra).to_contain_text("Fast")
-                tall = await value.bounding_box()
-                assert tall is not None and tall["width"] > 20, ("tall: the name beside the mark", tall)
+                tall_pill = await model_pill.bounding_box()
+                # The name stands beside the mark; on a phone the pill is narrow and a long name gives way to the level
+                # (item 1202), so what is measured is that the pill grew by the name and the grey words.
+                assert short_pill is not None and tall_pill is not None
+                assert tall_pill["width"] > short_pill["width"] + 40, (
+                    "tall: the name and the level",
+                    tall_pill,
+                    short_pill,
+                )
                 grey = await extra.evaluate("node => getComputedStyle(node).color")
                 ink = await value.evaluate("node => getComputedStyle(node).color")
                 assert grey != ink, ("the level and Fast are grey", grey, ink)
