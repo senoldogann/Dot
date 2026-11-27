@@ -375,15 +375,15 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
             form: Locator = page.locator(".settings-pane")
             agent: Locator = form.get_by_role("combobox", name="Bot")
             approvals: Locator = form.get_by_role("combobox", name="Approvals")
-            await page.get_by_role("link", name="New schedule").click()
+            await page.get_by_role("link", name="New routine").click()
             await expect(agent.locator(f"option[value='{chosen.id}']")).to_have_count(1)
             await form.get_by_label("Name", exact=True).fill("Morning look")
             await form.get_by_label("Goal", exact=True).fill("Look at the tide.")
             await form.get_by_label("Custom timing", exact=True).fill("0 9 * * 1-5")
             await agent.select_option(chosen.id)
             await approvals.select_option("supervised")
-            await form.get_by_role("button", name="Add schedule").click()
-            await expect(page.locator(".toast.ok", has_text="Schedule added.")).to_be_visible()
+            await form.get_by_role("button", name="Add routine").click()
+            await expect(page.locator(".toast.ok", has_text="Routine added.")).to_be_visible()
             await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
             added: list[ScheduleRecord] = [
                 record for record in await runtime.store.list_schedules() if record.name == "Morning look"
@@ -393,7 +393,7 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
                     (chosen.id, "supervised")
                 ]
                 # The next one opens on the defaults: Dot, the configured approvals, nothing typed.
-                await page.get_by_role("link", name="New schedule").click()
+                await page.get_by_role("link", name="New routine").click()
                 await expect(agent.locator(f"option[value='{chosen.id}']")).to_have_count(1)
                 await expect(agent).to_have_value("")
                 await expect(approvals).to_have_value("")
@@ -433,7 +433,7 @@ async def test_new_schedule_and_edit_are_a_page_that_fits_cancels_and_says_why_i
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"http://127.0.0.1:{port}/#/schedules")
                 await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
-                opener: Locator = page.get_by_role("link", name="New schedule")
+                opener: Locator = page.get_by_role("link", name="New routine")
                 # No form stands in the list: it comes with the link, as a page of its own.
                 await expect(page.get_by_label("Custom timing")).to_have_count(0)
                 await opener.click()
@@ -450,7 +450,7 @@ async def test_new_schedule_and_edit_are_a_page_that_fits_cancels_and_says_why_i
                 await page.get_by_label("Name", exact=True).fill("Too often")
                 await page.get_by_label("Goal", exact=True).fill("Look at the tide.")
                 await page.get_by_label("Custom timing", exact=True).fill("* * * * *")
-                await page.get_by_role("button", name="Add schedule").click()
+                await page.get_by_role("button", name="Add routine").click()
                 await expect(page.get_by_role("alert").filter(has_text="fires too often")).to_be_visible()
                 await page.screenshot(path=str(tmp_path / f"new-schedule-refused-{width}-{scheme}.png"))
                 await expect(page.get_by_label("Name", exact=True)).to_have_value("Too often")
@@ -459,7 +459,7 @@ async def test_new_schedule_and_edit_are_a_page_that_fits_cancels_and_says_why_i
                 assert [record for record in await runtime.store.list_schedules() if record.name == "Too often"] == []
                 # Put right, it is added, the list is shown and has the row.
                 await page.get_by_label("Custom timing", exact=True).fill("0 9 * * 1-5")
-                await page.get_by_role("button", name="Add schedule").click()
+                await page.get_by_role("button", name="Add routine").click()
                 await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
                 row: Locator = page.locator("[data-schedule]", has_text="Too often")
                 await expect(row).to_have_count(1)

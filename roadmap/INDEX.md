@@ -9,6 +9,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2038](2038.md) | done | 2026-11-27 | DotNext: the marks of an answer's references are drawn once |
 | [2037](2037.md) | done | 2026-11-27 | DotNext: a whole answer is parsed once, not each time its row is drawn |
 | [2036](2036.md) | done | 2026-11-27 | DotNext: a long chat's tables are measured once, and the scroll of a long chat is measured |
+| [2034](2034.md) | done | 2026-11-27 | The web says "routine", as the phone does |
 | [2033](2033.md) | done | 2026-11-27 | The web says "bot", as the phone does |
 | [2025](2025.md) | done | 2026-11-27 | A new chat's first message opens the one chat screen, on the phone and on the web |
 | [2024](2024.md) | done | 2026-11-27 | The chat header keeps the bot's face and name; only a lasting link problem shows, in the capsule |

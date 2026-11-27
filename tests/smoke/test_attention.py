@@ -308,7 +308,7 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
                     "campaign-cmp-1",
                 ),
                 (
-                    "A schedule did not run",
+                    "A routine did not run",
                     "Morning digest: skipped: 125 minutes overdue (Dot was off or the Mac slept)",
                     "schedule-sch-1",
                 ),
