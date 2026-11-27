@@ -5,7 +5,7 @@ import XCTest
 /// streamed while the app's frame meter counts the frames (the script reads its record). Skipped unless the script
 /// names the daemon (`DOTNEXT_E2E_HOST`, `DOTNEXT_E2E_KEY`).
 final class StreamingLiveUITests: XCTestCase {
-    private func launch(scene: String) throws -> XCUIApplication {
+    private func launch(scene: String, video: Data? = nil) throws -> XCUIApplication {
         let environment: [String: String] = ProcessInfo.processInfo.environment
         guard let host = environment["DOTNEXT_E2E_HOST"], let key = environment["DOTNEXT_E2E_KEY"] else {
             throw XCTSkip("run by scripts/e2e_streaming.sh against a throwaway daemon")
@@ -15,6 +15,7 @@ final class StreamingLiveUITests: XCTestCase {
             "-DotNextScene", scene, "-DotNextHost", host, "-DotNextKey", key, "-DotNextFrameMeter", "1", "-AppleLanguages", "(en)", "-AppleLocale",
             "en_US",
         ]
+        if let video { app.launchEnvironment["DotNextTestVideo"] = video.base64EncodedString() }
         app.launch()
         return app
     }
@@ -32,6 +33,37 @@ final class StreamingLiveUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    /// A video attached to a message stands in its bubble as a tile (its first frame, its length, a play glyph) once the
+    /// daemon has it, and a tap plays it full screen from the Mac's attachment route (item 1992).
+    func testAnAttachedVideoStandsAsATileInTheBubbleAndPlaysFullScreenOnATap() throws {
+        let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))
+        let app: XCUIApplication = try launch(scene: "home", video: try Data(contentsOf: clip))
+        // Dot's chat, which the script made, opens from the home.
+        let dot: XCUIElement = app.buttons["home.bot.dot"]
+        XCTAssertTrue(dot.waitForExistence(timeout: 60))
+        dot.tap()
+        let attach: XCUIElement = app.buttons["composer.attach"]
+        XCTAssertTrue(attach.waitForExistence(timeout: 15))
+        attach.tap()
+        let library: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Photos and videos")).firstMatch
+        XCTAssertTrue(library.waitForExistence(timeout: 10))
+        library.tap()
+        XCTAssertTrue(app.otherElements["composer.videoTile"].waitForExistence(timeout: 30), "the video's tile in the composer")
+        shot(app, "composer-tile")
+        type(app, "What happens in this video")
+        let tile: XCUIElement = app.buttons["owner.file.video"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 45), "the video's tile above the owner's words")
+        let length: XCUIElement = tile.staticTexts["tile.duration"]
+        XCTAssertTrue(length.waitForExistence(timeout: 20), "its length, read from the Mac's copy")
+        XCTAssertTrue(length.label.hasPrefix("0:01"), length.label)
+        shot(app, "bubble-tile")
+        tile.tap()
+        XCTAssertTrue(app.otherElements["player.video"].waitForExistence(timeout: 15), "the player opens full screen")
+        shot(app, "player")
+        app.buttons["player.close"].tap()
+        XCTAssertTrue(tile.waitForExistence(timeout: 10), "back in the chat")
     }
 
     func testANewChatStaysOpenAndBecomesTheRealChat() throws {

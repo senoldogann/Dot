@@ -1277,6 +1277,35 @@ class RunManager:
         )
         return run
 
+    async def start_hooked(self, agent: AgentRecord, goal: str, opening: str, thread_id: str) -> RunRecord:
+        """Queue the run a call to a hook bound to ``agent`` starts (:mod:`dotagent.hooks`), in the chat ``thread_id``,
+        as a watcher's run starts (:meth:`start_alert`): ``goal`` is the hook's template, the owner's own words;
+        ``opening`` holds what the call carried, fenced. The run is the agent's, within its own bounds and nothing
+        else (:func:`agent_bounds` with nothing asked), a task nobody watches (:data:`WATCHER_SOURCE`), and it starts
+        tainted: whoever called wrote what it carried."""
+        bounds: AgentBounds = agent_bounds(agent, None, None, None)
+        effort: Effort | None = bounds.effort
+        if effort is not None:
+            effort = await self._firing_effort(
+                parse_model_ref(bounds.model if bounds.model is not None else self._main_model), effort
+            )
+        run, _ = await self._launch(
+            goal,
+            "task",
+            bounds.model,
+            thread_id,
+            WATCHER_SOURCE,
+            None,
+            effort,
+            "standard",
+            bounds.approvals,
+            None,
+            RunOpening(text=opening, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS, tainted=True),
+            None,
+            agent.id,
+        )
+        return run
+
     async def start_own(
         self,
         goal: str,

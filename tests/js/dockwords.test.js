@@ -33,8 +33,8 @@ test("a chat with nothing to say has no capsule", () => {
 test("a run at work says how long it has worked, with its Stop", () => {
   const segments = dockSegments(state({ status: "running", took: 36 }));
   assert.deepEqual(ids(segments), ["status", "stop"]);
-  assert.equal(segments[0].label, "Working · 36 s");
-  assert.equal(segments[0].short, "36 s");
+  assert.equal(segments[0].label, "Working · 36s");
+  assert.equal(segments[0].short, "36s");
   assert.equal(segments[0].tone, "work");
   assert.equal(segments[1].label, "Stop");
   assert.equal(segments[1].name, "Stop the task");
@@ -72,10 +72,10 @@ test("helpers that work are counted, and the name says whether the run waits for
   const waited = dockSegments(state({ status: "running", helpers: { live: 2, waitedFor: 2, letGo: 0 } })).find((segment) => segment.id === "helpers");
   assert.equal(waited?.label, "2 helpers");
   assert.equal(waited?.short, "2");
-  assert.equal(waited?.name, "2 helpers. Waiting on 2 subagents");
+  assert.equal(waited?.name, "2 helpers. Waiting on 2 helpers");
   const loose = dockSegments(state({ status: "running", helpers: { live: 1, waitedFor: 0, letGo: 1 } })).find((segment) => segment.id === "helpers");
   assert.equal(loose?.label, "1 helper");
-  assert.equal(loose?.name, "1 helper. 1 subagent keeps working in the background");
+  assert.equal(loose?.name, "1 helper. 1 helper keeps working in the background");
 });
 
 test("one loop says how often it repeats, a loop of many words and several say how many", () => {

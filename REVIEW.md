@@ -56,6 +56,10 @@ here points at a test that no longer exists.
   pencil of a chat's Automations linked to `#/settings/schedules/<id>`, which no route matches, so a press dropped the
   owner on New chat while the docs said the editor opened; the test follows the pencil to the open editor (item 1334; the
   address is a route since item 1337, and the test reads the editor's Name field).
+- `tests/smoke/test_browser_chat_cards.py::test_the_daemon_shows_cards_at_desktop_and_phone_widths_and_replays_them` — a
+  choice card sent its words as the owner's message on one tap, so a run that had read a hostile page could word an
+  option that started a run unmarked; a tap now only writes the words into the composer, as a page's choice does, and the
+  test checks that no run starts until the owner sends (item 1967's review).
 - `tests/smoke/test_schedule_agent.py::test_every_way_out_of_the_editor_asks_not_the_links_alone_and_the_browsers_back_is_put_back` — the
   editor's "Discard your changes?" guard listened for clicks on links, so the nav search's Enter, the shortcuts and
   the browser's own Back dropped what was typed silently; the router now asks the page before any page swap, and puts

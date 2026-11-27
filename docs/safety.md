@@ -559,7 +559,9 @@ among it: in `yolo` the guard stops the steps of the work, not a run set on gett
 424) and what `watch_video` reads of a video (item 1212) can be written by third parties. Dot wraps them in a fence with a random marker per call (`<web_content …>`,
 `<screen_content …>`, `<account_content …>`) and tells the model that what is inside is data,
 never instructions; only the end that carries the marker closes a fence, and a closing tag inside, in any case, is
-broken. The reply of a teammate that read such content and the files you attach to a message are fenced the same way.
+broken. The reply of a teammate that read such content and the files you attach to a message are fenced the same way. The
+named fields of a call to a [hook](hooks.md) are fenced the same way, and the run the call starts is untrusted from its
+first step, within the bound schedule's or agent's own approvals.
 What a shell command printed after it reached the network (`curl`, `ssh`, `git clone`, `gh`, a line
 the guard cannot read), what a terminal program prints, and a find_help answer that lists skills or MCP servers that
 other agents of the Mac set up count the same way, unfenced, and so does reading back the files Dot keeps of such content
@@ -624,7 +626,9 @@ on from, since what a stranger wrote set it off: its goal is your own words and 
 a fence. So does every firing of a schedule a run made after it had read outside content (`schedule_create`, item
 899): its goal may hold those words; a change of yours in its form keeps the mark, and a schedule you make is yours.
 `recall` of such a schedule gives its name and goal in a fence and marks the run that reads them, and `schedule_list`
-marks the run when it lists one and names it (item 978). A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
+marks the run when it lists one and names it (item 978). A message you send starts a run unmarked, and
+a choice a run shows, in a page or a card, only writes its words into your message box: what a run wrote never goes out as
+your word on a tap (item 1967). A note a run saved while it was marked keeps that origin (`tainted`),
 as does one it saved after your message cleared its mark, since your words clear the run's mark, not the page's
 words a note may quote (item 899; a thing for later, `todo_add`, the same):
 it is never among the notes a run starts with, is handed while it works or in a site's note to a run (item 384), nor

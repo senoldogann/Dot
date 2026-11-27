@@ -133,7 +133,10 @@ struct BotChatScreen: View {
 
     @ViewBuilder private func content(_ bot: Bot) -> some View {
         let shown: String? = botChatThread(
-            chosen: chosen, route: route.thread, held: held, latest: bot.latest?.summary.id, deleted: { model.chats[$0]?.freshness == .deleted })
+            chosen: chosen, route: route.thread, held: held, latest: bot.latest?.summary.id,
+            // A chat being deleted is gone from the moment the delete is under way, not once its own stream says so (item
+            // 1985: while twenty chats were deleted, Dot's screen opened the one it held and waited on it, "Syncing…").
+            deleted: { model.goneChats.contains($0) || model.chats[$0]?.freshness == .deleted })
         if let key = shown, model.startingChats[key] != nil {
             StartingChat(key: key)
         } else if let thread = shown {
@@ -284,7 +287,7 @@ func findMatches(_ items: [TranscriptItem], words: String) -> [String] {
 /// Whether an item, or an item a fold holds, has the words.
 private func holds(_ item: TranscriptItem, _ wanted: String) -> Bool {
     switch item {
-    case .owner(_, let text, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
+    case .owner(_, let text, _, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
     case .work(let fold): fold.items.contains { holds($0, wanted) }
     default: false
     }
