@@ -313,7 +313,7 @@ struct ChatListView: View {
         .pageGround()
         .overlay {
             if rows.isEmpty && !query.isEmpty {
-                ContentUnavailableView.search(text: query)
+                SearchEmptyState(query: query)
             } else if rows.isEmpty, model.list.freshness == .live {
                 EmptyState(
                     title: String(localized: "No chats yet", comment: "Chat list empty state title"), systemImage: "bubble.left.and.bubble.right",

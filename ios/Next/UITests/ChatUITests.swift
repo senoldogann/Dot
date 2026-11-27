@@ -260,6 +260,24 @@ final class ChatUITests: XCTestCase {
         add(sheet)
     }
 
+    /// Owner 2026-11-27: an empty state is in the app's own type, so Settings › Appearance's text size reaches it (the
+    /// system's empty-state view kept its own larger title), and its glyph is still (no dotted circle like a spinner).
+    func testAnEmptyStateFollowsTheChosenTextSize() {
+        var heights: [CGFloat] = []
+        for size in ["xSmall", "xxxLarge"] {
+            let app: XCUIApplication = launch("n2-offline", defaults: ["-textSize", size])
+            let title: XCUIElement = app.staticTexts["Can't reach your Mac"]
+            XCTAssertTrue(title.waitForExistence(timeout: 10))
+            heights.append(title.frame.height)
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "empty-state-\(size)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+        XCTAssertGreaterThan(heights[1], heights[0] * 1.3, "the title grows with the chosen text size: \(heights)")
+    }
+
     /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// does; a tap shows the steps and a second folds them back.
     func testTheLiveLineSaysTheWorkAndATapShowsTheSteps() {
