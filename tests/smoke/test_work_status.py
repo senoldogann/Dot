@@ -351,7 +351,8 @@ async def test_messages_only_tells_the_calls_as_dots_messages_and_the_line_says_
     own_home: Path, tmp_path: Path
 ) -> None:
     """Item 1976 and the owner's word of 2026-11-27: with "Messages only" a call is no message of its own; the one live
-    line says what the run does ("Running sleep 6…") and how long it has worked; with "What it is doing" no time shows."""
+    line says what the run does ("Running sleep 6…") and how long it has worked; with "What it is doing" no time
+    shows."""
     async with _served(own_home, _SILENT_TURNS) as (manager, address, port):
         run: RunRecord = await _start(manager)
         async with async_playwright() as playwright:
