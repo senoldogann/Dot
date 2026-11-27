@@ -605,7 +605,7 @@ not ask them, but for a run of a chat you opened (an agent's chat among them, it
 message, a mail and a post itself or has the review model judge them (item 860), a release there being checked by the
 review model (item 962) as after a page; in yolo with `[policy] yolo_taint_check = false` nothing would check it, so it
 sends none there then. A `preapproved` rule of yours lets a step through in a run a note marked as it does after a page
-(see [Agents](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
+(see [Bots and campaigns](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
 some. A message you send to the run clears the mark; your answer to a question of a run you watch does not, whether the
 run waited for it or went on (item 508), as it answers what the run asked rather than sending it on its way: the run it
 reaches stays marked, and the run it starts once that run has ended starts as untrusted as that run ended; so does

@@ -148,7 +148,7 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
 ) -> None:
     """Items 835 and 1327: the owner's agents stand in a menu behind the button beside the search (the faces of item 835
     and the rows of a phone's home, item 1259, are one quiet list): each its badge, its name and the count of its
-    chats, to its page while it has no chat, the open one marked; under them All agents, New agent and Campaigns. Wide
+    chats, to its page while it has no chat, the open one marked; under them All bots, New bot and Campaigns. Wide
     and on a phone, light and dark."""
     _, address = served
     agents: dict[str, str] = {}
@@ -209,7 +209,7 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                         await expect(scout).not_to_have_attribute("aria-current", "true")
                         await items.filter(has_text="All bots").click()
                         # The page of every agent is Settings › Agents since item 1336: the sidebar is the settings' nav
-                        # while it is open, with Agents its marked row, and Back to chats gives the chats' sidebar back.
+                        # while it is open, with Bots its marked row, and Back to chats gives the chats' sidebar back.
                         await expect(page).to_have_url(f"{address}/#/settings/agents")
                         settings: Locator = page.get_by_role("navigation", name="Settings")
                         await expect(settings.locator("[aria-current='page'] .snav-label")).to_have_text("Bots")
