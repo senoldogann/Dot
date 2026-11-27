@@ -705,6 +705,7 @@ const CORE = {
   // The lines of a conversation's messages (messages.js).
   "messages.pending": "Bekliyor",
   "messages.starting": "Başlıyor…",
+  "messages.routine": "Rutin",
   "messages.scheduleRepeating": "tekrarlanan bir zamanlamayla",
   "messages.scheduleLabel": "Zamanlama kuruldu: {name}, {when}. Zamanlamalar sayfasında açar.",
   "messages.scheduleLabelBare": "Zamanlama kuruldu: {name}. Zamanlamalar sayfasında açar.",

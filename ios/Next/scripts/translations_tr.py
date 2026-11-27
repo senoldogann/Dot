@@ -1720,3 +1720,13 @@ TR.update(
         "Check the spelling or try a new search.": "Yazımı kontrol edin ya da yeni bir arama deneyin.",
     }
 )
+
+# HS1 (2026-11-27): a routine's message in a chat.
+TR.update(
+    {
+        "Routine": "Rutin",
+        "Routine: %@": "Rutin: %@",
+        "Hides the message": "Mesajı gizler",
+        "Shows the whole message": "Mesajın tamamını gösterir",
+    }
+)

@@ -120,6 +120,7 @@ from dotagent.agent.refusal import security_work
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     RESUMED_EVENT,
+    RESUMES_FOLLOWED,
     HandOff,
     InterruptedCall,
     Resumption,
@@ -130,6 +131,7 @@ from dotagent.agent.resume import (
     helper_not_resumed,
     identities_of,
     interrupted_calls,
+    origin_source,
     resume_note,
     resumes_on_start,
     stopped_line,
@@ -326,6 +328,26 @@ _NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset(
 # chat its command in the background ended (``BACKGROUND_SOURCE``): it goes on with the owner's chat, under their eyes
 # (the independent review of item 860: a mail its run had put off until a command ended went out unasked).
 _NOBODY_WATCHES: frozenset[str] = UNWATCHED_SOURCES | {NOTICE_SOURCE, REFLECTION_SOURCE, EVAL_SOURCE}
+# The sources of the runs nobody started (item 2016), whose processes keep the sandbox in every mode while [shell]
+# sandbox_unattended holds: a schedule's firing (a hook bound to a schedule fires it), a watcher's run (a hook bound to
+# an agent starts one), a run of Dot's own initiative, a run handed a mail's reply, a watcher's notice and a reflection.
+# An eval's task stands for the owner's message (``OWNER_SOURCES``), and is the owner's.
+_NOBODY_STARTED: frozenset[str] = UNWATCHED_SOURCES | {NOTICE_SOURCE, REFLECTION_SOURCE}
+# The sources of the runs that go on in a chat without a message of the owner's: one is unattended in a chat a source of
+# :data:`_NOBODY_STARTED` opened, and the owner's in theirs.
+_CARRIED_SOURCES: frozenset[str] = frozenset({BACKGROUND_SOURCE, WORK_ORDER_SOURCE, HELPER_SOURCE, WELCOME_SOURCE})
+# How many of a chat's newest runs a run of :data:`_CARRIED_SOURCES` reads to find the run it goes on from.
+_CARRIED_RUNS_READ: int = 20
+
+
+def unattended_origin(origin: str | None, opener: str | None) -> bool:
+    """Whether a run whose chain began with a run of the source ``origin`` (:func:`dotagent.agent.resume.origin_source`)
+    in a chat the source ``opener`` opened is one nobody started (item 2016): a source of
+    :data:`_NOBODY_STARTED`, or one of :data:`_CARRIED_SOURCES` in a chat such a source opened. An origin that
+    cannot be read (``None``) is unattended: the sandbox it keeps seals Dot's own files and asks nothing."""
+    if origin is None or origin in _NOBODY_STARTED:
+        return True
+    return origin in _CARRIED_SOURCES and opener in _NOBODY_STARTED
 
 
 def _owners_message(parent: "RunHandle | None", source: str, opening: RunOpening) -> bool:
@@ -4392,6 +4414,68 @@ class RunManager:
         log.info("run_resumed", run_id=run.id, from_run_id=old.id, cut_off=cut_off, automatic=automatic)
         return run
 
+    async def _unattended(
+        self,
+        marked_by: tuple[str, str],
+        run_id: str,
+        ended_parent: RunRecord | None,
+        opening: RunOpening,
+        opener: str | None,
+    ) -> bool:
+        """Whether the run ``run_id``, whose chat and source are ``marked_by``, is one nobody started (item 2016): by
+        the origin of its chain and its chat's opener (:func:`unattended_origin`), and, for a run that goes on in a
+        chat without the owner's message (:data:`_CARRIED_SOURCES`), by the chat's runs before it too: a schedule's
+        firing in the owner's chat (``/loop``) leaves a command in the background, and the run that tells its end
+        goes on from that firing (the security review of item 2016)."""
+        origin: str | None = await self._origin(marked_by[1], ended_parent, opening)
+        if unattended_origin(origin, opener):
+            return True
+        return origin in _CARRIED_SOURCES and await self._carried_unattended(marked_by[0], run_id)
+
+    async def _carried_unattended(self, thread_id: str, run_id: str) -> bool:
+        """Whether a run that goes on in the chat ``thread_id`` without the owner's message goes on from a run nobody
+        started: the newest of the chat's earlier runs that is not itself such a run is one, followed back through
+        resumes. Unattended when none of the newest :data:`_CARRIED_RUNS_READ` tells, as an origin that cannot be read
+        is."""
+        for earlier in await self._runtime.store.list_runs(_CARRIED_RUNS_READ, thread_id):
+            if earlier.id == run_id:
+                continue
+            origin: str | None = await origin_source(self._runtime, earlier)
+            if origin not in _CARRIED_SOURCES:
+                return origin is None or origin in _NOBODY_STARTED
+        return True
+
+    async def _origin(self, source: str, ended_parent: RunRecord | None, opening: RunOpening) -> str | None:
+        """The source the chain of a run of ``source`` began with (item 2016): for a resumed helper whose parent ended
+        (``ended_parent``), the source of the run at the top of its delegations, followed back through its resumes (a
+        helper's own source, ``delegate`` or ``team``, says nothing of who started the work: the pre-push review); for
+        a run that resumes another, the resumed run's (``opening.from_run_id``), followed back the same way; else its
+        own. ``None`` when it cannot be read."""
+        if ended_parent is not None:
+            top: RunRecord | None = await self._top_of(ended_parent)
+            return None if top is None else await origin_source(self._runtime, top)
+        if source != RESUME_SOURCE:
+            return source
+        if opening.from_run_id is None:
+            return None
+        try:
+            resumed: RunRecord = await self._runtime.store.get_run(opening.from_run_id)
+        except NotFoundError:
+            return None
+        return await origin_source(self._runtime, resumed)
+
+    async def _top_of(self, run: RunRecord) -> RunRecord | None:
+        """The run at the top of ``run``'s delegations: ``run`` itself when no run delegated it. ``None`` when a run of
+        the chain is gone, or the chain is longer than :data:`dotagent.agent.resume.RESUMES_FOLLOWED`."""
+        for _ in range(RESUMES_FOLLOWED):
+            if run.parent_run_id is None:
+                return run
+            try:
+                run = await self._runtime.store.get_run(run.parent_run_id)
+            except NotFoundError:
+                return None
+        return None
+
     async def _hops_among(self, run_ids: Sequence[str]) -> int:
         """The most hops of the runs ``run_ids``: how far from the start of its chain a run that reads them is (item
         1741)."""
@@ -4940,6 +5024,13 @@ class RunManager:
                 if marked_by is None
                 else marked_by[1] not in _NOBODY_WATCHES
             )
+            # Whether nobody started the run (item 2016): its processes keep the sandbox in every mode. A delegated run
+            # is as its parent; a resumed one as the run its chain began with; one whose parent is not known is.
+            unattended: bool = (
+                (parent is None or parent.gate.unattended)
+                if marked_by is None
+                else await self._unattended(marked_by, run.id, ended_parent, opening, opener)
+            )
             gate: RunGate = RunGate(
                 runtime.store,
                 runtime.bus,
@@ -4963,6 +5054,7 @@ class RunManager:
                 owners_word=owners_word,
                 owners_chat=owners_chat,
                 owner_there=owner_there,
+                unattended=unattended,
                 # The chat whose "don't ask again" answers its questions (item 866): a delegated run's parent's.
                 chat_id=(parent.gate.chat_id if parent is not None else None) if marked_by is None else marked_by[0],
             )

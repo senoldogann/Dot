@@ -6268,6 +6268,17 @@
         }
       }
     },
+    "Hides the message": {
+      "comment": "VoiceOver hint of an unfolded routine row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajı gizler"
+          }
+        }
+      }
+    },
     "Hides the steps": {
       "comment": "VoiceOver hint of an open work-log group",
       "localizations": {
@@ -10695,6 +10706,28 @@
         }
       }
     },
+    "Routine": {
+      "comment": "Chat: the label of a message a schedule, watcher or hook sent",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutin"
+          }
+        }
+      }
+    },
+    "Routine: %@": {
+      "comment": "VoiceOver: a routine's message in a chat; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutin: %@"
+          }
+        }
+      }
+    },
     "Routines": {
       "comment": "Bot profile: the bot's scheduled tasks",
       "localizations": {
@@ -12007,6 +12040,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adımları gösterir"
+          }
+        }
+      }
+    },
+    "Shows the whole message": {
+      "comment": "VoiceOver hint of a folded routine row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajın tamamını gösterir"
           }
         }
       }
