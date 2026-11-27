@@ -197,6 +197,9 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     /// The model's thinking of a step: `live` while it is being written.
     case thought(id: String, text: String, live: Bool)
     case tool(ToolEntry)
+    /// A call the run told as one of Dot's short messages, which its step's own words did not tell (a `narration` event,
+    /// item 1976): drawn in the conversation of "Show steps" off alone, in the words of the live line for that call.
+    case narration(id: String, step: HelperStep)
     /// The helpers a run started, each with its current step (plan §18).
     case helpers(id: String, runId: String, helpers: [HelperView])
     /// The run's plan as a checklist, as it stands now.
@@ -211,7 +214,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .owner(let id, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
-            .limit(let id, _):
+            .limit(let id, _), .narration(let id, _):
             id
         case .tool(let entry): entry.id
         case .decision(let anchor): anchor.id
@@ -234,7 +237,18 @@ public struct TranscriptContext: Sendable, Equatable {
 public func transcript(
     of chat: ChatProjection, pending: [PendingMessage], mode: ToolCallMode, streaming: Bool, context: TranscriptContext
 ) -> [TranscriptItem] {
-    var items: [TranscriptItem] = []
+    builtRuns(of: chat, streaming: streaming, context: context).flatMap { shaped($0.rows, finished: $0.finished, mode: mode) }
+        + pending.map { .owner(id: "p:\($0.key)", text: $0.text, delivery: $0.delivery) }
+}
+
+/// A run's rows and whether it is over, for the transcript's filter and fold.
+struct BuiltRun {
+    let rows: [Built]
+    let finished: Bool
+}
+
+/// The chat's runs, oldest first, each as its rows (`runItems`). Pure.
+private func builtRuns(of chat: ChatProjection, streaming: Bool, context: TranscriptContext) -> [BuiltRun] {
     let listed: [RunRecord] = chat.view.map(ownRuns(of:)) ?? []
     // A run the stream told of (its `run_queued`) before the view was read again shows at once (the send's first event).
     let known: Set<String> = Set(listed.map(\.id)).union((chat.view?.helpers ?? []).map(\.runId))
@@ -248,16 +262,53 @@ public func transcript(
     }
     let runs: [RunRecord] = (listed + told).sorted { $0.createdAt < $1.createdAt }
     let helpers: [HelperView] = chat.view?.helpers ?? []
-    for run in runs {
-        let built: [Built] = runItems(
-            run, timeline: chat.runs[run.id], writing: streaming ? chat.writing[run.id] : nil, thinking: streaming ? chat.thinking[run.id] : nil,
-            helpers: helpers.filter { $0.parentRunId == run.id }, context: context)
-        items.append(contentsOf: shaped(built, finished: !run.isActive || hasEnded(chat.runs[run.id]), mode: mode))
+    return runs.map { run in
+        BuiltRun(
+            rows: runItems(
+                run, timeline: chat.runs[run.id], writing: streaming ? chat.writing[run.id] : nil, thinking: streaming ? chat.thinking[run.id] : nil,
+                helpers: helpers.filter { $0.parentRunId == run.id }, context: context),
+            finished: !run.isActive || hasEnded(chat.runs[run.id]))
     }
-    for message in pending {
-        items.append(.owner(id: "p:\(message.key)", text: message.text, delivery: message.delivery))
+}
+
+/// The transcript of "Show steps" off (items 1915 and 1976): the chat told as a conversation, as Grok Bot tells its work.
+/// The owner's words, Dot's words (those on the way to its calls too, which stay where they were said), the lines of the
+/// calls its words did not tell (`narration`), the asks, the helpers and how runs ended; a run at work's steps and
+/// thoughts are left out but a failed call, its live line saying what it does. A finished run's steps, thoughts and plan
+/// are one fold, "Worked for 2m", before its answer: a tap there shows them, so nothing is lost. Pure.
+public func conversation(of chat: ChatProjection, pending: [PendingMessage], streaming: Bool, context: TranscriptContext) -> [TranscriptItem] {
+    builtRuns(of: chat, streaming: streaming, context: context).flatMap { conversed($0.rows, finished: $0.finished) }
+        + pending.map { .owner(id: "p:\($0.key)", text: $0.text, delivery: $0.delivery) }
+}
+
+/// The rows of one run in the conversation (`conversation`). Pure.
+func conversed(_ built: [Built], finished: Bool) -> [TranscriptItem] {
+    guard finished else {
+        return built.filter { row in
+            switch row.category {
+            case .thought: false
+            case .tool(let state): state == .failed
+            default: true
+            }
+        }.map(\.item)
     }
-    return items
+    let isStep: (Built) -> Bool = { row in
+        switch row.category {
+        case .tool, .thought, .plan: true
+        default: false
+        }
+    }
+    let steps: [Built] = built.filter(isStep)
+    var out: [Built] = built.filter { !isStep($0) }
+    guard let first: Built = steps.first else { return out.map(\.item) }
+    let tools: [ToolEntry] = steps.compactMap { if case .tool(let entry) = $0.item { entry } else { nil } }
+    let start: Double = steps.map(\.start).min() ?? first.start
+    let end: Double = steps.map(\.end).max() ?? start
+    let fold: Built = Built(
+        item: .work(WorkFold(id: "f:\(first.item.id)", seconds: max(0, Int((end - start).rounded())), tally: .of(tools), items: steps.map(\.item))),
+        category: .tool(.done), start: start, end: end)
+    out.insert(fold, at: out.firstIndex { $0.category == .answer(final: true) } ?? out.count)
+    return out.map(\.item)
 }
 
 /// The reaction target of an answer: its run and the message key the daemon names it by (`answer`, `step-N`).
@@ -286,6 +337,7 @@ enum Category: Equatable {
     case thought
     case decision
     case runEnd
+    case narration
 }
 
 /// A row with what the filter and the fold need: its category and when it began and ended.
@@ -314,9 +366,16 @@ private func runItems(
     var calls: [String: Int] = [:]
     var asks: [String: Int] = [:]
     var planAt: Int?
+    // Whether the newest step wrote words, which tell its calls: no line of a call stands beside them (item 1976).
+    var said: Bool = false
     let events: [EventRecord] = timeline?.events ?? []
     for event in events {
         switch event.kind {
+        case "narration":
+            guard !said, let tool: String = event.data["tool"]?.string else { continue }
+            let about: String = event.data["args"]?.object?.values.compactMap(\.string).first ?? ""
+            let step: HelperStep = HelperStep(tool: tool, target: about, line: "", at: event.ts)
+            items.append(Built(item: .narration(id: "n:\(event.id)", step: step), category: .narration, start: event.ts, end: event.ts))
         case "assistant":
             let thought: String = event.data["thinking"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !thought.isEmpty {
@@ -324,6 +383,7 @@ private func runItems(
                 items.append(Built(item: .thought(id: "th:\(run.id):\(step)", text: thought, live: false), category: .thought, start: event.ts, end: event.ts))
             }
             let text: String = event.data["text"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            said = !text.isEmpty
             guard !text.isEmpty else { continue }
             items.append(Built(item: .answer(id: "a:\(event.id)", text: text, writing: false, endedAt: nil), category: .answer(final: false), start: event.ts, end: event.ts))
         case "tool_call":
@@ -503,6 +563,8 @@ private func firstLine(_ text: String) -> String {
 /// Whether a row of `category` shows in `mode` (the table on `ToolCallMode`).
 func shows(_ category: Category, mode: ToolCallMode) -> Bool {
     switch (mode, category) {
+    // A call's line is the conversation's alone (`conversation`), never beside the steps it tells.
+    case (_, .narration): false
     case (.showAll, _): true
     case (_, .owner), (_, .note), (_, .answer(final: true)), (_, .writing), (_, .decision), (_, .runEnd): true
     case (.zen, .thought), (.hideAll, .thought): false

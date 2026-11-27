@@ -53,14 +53,15 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @asynccontextmanager
-async def _served(home: Path) -> AsyncIterator[tuple[RunManager, str, int]]:
-    """A daemon whose scripted model runs a command of a few seconds and answers: its run manager, address and port."""
+async def _served(home: Path, turns: tuple[ScriptedTurn, ...]) -> AsyncIterator[tuple[RunManager, str, int]]:
+    """A daemon whose scripted model takes ``turns`` (a command of a few seconds, and the answer): its run manager,
+    address and port."""
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false',
         encoding="utf-8",
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, list(_TURNS)))
+    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, list(turns)))
     manager: RunManager = RunManager(runtime)
     try:
         stopping: asyncio.Event = asyncio.Event()
@@ -120,7 +121,7 @@ async def _open(browser: Browser, port: int, address: str, run_id: str, work: st
 
 
 async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(own_home: Path, tmp_path: Path) -> None:
-    async with _served(own_home) as (manager, address, port):
+    async with _served(own_home, _TURNS) as (manager, address, port):
         run: RunRecord = await _start(manager)
         async with async_playwright() as playwright:
             browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
@@ -217,7 +218,7 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
 
 async def test_by_default_the_steps_fold_away_and_the_line_offers_them(own_home: Path) -> None:
     """Item 830: until the owner chooses, a chat shows the conversation as people chat, the steps a press away."""
-    async with _served(own_home) as (manager, address, port):
+    async with _served(own_home, _TURNS) as (manager, address, port):
         run: RunRecord = await _start(manager)
         async with asyncio.timeout(30):
             assert (await manager.wait(run.id)).status == "done"
@@ -238,7 +239,7 @@ async def test_the_line_says_the_run_waits_for_you_only_until_the_step_is_answer
     """Item 1148: while a step waits for the owner's yes the line says so; once it is answered the line says the work
     it was at again, while its command still runs (the pre-push review: it kept "Waiting for you" until the command
     ended)."""
-    async with _served(own_home) as (manager, address, port):
+    async with _served(own_home, _TURNS) as (manager, address, port):
         # A rule has the command ask, as a rule of the owner's would.
         async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as api:
             asked = await api.post(
@@ -283,7 +284,7 @@ async def test_an_update_streams_under_the_line_and_a_message_steps_it_aside(own
     steps, and the line keeps saying the work while they come; words that may be the answer ("either") and a chat's
     message stream in sight and step the line aside, as they then say what goes on; a live "either" note stays in
     sight under "What it is doing" until its step ends (run.css)."""
-    async with _served(own_home) as (_manager, _address, port), async_playwright() as playwright:
+    async with _served(own_home, _TURNS) as (_manager, _address, port), async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
             page: Page = await browser.new_page()
@@ -333,3 +334,45 @@ async def test_an_update_streams_under_the_line_and_a_message_steps_it_aside(own
             assert shown[0] != "none" and shown[1:] == ["none", "none"], shown
         finally:
             await browser.close()
+
+
+# A run that works without a word on the way (item 1976): it lists a folder, runs a command of a few seconds, answers.
+_SILENT_TURNS: tuple[ScriptedTurn, ...] = (
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="list_dir", arguments={"path": "."}),)),
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 6"}),)),
+    ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
+)
+
+
+async def test_messages_only_tells_the_calls_as_dots_messages_and_the_line_says_how_long(
+    own_home: Path, tmp_path: Path
+) -> None:
+    """Item 1976: with "Messages only" a call that turns the run to other work is one of Dot's short messages, the line
+    says how long the run has worked; with "What it is doing" neither shows."""
+    async with _served(own_home, _SILENT_TURNS) as (manager, address, port):
+        run: RunRecord = await _start(manager)
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+            try:
+                page: Page = await _open(browser, port, address, run.id, "messages", 390)
+                told: Locator = page.locator(".say-narration")
+                await expect(told).to_have_text(["List folder", "Running a command"])
+                await expect(told.last).to_be_visible()
+                await expect(page.locator("details.steps")).to_be_hidden()
+                line: Locator = page.locator(".work-status")
+                await expect(line).to_have_attribute("data-state", "working")
+                await expect(line.locator(".work-status-time")).to_have_text(re.compile(r"^· \d+ s$"))
+                await page.screenshot(path=str(tmp_path / "messages.png"))
+                other: Page = await _open(browser, port, address, run.id, "status", 390)
+                await expect(other.locator(".work-status")).to_have_attribute("data-state", "working")
+                await expect(other.locator(".say-narration").first).to_be_hidden()
+                await expect(other.locator(".work-status-time")).to_be_hidden()
+                async with asyncio.timeout(30):
+                    assert (await manager.wait(run.id)).status == "done"
+                # Over, the lines stay as the conversation, and the steps are one press away.
+                await expect(page.locator(".answer .prose")).to_have_text("Done.")
+                await expect(told.last).to_be_visible()
+                await page.close()
+                await other.close()
+            finally:
+                await browser.close()
