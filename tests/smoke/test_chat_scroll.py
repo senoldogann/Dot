@@ -18,13 +18,14 @@ from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import RunRecord
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -36,12 +37,40 @@ _ANSWER: str = "\n\n".join(
     for index in range(40)
 )
 _RUN_WAIT_S: float = 30.0
+_ASK_GOAL: str = "Pick a colour"
 
 
 def _script() -> list[ScriptedTurn]:
     return [
         ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": _ANSWER, "success": True}),))
     ]
+
+
+class _ByGoal:
+    """The scripted model: a long answer to every goal but the one that asks the owner a question, whose run waits."""
+
+    @property
+    def name(self) -> str:
+        return _PROVIDER
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        opening: str = next((message.content for message in request.messages if message.role == "user"), "")
+        if _ASK_GOAL in opening:
+            ask: ScriptedTurn = ScriptedTurn(
+                text="",
+                calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Which colour?", "wait": True}),),
+            )
+            return await ScriptedProvider(_PROVIDER, [ask]).complete(request, sink)
+        return await ScriptedProvider(_PROVIDER, _script()).complete(request, sink)
+
+    async def model_info(self, model: str) -> ModelInfo:
+        return await ScriptedProvider(_PROVIDER, ()).model_info(model)
+
+    async def list_models(self) -> tuple[ModelInfo, ...]:
+        return await ScriptedProvider(_PROVIDER, ()).list_models()
+
+    async def aclose(self) -> None:
+        return None
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -57,7 +86,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script() * 8))
+    await built.router.register(_PROVIDER, _ByGoal())
     try:
         yield built
     finally:
@@ -421,6 +450,79 @@ async def test_the_way_down_comes_when_the_reader_scrolls_up_in_a_chat_that_is_o
                 assert where["max"] - where["top"] <= 2, ("a press leads to the end", width, where)
                 await expect(arrow).to_be_hidden()
                 assert errors == []
+                await context.close()
+        finally:
+            await browser.close()
+
+
+async def test_the_way_down_follows_the_reader_while_a_run_is_at_work(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
+) -> None:
+    """Item 1991, as the iPhone: while a run works the chat follows its end and the arrow is not there; the reader's
+    scroll up stops the follow and brings the arrow, their scroll back to the end starts the follow again and takes it
+    away, and a press on it leads to the end. 1440 by 900 in the light and the dark, and 390 by 844."""
+    manager, address = served
+    first: RunRecord = await manager.start(
+        _GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        assert (await manager.wait(first.id)).status == "done"
+    second: RunRecord = await manager.start(
+        "Pick a colour",
+        "task",
+        SCRIPTED_MODEL,
+        first.thread_id,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "yolo",
+        False,
+        (),
+    )
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            shots: tuple[tuple[int, int, Literal["light", "dark"]], ...] = (
+                (1440, 900, "light"),
+                (1440, 900, "dark"),
+                (390, 844, "light"),
+            )
+            for width, height, scheme in shots:
+                context: BrowserContext = await browser.new_context(
+                    viewport={"width": width, "height": height}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                page: Page = await context.new_page()
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"{address}/#/runs/{second.id}")
+                await page.wait_for_selector(".run-main", timeout=15000)
+                await page.wait_for_timeout(1500)
+                phone: bool = width < 720
+                arrow: Locator = page.locator(".dock-end" if phone else ".status-bar .jump")
+                to_top: str = (
+                    "document.querySelector('.run-thread').scrollTop = 0" if phone else "window.scrollTo(0, 0)"
+                )
+                to_end: str = (
+                    "const t = document.querySelector('.run-thread'); t.scrollTop = t.scrollHeight"
+                    if phone
+                    else "window.scrollTo(0, document.documentElement.scrollHeight)"
+                )
+                await expect(arrow).to_be_hidden()
+                await page.evaluate(to_top)
+                await expect(arrow).to_be_visible(timeout=4000)
+                await page.screenshot(path=str(tmp_path / f"working-{width}-{scheme}.png"), animations="disabled")
+                await page.evaluate(to_end)
+                await expect(arrow).to_be_hidden(timeout=4000)
+                await page.evaluate(to_top)
+                await expect(arrow).to_be_visible(timeout=4000)
+                await arrow.click()
+                await page.wait_for_timeout(1200)
+                where = await page.evaluate(_AT_THE_FOOT)
+                assert where["max"] - where["top"] <= 2, ("a press leads to the end", width, where)
+                await expect(arrow).to_be_hidden()
                 await context.close()
         finally:
             await browser.close()

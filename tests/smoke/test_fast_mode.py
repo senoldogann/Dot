@@ -302,6 +302,24 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 await expect(fast).to_have_attribute("aria-selected", "true")
                 await page.screenshot(path=str(tmp_path / f"fast-{width}-{scheme}.png"), animations="disabled")
                 await page.keyboard.press("Escape")
+                # The chip (item 1991, as the iPhone's): while the box is short the model's pill is its mark alone;
+                # once it is tall (over 32 characters, a second line, a file) the name stands beside it and, in grey,
+                # the level with Fast.
+                box: Locator = page.locator(".dock textarea")
+                value: Locator = model_pill.locator(".composer-pill-value")
+                extra: Locator = model_pill.locator(".composer-pill-extra")
+                await box.fill("")
+                short = await value.bounding_box()
+                assert short is not None and short["width"] <= 2, ("short: the mark alone", short)
+                await box.fill("a message of more than thirty-two characters")
+                await expect(extra).to_contain_text("Fast")
+                tall = await value.bounding_box()
+                assert tall is not None and tall["width"] > 20, ("tall: the name beside the mark", tall)
+                grey = await extra.evaluate("node => getComputedStyle(node).color")
+                ink = await value.evaluate("node => getComputedStyle(node).color")
+                assert grey != ink, ("the level and Fast are grey", grey, ink)
+                await page.screenshot(path=str(tmp_path / f"chip-{width}-{scheme}.png"), animations="disabled")
+                await box.fill("")
                 await page.close()
         finally:
             await browser.close()

@@ -517,13 +517,16 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   function onLayout() {
     modelMenu.dispose();
     modelMenu = makeModelMenu();
+    paintPhonePill();
   }
   PHONE.addEventListener("change", onLayout);
 
   paintPhonePill = () => {
     const option = modes.find((candidate) => candidate.id === modeId);
     const named = option === undefined || option.id === AUTO_MODE.id ? "" : option.label;
-    const extra = [named, reasoningShort].filter((word) => word !== "").join(" · ");
+    // A phone's pill stands for the run's choices: the mode and the level in small words. A Mac's has its own pills for the
+    // mode and the level; the model's says the level and fast mode in grey, as the iPhone's chip does (item 1991).
+    const extra = (PHONE.matches ? [named, reasoningShort] : [reasoningShort]).filter((word) => word !== "").join(" · ");
     const value = modelPill.element.querySelector(".composer-pill-value")?.textContent ?? "";
     modelPill.setValue(value, extra);
   };

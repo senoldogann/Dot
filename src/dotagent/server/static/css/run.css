@@ -3931,11 +3931,17 @@ dialog.computer-full::backdrop {
   overflow: visible;
 }
 
-/* On a Mac's box the reasoning, the approvals and the mode have pills of their own: the model's says its name alone. */
-@media (min-width: 720.02px) {
-  .composer-pill[data-pill="model"] > .composer-pill-extra {
-    display: none;
-  }
+/* The model's pill is its mark alone while the box is short; once it is tall (a second line, more than 32 characters, a file)
+   it names the model and says the level and fast mode in grey, as the iPhone's chip does (item 1991). The words stay in the
+   page for a screen reader. */
+.composer:not([data-expanded]) .composer-pill[data-pill="model"] > :is(.composer-pill-value, .composer-pill-extra) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 
