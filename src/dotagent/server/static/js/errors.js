@@ -152,6 +152,10 @@ export function serviceFailure(line) {
   return { status, short: t(cause.short), next: t(cause.next), details: line.trim() };
 }
 
+// What the daemon writes as the result of a run the owner stopped (`RESULT_STOPPED` in store/endings.py): a screen says
+// it in the owner's language and does not show these words.
+export const STOPPED_RESULT = "The run was stopped.";
+
 /**
  * The model a refused message named and the one the daemon offers instead (null when none can answer), or null when
  * `error` is no such refusal.

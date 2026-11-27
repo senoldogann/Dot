@@ -1914,6 +1914,7 @@ export const EN_APP = {
   "approvals.whyPolicy": "The policy's words: {reason}",
   // Added by hand, for sentences that need their own word order.
   // Added by hand, for sentences that need their own word order.
+  "outcome.stoppedNote": "Stopped",
   // Added by hand, for sentences that need their own word order.
   "queue.countFile": "{count} file",
   "queue.countFiles": "{count} files",

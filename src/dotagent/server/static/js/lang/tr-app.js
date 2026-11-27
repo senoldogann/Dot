@@ -1915,6 +1915,7 @@ export const TR_APP = {
   "approvals.whyPolicy": "Politikanın sözleri: {reason}",
   // Added by hand, for sentences that need their own word order.
   // Added by hand, for sentences that need their own word order.
+  "outcome.stoppedNote": "Durduruldu",
   // Added by hand, for sentences that need their own word order.
   "queue.countFile": "{count} dosya",
   "queue.countFiles": "{count} dosya",

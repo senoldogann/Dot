@@ -19,7 +19,7 @@
 import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, sharedGet, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, setText, workingFor } from "./dom.js";
 import { withoutPolicyReason } from "./approvalwords.js";
-import { serviceFailure, serviceWords } from "./errors.js";
+import { serviceFailure, serviceWords, STOPPED_RESULT } from "./errors.js";
 import { t, tCount } from "./i18n.js";
 import { goTo } from "./hop.js";
 import { icon } from "./icons.js";
@@ -238,7 +238,9 @@ function chatText(chat, agent, children, waits = null, right = null, unread = fa
   // A chat its model service stopped says so in a few words of what stopped it (the service's sentence, a billing link
   // and all, stood here after item 1136); its own line stands in the chat. Any other chat ends on its last words.
   const stopped = chat.latest_status === "failed" ? serviceFailure(chat.last_message ?? "") : null;
-  const words = stopped === null ? serviceWords(chat.last_message ?? "").text : stopped.short;
+  // A chat the owner stopped says so in the owner's language, not in the daemon's sentence for it.
+  const stoppedByYou = chat.latest_status === "cancelled" && (chat.last_message ?? "").trim() === STOPPED_RESULT;
+  const words = stoppedByYou ? t("outcome.stoppedNote") : stopped === null ? serviceWords(chat.last_message ?? "").text : stopped.short;
   const last = words === "" || chat.last_role !== "user" || stopped !== null ? words : t("side.you", { words });
   const helpers = helperChip(children);
   // A chat with a team (item 610) says which, ahead of its last words.

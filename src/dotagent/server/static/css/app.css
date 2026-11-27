@@ -12324,3 +12324,9 @@ dialog.teach {
 .approval-fold > .stack {
   margin-top: var(--space-2);
 }
+
+/* The quiet word under what a stopped run had said (item 23 of the 2026-11-26 review). */
+.answer-stopped-note {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
