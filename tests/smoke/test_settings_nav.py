@@ -46,6 +46,7 @@ _ROWS: list[str] = [
     "AI services",
     "Phone",
     "Channels",
+    "Hooks",
     "System",
     "Self-repair",
     "Diagnostics",

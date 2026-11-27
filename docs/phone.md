@@ -322,7 +322,7 @@ On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-
 of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General,
 Appearance, Rules, Memory, Vault and Snapshots, then the groups Agents (Agents, Models, Browser, Web search, Scheduled tasks,
 Campaigns, Self-improvement; the sidebar has no Schedules icon, so its page is a row here), Connections (Connectors, Plugins,
-Skills, AI services, Phone, Channels), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
+Skills, AI services, Phone, Channels, Hooks), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
 steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its
@@ -437,8 +437,8 @@ the code is for pairing a phone, which it takes too): Settings ›
 Phone, on the Mac or in Safari where Dot is open with the Mac's own key, shows one with **Show code**, eight characters
 in two groups (Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a
 new code takes the place of the one before, and five wrong tries use a code up. The app trades it for a key of the
-phone's own (`POST /api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host
-and Origin checks hold for it as for any other; item 670): `phone.<id>.<secret>`, which the daemon keeps nowhere: it
+phone's own (`POST /api/phone/pair`, one of the routes that take no token, beside the health check, the proof and a signed
+call to a [hook](hooks.md); the Host and Origin checks hold for it as for any other; item 670): `phone.<id>.<secret>`, which the daemon keeps nowhere: it
 keeps the key's SHA-256, the phone's name (iPhone, iPad, Android phone, read from its browser), and when it was paired
 and last used, in `<home>/phones.json`, readable by you only. The phone proves the daemon with its key as with any token
 (the proof is keyed with the key's hash, the one thing the daemon holds of it). The daemon is not proven before a code
