@@ -56,6 +56,11 @@ function spoken(name) {
   return String(name).replace(/_/g, " ");
 }
 
+/** Whether the policy's flag has a phrase of its own (not one made from its name). */
+export function knownFlag(flag) {
+  return Object.hasOwn(FLAG_WORDS, flag);
+}
+
 /** What `flag` says of an action: "sends a message for you". */
 export function flagWords(flag) {
   return Object.hasOwn(FLAG_WORDS, flag) ? FLAG_WORDS[flag] : spoken(flag);

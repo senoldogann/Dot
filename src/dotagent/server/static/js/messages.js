@@ -4,7 +4,7 @@ import { dateTimeFull, duration, el, messageTime } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { copyButton } from "./copybutton.js";
-import { isStoppedResult, runFailure } from "./errors.js";
+import { isCutOffResult, isStoppedResult, runFailure } from "./errors.js";
 import { faceStateAtEnd } from "./face.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
@@ -260,7 +260,7 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
     ...(failure === null
       ? [
           outcomeAlert(status),
-          written ? prose(words) : el("div", { class: "muted" }, outcome === null ? "" : t(outcome.empty)),
+          written ? prose(words) : el("div", { class: "muted" }, bare && isCutOffResult(text) ? t("outcome.cutOffEmpty") : outcome === null ? "" : t(outcome.empty)),
           stopped && written ? el("div", { class: "answer-stopped-note" }, t("outcome.stoppedNote")) : null,
         ]
       : serviceStopped(failure)),

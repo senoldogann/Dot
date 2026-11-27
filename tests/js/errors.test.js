@@ -122,13 +122,16 @@ test("a run that ended for a fault of the harness's says what happened, and its 
 });
 
 test("words that begin in lower case are a line of a log, and a run whose end carried an error is one too", () => {
-  assert.equal(runFailure("the scripted model failed on purpose", false)?.short, "Stopped: Dot could not finish");
+  assert.equal(runFailure("the scripted model failed on purpose", null)?.short, "Stopped: Dot could not finish");
   assert.equal(runFailure("The login page asked for a code.", true)?.short, "Stopped: Dot could not finish");
 });
 
 test("an agent's own report of what it could not do is its answer, and is not rewritten", () => {
   assert.equal(runFailure("I could not sign in: the site wants a code from your phone.", false), null);
   assert.equal(runFailure("", false), null);
+  // Where the run's end is known to carry no error, a report that begins in lower case is still the agent's own words.
+  assert.equal(runFailure("npm run build fails on Node 18, the lockfile is stale", false), null);
+  assert.equal(runFailure("npm run build fails on Node 18, the lockfile is stale", null)?.short, "Stopped: Dot could not finish");
 });
 
 test("the daemon's two results of a stopped run, and a model's refusal, are told in plain words (item 1980, 1981)", () => {

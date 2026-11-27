@@ -791,6 +791,7 @@ const CORE = {
   "outcome.failedAlert": "Görev başarısız oldu",
   "outcome.cancelled": "Durduruldu",
   "outcome.cancelledEmpty": "Görev bir yanıt yazmadan önce durduruldu.",
+  "outcome.cutOffEmpty": "Görev, Dot kapandığı ya da onu yürüten komut sona erdiği için yarıda kesildi.",
   "outcome.waiting": "Sizi bekliyor",
   "outcome.waitingEmpty": "Görev yalnızca sizin verebileceğiniz bir şey için durdu.",
   "outcome.needs": "Dot'un sizden istedikleri",

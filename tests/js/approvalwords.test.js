@@ -25,3 +25,8 @@ test("a chat's row says the step alone, not the policy's reason after it", () =>
   );
   assert.equal(withoutPolicyReason("Which colour — blue or green?"), "Which colour — blue or green?");
 });
+
+test("a flag with no phrase of its own is left as the policy wrote it, never spoken as a program's name", () => {
+  assert.equal(plainReason("balanced preset asks for: new_thing"), null);
+  assert.equal(plainReason("balanced preset asks for: privilege, new_thing"), null);
+});

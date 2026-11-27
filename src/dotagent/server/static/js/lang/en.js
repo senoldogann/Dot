@@ -808,6 +808,7 @@ const CORE = {
   "outcome.failedAlert": "The task failed",
   "outcome.cancelled": "Stopped",
   "outcome.cancelledEmpty": "The task was stopped before it wrote an answer.",
+  "outcome.cutOffEmpty": "The task was cut off because Dot shut down or the command that drove it ended.",
   "outcome.waiting": "Waiting on you",
   "outcome.waitingEmpty": "The task stopped for something only you can give.",
   "outcome.needs": "What Dot needs from you",

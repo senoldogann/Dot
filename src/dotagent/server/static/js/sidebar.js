@@ -237,7 +237,7 @@ function chatText(chat, agent, children, waits = null, right = null, unread = fa
   }
   // A chat its model service stopped says so in a few words of what stopped it (the service's sentence, a billing link
   // and all, stood here after item 1136); its own line stands in the chat. Any other chat ends on its last words.
-  const stopped = chat.latest_status === "failed" ? runFailure(chat.last_message ?? "", false) : null;
+  const stopped = chat.latest_status === "failed" ? runFailure(chat.last_message ?? "", null) : null;
   // A chat the owner stopped says so in the owner's language, not in the daemon's sentence for it.
   const stoppedByYou = chat.latest_status === "cancelled" && isStoppedResult(chat.last_message ?? "");
   const words = stoppedByYou ? t("outcome.stoppedNote") : stopped === null ? serviceWords(chat.last_message ?? "").text : stopped.short;

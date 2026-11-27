@@ -175,6 +175,15 @@ export function isStoppedResult(text) {
   return words === STOPPED_RESULT || words.startsWith(EMERGENCY_PREFIX) || CUT_OFF_RESULTS.some((result) => words === result);
 }
 
+/**
+ * Whether `text` is the result of a run cut off when the daemon shut down or the `dotx` command that drove it ended.
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isCutOffResult(text) {
+  return CUT_OFF_RESULTS.includes(text.trim());
+}
+
 // What the harness writes as a failed run's last words when the run ended for a reason of its own (`store/endings.py`),
 // each with the sentence that says what to do (item 25 of the 2026-11-26 review): a chat that ended so says it plainly,
 // and the words the program used stand under Details.
@@ -193,11 +202,12 @@ const HARNESS_ENDINGS = [
 /**
  * A run's last words read as an ending the harness wrote (a fault inside Dot, empty replies, a stall, a limit, a restart),
  * or null for any other words (the agent's own report). `recorded` says the run's end carried an error of the daemon's
- * (the `error` of its `run_finished`); without it, words that begin in lower case are a line of a log, which an agent's
- * own report, a sentence, never is. `title` says what happened in a few words, `short` the same for a chat's line in the
+ * (the `error` of its `run_finished`): true, it did; false, it did not, so the words are the agent's own report and are
+ * never rewritten; null, that is not known (a chat's row in the sidebar), and words that begin in lower case are a line
+ * of a log, which an agent's own report, a sentence, never is. `title` says what happened in a few words, `short` the same for a chat's line in the
  * sidebar, `next` what the owner can do, and `details` the words as they were recorded.
  * @param {string} line
- * @param {boolean} recorded
+ * @param {boolean | null} recorded
  * @returns {{ title: string, short: string, next: string, details: string } | null}
  */
 function harnessFailure(line, recorded) {
@@ -206,7 +216,7 @@ function harnessFailure(line, recorded) {
   if (found !== undefined) {
     return { title: t("errors.taskStopped"), short: t(found[1]), next: t(found[2]), details: text };
   }
-  if (text !== "" && (recorded || /^[a-z]/.test(text))) {
+  if (text !== "" && (recorded === true || (recorded === null && /^[a-z]/.test(text)))) {
     return { title: t("errors.taskStopped"), short: t("errors.faultShort"), next: t("errors.faultNext"), details: text };
   }
   return null;
@@ -216,7 +226,7 @@ function harnessFailure(line, recorded) {
  * A failed run's last words as a failure the owner reads plainly: a model service's (`serviceFailure`) or one the harness
  * wrote (`harnessFailure`); null for the agent's own report, which is its answer and stays as it is.
  * @param {string} line
- * @param {boolean} recorded whether the run's end carried an error of the daemon's
+ * @param {boolean | null} recorded whether the run's end carried an error of the daemon's (null when that is not known)
  * @returns {{ title: string, short: string, next: string, details: string } | null}
  */
 export function runFailure(line, recorded) {

@@ -287,7 +287,8 @@ function foldedDetails(chips, severity, policyWords) {
   }
   return el(
     "details",
-    { class: "approval-fold" },
+    // A high-risk step's fold stands open: its risk and what it counts as are read before Approve, not behind a press.
+    { class: "approval-fold", open: severity === "high" },
     el("summary", null, t("approvals.details")),
     el("div", { class: "stack tight" }, chips, risk === null ? null : el("div", { class: "small muted" }, risk), policyWords === null ? null : el("div", { class: "small muted" }, t("approvals.whyPolicy", { reason: policyWords }))),
   );

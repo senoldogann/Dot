@@ -3,7 +3,7 @@
 // card says what Dot wants to do and, in this sentence, why it asks, and folds the policy's own words under Details. Pure,
 // so it can be read alone (tests/js/approvalwords.test.js).
 
-import { flagWords } from "./flagwords.js";
+import { flagWords, knownFlag } from "./flagwords.js";
 import { listAnd, t } from "./i18n.js";
 
 const CAUTIOUS_REASON = "cautious preset asks before anything that is not read-only";
@@ -21,12 +21,12 @@ function nameWords(name) {
   if (name === "high risk") {
     return t("approvalwords.highRisk");
   }
-  return flagWords(name);
+  return knownFlag(name) ? flagWords(name) : null;
 }
 
 /**
  * The sentence for a policy reason that names a preset, or null when the reason is anything else (a rule's own words, the
- * review model's warning), which a card shows as it is.
+ * review model's warning, a flag with no phrase of its own), which a card shows as it is.
  * @param {string} reason
  * @returns {string | null}
  */
@@ -45,7 +45,12 @@ export function plainReason(reason) {
   if (names.length === 0) {
     return null;
   }
-  return t("approvalwords.asksBecause", { what: listAnd(names.map(nameWords)) });
+  const phrases = names.map(nameWords);
+  // A name the policy raises that has no phrase here is shown as the policy wrote it, never as a program's name in a sentence.
+  if (phrases.some((phrase) => phrase === null)) {
+    return null;
+  }
+  return t("approvalwords.asksBecause", { what: listAnd(phrases) });
 }
 
 /** The risk level of a step in words: the policy's `high`, else the level it names. */
