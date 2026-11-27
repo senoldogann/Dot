@@ -172,12 +172,12 @@ struct ChatScreen: View {
                 }
             }
             .task(id: linkNow) {
-                // A state shows once it lasted a second, and goes at once: a blip of the link does not flicker the pill.
+                // A problem shows once it lasted a few seconds, and goes at once: a reconnection that mends shows nowhere.
                 guard let next = linkNow else {
                     shownLink = nil
                     return
                 }
-                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                do { try await Task.sleep(for: linkLineDelay) } catch { return }
                 shownLink = next
             }
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
@@ -386,6 +386,8 @@ struct ChatScreen: View {
             .swipeToQuote(text, quote: quoteMessage)
         case .note(_, let text):
             DotNoteRow(text: text)
+        case .automation(_, let title, let prompt):
+            RoutineRow(title: title, prompt: prompt)
         case .answer(let id, let text, let writing, let endedAt):
             VStack(alignment: .leading, spacing: Space.xxs) {
                 AnswerBody(markdown: text, writing: writing)
@@ -712,11 +714,6 @@ struct ChatScreen: View {
         if let botChat {
             BotHeader(
                 chat: botChat,
-                subtitle: chat.flatMap {
-                    freshnessLine(
-                        freshness: $0.freshness, transport: model.transport, savedAt: model.savedAt[thread], workingAt: model.workingAt[thread],
-                        now: .now)
-                },
                 find: {
                     findIndex = 0
                     finding = ""
@@ -735,16 +732,16 @@ struct ChatScreen: View {
 
     /// The link line of this moment, before the second's wait (item 1931).
     private var linkNow: LinkLine? {
-        linkLine(transport: model.transport, freshness: chat?.freshness, mac: model.macName ?? String(localized: "your Mac", comment: "The Mac when its name is not known"))
+        linkLine(transport: model.transport, mac: model.macName ?? String(localized: "your Mac", comment: "The Mac when its name is not known"))
     }
 
-    /// Whether the subtitle says what the pill does not (item 1931): since when the copy is saved while offline, that a
-    /// run worked when it was saved, a refused key, an old Dot. Reconnecting and Syncing are the pill's.
+    /// Whether the subtitle says the link: only a refused key or an old Dot, which no wait mends. Offline and an
+    /// unreachable Mac are the capsule's once they last; syncing and reconnecting show nowhere (the owner's report of
+    /// 2026-11-27).
     private var subtitleSaysTheLink: Bool {
         switch model.transport {
-        case .reconnecting: false
-        case .connecting, .up: model.workingAt[thread] != nil
-        case .offline, .keyRefused, .daemonTooOld: true
+        case .keyRefused, .daemonTooOld: true
+        case .offline, .reconnecting, .connecting, .up: false
         }
     }
 
@@ -767,14 +764,15 @@ struct ChatScreen: View {
         }
     }
 
-    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting on N helpers" while the
-    /// main run's own step only waits for its helpers (N still working); `nil` while it takes a step of its own, which
-    /// the capsule says as "Working" with the turn's clock.
+    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting on N helpers" only while
+    /// the main run has stopped and every open call of its step waits on a helper (`waitsOnHelpers`, the owner's report of
+    /// 2026-11-27; N the helpers it still waits for); `nil` while it works itself, even with helpers at work beside it,
+    /// which the capsule says as "Working" with the turn's clock and the helpers' own segment.
     private var activityWords: String? {
-        guard capsuleStatus == .working, let run = activeRun, let chat, case .tool(let step)? = activity(of: chat, run: run.id) else { return nil }
-        let working: Int = newestRunHelpers.filter { helperState($0.status).isLive }.count
-        guard working > 0, isHelperStep(step.tool) else { return nil }
-        return String(localized: "Waiting on \(working) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
+        guard capsuleStatus == .working, let run = activeRun, let chat, waitsOnHelpers(of: chat, run: run.id) else { return nil }
+        let waited: Int = newestRunHelpers.filter { helperState($0.status).isLive && $0.blocking }.count
+        guard waited > 0 else { return nil }
+        return String(localized: "Waiting on \(waited) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
     }
 
     /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none. Zen filters the

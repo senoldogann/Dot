@@ -39,6 +39,12 @@
         case jank = "n2-jank"
         /// A run that wrote its answer and finished with it in slightly other words (item 1996): the answer stands once.
         case restated = "n2-restated"
+        /// The main run has stopped and only waits for a helper it delegated to (its newest step's one open call is a
+        /// delegate): the capsule says "Waiting on 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
+        /// beside its helper and says "Working".
+        case helpersWait = "n2-helpers"
+        /// The first run a schedule fired (owner 2026-11-27): its message is the routine's compact row, not a bubble.
+        case routine = "n2-routine"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -135,24 +141,30 @@
                 self == .queue || self == .editing || self == .work
                 ? #"[{"id":"q1","thread_id":"thr_fixture","position":1,"text":"Connect everything to real data, as a Grok-like assistant would, and keep the tool calls visible","created_at":1,"source":"phone"},{"id":"q2","thread_id":"thr_fixture","position":2,"text":"Then send me the screenshots of the new designs","created_at":2,"source":"phone"}]"#
                 : "[]"
+            let sourceA: String = self == .routine ? "schedule" : "phone"
+            let schedules: String =
+                self == .routine
+                ? #"[{"schedule":{"record":{"id":"sch_1","name":"Site build check","goal":"Find out why the site's build fails on CI and fix it"}},"loop":false}]"#
+                : "[]"
             return """
                 {"revision":7,
                  "thread":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"agent_id":null},
                  "summary":null,
                  "runs":[
-                   {"id":"run_a","thread_id":"thr_fixture","goal":"Find out why the site's build fails on CI and fix it","mode":"task","model":"claude_code:opus","status":"done","created_at":\(now - 3000),"finished_at":\(now - 2866),"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":48210,"output_tokens":3120,"approvals":"auto"},
+                   {"id":"run_a","thread_id":"thr_fixture","goal":"Find out why the site's build fails on CI and fix it","mode":"task","model":"claude_code:opus","status":"done","created_at":\(now - 3000),"finished_at":\(now - 2866),"result":"","parent_run_id":null,"source":"\(sourceA)","effort":"medium","input_tokens":48210,"output_tokens":3120,"approvals":"auto"},
                    {"id":"run_b","thread_id":"thr_fixture","goal":"Book me the dentist for next week, afternoons if you can.","mode":"task","model":"claude_code:opus","status":"\(runB)","created_at":\(now - 2475),"finished_at":null,"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":3212154,"output_tokens":8132,"approvals":"auto"}
                  ],
                  "older":false,"newest":null,"newest_events":[],"newest_events_cut":false,
                  "queue":{"held":false,"messages":\(queue),"beside_run_id":"run_b","beside_thread_id":null},
                  "asks":\(asks),
                  "helpers":[
-                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
+                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":\(self == .helpersWait),"stop":"/api/runs/run_h1/cancel"},
                    {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"claude_code","model":"sonnet","effort":"low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
                  ],
                  "background":[],
                  "reactions":[{"run_id":"run_a","message":"answer","reaction":"good"}],
-                 "drafts":[]}
+                 "drafts":[],
+                 "schedules":\(schedules)}
                 """
         }
 
@@ -189,6 +201,12 @@
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"failed","result":"","error":{"kind":"model","message":"The model answered HTTP 529: overloaded. Try again in a minute."}}}"#)
             case .deleted:
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"done","result":"Booked Tuesday 14:00."}}"#)
+            case .helpersWait:
+                events.append(contentsOf: [
+                    #"{"id":29,"run_id":"run_b","ts":\#(b + 44),"kind":"tool_result","data":{"call_id":"b4","ok":true,"text":"ready"}}"#,
+                    #"{"id":30,"run_id":"run_b","ts":\#(b + 45),"kind":"assistant","data":{"text":"","step":5,"tool_calls":["delegate"]}}"#,
+                    #"{"id":31,"run_id":"run_b","ts":\#(b + 46),"kind":"tool_call","data":{"call_id":"b5","tool":"delegate","args":{"goal":"Check the dentist's free slots"}}}"#,
+                ])
             case .restated:
                 events.append(contentsOf: [
                     #"{"id":30,"run_id":"run_b","ts":\#(b + 50),"kind":"assistant","data":{"text":"Booked: Tuesday at 14:00 with Dr. Lind. ","step":5,"tool_calls":[]}}"#,

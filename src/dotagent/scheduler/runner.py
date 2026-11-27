@@ -964,11 +964,12 @@ class Scheduler:
         return configured if record.options.same_chat is None else record.options.same_chat
 
     async def _check(self, name: str) -> CheckVerdict:
-        """Run the check ``name`` (item 1855) as a run's commands start: in the sandbox while it is on, from the
-        workspace, with the environment of a run's commands."""
+        """Run the check ``name`` (item 1855) as the commands of a run nobody started start (item 2016): in the
+        sandbox while [shell] sandbox_unattended holds (else while [shell] sandbox is on), from the workspace, with the
+        environment of a run's commands."""
         return await run_check(
             name,
-            self._runtime.sandbox.current().commands,
+            self._runtime.sandbox.unattended().commands,
             workspace_dir(),
             self._runtime.shell_env,
             CHECK_TIMEOUT_S,

@@ -18,7 +18,12 @@ While a run works, its step's thinking and words stream as the model writes them
 successful, as a row of the stretch of work with its first sentence; the words at a steady pace, the newest fading in);
 in Hide all (the default) and Zen one live line under the last message says what the run does now (`WorkLineView`,
 `workNow`: typing, thinking, the command it runs, the file it reads, waiting for you), and a tap on it shows the steps.
-The floating capsule says Working with a clock that ticks every second whether events come or not. Dot's own tools
+The floating capsule says Working with a clock that ticks every second whether events come or not, and no spinner;
+"Waiting on N helpers" stands in its place only while the main run has stopped for them, every open call of its step a
+wait on a helper (`waitsOnHelpers`, DotEngine), never while it works beside them. The link to the Mac is told only when
+it is a lasting problem, and only there: Offline, or Can't reach <the Mac> once it lasted five seconds (`linkLine`,
+`linkLineDelay`); a reconnection that mends and a chat being brought up to date show nowhere, and a bot's header pill is
+always its face and name. Dot's own tools
 read as words with Dot's mark. A new chat opens as soon as its first message is sent, under the outbox's
 key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
 while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
@@ -43,9 +48,10 @@ Wave L1 (items 1800-1802): the chat list (`ChatListView`, `App/Live.swift`, self
 it) selects several chats (Select in the bar or on a row's menu) and pins or deletes them together, with a Pinned
 section on top. The composer's model chip, and a new chat before its first message, open the chat's settings
 (`App/ChatSettingsSheet.swift`, rules in `ChatSettingsRules.swift`) on the app's one model catalog
-(`Components/ModelCatalog.swift`): the recent models, the providers as folding groups with their marks, Default, ✓ and ☆
-favourites, a search with a filter, the reasoning level on the model's own levels, fast mode, the approval mode, plan
-first and hidden models; the picks go to the chat's choices or with a new chat's first message (`POST /api/runs`). The
+(`Components/ModelCatalog.swift`), as inset groups the way iOS draws its settings: the recent models, Options (the
+reasoning level as a menu of the model's own levels in full words, fast mode only for a model that has it, the approval
+mode, plan first), the providers as folding groups, each model with its provider's mark, "Default" under the main one, ✓
+on the chosen one and a quiet ★ on a favourite (a long press stars it), a search with a filter, and hidden models; the picks go to the chat's choices or with a new chat's first message (`POST /api/runs`). The
 microphone turns the composer into a recorder (`Components/VoiceRecorder.swift`, `Data/VoiceInput.swift`): ✕, a live
 waveform, a clock, ✓; written down on the phone (Speech, on the device, a long dictation going on across the recognizer's
 pauses) or on the Mac (`/api/voice/streams`), as Settings › Voice says (`Settings/VoicePage.swift`, with the preferred

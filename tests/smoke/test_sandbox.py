@@ -83,6 +83,7 @@ async def _nobody(request: ReviewRequest) -> ReviewVerdict:
 
 
 async def _context(runtime: Runtime, approvals: ApprovalMode) -> ToolContext:
+    """The context of a run the owner started (a message of theirs)."""
     thread: ThreadRecord = await runtime.store.create_thread("sandbox", "test")
     run: RunRecord = await runtime.store.create_run(
         thread.id,
@@ -230,6 +231,37 @@ async def test_a_command_of_a_run_neither_reads_nor_changes_dots_own_files_whate
     assert await asyncio.to_thread(config_path().read_text, encoding="utf-8") == settings
     assert everyday.startswith("[exit 0") and "fine" in everyday, everyday
     assert TOKEN in await _run(await _context(runtime, "yolo"), "shell", {"command": f"python3 {script}"})
+
+
+async def _unattended(runtime: Runtime, approvals: ApprovalMode) -> ToolContext:
+    """The context of a run nobody started (a schedule's, a watcher's, Dot's own initiative): item 2016."""
+    return dataclasses.replace(await _context(runtime, approvals), unattended=True)
+
+
+@pytest.mark.parametrize("approvals", get_args(ApprovalMode))
+async def test_a_run_nobody_started_keeps_the_sandbox_in_every_mode_whatever_the_owners_switch_says(
+    runtime: Runtime, approvals: ApprovalMode
+) -> None:
+    """Item 2016: a run of a schedule, a watcher, a hook or Dot's own initiative starts its processes in the sandbox in
+    yolo too, and with the owner's [shell] sandbox switched off; a run the owner started in yolo does not."""
+    script: Path = workspace_dir() / "peek.py"
+    await asyncio.to_thread(script.write_text, f"print(open({str(token_path())!r}).read())\n", encoding="utf-8")
+    command: dict[str, str] = {"command": f"python3 {shlex.quote(str(script))}"}
+    await runtime.sandbox.switch(False)
+    try:
+        ctx: ToolContext = await _unattended(runtime, approvals)
+        read: str = await _run(ctx, "shell", command)
+        searched: str = await _search(ctx, _matching(TOKEN), dot_home())
+        opened: str = await _run(ctx, "terminal_open", {"command": f"cat {shlex.quote(str(token_path()))}"})
+        everyday: str = await _run(ctx, "shell", {"command": "echo fine > fine.txt && cat fine.txt"})
+        owners: str = await _run(await _context(runtime, "yolo"), "shell", command)
+    finally:
+        await runtime.sandbox.switch(True)
+    assert _refused(read) and TOKEN not in read, read
+    assert _refused(searched) and TOKEN not in searched, searched
+    assert _refused(opened) and TOKEN not in opened, opened
+    assert everyday.startswith("[exit 0") and "fine" in everyday, everyday
+    assert TOKEN in owners, owners
 
 
 @pytest.mark.parametrize("approvals", [mode for mode in get_args(ApprovalMode) if mode != "yolo"])

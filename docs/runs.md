@@ -533,7 +533,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the packages and builds of a project such as `node_modules`, item 1088; a full path in words may go through a folder
   of capitalised words such as `Application Support`), and the eye on a file's row in the
   Changes tab, which shows the file as it is now without opening its diff. The Task tab's list of the conversation's files went
-  with item 544. The panel takes half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
+  with item 544. A file's row in the Changes tab (and in the iPhone app's This chat sheet, whose
+  sections all start folded with their count) opens on its change read by its format (item 2017): a file changed
+  as a diff in a monospaced view that never wraps (it scrolls sideways), with both line numbers, a + or − and a green or
+  red tint for a line added or removed, a hunk's head as a quiet band and the code coloured by its language (Python,
+  JavaScript, TypeScript, Swift, JSON, TOML, YAML, shell, Markdown, HTML and XML, CSS, Rust, Go); a file the runs made
+  as the file, numbered from 1 with no sign on each line, a Markdown file formatted with its source a press away and
+  JSON laid out in its own key order; an image or a PDF opens as the file it is now. The rows are drawn as they come
+  into view, so a file of thousands of lines opens at once. The panel takes half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
   daemon draws with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused
   rather than drawn (item 386). A Word document, an Excel
   workbook and a presentation show first as macOS's Quick Look draws them (item 268), as Finder would: their fonts,
@@ -1159,10 +1166,12 @@ helper off and Dot resumed it. A helper is not resumed when `[agent] resume` is 
 restarts), or when a call that pays, sends or posts for you was cut while it ran (a second try could send twice): its
 chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the
 work again rather than taking it as a failed part. A helper the run still waited for when the daemon stopped ends with
-that run, whose own resume note names the cut `delegate` call. The line over the
-composer says "Waiting on N helpers" only while the run is blocked on them, "N helpers keep working in the
-background" once it was released, and nothing when none work; on a phone (item 1383) the same words are the first line
-of the sheet that the capsule's **N helpers** segment opens, which also names what each helper does now and has
+that run, whose own resume note names the cut `delegate` call. The bar over the
+composer says "Waiting on N helpers" in place of Working only while the run has stopped for them (every call of its
+step that has no answer yet waits on a helper; while a command of the same step still runs, or the model thinks, it
+says Working and the helpers keep their own part), with no spinner, and the line over it says what the first helper
+does now; "N helpers keep working in the background" once it was released, and nothing when none work; on a phone
+(item 1383) the capsule's status says the same, and its **N helpers** segment opens a sheet whose first line it is, which also names what each helper does now and has
 **Details** and **Stop**. Calls of `fan_out`, `message_agent` and the work orders
 keep waiting as before. The helper of a run of one of your agents carries the agent's id (item 553): its tools are those the
 agent is bound to, as its parent's are, and its prompt holds the agent's instructions. A step it hands to you, or a

@@ -1,8 +1,9 @@
 """The Changes of a chat in the side panel (item 368): the file a run created and edited, with its lines added and
 removed, opening on its diff, and the tab counting the files; the same from `GET /api/runs/{id}/changes`. A file there
 shows as it is now from its row, a web page drawn in a sandboxed frame, and a file the answer names by its name, in
-words or in code, from the answer (item 1077). Wide and light, and on a phone and dark. A real server on a scripted
-model."""
+words or in code, from the answer (item 1077). An opened change reads by its format (item 2017): a file changed
+as a diff with its line numbers, signs and colours, a new file as the file, a new Markdown file formatted with its
+source a press away. At 1440x900 and light, and at 390x844 and dark. A real server on a scripted model."""
 
 import asyncio
 import time
@@ -41,6 +42,9 @@ PAGE: str = (
     '<script>document.getElementById("line").textContent = "ran"; location = "http://127.0.0.1:9/"</script>\n'
 )
 ANSWER: str = "The notes are written in notes.md, and the page in `page.html`."
+# A file that was there before the run, which the run edits: its change is a diff. And a new Python file.
+APP_BEFORE: str = "import sys\n\n\ndef main() -> int:\n    x = 1\n    return x\n"
+TOOL: str = "import os\n\n\ndef main() -> None:\n    print(os.getcwd())\n"
 
 
 def _call(tool: str, arguments: dict[str, object]) -> ScriptedTurn:
@@ -52,6 +56,8 @@ def _script() -> list[ScriptedTurn]:
         _call("write_file", {"path": "notes.md", "content": "one\ntwo\nthree\n"}),
         _call("edit_file", {"path": "notes.md", "old": "two", "new": "2"}),
         _call("write_file", {"path": "site/page.html", "content": PAGE}),
+        _call("edit_file", {"path": "app.py", "old": "x = 1", "new": "x = 2"}),
+        _call("write_file", {"path": "tool.py", "content": TOOL}),
         _call(FINISH_TOOL, {"answer": ANSWER, "success": True}),
     ]
 
@@ -68,6 +74,8 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
+    (home / "workspace").mkdir(exist_ok=True)
+    (home / "workspace" / "app.py").write_text(APP_BEFORE, encoding="utf-8")
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
     await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script()))
     try:
@@ -127,7 +135,7 @@ async def test_the_api_lists_the_file_with_its_counts_and_its_diff(served: tuple
         answer = await client.get(f"/api/runs/{run.id}/changes")
     assert answer.status_code == 200, answer.text
     view = answer.json()
-    assert (view["added"], view["removed"]) == (4, 0)
+    assert (view["added"], view["removed"]) == (10, 1)
     [file] = [file for file in view["files"] if file["path"].endswith("notes.md")]
     assert file["path"].endswith("/workspace/notes.md")
     assert (file["created"], file["gone"], file["changes"], file["note"]) == (True, False, 2, None)
@@ -142,9 +150,9 @@ async def test_the_changes_tab_counts_the_files_and_opens_each_on_its_diff(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch()
         try:
-            for width, scheme in ((1280, "light"), (390, "dark")):
+            for width, height, scheme in ((1440, 900, "light"), (390, 844, "dark")):
                 context = await browser.new_context(
-                    viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+                    viewport={"width": width, "height": height}, color_scheme=scheme, reduced_motion="reduce"
                 )
                 page: Page = await context.new_page()
                 errors: list[str] = []
@@ -160,20 +168,26 @@ async def test_the_changes_tab_counts_the_files_and_opens_each_on_its_diff(
                 if width < 960:
                     await page.locator("button[aria-label='Task details']").click()
                 tab: Locator = page.get_by_role("tab", name="Changes")
-                await expect(tab).to_contain_text("2")
+                await expect(tab).to_contain_text("4")
                 await tab.click()
                 section: Locator = page.locator("#panel-run-changes")
-                await expect(section.locator("details.change")).to_have_count(2)
+                await expect(section.locator("details.change")).to_have_count(4)
+                # Every file starts closed, and what it shows is drawn once it is opened (item 674).
+                await expect(section.locator("details.change[open]")).to_have_count(0)
+                await expect(section.locator(".code-view")).to_have_count(0)
                 row: Locator = section.locator("details.change").filter(has_text="notes.md")
                 await expect(row.locator(".change-name")).to_have_text("notes.md")
                 await expect(row.locator(".badge")).to_have_text("created")
                 await expect(row.locator(".change-add")).to_have_text("+3")
                 await expect(row.locator(".change-del")).to_have_count(0)
-                # The lines of the diff are drawn once the file is opened (item 674).
-                await expect(row.locator(".diff-line")).to_have_count(0)
+                # A new Markdown file reads formatted, its source a press away, numbered and with no sign.
                 await row.locator(".change-head").click()
-                await expect(row.locator(".diff-add")).to_have_text(["+one", "+2", "+three"])
-                box = await row.locator(".diff").bounding_box()
+                await expect(row.locator(".change-markdown .file-markdown")).to_contain_text("three")
+                await row.get_by_role("button", name="Source").click()
+                await expect(row.locator(".code-row .code-text")).to_have_text(["one", "2", "three"])
+                await expect(row.locator(".code-sign")).to_have_count(0)
+                await _code_views(section, width)
+                box = await row.locator(".change-body").bounding_box()
                 assert box is not None and box["x"] + box["width"] <= width, box
                 await page.screenshot(path=str(tmp_path / f"changes-{width}-{scheme}.png"))
                 await _previews(page, section, tmp_path / f"page-{width}-{scheme}.png")
@@ -181,6 +195,30 @@ async def test_the_changes_tab_counts_the_files_and_opens_each_on_its_diff(
                 await context.close()
         finally:
             await browser.close()
+
+
+async def _code_views(section: Locator, width: int) -> None:
+    """A file changed opens on its diff: both line numbers, a sign and a tint for a line added or removed, the code
+    coloured, no line wrapped, the view no wider than the page; a new Python file reads as the file, numbered from 1."""
+    app: Locator = section.locator("details.change").filter(has_text="app.py")
+    await app.locator(".change-head").click()
+    view: Locator = app.locator(".code-view")
+    await expect(view).to_have_attribute("data-signed", "true")
+    await expect(view.locator(".code-removed .code-text")).to_have_text(["    x = 1"])
+    await expect(view.locator(".code-added .code-text")).to_have_text(["    x = 2"])
+    await expect(view.locator(".code-added .code-sign")).to_have_text("+")
+    await expect(view.locator(".code-removed .code-num")).to_have_text(["5", ""])
+    await expect(view.locator(".code-added .code-num")).to_have_text(["", "5"])
+    await expect(view.locator(".tok-keyword").first).to_have_text("def")
+    assert await view.locator(".code-text").first.evaluate("node => getComputedStyle(node).whiteSpace") == "pre"
+    box = await view.bounding_box()
+    assert box is not None and box["x"] + box["width"] <= width, box
+    tool: Locator = section.locator("details.change").filter(has_text="tool.py")
+    await tool.locator(".change-head").click()
+    await expect(tool.locator(".code-view")).to_have_attribute("data-signed", "false")
+    await expect(tool.locator(".code-row")).to_have_count(5)
+    await expect(tool.locator(".code-num").first).to_have_text("1")
+    await expect(tool.locator(".code-sign")).to_have_count(0)
 
 
 async def _previews(page: Page, section: Locator, shot: Path) -> None:

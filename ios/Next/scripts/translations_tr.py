@@ -956,8 +956,6 @@ TR: dict[str, str] = {
     'What %@ did': '%@ ne yaptı',
     'All chats': 'Tüm sohbetler',
     'the Agents page': 'Ajanlar sayfası',
-    'Activity comes in the next version': 'Etkinlik bir sonraki sürümde geliyor',
-    'What Dot does on its own (schedules, helpers, drafts that wait) will show here.': "Dot'un kendi başına yaptıkları (zamanlanmış görevler, yardımcılar, bekleyen taslaklar) burada görünecek.",
     'What should it do?': 'Ne yapmalı?',
     'You': 'Sen',
     'Your Mac': "Mac'in",
@@ -1227,6 +1225,9 @@ TR.update(
         "User input needed": "Senden bir cevap bekleniyor",
         "%lld / %lld": "%lld / %lld",
         "Submit answers": "Yanıtları gönder",
+        "Default (%@)": "Varsayılan (%@)",
+        "Favourite": "Favori",
+        "Can't reach %@": "%@ cihazına ulaşılamıyor",
         "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
         "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
         "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
@@ -1695,4 +1696,41 @@ TR.update(
         "Resume bot": "Botu sürdür",
     }
 )
+# A change opened from This chat, its folded sections (CH1, item 2017).
+TR.update(
+    {
+        "No diff to show": "Gösterilecek fark yok",
+        "Loading the change": "Değişiklik yükleniyor",
+        "View": "Görünüm",
+        "Formatted": "Biçimli",
+        "Source": "Kaynak",
+        "Deleted": "Silindi",
+        "New · %lld lines": "Yeni · %lld satır",
+        "Lines from %lld": "%lld. satırdan itibaren",
+        "Added, line %lld: %@": "Eklendi, satır %1$lld: %2$@",
+        "Removed, line %lld: %@": "Silindi, satır %1$lld: %2$@",
+        "Line %lld: %@": "Satır %1$lld: %2$@",
+        # In the catalogue since item 1967 without its line here, which stopped apply_translations.py.
+        "Show cards": "Kart göster",
+    }
+)
+EN_PLURALS.update({"New · %lld lines": ("New · %lld line", "New · %lld lines")})
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+# Chat settings as inset groups, the capsule without a spinner (the owner's report of 2026-11-27).
+
+# HS1 (2026-11-27): empty states in the app's own type.
+TR.update(
+    {
+        "Check the spelling or try a new search.": "Yazımı kontrol edin ya da yeni bir arama deneyin.",
+    }
+)
+
+# HS1 (2026-11-27): a routine's message in a chat.
+TR.update(
+    {
+        "Routine": "Rutin",
+        "Routine: %@": "Rutin: %@",
+        "Hides the message": "Mesajı gizler",
+        "Shows the whole message": "Mesajın tamamını gösterir",
+    }
+)

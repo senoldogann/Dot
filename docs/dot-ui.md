@@ -136,25 +136,27 @@ and made again, after 0.5, 1, 2, 4, 8 and 15 s, from the last event, with `Last-
 kept by `js/outbox.js` (the rules are `js/outboxrules.js`) and shown under the chat by `js/outboxrows.js`: a message as
 *Waiting to send* with Retry now and Edit, sent once with its key when the link is back (item 1523). The line under the
 bar (`js/connectionline.js`, in the bar's own header, a row of its own for *Offline* and a refused key, floating over the room
-under the bar for *Reconnecting…* so that nothing read moves; the words are `js/linewords.js`) says *Offline: showing saved chats,
-last updated 3 min ago*, *Offline: 2 waiting to send*, *Reconnecting…* or *This phone's key was refused* (item 1524), and a
+under the bar for *Can't reach Dot* so that nothing read moves; the words are `js/linewords.js`) says *Offline: showing saved chats,
+last updated 3 min ago*, *Offline: 2 waiting to send*, *Can't reach Dot* or *This phone's key was refused* (item 1524), and a
 failed request shows no toast over the chat while it does. See [On a bad link: the web app](phone.md).
 
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)
 
 The run page is drawn as a developer tool draws a thread, plain and professional, the same language on a Mac and on a
-phone: what you wrote is a raised, rounded box; what Dot says is plain text with no bubble; the steps of a turn are one
+phone: what you wrote is a raised, rounded box, and a routine's message (item 2021) a compact "Routine" row on that
+surface that unfolds its words; what Dot says is plain text with no bubble; the steps of a turn are one
 quiet line each. The modules of the conversation and the panel, and what each holds:
 
 | Module | What it draws |
 |---|---|
 | `timeline.js` | The turn by turn flow; a group of helpers is one card (`buildFlock`): faces, "2 helpers", "2 working" in blue, the time, and a row each (`childScope`): the job, what it does now (`callPhrase` of `workstatus.js`), its state in a word beside the time. |
-| `capsule.js` | The bar over the composer, and above it the line "Waiting on 2 helpers" with Details and Stop; once the run was released from its wait (a message of yours, item 1351) the line says "2 helpers keep working in the background" (`waitcounts.js` counts which). A pane in the dock on the bar's own ground (item 1347). A window wider than a phone's (721 px up) draws it; a phone's chat draws `dockbar.js` instead. |
+| `capsule.js` | The bar over the composer, whose status says "Waiting on 2 helpers" only while the run has stopped for them (`waitsOnHelpers` in `waitcounts.js`) and no spinner, and above it the line of what the first helper does now with Details and Stop; once the run was released from its wait (a message of yours, item 1351) the line says "2 helpers keep working in the background" (`waitcounts.js` counts which). A pane in the dock on the bar's own ground (item 1347). A window wider than a phone's (721 px up) draws it; a phone's chat draws `dockbar.js` instead. |
 | `dockbar.js`, `dockwords.js` | A phone's one row over the composer (item 1383): a capsule of glass whose segments are the run's status with its Stop, the plan, helpers, loops, the queue and the commands at work, each there only while it has something to say, with the round way down beside it. `dockwords.js` says which segments there are and their words from what the page knows (pure, `tests/js/dockwords.test.js`); `dockbar.js` draws them and says fewer words, step by step, until the row fits (never a scroll). |
 | `docksheet.js` | The one sheet of a phone's chat: a segment of the capsule opens its detail from the foot of the screen, one at a time, closed by a tap outside, Escape, its handle or a swipe down. The queue, the loops and the commands at work stand in it as the very panes (`queue.js`, `loops.js`, `background.js`) that stay over the composer on a computer; the helpers and the plan are drawn from their words. |
 | `inspector.js` | The side panel, closed by default: one rounded card in two parts, a head that stays (the tabs as a segmented switch, and on a phone the grabber and Close) and a body that scrolls (`.inspector-body`), whose sections each have a small sticky head (`.panel-section-head`: title, count, buttons on one line) over tight rows on the 8 px scale. A sheet from the foot on a phone. |
 | `prose.js`, `linkpill.js` | A link in a message (a markdown link or an autolink, in what you wrote and in what Dot says) is plain words: no frame, no fill and no icon, in the text's ink tilted toward the accent (`.msg-link`; a shade brighter in dark, more saturated in light, above 4.5:1 on every ground), underlined only under the pointer and with the focus, which keeps the page's ring. It opens in a new window, and its label is the link's words, `#1001` for a GitHub pull request or issue, or the site's name for a bare address (`data-words` keeps the words as written for a copy). Dot asks no site for an icon. |
 | `agentlist.js` | The **Lineage** ("Lineage · 2 running": the task that leads and its helpers) and the fold of the previous agents; the Task tab has it compact, the Agents tab in full. |
+| `routinewords.js`, `messages.js` (`routineMessage`) | The row of a message a routine sent (a run of source `schedule` or `watcher`, item 2021): `.routine`, a `details` whose head says "Routine" and the title (the chat's schedule's name from `GET /api/threads/{id}/automations`, else the words' first sentence, `routineTitle`) and whose body is the whole message. |
 | `automations.js`, `automationwords.js` | The **Automations** of the chat in the Task tab: its schedules and loops, each with a pencil (`#/settings/schedules/<id>`, the schedule's editor page), a play and a switch, from `GET /api/threads/{id}/automations`. |
 
 Colours and radii of these are tokens (`var(--accent-strong)` for the colour of work, `--ok`, `--bad`, `--border`,

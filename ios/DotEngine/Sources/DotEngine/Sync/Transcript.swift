@@ -204,6 +204,9 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     /// A call the run told as one of Dot's short messages, which its step's own words did not tell (a `narration` event,
     /// item 1976): drawn in the conversation of "Show steps" off alone, in the words of the live line for that call.
     case narration(id: String, step: HelperStep)
+    /// The message a routine sent into the chat (a schedule's, a watcher's or a hook's run, owner 2026-11-27): one compact
+    /// row, "Routine · <its title>", whose chevron shows the whole `prompt`; never an owner's bubble.
+    case automation(id: String, title: String, prompt: String)
     /// The helpers a run started, each with its current step (plan §18).
     case helpers(id: String, runId: String, helpers: [HelperView])
     /// The run's plan as a checklist, as it stands now.
@@ -218,7 +221,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .owner(let id, _, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
-            .limit(let id, _), .narration(let id, _):
+            .limit(let id, _), .narration(let id, _), .automation(let id, _, _):
             id
         case .tool(let entry): entry.id
         case .decision(let anchor): anchor.id
@@ -270,7 +273,7 @@ private func builtRuns(of chat: ChatProjection, streaming: Bool, context: Transc
         BuiltRun(
             rows: runItems(
                 run, timeline: chat.runs[run.id], writing: streaming ? chat.writing[run.id] : nil, thinking: streaming ? chat.thinking[run.id] : nil,
-                helpers: helpers.filter { $0.parentRunId == run.id }, context: context),
+                helpers: helpers.filter { $0.parentRunId == run.id }, schedules: chat.view?.schedules ?? [], context: context),
             finished: !run.isActive || hasEnded(chat.runs[run.id]))
     }
 }
@@ -370,11 +373,30 @@ private func hasEnded(_ timeline: RunTimeline?) -> Bool {
     timeline?.events.contains { $0.kind == "run_finished" } ?? false
 }
 
+/// The sources of the runs a routine started, not the owner: a schedule's firing (a hook's too) and a watcher's.
+let routineSources: Set<String> = ["schedule", "watcher"]
+
+/// The title of a routine's message: the name of the chat's schedule that sends these words, else of its one schedule,
+/// else the words' first sentence (`shortTitle`). Pure.
+func routineTitle(goal: String, schedules: [ChatSchedule]) -> String {
+    if let named = schedules.first(where: { $0.goal == goal }) ?? (schedules.count == 1 ? schedules.first : nil), !named.name.isEmpty {
+        return named.name
+    }
+    return shortTitle(goal)
+}
+
 private func runItems(
-    _ run: RunRecord, timeline: RunTimeline?, writing: String?, thinking: LiveThought?, helpers: [HelperView], context: TranscriptContext) -> [Built] {
-    // A run a helper's report started (item 1351) begins with Dot's note, not the owner's words.
+    _ run: RunRecord, timeline: RunTimeline?, writing: String?, thinking: LiveThought?, helpers: [HelperView], schedules: [ChatSchedule],
+    context: TranscriptContext
+) -> [Built] {
+    // A run a helper's report started (item 1351) begins with Dot's note, not the owner's words; one a routine started
+    // with the routine's row.
     let opening: TranscriptItem =
-        run.source == "helper_report" ? .note(id: "u:\(run.id)", text: run.goal) : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil, files: [])
+        run.source == "helper_report"
+        ? .note(id: "u:\(run.id)", text: run.goal)
+        : routineSources.contains(run.source)
+            ? .automation(id: "u:\(run.id)", title: routineTitle(goal: run.goal, schedules: schedules), prompt: run.goal)
+            : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil, files: [])
     // A run that follows the owner's reaction (item 844) draws no message of the owner's: the reaction stands on its message.
     // Nor does an agent's first meeting (item 993, source `welcome`): its goal is Dot's words to the agent, and the agent
     // speaks first (item 1881).
@@ -683,4 +705,30 @@ public func activity(of chat: ChatProjection, run: String) -> RunActivity? {
         return .tool(step)
     }
     return nil
+}
+
+/// The tools whose open call holds a run until a helper ends: `delegate` (unless it asked for no wait) and the agent
+/// tools of the coding CLIs.
+public let helperWaitTools: Set<String> = ["delegate", "message_agent", "task", "agent"]
+
+/// Whether `run` of `chat` has stopped and only waits for its helpers: it writes and thinks nothing, and every call of
+/// its newest step that has no result yet waits on a helper (`helperWaitTools`; a `delegate` with `wait` false does not).
+/// `false` while any other call of that step runs, while it has no open call, and once it ended: then it works or
+/// rests. The capsule says "Waiting on N helpers" only while this holds (the owner's report of 2026-11-27). Pure.
+public func waitsOnHelpers(of chat: ChatProjection, run: String) -> Bool {
+    if let words: String = chat.writing[run], !words.isEmpty { return false }
+    if let thought: LiveThought = chat.thinking[run], !thought.text.isEmpty { return false }
+    let events: [EventRecord] = chat.runs[run]?.events ?? []
+    guard !events.contains(where: { $0.kind == "run_finished" }) else { return false }
+    let since: ArraySlice<EventRecord> = events[((events.lastIndex { $0.kind == "assistant" }) ?? -1) + 1..<events.count]
+    let done: Set<String> = Set(since.filter { $0.kind == "tool_result" }.compactMap { $0.data["call_id"]?.string })
+    let open: [EventRecord] = since.filter { event in
+        guard event.kind == "tool_call", let tool: String = event.data["tool"]?.string, !silentTools.contains(tool) else { return false }
+        guard let call: String = event.data["call_id"]?.string else { return true }
+        return !done.contains(call)
+    }
+    return !open.isEmpty && open.allSatisfy { event in
+        let tool: String = event.data["tool"]?.string?.lowercased() ?? ""
+        return helperWaitTools.contains(tool) && event.data["args"]?.object?["wait"]?.bool != false
+    }
 }

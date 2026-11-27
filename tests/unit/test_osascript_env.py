@@ -10,6 +10,7 @@ import pytest
 
 from dotagent.config import load_default_config
 from dotagent.desktop.script import run_osascript
+from dotagent.policy.sandbox import UNSANDBOXED, SwitchedSandbox
 from dotagent.tools.apple import build_apple_tool
 from dotagent.tools.context import ToolContext
 
@@ -44,10 +45,15 @@ async def test_the_apple_script_tool_gives_its_script_the_environment_of_a_runs_
         ToolContext,
         SimpleNamespace(
             runtime=SimpleNamespace(
-                config=load_default_config(), shell_env=_commands_env(), protected=(), dot_paths=(), sandbox=None
+                config=load_default_config(),
+                shell_env=_commands_env(),
+                protected=(),
+                dot_paths=(),
+                sandbox=SwitchedSandbox(UNSANDBOXED, False, False),
             ),
             workspace=Path("/nonexistent-workspace"),
             approvals="yolo",
+            unattended=False,
         ),
     )
     prepared = await tool.prepare({"script": _ECHO}, ctx)
