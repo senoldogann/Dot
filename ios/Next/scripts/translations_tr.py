@@ -139,7 +139,6 @@ TR: dict[str, str] = {
     "Paste image": "Görseli yapıştır",
     "Pin: Dot keeps a note of it": "İğnele: Dot bunu not eder",
     "Plan": "Plan",
-    "Plan · %lld of %lld done": "Plan · %lld / %lld bitti",
     "Previous ask": "Önceki soru",
     "Queue a message": "Mesajı sıraya al",
     "Queue: starts after this run": "Sıraya al: bu çalışmadan sonra başlar",
