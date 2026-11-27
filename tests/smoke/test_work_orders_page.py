@@ -22,7 +22,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import AgentRecord, ObjectiveNote, ObjectiveWorkflow, WorkOrderRecord
+from dotagent.store.models import AgentRecord, ObjectiveNote, ObjectiveWorkflow, RunRecord, WorkOrderRecord
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -219,7 +219,7 @@ async def test_a_next_step_written_after_outside_content_is_marked(runtime: Runt
 
 @pytest.mark.parametrize(("width", "phone"), [(1280, False), (390, True)])
 async def test_an_agents_page_lists_its_own_work_as_the_phones_profile_does(
-    runtime: Runtime, client: httpx.AsyncClient, width: int, phone: bool
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path, width: int, phone: bool
 ) -> None:
     """Item 2035: an agent's page has a Work section with its open work orders, its active objectives and today's
     hand-offs, each counted and a link to a page scoped to the agent (open, then finished; active, then finished), as
@@ -240,6 +240,75 @@ async def test_an_agents_page_lists_its_own_work_as_the_phones_profile_does(
     )
     await store.move_work_order(done.id, "cancelled", ("assigned",))
     await store.add_work_order(other.id, f"Not the scout's {width}", "Brief.", "Done.", None, None, None, None, False)
+    # Two hand-offs of the day: Dot asks the scout (answered), then the scout asks Dot (at work), a second later.
+    chat = await store.create_thread(f"Scouting {width}", "ui")
+    lead: RunRecord = await store.create_run(
+        chat.id,
+        "Hand out the scouting",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "ui",
+        "medium",
+        "standard",
+        None,
+        "yolo",
+        False,
+        None,
+        None,
+        None,
+    )
+    await store.finish_run(lead.id, "done", "Handed out.")
+    asked: RunRecord = await store.create_run(
+        chat.id,
+        f"Which markets first {width}?",
+        "task",
+        SCRIPTED_MODEL,
+        lead.id,
+        "team",
+        "medium",
+        "standard",
+        None,
+        "yolo",
+        False,
+        None,
+        agent.id,
+        None,
+    )
+    await store.finish_run(asked.id, "done", "Berlin and Lisbon.")
+    await asyncio.sleep(1.1)
+    scout_run: RunRecord = await store.create_run(
+        chat.id,
+        "The scout's own run",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "ui",
+        "medium",
+        "standard",
+        None,
+        "yolo",
+        False,
+        None,
+        agent.id,
+        None,
+    )
+    await store.create_run(
+        chat.id,
+        f"Is the budget fixed {width}?",
+        "task",
+        SCRIPTED_MODEL,
+        scout_run.id,
+        "team",
+        "medium",
+        "standard",
+        None,
+        "yolo",
+        False,
+        None,
+        None,
+        None,
+    )
     playwright, browser = await _launch(runtime)
     try:
         context: BrowserContext = await browser.new_context(
@@ -254,8 +323,8 @@ async def test_an_agents_page_lists_its_own_work_as_the_phones_profile_does(
         work = page.locator('[data-section="work"]')
         await expect(work.locator('[data-work="orders"]')).to_contain_text("1 open", timeout=_WAIT_S * 1000)
         await expect(work.locator('[data-work="objectives"]')).to_contain_text("1 active")
-        await expect(work.locator('[data-work="handoffs"]')).to_contain_text("None")
-        await page.screenshot(path=f"/tmp/agent-work-{width}.png")
+        await expect(work.locator('[data-work="handoffs"]')).to_contain_text("2 today")
+        await page.screenshot(path=str(tmp_path / f"agent-work-{width}.png"))
         await work.locator('[data-work="orders"]').click()
         await expect(page).to_have_url(f"http://{host}:{port}/#/agents/{agent.id}/orders")
         groups = page.locator(".agent-work-group")
@@ -267,8 +336,23 @@ async def test_an_agents_page_lists_its_own_work_as_the_phones_profile_does(
         await expect(page.locator(".agent-work")).not_to_contain_text(f"Not the scout's {width}")
         await page.goto(f"http://{host}:{port}/#/agents/{agent.id}/objectives")
         await expect(page.locator(".agent-work-group").first).to_contain_text(f"Map the market {width}")
+        # The hand-offs: received, then sent to others, with no badge; the Handoffs page has the day newest first.
         await page.goto(f"http://{host}:{port}/#/agents/{agent.id}/handoffs")
-        await expect(page.locator(".agent-work")).to_contain_text("No hand-offs today")
+        groups = page.locator(".agent-work-group")
+        await expect(groups).to_have_count(2)
+        await expect(groups.first).to_contain_text("Received")
+        await expect(groups.first).to_contain_text(f"Which markets first {width}?")
+        await expect(groups.last).to_contain_text("Sent to others")
+        await expect(groups.last).to_contain_text(f"Is the budget fixed {width}?")
+        await expect(page.locator(".team-row .badge")).to_have_count(0)
+        await page.goto(f"http://{host}:{port}/#/team")
+        rows = page.locator(".team-row")
+        await expect(rows.first).to_contain_text(f"Is the budget fixed {width}?")
+        texts: list[str] = await rows.all_inner_texts()
+        newer = next(i for i, text in enumerate(texts) if f"Is the budget fixed {width}?" in text)
+        older = next(i for i, text in enumerate(texts) if f"Which markets first {width}?" in text)
+        assert newer < older, texts
+        await expect(page.locator(".team-row .badge")).to_have_count(0)
         assert await page.evaluate(_SIDEWAYS) <= 1
     finally:
         await browser.close()

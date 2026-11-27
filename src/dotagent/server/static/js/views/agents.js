@@ -1410,7 +1410,21 @@ export function homeSection(key, title, rows, folds, toggle) {
 
 /** The agent's work (item 2035), three rows as the phone's bot profile has them: its open work orders, its active
  * objectives and today's hand-offs, each counted, each a link to its own page. */
-function workSection(agentId, counts) {
+function workCounts(agentId, orders, objectives, team) {
+  const { received, sent } = agentHandoffs(agentId, team.messages);
+  return {
+    error: null,
+    orders: agentOrders(agentId, orders).filter(orderOpen).length,
+    objectives: agentObjectives(agentId, orders, objectives).filter((objective) => objective.status === "active").length,
+    handoffs: received.length + sent.length,
+  };
+}
+
+/** The Work section; `counts.error` (the lists could not be read) is said in it, with `retry`. */
+function workSection(agentId, counts, retry) {
+  if (counts.error !== null) {
+    return el("div", { class: "home-today-section", "data-section": "work" }, el("h2", { class: "section-label" }, t("views.agentwork.work")), errorPanel(counts.error, retry));
+  }
   const row = (kind, mark, title, count, words) =>
     el(
       "a",
@@ -1634,19 +1648,18 @@ function mountPage(root, ctx, agentId) {
           console.warn("the templates could not be listed", error);
           return [];
         }),
-        // What the agent is handed and passes on (item 2035), counted on its page as the phone's profile counts it.
-        Promise.all([api.get("/work-orders"), api.get("/objectives"), api.get("/team")]),
+        // What the agent is handed and passes on (item 2035), counted on its page as the phone's profile counts it; a
+        // list that cannot be read says so in the Work section alone, and the page stands.
+        Promise.all([api.get("/work-orders"), api.get("/objectives"), api.get("/team")]).then(
+          (lists) => ({ lists, error: null }),
+          (error) => ({ lists: null, error }),
+        ),
       ]);
       const own = schedules.filter((view) => view.record.options.agent_id === agentId);
       const name = detail.record.name.trim().toLowerCase();
       const template = templates.find((each) => each.name.toLowerCase() === name && each.cron !== "") ?? null;
       const suggested = template !== null && !own.some((view) => view.record.goal === template.task) ? template : null;
-      const [orders, objectives, team] = work;
-      const counts = {
-        orders: agentOrders(agentId, orders).filter(orderOpen).length,
-        objectives: agentObjectives(agentId, orders, objectives).filter((objective) => objective.status === "active").length,
-        handoffs: (({ received, sent }) => received.length + sent.length)(agentHandoffs(agentId, team.messages)),
-      };
+      const counts = work.lists === null ? { error: work.error } : workCounts(agentId, ...work.lists);
       return disposed || mine !== ticket ? null : { ...detail, schedules: own, suggested, work: counts };
     } catch (error) {
       if (!disposed && mine === ticket) {
@@ -1678,7 +1691,7 @@ function mountPage(root, ctx, agentId) {
       },
     });
     const parts = [
-      workSection(detail.record.id, detail.work),
+      workSection(detail.record.id, detail.work, () => attempt(reload)),
       homeSection(
         "schedules",
         t("views.agents.schedules"),
