@@ -955,8 +955,6 @@ TR: dict[str, str] = {
     'What %@ did': '%@ ne yaptı',
     'All chats': 'Tüm sohbetler',
     'the Agents page': 'Ajanlar sayfası',
-    'Activity comes in the next version': 'Etkinlik bir sonraki sürümde geliyor',
-    'What Dot does on its own (schedules, helpers, drafts that wait) will show here.': "Dot'un kendi başına yaptıkları (zamanlanmış görevler, yardımcılar, bekleyen taslaklar) burada görünecek.",
     'What should it do?': 'Ne yapmalı?',
     'You': 'Sen',
     'Your Mac': "Mac'in",
@@ -1692,3 +1690,10 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+
+# HS1 (2026-11-27): empty states in the app's own type.
+TR.update(
+    {
+        "Check the spelling or try a new search.": "Yazımı kontrol edin ya da yeni bir arama deneyin.",
+    }
+)

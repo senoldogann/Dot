@@ -1361,17 +1361,6 @@
         }
       }
     },
-    "Activity comes in the next version": {
-      "comment": "Activity page: placeholder until the view is built",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Etkinlik bir sonraki sürümde geliyor"
-          }
-        }
-      }
-    },
     "Add": {
       "comment": "New schedule toolbar: makes it\nOwn initiative: adds a thing to the list",
       "localizations": {
@@ -2662,6 +2651,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaporayı Finance ile kontrol et"
+          }
+        }
+      }
+    },
+    "Check the spelling or try a new search.": {
+      "comment": "Search: what to do when nothing matches",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazımı kontrol edin ya da yeni bir arama deneyin."
           }
         }
       }
@@ -7938,7 +7938,7 @@
       }
     },
     "No results for “%@”": {
-      "comment": "Connect apps: a search found nothing; the argument is the query",
+      "comment": "Search: nothing matches the words; the argument is what was searched",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14868,17 +14868,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un yapacağı"
-          }
-        }
-      }
-    },
-    "What Dot does on its own (schedules, helpers, drafts that wait) will show here.": {
-      "comment": "Activity page: what it will show",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un kendi başına yaptıkları (zamanlanmış görevler, yardımcılar, bekleyen taslaklar) burada görünecek."
           }
         }
       }
