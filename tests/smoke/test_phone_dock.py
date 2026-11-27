@@ -110,7 +110,7 @@ async def test_a_phones_dock_is_one_capsule_of_segments_over_the_composer_and_ea
                 await expect(bar).to_be_visible()
                 # The segments the run has something to say of, named for a screen reader whatever the room.
                 await expect(_segment(page, "status")).to_contain_text(re.compile(r"\d"))
-                await expect(_segment(page, "status")).to_have_attribute("aria-label", "Waiting on 2 helpers")
+                await expect(_segment(page, "status")).to_have_attribute("aria-label", "Waiting for 2 helpers")
                 await expect(_segment(page, "stop")).to_have_attribute("aria-label", "Stop the task")
                 await expect(_segment(page, "helpers")).to_have_attribute(
                     "aria-label", "2 helpers. Waiting for 2 helpers"
@@ -461,7 +461,7 @@ async def test_a_chat_at_rest_has_no_capsule_and_a_lost_stream_is_said_in_it(log
         browser = await playwright.webkit.launch(headless=True)
         try:
             page = await _page(browser, sc, 390, 844, "light")
-            await expect(_segment(page, "status")).to_contain_text("Waiting on 2 helpers")
+            await expect(_segment(page, "status")).to_contain_text("Waiting for 2 helpers")
             # The daemon goes away: the page lost its stream and says so once, in the capsule.
             sc.stop_serving()
             await expect(_segment(page, "status")).to_have_text("Can't reach Dot", use_inner_text=True, timeout=30000)

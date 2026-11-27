@@ -195,7 +195,7 @@ async def test_a_chat_the_phone_keeps_only_the_newest_events_of_says_that_steps_
         try:
             context: BrowserContext = await phone(browser, playwright, *_SIZES[0])
             page: Page = await open_chat(context, working.address, working.token, working.run.id)
-            await expect(page.locator(".capsule")).to_contain_text("Waiting on 2 helpers", timeout=20_000)
+            await expect(page.locator(".capsule")).to_contain_text("Waiting for 2 helpers", timeout=20_000)
             # Read whole from Dot, the chat shows no such note.
             assert await page.locator(".steps-not-shown").count() == 0
             await until_kept(page, chats=1, lists=2)
