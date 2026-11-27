@@ -6,10 +6,13 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2033](2033.md) | done | 2026-11-27 | The web says "bot", as the phone does |
+| [2025](2025.md) | done | 2026-11-27 | A new chat's first message opens the one chat screen, on the phone and on the web |
 | [2024](2024.md) | done | 2026-11-27 | The chat header keeps the bot's face and name; only a lasting link problem shows, in the capsule |
 | [2023](2023.md) | done | 2026-11-27 | Chat settings as native inset groups, and a capsule that says "Waiting on N helpers" only while the run waits, with no spinner |
 | [2022](2022.md) | in progress | 2026-11-27 | Empty states in the app's own type, and the profile's Activity is the real page |
 | [2021](2021.md) | in progress | 2026-11-27 | A routine's message is one compact row, not the owner's bubble |
+| [2019](2019.md) | in progress | 2026-11-27 | A helper's chat as the bottom sheet everywhere, with its parent's Show steps and its task as its title; one calm live line |
 | [2017](2017.md) | done | 2026-11-27 | A change reads by its format, on the phone and the web; This chat's sections start folded |
 | [2016](2016.md) | built | 2026-11-27 | Unattended runs keep the sandbox: a run nobody started seals Dot's own files in yolo and free mode too |
 | [2015](2015.md) | done | 2026-11-27 | The web composer works as DotNext's on every width: one capsule, the model as its mark, its settings in one sheet |
@@ -23,6 +26,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2005](2005.md) | done | 2026-11-27 | A step writes only the message it shortened, not the whole history |
 | [2004](2004.md) | done | 2026-11-27 | A run's start no longer reads every skill again, nor waits minutes for an embedding |
 | [2003](2003.md) | done | 2026-11-27 | Where the seconds go: `dotx perf` and Settings › Maintenance › Speed |
+| [2001](2001.md) | done | 2026-11-27 | The question card is one panel on the phone and on the web: "User input needed", a pick per card, one Submit |
 | [2000](2000.md) | done | 2026-11-27 | The capsule's clock says whole seconds, as DotNext's pill does |
 | [1999](1999.md) | done | 2026-11-27 | A message sent in a chat is in it at once, with a quiet "Pending" and "Starting…", as DotNext does it |
 | [1998](1998.md) | in progress | 2026-11-27 | The web chat takes DotNext's decisions: what it already has, what differs, what is missing |

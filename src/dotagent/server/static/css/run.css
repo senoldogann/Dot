@@ -177,16 +177,9 @@
   padding-inline: 0;
 }
 
-/* "Messages only" (item 1976): the run told as a conversation, as Grok Bot tells its work. What the run says on the way
-   to its calls is one of its messages, drawn as one, and a call that turns it to other work, which its own words did not
-   tell, is one of Dot's short messages too (`say-narration`, from the run's `narration` events); the steps fold out as
-   with "What it is doing", and the line under the conversation says what it does now and for how long. A line of a call
-   shows in this choice alone, never beside the steps it tells. */
-:root:not([data-work="messages"]) .say-narration,
-:root[data-work="messages"] .run-thread.steps-shown .say-narration {
-  display: none;
-}
-
+/* "Messages only" (item 1976): the run told as a conversation. What the run says on the way to its calls is one of its
+   messages; the steps fold out as with "What it is doing", and the one line under the conversation says what it does
+   now and for how long. A call is never a message of its own (owner 2026-11-27): it is that line's. */
 .work-status-time {
   display: none;
   flex: none;

@@ -27,6 +27,8 @@ struct AskDock: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     private var submittable: [(ask: Ask, answer: String)] { submittedAnswers(entries, drafts: drafts) }
+    /// The questions still to answer: Submit sends them together once each has an answer (item 2001).
+    private var openQuestions: Int { entries.filter { $0.ask.kind == .question && $0.phase.answerable }.count }
     private var showsQuestion: Bool { entries.indices.contains(index) && entries[index].ask.kind == .question }
 
     private var index: Int {
@@ -56,14 +58,15 @@ struct AskDock: View {
                     for (ask, answer) in submittable { actions.decide(ask, true, answer, false) }
                 } label: {
                     Text(
-                        submittable.count > 1
-                            ? String(localized: "Submit \(submittable.count) answers", comment: "Ask dock: sends the answers of several questions; the argument is how many")
+                        openQuestions > 1
+                            ? String(localized: "Submit answers", comment: "Ask dock: sends the answers of every question at once")
                             : String(localized: "Submit answer", comment: "Ask dock: sends the answer of the question")
                     )
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(submittable.isEmpty)
+                // Every question answered first (item 2001): one Submit sends them all, none is left behind unanswered.
+                .disabled(submittable.isEmpty || submittable.count < openQuestions)
                 .accessibilityIdentifier("ask.submit")
             }
             if let stop = actions.stop, !folded {
@@ -91,7 +94,7 @@ struct AskDock: View {
 
     /// The owner's shot (§21): a quiet uppercase eyebrow, then a bold title, the controls at the trailing edge.
     @ViewBuilder private var header: some View {
-        let eyebrow: some View = Text(String(localized: "Your answer is needed", comment: "Ask dock header"))
+        let eyebrow: some View = Text(String(localized: "User input needed", comment: "Ask dock header: Dot waits for the owner's answer"))
             .textRole(.label).fontWeight(.semibold).textCase(.uppercase).tracking(1.2).foregroundStyle(Tone.tertiary)
         let title: some View = Text(
             showsQuestion
@@ -121,7 +124,7 @@ struct AskDock: View {
     private var controlsRow: some View {
         HStack(spacing: Space.xs) {
             if entries.count > 1 {
-                Text(String(localized: "\(index + 1) of \(entries.count)", comment: "Ask dock: which ask is shown; the arguments are its place and the count"))
+                Text(String(localized: "\(index + 1) / \(entries.count)", comment: "Ask dock: which ask is shown, \"1 / 3\"; the arguments are its place and the count"))
                     .textRole(.label).foregroundStyle(Tone.secondary).tabularNumbers().lineLimit(1).fixedSize()
             }
             if dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
@@ -221,31 +224,41 @@ struct AskCard: View {
                 Button {
                     draft = draft.picking(option.label, multiple: ask.multiple)
                 } label: {
+                    // A full-width card (the owner's reference, item 2001): the bold label over its grey description,
+                    // whole at every text size; the pick is an ink ring and a check, never a colour alone.
                     HStack(alignment: .firstTextBaseline, spacing: Space.s) {
                         VStack(alignment: .leading, spacing: Space.xxs) {
                             Text(option.recommended ? String(localized: "\(option.label) (Recommended)", comment: "Ask dock: the option Dot recommends; the argument is its label") : option.label)
-                                .textRole(.body).fontWeight(.semibold).foregroundStyle(picked ? Tone.text : Tone.secondary)
+                                .textRole(.body).fontWeight(.semibold).foregroundStyle(Tone.text)
+                                .fixedSize(horizontal: false, vertical: true)
                             if !option.detail.isEmpty {
-                                Text(option.detail).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(3)
+                                Text(option.detail).textRole(.footnote).foregroundStyle(Tone.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         Spacer(minLength: 0)
-                        Image(systemName: picked ? "checkmark.circle.fill" : "circle").font(.system(.body, weight: .medium))
-                            .foregroundStyle(picked ? Tone.text : Tone.tertiary).accessibilityHidden(true)
+                        if ask.multiple || picked {
+                            Image(systemName: ask.multiple ? (picked ? "checkmark.square.fill" : "square") : "checkmark.circle.fill")
+                                .font(.system(.body, weight: .medium))
+                                .foregroundStyle(picked ? Tone.text : Tone.tertiary).accessibilityHidden(true)
+                        }
                     }
                     .padding(Space.m)
-                    .frame(minHeight: Metric.hit)
-                    .background(picked ? Tone.sheet : Tone.nested, in: rounded(Radius.bubble))
-                    .contentShape(rounded(Radius.bubble))
+                    .frame(maxWidth: .infinity, minHeight: Metric.hit, alignment: .leading)
+                    .background(Tone.nested, in: rounded(Radius.inner))
+                    .overlay { rounded(Radius.inner).strokeBorder(picked ? Tone.text : Color.clear, lineWidth: 1.5) }
+                    .contentShape(rounded(Radius.inner))
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(picked ? .isSelected : [])
+                .accessibilityIdentifier("ask.option")
             }
             TextField(
                 ask.options.isEmpty ? String(localized: "Your answer", comment: "Ask dock: the field of a question's answer") : String(localized: "Or write your own answer", comment: "Ask dock: the field beside a question's options"),
                 text: $draft.written, axis: .vertical
             )
-            .textRole(.body).lineLimit(1...5).padding(Space.m).background(Tone.nested, in: rounded(Radius.bubble))
+            .textRole(.body).lineLimit(1...5).padding(Space.m).background(Tone.nested, in: rounded(Radius.inner))
+            .accessibilityIdentifier("ask.written")
             .accessibilityLabel(String(localized: "Your answer", comment: "Ask dock: the field of a question's answer"))
             Button(String(localized: "Skip this question", comment: "Ask dock: skips one question without an answer")) { actions.decide(ask, false, "", false) }
                 .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary).frame(minHeight: Metric.hit)
