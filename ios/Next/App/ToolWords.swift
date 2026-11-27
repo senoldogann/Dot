@@ -19,6 +19,7 @@ func dotToolWords(_ tool: String) -> String? {
     case "agents_now": String(localized: "Agents at work", comment: "Tool row of Dot's own tool: what the agents do now")
     case "notify": String(localized: "Notify", comment: "Tool row of Dot's own tool: a notification to the owner")
     case "show_page": String(localized: "Show page", comment: "Tool row of Dot's own tool: a page shown in the chat")
+    case "show_cards": String(localized: "Show cards", comment: "Tool row of Dot's own tool: cards shown in the chat")
     case "draft_message": String(localized: "Draft message", comment: "Tool row of Dot's own tool: a message drafted for the owner")
     case "send_to_chat": String(localized: "Write to a chat", comment: "Tool row of Dot's own tool: words sent to another chat")
     case "read_chat", "read_agent_chat": String(localized: "Read a chat", comment: "Tool row of Dot's own tool: another chat read")

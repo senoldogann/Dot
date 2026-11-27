@@ -25,7 +25,7 @@ final class ChatWordsTests: XCTestCase {
 
     func testFindInChatSearchesTheWordsOfTheChatNotTheToolOutput() {
         let items: [TranscriptItem] = [
-            .owner(id: "u:1", text: "Book the garage", delivery: nil),
+            .owner(id: "u:1", text: "Book the garage", delivery: nil, files: []),
             .tool(ToolEntry(id: "t:1", tool: "shell", kind: .command, target: "garage", args: "", output: "garage", state: .done, images: [], startedAt: 0, endedAt: 1)),
             .answer(id: "a:1", text: "The GARAGE is booked", writing: false, endedAt: 2),
         ]

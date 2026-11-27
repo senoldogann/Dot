@@ -69,7 +69,9 @@ final class ChatUITests: XCTestCase {
         ).firstMatch
         XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
         library.tap()
-        let duration: XCUIElement = app.staticTexts["composer.videoDuration"]
+        // The video stands as a tile (its first frame, the length at its foot, a × at its corner), item 1992.
+        XCTAssertTrue(app.otherElements["composer.videoTile"].waitForExistence(timeout: 15), app.debugDescription)
+        let duration: XCUIElement = app.staticTexts["tile.duration"]
         XCTAssertTrue(duration.waitForExistence(timeout: 15))
         XCTAssertTrue(duration.label.hasPrefix("0:01"), duration.label)
         app.buttons["Remove Sample.mp4"].tap()

@@ -108,6 +108,7 @@ from dotagent.tools.appearance import build_appearance_tools
 from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.campaign import build_campaign_tools
+from dotagent.tools.cards import build_cards_tool
 from dotagent.tools.codes import build_code_tools
 from dotagent.tools.coding_work import build_coding_work_tool
 from dotagent.tools.consult import build_consult_tools
@@ -322,6 +323,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_recon_tool(), build_security_tool()),
         build_meta_tools(),
         build_page_tools(),
+        (build_cards_tool(),),
         build_image_tools(),
         build_appearance_tools(),
         (build_coding_work_tool(),),

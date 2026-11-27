@@ -9335,6 +9335,17 @@
         }
       }
     },
+    "Photo %@": {
+      "comment": "VoiceOver: a photo the owner's message carried; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotoğraf %@"
+          }
+        }
+      }
+    },
     "Photos and videos": {
       "comment": "Composer + menu: opens the photo library",
       "localizations": {
@@ -9474,6 +9485,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plan, %lld / %lld adım bitti"
+          }
+        }
+      }
+    },
+    "Play video %@": {
+      "comment": "VoiceOver: a video the owner's message carried; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ videosunu oynat"
           }
         }
       }
@@ -11758,6 +11780,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Daha fazla not göster"
+          }
+        }
+      }
+    },
+    "Show cards": {
+      "comment": "Tool row of Dot's own tool: cards shown in the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kart göster"
           }
         }
       }
@@ -14377,6 +14410,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sürüm"
+          }
+        }
+      }
+    },
+    "Video %@": {
+      "comment": "VoiceOver: a video in the composer that is being prepared; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video %@"
+          }
+        }
+      }
+    },
+    "Video %@, %@": {
+      "comment": "VoiceOver: a video in the composer; the arguments are its name and its length",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video %@, %@"
           }
         }
       }

@@ -34,6 +34,8 @@ here points at a test that no longer exists.
 - `tests/smoke/test_work_orders_page.py::test_a_next_step_written_after_outside_content_is_marked` — the Agents page and the
   phone's bot profile showed an objective's next step with no outside-words mark: the step has its own flag, which the mark
   left out (item 2009's review).
+- `tests/smoke/test_scheduler.py::test_the_emergency_stop_cancels_the_kind_pass_under_way_and_starts_none` — the
+  hourly pass that asks the fast model the kind of a note went on under the emergency stop (item 1975's review).
 - `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
   on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
   chat deleted (item 1962's review).
@@ -57,6 +59,10 @@ here points at a test that no longer exists.
   pencil of a chat's Automations linked to `#/settings/schedules/<id>`, which no route matches, so a press dropped the
   owner on New chat while the docs said the editor opened; the test follows the pencil to the open editor (item 1334; the
   address is a route since item 1337, and the test reads the editor's Name field).
+- `tests/smoke/test_browser_chat_cards.py::test_the_daemon_shows_cards_at_desktop_and_phone_widths_and_replays_them` — a
+  choice card sent its words as the owner's message on one tap, so a run that had read a hostile page could word an
+  option that started a run unmarked; a tap now only writes the words into the composer, as a page's choice does, and the
+  test checks that no run starts until the owner sends (item 1967's review).
 - `tests/smoke/test_schedule_agent.py::test_every_way_out_of_the_editor_asks_not_the_links_alone_and_the_browsers_back_is_put_back` — the
   editor's "Discard your changes?" guard listened for clicks on links, so the nav search's Enter, the shortcuts and
   the browser's own Back dropped what was typed silently; the router now asks the page before any page swap, and puts

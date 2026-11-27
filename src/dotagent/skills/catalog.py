@@ -1,7 +1,8 @@
 """The catalog: every skills directory read into the usable skills, each name once, and the folders left out."""
 
+import os
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from dotagent.config import AppConfig, SkillsConfig
@@ -95,11 +96,53 @@ def _text(file: Path) -> str:
         raise SkillError("SKILL.md cannot be read as UTF-8 text", {"path": str(file), "error": str(exc)}) from exc
 
 
+# How a file stood when it was read: when it last changed (nanoseconds), its size and its inode.
+type FileStamp = tuple[int, int, int]
+
+# The skills read from their SKILL.md files in this process, by the file and how it was read, with the file's stamp
+# then (item 2004): a run's start read and parsed every skill again, 1.4 to 3.1 s for 560 skills on the owner's
+# Mac, and a file whose stamp is the same holds the same text. A file that changed, or was replaced, is read again.
+_READ: dict[tuple[str, str], tuple[FileStamp, Skill]] = {}
+
+
+def file_stamp(file: Path) -> FileStamp | None:
+    """How ``file`` stands now (:data:`FileStamp`), ``None`` when it cannot be read."""
+    try:
+        status: os.stat_result = file.stat()
+    except OSError:
+        return None
+    return (status.st_mtime_ns, status.st_size, status.st_ino)
+
+
+def _remembered(file: Path, kind: str, parse: Callable[[], Skill]) -> Skill:
+    """The skill ``parse`` reads from ``file``, or the one read before while the file's stamp is the same. The stamp is
+    taken before the file is read, so a file written in between is read again the next time."""
+    stamp: FileStamp | None = file_stamp(file)
+    key: tuple[str, str] = (str(file), kind)
+    held: tuple[FileStamp, Skill] | None = _READ.get(key)
+    if stamp is not None and held is not None and held[0] == stamp:
+        return held[1]
+    skill: Skill = parse()
+    if stamp is not None:
+        _READ[key] = (stamp, skill)
+    return skill
+
+
+def _identity(file: Path) -> tuple[int, int] | Path:
+    """What ``file`` is, whichever link it is reached through: its device and inode, or its resolved path when it
+    cannot be read."""
+    try:
+        status: os.stat_result = file.stat()
+    except OSError:
+        return file.resolve()
+    return (status.st_dev, status.st_ino)
+
+
 def read_skill(file: Path, source: str) -> Skill:
     """The skill ``file`` holds, one the owner or a plugin brought, read as Claude Code reads it (item 1723: one without
     a frontmatter loads, :func:`parse_others_skill`); one that cannot be read as UTF-8 text, or is no skill the loader
-    reads, raises :class:`SkillError`."""
-    return parse_others_skill(file, _text(file), source)
+    reads, raises :class:`SkillError`. A file unchanged since it was read is not read again (:func:`_remembered`)."""
+    return _remembered(file, source, lambda: parse_others_skill(file, _text(file), source))
 
 
 def read_playbook(file: Path) -> Skill:
@@ -107,8 +150,8 @@ def read_playbook(file: Path) -> Skill:
     (:func:`parse_skill`), and named as its folder is. A skill of another folder may go by a name its folder does not
     carry (item 948), but a playbook is kept, dated, listed and dropped by its folder's name (items 557 and 585): one
     named otherwise would be found under another playbook's record, so it raises :class:`SkillError`, for the catalog
-    and the playbooks' list alike."""
-    skill: Skill = parse_skill(file, _text(file), PLAYBOOK_SOURCE)
+    and the playbooks' list alike. A file unchanged since it was read is not read again (:func:`_remembered`)."""
+    skill: Skill = _remembered(file, PLAYBOOK_SOURCE, lambda: parse_skill(file, _text(file), PLAYBOOK_SOURCE))
     if skill.name != file.parent.name:
         raise SkillError(
             "the name in SKILL.md is not the name of its folder, which a skill Dot learned or was taught must carry",
@@ -131,7 +174,7 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
     replaces it."""
     skills: dict[str, Skill] = {}
     problems: list[SkillProblem] = []
-    seen: set[Path] = set()
+    seen: set[tuple[int, int] | Path] = set()
     for root in roots:
         if not root.path.is_dir():
             problems.append(SkillProblem(path=root.path, reason="the skills directory does not exist"))
@@ -142,7 +185,8 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
             problems.append(SkillProblem(path=root.path, reason=_reason(exc)))
             continue
         for file in files:
-            real: Path = file.resolve()
+            # The file itself, by its device and inode (one stat, where resolving the path took one per part of it).
+            real: tuple[int, int] | Path = _identity(file)
             if real in seen:
                 continue
             seen.add(real)
@@ -177,7 +221,15 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
                     )
                 continue
             skills[skill.name] = skill
+    _forget_gone()
     return SkillCatalog(skills=tuple(skills.values()), problems=tuple(problems))
+
+
+def _forget_gone() -> None:
+    """Drop the skills read from files that are gone (a skill deleted or renamed), so that what is kept is bounded by
+    the files there are."""
+    for key in [key for key in list(_READ) if file_stamp(Path(key[0])) is None]:
+        _READ.pop(key, None)
 
 
 # What :func:`unreported` has handed out: a skill that cannot be read is told once per process for as long as its file
