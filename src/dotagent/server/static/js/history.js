@@ -236,8 +236,9 @@ function drawFlow(past, flow, asked, events, reactions) {
     }
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
-      stepSaid = said !== "";
-      if (said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer)) {
+      // Only words drawn tell the step's calls: those the answer restates are not drawn here.
+      stepSaid = said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer);
+      if (stepSaid) {
         batch = null;
         blocks.push({ say: said, step: event.data.step, progress: narrates(event.data.tool_calls ?? []) });
       }

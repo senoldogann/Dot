@@ -1,9 +1,10 @@
 """The run told as a conversation (item 1976): which calls get a line of their own, what a line names, and that the line
 is an event beside the call, made from the run's newest lines in the store."""
 
+import asyncio
 from pathlib import Path
 
-from dotagent.agent.narration import NARRATION_EVENT, Narration, narration_of, tell_call
+from dotagent.agent.narration import NARRATION_EVENT, Narration, SameCall, narration_of, opencode_call, tell_call
 from dotagent.events import EventBus
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord
@@ -75,3 +76,31 @@ async def test_the_line_is_an_event_beside_the_call_read_against_the_runs_newest
         assert len(await store.events_of_kind("run_b", NARRATION_EVENT, 10)) == 1
     finally:
         await store.close()
+
+
+async def test_the_calls_of_one_step_that_run_at_once_are_one_line(tmp_path: Path) -> None:
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        bus: EventBus = EventBus(store)
+        await asyncio.gather(
+            *(tell_call(bus, store, "run_a", f"c{n}", "read_file", {"path": f"{n}.md"}, ()) for n in range(3))
+        )
+        assert len(await store.events_of_kind("run_a", NARRATION_EVENT, 10)) == 1
+    finally:
+        await store.close()
+
+
+def test_opencodes_own_tools_are_told_as_the_dot_tool_that_does_the_same() -> None:
+    assert opencode_call("read", {"filePath": "/w/notes.md"}) == SameCall(
+        tool="read_file", args={"path": "/w/notes.md"}
+    )
+    assert opencode_call("bash", {"command": "ls"}) == SameCall(tool="shell", args={})
+    assert opencode_call("webfetch", {"url": "https://a.org/x"}) == SameCall(
+        tool="web_fetch", args={"url": "https://a.org/x"}
+    )
+    assert opencode_call("todowrite", {}) is None
+    same: SameCall | None = opencode_call("read", {"filePath": "/w/notes.md"})
+    assert same is not None
+    assert narration_of("c1", same.tool, same.args, [], ()) == Narration(
+        call_id="c1", tool="read_file", args={"path": "notes.md"}
+    )

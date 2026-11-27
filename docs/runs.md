@@ -70,7 +70,7 @@ to its calls is drawn as one of its messages and stays where it was said; and a 
 which its own words did not tell is one of Dot's short messages too, in the words the line uses for it ("Searching the
 web for “GistSmith contact”", "Looking at gistsmith.com", "Running a command"). The line under them says what the run
 does now and for how long ("Reading README.md… · 2 min"). Those lines come from the daemon's `narration` events
-(`agent/narration.py`), one beside a call's `tool_call` in every harness (Dot's own loop, Claude Code, OpenCode): no model
+(`agent/narration.py`), one beside a call's `tool_call` in every harness (Dot's own loop, Claude Code, OpenCode, whose own tools are told as the Dot tool that does the same): no model
 is asked for them and the model never reads them, so they cost no token. A stretch of one kind of work is one line: a
 call of a kind one of the run's four newest lines told is not told again, but for a search of other words or a page on
 another site; a line names a page by its site, a file by its name and a search by its words, never a command's text. Over

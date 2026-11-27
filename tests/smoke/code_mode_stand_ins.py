@@ -222,6 +222,7 @@ class FakeBus:
 
     def __init__(self) -> None:
         self.events: list[tuple[str, JsonObject]] = []
+        self.narrating: asyncio.Lock = asyncio.Lock()
 
     async def emit(self, run_id: str, kind: str, data: JsonObject, _persist: bool = True) -> None:
         self.events.append((kind, data))

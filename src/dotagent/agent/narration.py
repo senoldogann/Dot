@@ -62,8 +62,8 @@ def _site(address: str) -> str:
 
 
 def _named(key: str, value: str) -> str:
-    """What a line keeps of ``value``: a site for an address, a name for a path ("" for ``.``), the words on one line for
-    the rest."""
+    """What a line keeps of ``value``: a site for an address, a name for a path ("" for ``.``), the words on one line
+    for the rest."""
     flat: str = " ".join(value.split())
     if key == "url":
         return _site(flat)
@@ -100,6 +100,43 @@ def _goes_on(recent: Sequence[Narration], kind: str, about: str) -> bool:
     return kind not in _TOLD_AGAIN or about == "" or any(_subject(line.args) == about for line in told)
 
 
+class SameCall(FrozenModel):
+    """One of OpenCode's own calls as the Dot tool that does the same (``tool``), with that tool's argument
+    (``args``)."""
+
+    tool: str
+    args: JsonObject
+
+
+def _text(arguments: JsonObject, key: str) -> str:
+    value: JsonValue = arguments.get(key)
+    return value if isinstance(value, str) else ""
+
+
+def opencode_call(tool: str, arguments: JsonObject) -> SameCall | None:
+    """OpenCode's own ``tool`` called with ``arguments`` as the Dot tool that does the same, so that its line reads as
+    one of Dot's ("Reading notes.md", "Running a command"); ``None`` for a tool with no such twin (its to-do list, a
+    subagent), which is not told."""
+    path: str = _text(arguments, "filePath") or _text(arguments, "path")
+    match tool:
+        case "bash":
+            return SameCall(tool="shell", args={})
+        case "read":
+            return SameCall(tool="read_file", args={"path": path})
+        case "edit" | "write" | "patch" | "multiedit":
+            return SameCall(tool="edit_file", args={"path": path})
+        case "list":
+            return SameCall(tool="list_dir", args={"path": path})
+        case "glob" | "grep":
+            return SameCall(tool="search_files", args={})
+        case "webfetch":
+            return SameCall(tool="web_fetch", args={"url": _text(arguments, "url")})
+        case "websearch" | "codesearch":
+            return SameCall(tool="web_search", args={"query": _text(arguments, "query")})
+        case _:
+            return None
+
+
 def narration_of(
     call_id: str, tool: str, arguments: JsonObject, recent: Sequence[Narration], known: Sequence[str]
 ) -> Narration | None:
@@ -119,9 +156,11 @@ async def tell_call(
     bus: EventBus, store: Store, run_id: str, call_id: str, tool: str, arguments: JsonObject, known: Sequence[str]
 ) -> None:
     """Emit the line of a call the run just made (:func:`narration_of`), after the run's last one as the store holds it,
-    when it tells something new. One read of the run's newest ``narration`` events; nothing waits on a model."""
-    kept: list[EventRecord] = await store.events_of_kind(run_id, NARRATION_EVENT, RECENT_LINES)
-    recent: list[Narration] = [Narration.model_validate(event.data) for event in kept]
-    line: Narration | None = narration_of(call_id, tool, arguments, recent, known)
-    if line is not None:
-        await bus.emit(run_id, NARRATION_EVENT, line.event(), True)
+    when it tells something new. One read of the run's newest ``narration`` events, under the bus's ``narrating`` lock
+    so that the calls of one step, which run at once, are weighed one after another; nothing waits on a model."""
+    async with bus.narrating:
+        kept: list[EventRecord] = await store.events_of_kind(run_id, NARRATION_EVENT, RECENT_LINES)
+        recent: list[Narration] = [Narration.model_validate(event.data) for event in kept]
+        line: Narration | None = narration_of(call_id, tool, arguments, recent, known)
+        if line is not None:
+            await bus.emit(run_id, NARRATION_EVENT, line.event(), True)

@@ -552,10 +552,6 @@ async def _execute_one(
         },
         True,
     )
-    if parent is None:
-        # The call told as a line of the conversation when it turns the run to other work (item 1976); a call a code
-        # makes is part of the code's.
-        await tell_call(ctx.runtime.bus, ctx.runtime.store, ctx.run_id, call.id, call.name, call.arguments, known)
     action: ActionInfo | None = None
     waited_s: float = 0.0
     ran_s: float = 0.0
@@ -579,6 +575,10 @@ async def _execute_one(
             f"{truncate_middle(broken, _BROKEN_ARGUMENTS_CHARS)}"
         )
     else:
+        if parent is None:
+            # The call told as a line of the conversation when it turns the run to other work (item 1976), once it is
+            # one that can run (a refused, unknown or broken call is not); a call a code makes is part of the code's.
+            await tell_call(ctx.runtime.bus, ctx.runtime.store, ctx.run_id, call.id, call.name, call.arguments, known)
         # A call a code makes has no nesting to give: code cannot start code, whatever the list of the tools it cannot
         # call says (item 1501).
         nesting = None if parent is not None else _nesting_for(tool, call, registry, ctx, gate)

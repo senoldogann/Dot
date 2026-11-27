@@ -292,22 +292,23 @@ func conversed(_ built: [Built], finished: Bool) -> [TranscriptItem] {
             }
         }.map(\.item)
     }
-    let steps: [Built] = built.filter { row in
+    let isStep: (Built) -> Bool = { row in
         switch row.category {
         case .tool, .thought, .plan: true
         default: false
         }
     }
-    var out: [TranscriptItem] = built.filter { row in !steps.contains(row) }.map(\.item)
-    guard let first: Built = steps.first else { return out }
+    let steps: [Built] = built.filter(isStep)
+    var out: [Built] = built.filter { !isStep($0) }
+    guard let first: Built = steps.first else { return out.map(\.item) }
     let tools: [ToolEntry] = steps.compactMap { if case .tool(let entry) = $0.item { entry } else { nil } }
     let start: Double = steps.map(\.start).min() ?? first.start
     let end: Double = steps.map(\.end).max() ?? start
-    let fold: TranscriptItem = .work(
-        WorkFold(id: "f:\(first.item.id)", seconds: max(0, Int((end - start).rounded())), tally: .of(tools), items: steps.map(\.item)))
-    let answerAt: Int? = built.filter { row in !steps.contains(row) }.firstIndex { $0.category == .answer(final: true) }
-    out.insert(fold, at: answerAt ?? out.count)
-    return out
+    let fold: Built = Built(
+        item: .work(WorkFold(id: "f:\(first.item.id)", seconds: max(0, Int((end - start).rounded())), tally: .of(tools), items: steps.map(\.item))),
+        category: .tool(.done), start: start, end: end)
+    out.insert(fold, at: out.firstIndex { $0.category == .answer(final: true) } ?? out.count)
+    return out.map(\.item)
 }
 
 /// The reaction target of an answer: its run and the message key the daemon names it by (`answer`, `step-N`).

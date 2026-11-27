@@ -77,7 +77,7 @@ from dotagent.agent.loop import (
     run_prompt_inputs,
     turn_skills,
 )
-from dotagent.agent.narration import tell_call
+from dotagent.agent.narration import SameCall, opencode_call, tell_call
 from dotagent.agent.prompt import PromptInputs, build_system_prompt
 from dotagent.agent.streammask import StreamMask, delta_event, said_in_harness
 from dotagent.browser.safety import UrlVerdict, browser_host, check_url, host_matches, url_flags
@@ -746,9 +746,12 @@ class _Follow:
             await self.emit(
                 "tool_call", {"call_id": event.call_id, "tool": name, "args": redact_json(event.input, known)}, True
             )
-            await tell_call(
-                self.runtime.bus, self.runtime.store, self.agent.run.id, event.call_id, name, event.input, known
-            )
+            # Told as the Dot tool that does the same (item 1976): its line then reads as one of Dot's.
+            same: SameCall | None = opencode_call(event.tool, event.input)
+            if same is not None:
+                await tell_call(
+                    self.runtime.bus, self.runtime.store, self.agent.run.id, event.call_id, same.tool, same.args, known
+                )
         if event.status == "running":
             return
         ok: bool = event.status == "completed"
