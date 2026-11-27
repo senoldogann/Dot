@@ -696,53 +696,12 @@ struct PushedNewChat: View {
         if let key = started {
             // Named by the daemon: its own id; before that the key (the starting chat).
             let thread: String = model.startedChats[key] ?? key
-            if model.startingChats[thread] != nil {
-                StartingChat(key: thread)
-            } else {
-                ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false).id(thread)
-            }
+            // The one chat screen from the first send (item 2025): the starting chat by its key, then, once the daemon names
+            // it, the chat itself; the screen keeps its identity (the key) across the swap, so nothing is pushed or redrawn.
+            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false).id(key)
         } else {
             BotNewChat(botId: botId, opened: { started = $0 })
         }
-    }
-}
-
-/// A new chat between its first send and the daemon's answer (item 1849): the owner's message where the chat shows it,
-/// with where it stands, under the chat's title; the list swaps it for the real chat, in place, once the daemon names it.
-struct StartingChat: View {
-    let key: String
-    @Environment(AppModel.self) private var model: AppModel
-    @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
-
-    var body: some View {
-        let text: String = model.startingChats[key] ?? ""
-        let delivery: Delivery = model.pendingChats.first { $0.key == key }?.delivery ?? .delivered
-        ScrollView {
-            VStack(alignment: .trailing, spacing: Space.xxs) {
-                OwnerMessage(text: text)
-                if let progress = model.outbox.first(where: { $0.id == key })?.attachmentUpload {
-                    AttachmentTransferLine(key: key, progress: progress)
-                } else {
-                    Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(refused(delivery) ? Tone.failure : Tone.tertiary)
-                    if case .rejected = delivery {
-                        Button(String(localized: "Try again", comment: "Under a refused message: sends it again")) { model.retry(key) }.textRole(.label)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.horizontal, Space.gutter)
-            .padding(.vertical, Space.m)
-        }
-        .background(Tone.ground)
-        .navigationTitle(text)
-        .navigationSubtitle(ChatStatus.starting.word)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
-    }
-
-    private func refused(_ delivery: Delivery) -> Bool {
-        if case .rejected = delivery { return true }
-        return false
     }
 }
 
