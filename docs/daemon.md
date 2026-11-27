@@ -242,7 +242,7 @@ its title, which counts its rows, and the folds are kept in that browser. The li
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
 and `due`. The composer works as the iPhone app's does, on every width (item 2015). It is one rounded box (item 1330): its corner
 is the token's (`--radius-composer`), its edge a hairline that grows stronger under the pointer and in focus, on the
-page's own surface. While the words are short (32 characters at most, on one line, with no file or pick) it is one row:
+page's own surface. While the words are short (32 characters at most, on one line, with no file or pick) and the box itself is at least 340 px wide (an iPhone SE's box, 320 px across, keeps the words on a line of their own whatever their length) it is one row:
 the **+**, the words, the model as its provider's mark and a chevron, the size of the chat (a ring, once a run has one),
 the microphone and the round send, on one centre line. Longer words, a line break or a file open it: the words on top,
 and under them the **+**, the model's mark with its name and, in grey, the mode when one is named, the reasoning's level
