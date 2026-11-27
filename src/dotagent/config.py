@@ -139,7 +139,7 @@ class ServerConfig(FrozenModel):
 
 class DaemonConfig(FrozenModel):
     """What the daemon does for Dot's work (``[daemon]``, item 1671): ``keep_awake`` keeps the Mac from idle sleep while
-    a run, a schedule's run or a meeting works, and ``keep_awake_after_s`` seconds after the last one ended."""
+    work is active or a routine or watcher is due soon, with ``keep_awake_after_s`` seconds of grace."""
 
     keep_awake: bool
     keep_awake_after_s: float = Field(ge=0)

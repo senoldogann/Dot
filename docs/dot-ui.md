@@ -135,11 +135,10 @@ newest 400 and says that some steps are not shown (`views/run.js`, `afterTheGap`
 `js/sseframes.js` (item 1522: a connection that answers nothing in 8 s and a stream that says nothing in 35 s are dropped
 and made again, after 0.5, 1, 2, 4, 8 and 15 s, from the last event, with `Last-Event-ID`). What is done with no link is
 kept by `js/outbox.js` (the rules are `js/outboxrules.js`) and shown under the chat by `js/outboxrows.js`: a message as
-*Waiting to send* with Retry now and Edit, sent once with its key when the link is back (item 1523). The line under the
-bar (`js/connectionline.js`, in the bar's own header, a row of its own for *Offline* and a refused key, floating over the room
-under the bar for *Can't reach Dot* so that nothing read moves; the words are `js/linewords.js`) says *Offline: showing saved chats,
-last updated 3 min ago*, *Offline: 2 waiting to send*, *Can't reach Dot* or *This phone's key was refused* (item 1524), and a
-failed request shows no toast over the chat while it does. See [On a bad link: the web app](phone.md).
+*Waiting to send* with Retry now and Edit, sent once with its key when the link is back (item 1523). Desktop and phone
+browsers show *Mac asleep or unreachable since HH:MM* under the bar during a lasting daemon outage. The line floats
+without moving the conversation. On phones, *Offline* and a refused key
+take their own row in the bar. See [On a bad link: the web app](phone.md).
 
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)
 

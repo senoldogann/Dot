@@ -1,6 +1,7 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# MS1: the last confirmed contact with the Mac.
 # Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
@@ -1193,7 +1194,6 @@ TR: dict[str, str] = {
     # D2: the link in the chat's pill (item 1931).
     "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
     "Syncing messages…": "Mesajlar eşitleniyor…",
-    "your Mac": "Mac",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
@@ -1221,13 +1221,14 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
+        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
         "User input needed": "Senden bir cevap bekleniyor",
         "%lld / %lld": "%lld / %lld",
         "Submit answers": "Yanıtları gönder",
         "Default (%@)": "Varsayılan (%@)",
         "Favourite": "Favori",
-        "Can't reach %@": "%@ cihazına ulaşılamıyor",
-        "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
+            "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
         "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
         "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
         "Deleted for good %@.": "Kalıcı olarak silinecek: %@.",

@@ -14,6 +14,7 @@ No network and no model service is used: the scripted model plays each run.
 
 import asyncio
 import re
+import shlex
 import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
@@ -225,6 +226,52 @@ class _Recording(ScriptedProvider):
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         self.asked.append(request.messages)
         return await super().complete(request, sink)
+
+
+@pytest.mark.parametrize("exit_code", (0, 1))
+async def test_a_helpers_pull_request_watch_wakes_the_parent_chat_once(tmp_path: Path, exit_code: int) -> None:
+    """A local gh stands in for remote checks. Its polls continue after both runs end, with no model turns."""
+    checks_done: Path = tmp_path / "checks-done"
+    gh: Path = tmp_path / "gh"
+    await asyncio.to_thread(
+        gh.write_text,
+        "#!/bin/sh\n"
+        '[ "$*" = "pr checks https://github.com/example/dot/pull/42 --watch --fail-fast" ] || exit 2\n'
+        f"while [ ! -f {shlex.quote(str(checks_done))} ]; do\n"
+        "  echo poll\n"
+        "  /bin/sleep 0.1\n"
+        "done\n"
+        f"exit {exit_code}\n",
+        encoding="utf-8",
+    )
+    await asyncio.to_thread(gh.chmod, 0o700)
+    delegate: ScriptedTurn = ScriptedTurn(
+        text="", calls=(ScriptedCall(tool="delegate", arguments={"goal": "Open the PR and watch its checks."}),)
+    )
+    command: str = "gh pr checks https://github.com/example/dot/pull/42 --watch --fail-fast"
+    model: _Recording = _Recording(_PROVIDER, [delegate, _open(command), _FINISH, _FINISH, _FINISH])
+    env: dict[str, str] = {"PATH": str(tmp_path)}
+    async with _session(env, model) as (runtime, manager), _heard(runtime, QUEUE_CHANGED_EVENT) as changes:
+        parent: RunRecord = await _start(manager)
+        assert (await _ended(manager, parent.id)).status == "done"
+        [helper] = [run for run in await runtime.store.list_runs(10, None) if run.parent_run_id == parent.id]
+        assert helper.status == "done"
+        [session] = runtime.terminals.sessions(parent.thread_id)
+        assert session.background and not session.ended
+        assert runtime.terminals.sessions(helper.thread_id) == []
+        assert len(model.asked) == 4
+        await session.read(0)
+        assert (await session.read(2)).splitlines().count("poll") >= 3
+        assert len(model.asked) == 4
+        assert len(await runtime.store.list_runs(10, parent.thread_id)) == 1
+        await asyncio.to_thread(checks_done.touch)
+        wake: RunRecord = await _started(changes, runtime, parent)
+        assert wake.source == BACKGROUND_SOURCE
+        assert f"{session.id} ended with exit {exit_code}" in wake.goal
+        assert (await _ended(manager, wake.id)).status == "done"
+        assert len(model.asked) == 5
+        assert len(await runtime.store.list_runs(10, parent.thread_id)) == 2
+        assert not runtime.terminals.has_untold_ends(parent.thread_id)
 
 
 def _notes(messages: Sequence[Message]) -> list[str]:
