@@ -77,6 +77,7 @@ from dotagent.agent.loop import (
     run_prompt_inputs,
     turn_skills,
 )
+from dotagent.agent.narration import tell_call
 from dotagent.agent.prompt import PromptInputs, build_system_prompt
 from dotagent.agent.streammask import StreamMask, delta_event, said_in_harness
 from dotagent.browser.safety import UrlVerdict, browser_host, check_url, host_matches, url_flags
@@ -744,6 +745,9 @@ class _Follow:
             step.tools.append(name)
             await self.emit(
                 "tool_call", {"call_id": event.call_id, "tool": name, "args": redact_json(event.input, known)}, True
+            )
+            await tell_call(
+                self.runtime.bus, self.runtime.store, self.agent.run.id, event.call_id, name, event.input, known
             )
         if event.status == "running":
             return

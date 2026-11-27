@@ -14,6 +14,7 @@ from dotagent.agent.failure_lessons import LessonsNote, hand_failure_lessons
 from dotagent.agent.gate import RunGate, hold_note, masked_action
 from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.limits import LIMIT_TOOLS
+from dotagent.agent.narration import tell_call
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
 from dotagent.agent.sites import hand_outside_site_lessons
 from dotagent.agent.yolo_log import note_checkpoint
@@ -551,6 +552,10 @@ async def _execute_one(
         },
         True,
     )
+    if parent is None:
+        # The call told as a line of the conversation when it turns the run to other work (item 1976); a call a code
+        # makes is part of the code's.
+        await tell_call(ctx.runtime.bus, ctx.runtime.store, ctx.run_id, call.id, call.name, call.arguments, known)
     action: ActionInfo | None = None
     waited_s: float = 0.0
     ran_s: float = 0.0
