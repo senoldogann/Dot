@@ -1690,3 +1690,11 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+# Chat settings as inset groups, the capsule without a spinner (the owner's report of 2026-11-27).
+TR.update(
+    {
+        "Default (%@)": "Varsayılan (%@)",
+        "Favourite": "Favori",
+        "Can't reach %@": "%@ cihazına ulaşılamıyor",
+    }
+)

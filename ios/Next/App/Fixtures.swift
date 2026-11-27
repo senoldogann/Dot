@@ -39,6 +39,10 @@
         case jank = "n2-jank"
         /// A run that wrote its answer and finished with it in slightly other words (item 1996): the answer stands once.
         case restated = "n2-restated"
+        /// The main run has stopped and only waits for a helper it delegated to (its newest step's one open call is a
+        /// delegate): the capsule says "Waiting on 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
+        /// beside its helper and says "Working".
+        case helpersWait = "n2-helpers"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -144,7 +148,7 @@
                  "queue":{"held":false,"messages":\(queue),"beside_run_id":"run_b","beside_thread_id":null},
                  "asks":\(asks),
                  "helpers":[
-                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
+                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":\(self == .helpersWait),"stop":"/api/runs/run_h1/cancel"},
                    {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"claude_code","model":"sonnet","effort":"low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
                  ],
                  "background":[],
@@ -186,6 +190,12 @@
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"failed","result":"","error":{"kind":"model","message":"The model answered HTTP 529: overloaded. Try again in a minute."}}}"#)
             case .deleted:
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"done","result":"Booked Tuesday 14:00."}}"#)
+            case .helpersWait:
+                events.append(contentsOf: [
+                    #"{"id":29,"run_id":"run_b","ts":\#(b + 44),"kind":"tool_result","data":{"call_id":"b4","ok":true,"text":"ready"}}"#,
+                    #"{"id":30,"run_id":"run_b","ts":\#(b + 45),"kind":"assistant","data":{"text":"","step":5,"tool_calls":["delegate"]}}"#,
+                    #"{"id":31,"run_id":"run_b","ts":\#(b + 46),"kind":"tool_call","data":{"call_id":"b5","tool":"delegate","args":{"goal":"Check the dentist's free slots"}}}"#,
+                ])
             case .restated:
                 events.append(contentsOf: [
                     #"{"id":30,"run_id":"run_b","ts":\#(b + 50),"kind":"assistant","data":{"text":"Booked: Tuesday at 14:00 with Dr. Lind. ","step":5,"tool_calls":[]}}"#,

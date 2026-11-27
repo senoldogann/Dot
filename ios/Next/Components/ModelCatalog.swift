@@ -4,8 +4,9 @@ import SwiftUI
 /// The app's one model catalog (PLAN §22/§24, owner-refs/ref-model-picker-1/2.png), used by every model picker (the
 /// chat's settings, Settings › Models): the chosen and recent models on top, then the caller's options, then the
 /// providers as groups with their mark that fold (a count when folded; all but the chosen model's start folded, so
-/// hundreds of models are no long scroll), each model once in its group with a "Default" badge, a ✓ on the chosen one and a ☆
-/// favourite (favourites float up in their group), or an eye while hidden models are managed. The search and the filter
+/// hundreds of models are no long scroll), each model once in its group with its provider's mark, "Default" under the
+/// daemon's main, a ✓ on the chosen one and a quiet ★ on a favourite (a long press stars it; favourites float up in their
+/// group), or an eye while hidden models are managed. The search and the filter
 /// are the caller's (`ModelSearchBar`); the favourites and hidden models are kept on the phone (`ModelMarks`) at once,
 /// whatever the caller then keeps or drops of its own picks.
 struct ModelCatalog<Options: View>: View {
@@ -48,7 +49,7 @@ struct ModelCatalog<Options: View>: View {
                     .textRole(.footnote).foregroundStyle(Tone.secondary).padding(.horizontal, Space.groupedGutter)
             }
             if query.isEmpty, filter == .all, !recentModels.isEmpty {
-                PlainSection(header: String(localized: "Recently used", comment: "Model picker section: the chosen model and the ones picked last")) {
+                InsetSection(header: String(localized: "Recently used", comment: "Model picker section: the chosen model and the ones picked last")) {
                     ForEach(recentModels) { row in modelRow(row) }
                 }
             }
@@ -58,7 +59,7 @@ struct ModelCatalog<Options: View>: View {
                 // A provider that listed nothing says why, as Settings › Models does.
                 ForEach(failedProviders(providers), id: \.provider) { failed in
                     Text(verbatim: providerTitle(failed.provider) + " · " + failed.why)
-                        .textRole(.footnote).foregroundStyle(Tone.tertiary).padding(.horizontal, Space.xs)
+                        .textRole(.footnote).foregroundStyle(Tone.tertiary).padding(.horizontal, Space.groupedGutter)
                 }
             }
         }
@@ -86,7 +87,7 @@ struct ModelCatalog<Options: View>: View {
                     if isFolded { Text(verbatim: "\(group.rows.count)").textRole(.footnote).foregroundStyle(Tone.tertiary).tabularNumbers() }
                     Symbol(name: isFolded ? "chevron.down" : "chevron.up", context: .chevron).foregroundStyle(Tone.tertiary)
                 }
-                .padding(.horizontal, Space.xs)
+                .padding(.horizontal, Space.groupedGutter)
                 .frame(minHeight: Metric.hit)
                 .contentShape(Rectangle())
             }
@@ -98,7 +99,7 @@ struct ModelCatalog<Options: View>: View {
                     : String(localized: "Open", comment: "VoiceOver: an open provider group"))
             .accessibilityIdentifier("modelCatalog.provider")
             if !isFolded {
-                PlainSection(header: nil) { ForEach(group.rows) { row in modelRow(row) } }
+                InsetSection(header: nil) { ForEach(group.rows) { row in modelRow(row) } }
             }
         }
     }
@@ -114,31 +115,55 @@ struct ModelCatalog<Options: View>: View {
         recentRows(providers, recent: recent, chosenRef: chosenRef, defaultRef: defaultRef, marks: marks, showsHidden: managesHidden, limit: 4)
     }
 
+    /// A model: its provider's mark, its name with a quiet ★ when starred and "Default" under it for the daemon's main,
+    /// a ✓ on the chosen one. A long press (or VoiceOver's actions) stars it; while hidden models are managed, an eye
+    /// hides or shows it. No column of empty stars and no badge: the owner's report of 2026-11-27.
     private func modelRow(_ row: ModelRow) -> some View {
         let isChosen: Bool = row.option.ref == chosenRef
+        let favourite: String =
+            row.isFavourite
+            ? String(localized: "Remove \(row.option.label) from favourites", comment: "VoiceOver: unstars a model; the argument is its name")
+            : String(localized: "Add \(row.option.label) to favourites", comment: "VoiceOver: stars a model; the argument is its name")
         return HStack(spacing: Space.s) {
             Button {
                 pick(row.option)
             } label: {
-                HStack(spacing: Space.xs) {
-                    Text(row.option.label).textRole(.body).foregroundStyle(row.isHidden ? Tone.tertiary : Tone.text).lineLimit(2)
-                    if row.isDefault {
-                        Text(String(localized: "Default", comment: "Chat settings: the badge of the daemon's main model"))
-                            .textRole(.label).fontWeight(.medium).foregroundStyle(Tone.secondary)
-                            .padding(.horizontal, Space.xs).padding(.vertical, 2)
-                            .background(Tone.nested, in: rounded(6))
+                HStack(spacing: Space.s) {
+                    Image(providerMarkAsset(providerOfModel(row.option.ref, in: providers))).resizable().renderingMode(.template).scaledToFit()
+                        .frame(width: 20, height: 20).foregroundStyle(row.isHidden ? Tone.tertiary : Tone.text)
+                        .frame(minWidth: Metric.iconSlot)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        HStack(spacing: Space.xxs + 2) {
+                            Text(row.option.label).textRole(.body).foregroundStyle(row.isHidden ? Tone.tertiary : Tone.text).lineLimit(2)
+                            if row.isFavourite {
+                                Image(systemName: "star.fill").font(.system(.caption2)).foregroundStyle(Tone.secondary).accessibilityHidden(true)
+                            }
+                        }
+                        if row.isDefault {
+                            Text(String(localized: "Default", comment: "Chat settings: the badge of the daemon's main model"))
+                                .textRole(.footnote).foregroundStyle(Tone.secondary)
+                        }
                     }
                     Spacer(minLength: Space.xs)
-                    if isChosen {
-                        Image(systemName: "checkmark").font(.system(.callout, weight: .semibold)).foregroundStyle(Tone.text).accessibilityHidden(true)
-                    }
+                    Image(systemName: "checkmark").font(.system(.body, weight: .semibold)).foregroundStyle(Tone.text)
+                        .opacity(isChosen ? 1 : 0).accessibilityHidden(true)
                 }
-                .frame(minHeight: Metric.row)
+                .padding(.vertical, Space.xs)
+                .frame(minHeight: row.isDefault ? Metric.rowWithDescription : Metric.row)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(
+                [row.option.label, row.isDefault ? String(localized: "Default", comment: "Chat settings: the badge of the daemon's main model") : nil,
+                 row.isFavourite ? String(localized: "Favourite", comment: "VoiceOver: a starred model") : nil].compactMap { $0 }.joined(separator: ", "))
             .accessibilityAddTraits(isChosen ? [.isSelected] : [])
+            .accessibilityAction(named: favourite) { marks = marks.togglingFavourite(row.option.ref) }
             .accessibilityIdentifier("modelCatalog.model")
+            .contextMenu {
+                Button(favourite, systemImage: row.isFavourite ? "star.slash" : "star") { marks = marks.togglingFavourite(row.option.ref) }
+                    .accessibilityIdentifier("modelCatalog.star")
+            }
             if managesHidden {
                 Button { marks = marks.togglingHidden(row.option.ref) } label: {
                     Image(systemName: row.isHidden ? "eye.slash" : "eye").font(.system(.body, weight: .regular)).foregroundStyle(Tone.secondary)
@@ -149,24 +174,12 @@ struct ModelCatalog<Options: View>: View {
                     row.isHidden
                         ? String(localized: "Show \(row.option.label)", comment: "VoiceOver: shows a hidden model again; the argument is its name")
                         : String(localized: "Hide \(row.option.label)", comment: "VoiceOver: hides a model from the list; the argument is its name"))
-            } else {
-                Button { marks = marks.togglingFavourite(row.option.ref) } label: {
-                    Image(systemName: row.isFavourite ? "star.fill" : "star").font(.system(.body, weight: .regular))
-                        .foregroundStyle(row.isFavourite ? Tone.text : Tone.tertiary)
-                        .frame(width: Metric.hit, height: Metric.hit).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .haptic(.selection, trigger: row.isFavourite)
-                .accessibilityLabel(
-                    row.isFavourite
-                        ? String(localized: "Remove \(row.option.label) from favourites", comment: "VoiceOver: unstars a model; the argument is its name")
-                        : String(localized: "Add \(row.option.label) to favourites", comment: "VoiceOver: stars a model; the argument is its name"))
-                .accessibilityIdentifier("modelCatalog.star")
             }
         }
         .padding(.leading, Space.groupedGutter)
-        .padding(.trailing, Space.xxs)
+        .padding(.trailing, managesHidden ? Space.xxs : Space.groupedGutter)
         .haptic(.selection, trigger: isChosen)
+        .haptic(.selection, trigger: row.isFavourite)
     }
 }
 
@@ -214,9 +227,9 @@ struct ModelSearchBar: View {
     }
 }
 
-/// A section of a picker sheet (the owner's look of 2026-11-26): its rows plain on the sheet's ground, a hairline between
-/// two of them and no card behind, like the provider rows; the header in the same quiet ink as theirs.
-struct PlainSection<Content: View>: View {
+/// A section of a picker sheet, inset and grouped as iOS draws its settings (the owner's report of 2026-11-27): the rows
+/// on one card, a hairline between two of them from the text's edge, the header in quiet ink over it.
+struct InsetSection<Content: View>: View {
     let header: String?
     @ViewBuilder let content: () -> Content
     @Environment(\.displayScale) private var displayScale: CGFloat
@@ -225,7 +238,7 @@ struct PlainSection<Content: View>: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             if let header {
                 Text(header).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary)
-                    .padding(.horizontal, Space.xs)
+                    .padding(.horizontal, Space.groupedGutter)
                     .accessibilityAddTraits(.isHeader)
             }
             VStack(spacing: 0) {
@@ -240,6 +253,8 @@ struct PlainSection<Content: View>: View {
                     }
                 }
             }
+            .background(Tone.card, in: rounded(Radius.section))
+            .clipShape(rounded(Radius.section))
         }
     }
 }

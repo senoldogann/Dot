@@ -163,7 +163,7 @@ export function arePicks(value) {
 /**
  * The picks of one composer: `list` is the row of their chips, to place under the box, and `onChange()` runs after
  * every change. Returns `list`, `has(kind, name)`, `add(kind, name)` and `toggle(kind, name)` for a "plugin", an
- * "account" or a "skill", `planFirst()`, `planRow()` (the switch of Plan first, for the composer's menu), `setPlanAvailable(on)` (a chat
+ * "account" or a "skill", `planFirst()`, `setPlanFirst(on)`, `planRow()` (the switch of Plan first, for the composer's menu), `setPlanAvailable(on)` (a chat
  * has no Plan first: off, the switch hides and the pick goes), `count()`, `body()` (the fields of a run request:
  * `{ plugins, skills, accounts, plan_first }`), `saved()` and `restore(saved)` for a draft, and `sent()` once a message that
  * starts a run went with them.
@@ -237,6 +237,7 @@ export function createPicks({ onChange }) {
     add,
     toggle: (kind, name) => (chosen[kind].includes(name) ? remove(kind, name) : add(kind, name)),
     planFirst: () => planFirst,
+    setPlanFirst,
     planRow: () => planRow,
     setPlanAvailable: (on) => {
       planAvailable = on;
