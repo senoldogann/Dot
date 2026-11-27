@@ -119,7 +119,7 @@ watcher has:
 - **what it does**: **Tell me** (the default), or **Tell me and start a task** with your goal text ("draft a reply in my
   voice and keep it as a draft").
 
-**It looks; nothing reaches the daemon.** The daemon looks for each watcher at its own interval, in a loop of its own
+**It looks; a watcher is not called.** The daemon looks for each watcher at its own interval, in a loop of its own
 beside the scheduler (`[watchers] tick_s` is how often it sees which are due). A watcher is not called: a service that
 can call an address starts work through a [hook](hooks.md) instead, signed with the hook's secret. A watcher keeps
 its place in the store, so a restart neither repeats nor misses: mail asks from five minutes before the last look began

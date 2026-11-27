@@ -104,6 +104,12 @@ type ContextTokens = Annotated[int | Literal["most"], AfterValidator(_context_to
 type PageAppearance = Literal["system", "light", "dark"]
 
 
+# A Host header's value: a DNS name, with a port or none.
+_HOST_HEADER: re.Pattern[str] = re.compile(
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*(?::[0-9]{1,5})?"
+)
+
+
 class ServerConfig(FrozenModel):
     """``host`` and ``port`` are where the daemon listens, a loopback address only. ``reach`` names the hosts a reverse
     proxy on the owner's own network presents the daemon as (``tailscale serve`` gives ``<mac>.<tailnet>.ts.net``); a
@@ -117,6 +123,15 @@ class ServerConfig(FrozenModel):
     hook_hosts: list[str]
     # Whether the daemon keeps the Mac awake while it charges (item 271), for a phone that reaches it from away.
     keep_awake: bool
+
+    @field_validator("hook_hosts")
+    @classmethod
+    def _hook_hosts_are_hosts(cls, hosts: list[str]) -> list[str]:
+        # Each is compared with a request's Host header as it stands: a name, with its port when it is not 443.
+        bad: list[str] = [host for host in hosts if _HOST_HEADER.fullmatch(host) is None]
+        if bad:
+            raise ValueError(f"[server] hook_hosts takes host names such as mac.tailnet.ts.net:8443, not {bad}")
+        return hosts
 
 
 class DaemonConfig(FrozenModel):

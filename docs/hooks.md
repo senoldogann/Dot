@@ -52,7 +52,8 @@ The body is signed byte for byte as it is sent. Dot answers:
   address but not the secret cannot use them up. **409**: the work could not start now (see above). **503**: the hooks'
   file cannot be read (the log says why).
 
-A call that is sent twice with the same timestamp and body is a replay: sign each call afresh.
+A call that is sent twice with the same timestamp and body is a replay: sign each call afresh. A call answered 429
+started nothing and is not remembered: it may be sent again once `Retry-After` has passed, inside the 5 minutes.
 
 ```bash
 secret='the secret Settings showed you'

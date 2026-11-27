@@ -1349,12 +1349,14 @@ The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any 
 `127.0.0.1`, `localhost` or `::1`, written so (another spelling of a loopback address, such as `127.0.0.2` or `::1` in
 full, would start a server that refuses every request, its own client's too: item 561). Every request must carry
 a path without a `.` or `..` segment (`..%2F`, as a browser sends it, reads as one; item 419), a `Host` of the loopback
-address and, when it has one, an `Origin` of the server itself; every call under `/api` except
-`/api/health`, `/api/proof` and `/api/phone/pair` needs the bearer token in `<home>/api-token` (mode 0600), or the key
-of a paired phone that is still listed (item 670, [Dot on the phone](phone.md)), which pairing codes and the paired
-phones' routes do not take (403). A request's body is read whole only within its limit, after the guard let it
-through: 4 KB on what it lets through without a token (those three routes, the pages and the files), 32 MB on every
-route that needs the token or a phone's key (an attachment of 20 MB in base64); a longer one, declared
+address or a name of `[server] reach` (and, for a call to a hook alone, one of `[server] hook_hosts`) and, when it has
+one, an `Origin` of the server itself; every call under `/api` except
+`/api/health`, `/api/proof`, `/api/phone/pair` and a call to a hook (`POST /api/hooks/<id>`, signed with the hook's own
+secret instead, [Hooks](hooks.md)) needs the bearer token in `<home>/api-token` (mode 0600), or the key
+of a paired phone that is still listed (item 670, [Dot on the phone](phone.md)), which pairing codes, the paired
+phones' routes and the hooks' own routes do not take (403). A request's body is read whole only within its limit, after
+the guard let it through: 4 KB on what it lets through without a token (the three routes, the pages and the files),
+64 KiB on a call to a hook, 32 MB on every route that needs the token or a phone's key (an attachment of 20 MB in base64); a longer one, declared
 or streamed, is answered 413 and read no further (item 942). The one route that takes a file as its raw body,
 `PUT /api/attachments/stream`, is not read whole: a declared length over 200 MiB is answered 413 at once, and the route
 counts the rest as it writes it (item 1933). A page a run showed

@@ -437,8 +437,8 @@ the code is for pairing a phone, which it takes too): Settings ›
 Phone, on the Mac or in Safari where Dot is open with the Mac's own key, shows one with **Show code**, eight characters
 in two groups (Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a
 new code takes the place of the one before, and five wrong tries use a code up. The app trades it for a key of the
-phone's own (`POST /api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host
-and Origin checks hold for it as for any other; item 670): `phone.<id>.<secret>`, which the daemon keeps nowhere: it
+phone's own (`POST /api/phone/pair`, one of the routes that take no token, beside the health check, the proof and a signed
+call to a [hook](hooks.md); the Host and Origin checks hold for it as for any other; item 670): `phone.<id>.<secret>`, which the daemon keeps nowhere: it
 keeps the key's SHA-256, the phone's name (iPhone, iPad, Android phone, read from its browser), and when it was paired
 and last used, in `<home>/phones.json`, readable by you only. The phone proves the daemon with its key as with any token
 (the proof is keyed with the key's hash, the one thing the daemon holds of it). The daemon is not proven before a code

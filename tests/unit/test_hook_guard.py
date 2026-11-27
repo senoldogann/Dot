@@ -6,10 +6,12 @@ and a page of another site is refused."""
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.types import Receive, Scope, Send
 
+from dotagent.config import ServerConfig
 from dotagent.server.bodylimit import MOST, PUBLIC_MOST, body_most
 from dotagent.server.guard import LocalGuard, check_request, is_hook_call, needs_main_token, needs_token
 
@@ -76,3 +78,11 @@ async def test_a_call_is_reached_on_this_mac_and_the_reach_names_and_a_hook_host
         assert (await client.post(CALL, headers={"Origin": "https://evil.example"})).status_code == 403
     async with _client(frozenset()) as closed:
         assert (await closed.post(CALL, headers={"Host": FUNNEL})).status_code == 421
+
+
+def test_hook_hosts_take_host_names_with_a_port_and_nothing_else() -> None:
+    base = {"host": "127.0.0.1", "port": PORT, "reach": [], "keep_awake": False}
+    assert ServerConfig(**base, hook_hosts=[FUNNEL, "example.org"]).hook_hosts == [FUNNEL, "example.org"]
+    for bad in ("", "https://mac.tailnet.ts.net", "mac.tailnet.ts.net/api", "a b", ":8443"):
+        with pytest.raises(ValidationError):
+            ServerConfig(**base, hook_hosts=[bad])
