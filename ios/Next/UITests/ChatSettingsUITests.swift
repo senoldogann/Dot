@@ -105,7 +105,7 @@ final class ChatSettingsUITests: XCTestCase {
     /// Dark and light, and the largest accessibility size: the chip stays a 44 pt target (the mark alone at AX3) and the
     /// capsule keeps its parts on one line each. The shots go to the result bundle for the report.
     func testTheCapsuleHoldsInDarkAndAtTheLargestAccessibilitySize() {
-        for (name, extra) in [("dark", ["-AppleInterfaceStyle", "Dark"]), ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"])] {
+        for (name, extra) in [("dark", ["-colorScheme", "dark"]), ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"])] {
             let app: XCUIApplication = XCUIApplication()
             app.launchArguments = ["-DotNextScene", "n2-chat", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + extra
             app.launch()
@@ -158,12 +158,13 @@ final class ChatSettingsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chatSettings.done"].isEnabled)
     }
 
-    /// No word of the level is cut, at the default size and at the largest accessibility size: the row and every choice of
-    /// its menu lie whole inside the window, one menu item per level with the full word. Shots of each, light and dark,
+    /// No word of the level is cut, at the default size and at the largest accessibility size: the row lies whole inside
+    /// the window and every choice of its menu whole across it (the menu scrolls at AX3), one item per level with the full
+    /// word. Shots of each, light and dark,
     /// go to the result bundle for the report.
     func testNoLevelIsCutAtTheDefaultSizeOrAtAX3() {
         for (name, extra) in [
-            ("default", [String]()), ("dark", ["-AppleInterfaceStyle", "Dark"]),
+            ("default", [String]()), ("dark", ["-colorScheme", "dark"]),
             ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]),
         ] {
             let app: XCUIApplication = XCUIApplication()
@@ -186,7 +187,9 @@ final class ChatSettingsUITests: XCTestCase {
                 let item: XCUIElement = app.buttons[level].firstMatch
                 XCTAssertTrue(item.waitForExistence(timeout: 3), "\(name): \(level) in the menu")
                 XCTAssertEqual(item.label, level, "\(name): the full word")
-                XCTAssertTrue(window.contains(item.frame), "\(name): \(level) lies whole inside the window: \(item.frame)")
+                // Whole across the window; at AX3 the system's menu scrolls, so a level may stand below its foot.
+                XCTAssertTrue(
+                    item.frame.minX >= window.minX && item.frame.maxX <= window.maxX, "\(name): \(level) lies whole across the window: \(item.frame)")
             }
             let menu: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
             menu.name = "chat-settings-levels-\(name)"

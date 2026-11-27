@@ -159,7 +159,7 @@ struct ChatSettingsSheet: View {
     private var approvalsPage: some View {
         SettingsScroll(title: String(localized: "Approvals", comment: "Chat settings row: the approval mode the run works under")) {
             GroupedSection(header: nil, footer: String(localized: "Free mode, which asks nothing, is switched for all of Dot on the Mac.", comment: "Chat settings: free mode is not a chat's choice")) {
-                RadioRow(title: approvalWords(nil), description: nil, isSelected: draft.choices.approvals == nil) {
+                RadioRow(title: approvalWords(nil), description: macApprovalWords, isSelected: draft.choices.approvals == nil) {
                     draft.choices = draft.choices.with(approvals: nil)
                 }
                 ForEach(ApprovalChoice.allCases, id: \.self) { choice in
@@ -173,12 +173,15 @@ struct ChatSettingsSheet: View {
         .background(Tone.sheet)
     }
 
+    /// The Mac's own approval mode by name, under "Dot's setting" on the Approvals page; `nil` until it is read.
+    private var macApprovalWords: String? {
+        defaults.flatMap { ApprovalChoice(rawValue: $0.approvals) }?.title
+    }
+
     private func approvalWords(_ approvals: String?) -> String {
         if let approvals, let choice = ApprovalChoice(rawValue: approvals) { return choice.title }
-        guard let fallback = defaults?.approvals, let choice = ApprovalChoice(rawValue: fallback) else {
-            return String(localized: "Dot's setting", comment: "Chat settings: the approval mode configured on the Mac")
-        }
-        return String(localized: "Dot's setting (\(choice.title))", comment: "Chat settings: the approval mode configured on the Mac; the argument is its name")
+        // The Mac's own mode is named on the Approvals page; the row keeps to two words, so it is never cut.
+        return String(localized: "Dot's setting", comment: "Chat settings: the approval mode configured on the Mac")
     }
 }
 
