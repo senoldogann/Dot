@@ -17,7 +17,7 @@ from typing import BinaryIO
 
 from pydantic import AliasChoices, Field, JsonValue
 
-from dotagent.core.errors import ToolExecutionError
+from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.held import held_folder, open_regular
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.photos import MACOS_IMAGE_SUFFIXES, drawn_by_macos
@@ -61,6 +61,17 @@ _RG_ERROR: int = 2
 # reading of a folder of a large tree, such as those under ~/Library/Containers, which reads a moment later).
 _UNREAD_PATH: re.Pattern[str] = re.compile(r"rg: (.+ \(os error (?:1|4|13)\))")
 _UNREAD_SHOWN: int = 10
+# Its lines for a pattern it cannot read as a regex (item 1988): "rg: regex parse error:", the pattern, a caret line and
+# "error: <reason>"; or "rg: the literal "\n" is not allowed in a regex". Some go on with advice to pass a flag
+# (--pcre2, --multiline) that search_files does not take, so the reason alone is kept.
+_PARSE_REASON: re.Pattern[str] = re.compile(r"^error: (.+)$", re.MULTILINE)
+_NOT_ALLOWED: re.Pattern[str] = re.compile(r"^rg: (the literal .+ is not allowed in a regex)$", re.MULTILINE)
+# What the model is told of the syntax search_files reads, in the pattern's description and in the error of one it
+# cannot read: models write Python's or PCRE's syntax, a look-ahead or a "\n" across lines.
+_PATTERN_SYNTAX: str = (
+    "Rust regex syntax, as ripgrep reads it: no look-around ((?=, (?!, (?<=, (?<!) and no backreferences, and a match "
+    "lies within one line, so a pattern holds no \\n; escape ( ) [ ] { } . | * + ? ^ $ \\ to match them as text"
+)
 # Its line for a path given it that is not there (ENOENT), the model's own guess of a path (item 1283).
 _MISSING_PATH: re.Pattern[str] = re.compile(
     r"rg: (.+?): (?:IO error for operation on .+: )?No such file or directory \(os error 2\)"
@@ -726,6 +737,16 @@ def _unread(stderr: str) -> list[str] | None:
     return said if lines and len(said) == len(lines) else None
 
 
+def _pattern_fault(stderr: str) -> str | None:
+    """ripgrep's reason the pattern it was given is not a regex it reads (item 1988), when that is what it said; None
+    when it said anything else."""
+    if stderr.startswith("rg: regex parse error:"):
+        reason: re.Match[str] | None = _PARSE_REASON.search(stderr)
+        return reason.group(1) if reason is not None else "regex parse error"
+    literal: re.Match[str] | None = _NOT_ALLOWED.search(stderr)
+    return literal.group(1) if literal is not None else None
+
+
 def _missing(stderr: str, target: Path) -> bool:
     """Whether all ripgrep said is that ``target``, the path it was given, is not there (item 1283): the search fails
     as ``list_dir`` and ``read_file`` do for a path that does not exist, rather than as a failure of ripgrep's own. A
@@ -748,7 +769,7 @@ class SearchFilesArgs(ToolArgs):
     # refused and sent again.
     pattern: str = Field(
         validation_alias=AliasChoices("pattern", "query"),
-        description="Regular expression to search for in file contents.",
+        description=f"Regular expression to search for in file contents, in {_PATTERN_SYNTAX}.",
     )
     path: str | None = Field(default=None, description="Directory or file to search. Defaults to the workspace.")
     glob: str | None = Field(default=None, description="Only search files matching this glob, e.g. '*.py'.")
@@ -785,6 +806,12 @@ def _search_files_tool() -> RegisteredTool:
             found = ok(_with_unread(_capped(lines, "matches") + cut if stdout.strip() != "" else "No matches.", unread))
         elif code == _RG_ERROR and _missing(stderr, target_of(args, ctx)):
             raise ToolExecutionError("path does not exist", {"path": str(target_of(args, ctx))})
+        elif code == _RG_ERROR and (fault := _pattern_fault(stderr)) is not None:
+            # The model's pattern, not a failure of ripgrep's own (item 1988): told as an error of the call's input.
+            raise ToolInputError(
+                f"The pattern has a regex syntax error ({fault}). search_files reads {_PATTERN_SYNTAX}.",
+                {"pattern": args.pattern},
+            )
         elif code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "pattern": args.pattern})
         else:

@@ -718,7 +718,9 @@ a model on the owner's Mac sent them 17 times in two days, each call refused), `
 `file_text` too (item 1902: Claude models sent that name, the one Anthropic's text editor tool gives it), `search_files` reads its `pattern` as
 `query` too (item 1176: a run on the Claude plan sent that name four times), `search_files` and `find_files` of a
 path that is not there fail with "path does not exist", as `list_dir` and `read_file` do, not as a failure of
-ripgrep's own (item 1283), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
+ripgrep's own (item 1283), `search_files` reads its pattern in ripgrep's own regex syntax, which its description
+names (no look-around, no backreferences, a match within one line), and fails a pattern ripgrep cannot read as the
+call's error with ripgrep's reason, not as a failure of ripgrep's own (item 1988), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
 comes, ending the search at that and saying so, so that a word a tree holds everywhere no longer costs the daemon
 the 1.8 GB that 397 MB of matches did (item 1956), and a wait or a count asked past its
 bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
