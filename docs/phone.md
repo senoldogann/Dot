@@ -108,8 +108,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
    Work (Work orders, Objectives, with those done or let go below the active ones, and Hand-offs with the two faces and "From → To", each to read, and
-   laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
-   and writes none, so the phone only reads, and scopes them to the bot itself: an agent's page has the orders given to it,
+   laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; neither the web nor the phone
+   writes them, and both scope them to the bot (the web on a bot's page since item 2035, by the same rules): an agent's page has the orders given to it,
    the objectives those serve and the messages to or from it; Dot's own has every order and objective and the messages it sent
    or was sent, not those between two other agents; all within the newest 60 orders and 60 objectives the daemon sends), a ⋯ menu with Pause bot and Resume bot for an agent (`POST /api/agents/{id}/pause|resume`, item 465), then
    Routines, Model, Activity, and a Notifications switch that is the phone's own count of its unread chats and what waits
@@ -363,6 +363,7 @@ capsule of glass (a blurred translucent surface with a solid one where the brows
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
 never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Waiting for 2 helpers** (only while the run has stopped for them), **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
+**Waiting on 2 helpers** while the run has stopped for them, **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
 "Working") and at 320 px, with everything to say, takes a second line that keeps the status and the Stop in words, never

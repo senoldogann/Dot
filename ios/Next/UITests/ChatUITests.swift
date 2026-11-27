@@ -50,6 +50,41 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// The swipe to quote beats the navigation's pull-back (item 2030): iOS 26 pulls a pushed chat back from a swipe to the
+    /// right anywhere in it, which a swipe on a message is. On a message of the owner's and of Dot's, from the middle of the
+    /// screen, the message is quoted and the chat stays open; a swipe from the screen's edge still goes back.
+    @MainActor
+    func testASwipeOnAMessageQuotesWhileTheEdgeSwipeStillGoesBack() {
+        let app: XCUIApplication = launch("n2-failed", defaults: ["-DotNextPushed", "YES"])
+        let home: XCUIElement = app.staticTexts["Fixture home"]
+        let chip: XCUIElement = app.descendants(matching: .any)["composer.quote"]
+        let owner: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+        XCTAssertTrue(owner.waitForExistence(timeout: 10))
+        let origin: XCUICoordinate = app.coordinate(withNormalizedOffset: .zero)
+        func drag(_ element: XCUIElement, by dx: CGFloat) {
+            let start: CGVector = CGVector(dx: element.frame.midX - 40, dy: element.frame.midY)
+            origin.withOffset(start).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: start.dx + dx, dy: start.dy)))
+        }
+        drag(owner, by: 200)
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on the owner's message quotes it")
+        XCTAssertTrue(chip.label.contains("Book me the dentist"), chip.label)
+        XCTAssertFalse(home.exists, "the chat is still open")
+        app.buttons["composer.quote.remove"].tap()
+
+        let answer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "merged, see")).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 10))
+        drag(answer, by: 200)
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on Dot's message quotes it")
+        XCTAssertTrue(chip.label.contains("merged"), chip.label)
+        XCTAssertFalse(home.exists, "the chat is still open")
+        app.buttons["composer.quote.remove"].tap()
+
+        // From the screen's own edge it is still the way back.
+        origin.withOffset(CGVector(dx: 2, dy: 400)).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: 260, dy: 400)))
+        XCTAssertTrue(home.waitForExistence(timeout: 10), "the edge swipe goes back")
+        XCTAssertFalse(chip.exists)
+    }
+
     @MainActor
     func testThePlusMenuAttachesAVideoWithItsDurationAndCanRemoveIt() throws {
         let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))

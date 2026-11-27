@@ -150,9 +150,9 @@ async def test_the_phone_sheet_has_the_phones_options_in_its_order_and_words(add
                 await sheet.get_by_role("option", name="Thinker").click()
                 await page.screenshot(path=str(shots / f"web-chat-settings-390-{scheme}.png"))
                 options: Locator = sheet.locator(".sheet-options")
-                await expect(options.locator(".sheet-row-text > span:first-child")).to_have_text(
-                    ["Reasoning", "Fast mode", "Approvals", "Plan first"]
-                )
+                await expect(
+                    options.locator("summary > .sheet-row-text, .sheet-switch .sheet-row-text > span:first-child")
+                ).to_have_text(["Reasoning", "Fast mode", "Approvals", "Plan first"])
                 # The levels in full words, none cut.
                 await options.locator("summary", has_text="Reasoning").click()
                 levels: Locator = options.get_by_role("listbox", name="Reasoning").get_by_role("option")
@@ -172,9 +172,9 @@ async def test_the_phone_sheet_has_the_phones_options_in_its_order_and_words(add
                 await fast.click()
                 await expect(fast).to_have_attribute("aria-checked", "true")
                 await sheet.get_by_role("option", name="Plain").click()
-                await expect(options.locator(".sheet-row-text > span:first-child")).to_have_text(
-                    ["Reasoning", "Approvals", "Plan first"]
-                )
+                await expect(
+                    options.locator("summary > .sheet-row-text, .sheet-switch .sheet-row-text > span:first-child")
+                ).to_have_text(["Reasoning", "Approvals", "Plan first"])
                 await expect(options.get_by_role("switch", name="Fast mode")).to_have_count(0)
                 await expect(page.get_by_text("This model has no fast mode.")).to_have_count(0)
                 await page.close()
