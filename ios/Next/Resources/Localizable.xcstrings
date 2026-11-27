@@ -2446,17 +2446,6 @@
         }
       }
     },
-    "Can't reach %@": {
-      "comment": "Chat capsule: the link to the Mac broke a while ago and has not come back; the argument is the Mac's name",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ cihazına ulaşılamıyor"
-          }
-        }
-      }
-    },
     "Can't reach your Mac": {
       "comment": "Connect apps: no answer from the Mac and nothing to show\nEmpty chat when offline with nothing saved",
       "localizations": {
@@ -7049,6 +7038,17 @@
         }
       }
     },
+    "Looking into it…": {
+      "comment": "Chat message of Dot's, said the moment a task starts, before it has done anything",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bakıyorum…"
+          }
+        }
+      }
+    },
     "Looks every %lld minutes": {
       "comment": "Watcher: how often it looks",
       "localizations": {
@@ -7141,6 +7141,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac uygulaması"
+          }
+        }
+      }
+    },
+    "Mac asleep or unreachable": {
+      "comment": "Connection status when the last contact time is unknown",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac uykuda veya ulaşılamıyor"
+          }
+        }
+      }
+    },
+    "Mac asleep or unreachable since %@": {
+      "comment": "Connection status with the time of the last successful contact",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac uykuda veya ulaşılamıyor · son bağlantı %@"
           }
         }
       }
@@ -16749,17 +16771,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "· sormadan"
-          }
-        }
-      }
-    },
-    "your Mac": {
-      "comment": "The Mac when its name is not known",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mac"
           }
         }
       }

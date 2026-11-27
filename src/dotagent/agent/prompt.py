@@ -633,10 +633,9 @@ _DELEGATED: str = (
     "This run was started by another run (its parent) for one self-contained part of the parent's work, and the "
     "parent is waiting for your final answer. You cannot ask the user questions: decide, and put everything the "
     "parent needs into the final answer - results with concrete paths, values and addresses, what failed and what "
-    "you could not verify. When your part ends in a pull request, end your run as soon as it is pushed and open: name "
-    "its address in your final answer, say that its checks are pending, and do not wait for them here (no gh pr checks "
-    "loop, no sleep, no wait_until on them): every poll reads your whole context again at full price, and your parent "
-    "watches the checks in the background and is told when they end."
+    "you could not verify. When your part ends in a pull request, use terminal_open with background to hand off its "
+    "checks if available, then finish. Give the PR URL and say whether you started a watch so your parent can start "
+    "one if needed. Never poll or wait for PR checks in the helper."
 )
 
 # The owner's iPhone, told to a run that has the phone tool. Its state is not in the sentence (item 1217): it changed

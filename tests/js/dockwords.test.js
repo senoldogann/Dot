@@ -57,7 +57,7 @@ test("a run that was told to stop says it stops, and offers no Stop", () => {
 test("a lost stream says it reconnects, over the time, and keeps the Stop of a run that works", () => {
   const working = dockSegments(state({ status: "running", took: 36, reconnecting: true }));
   assert.deepEqual(ids(working), ["status", "stop"]);
-  assert.equal(working[0].label, "Can't reach Dot");
+  assert.equal(working[0].label, "Chat updates interrupted");
   assert.equal(working[0].tone, "warn");
   // With no run to stop, the capsule is the one segment that says it.
   assert.deepEqual(ids(dockSegments(state({ reconnecting: true }))), ["status"]);

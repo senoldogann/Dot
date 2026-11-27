@@ -634,7 +634,10 @@ async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_bl
                 await page.goto(f"{address}/#/runs/{parent.id}")
                 line = page.locator(".wait-line-text")
                 if width == 1280:
-                    await expect(line).to_have_text("Waiting for 1 helper", timeout=WAIT_S * 1000)
+                    # The bar's own part says the wait; the line over it holds the helper's words (capsule.js).
+                    await expect(page.locator(".capsule-time")).to_have_text(
+                        "Waiting for 1 helper", timeout=WAIT_S * 1000
+                    )
                     manager.steer(parent.id, "Stop waiting.", ())
                 await expect(line).to_have_text("1 helper keeps working in the background", timeout=WAIT_S * 1000)
                 await expect(page.locator(".wait-line")).to_have_attribute(
