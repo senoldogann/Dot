@@ -138,7 +138,7 @@
   display: none;
 }
 
-:root[data-work="status"] .run-thread:not(.steps-shown) :is(details.steps, details.thought) {
+:root:is([data-work="status"], [data-work="messages"]) .run-thread:not(.steps-shown) :is(details.steps, details.thought) {
   display: none;
 }
 
@@ -155,8 +155,8 @@
 /* Words that may be the answer (`data-either`) are drawn as the message they most often stay while they stream: 45 of
    68 of the owner's Claude Code tasks ended with such words as the answer (item 1166), and a quiet note that turned into
    a message at its step's end grew half again in height under the reader (item 274's rule: drawn as it will stay). */
-.run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]),
-.run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]) > .prose {
+:root:not([data-work="messages"]) .run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]),
+:root:not([data-work="messages"]) .run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]) > .prose {
   background: none;
   box-shadow: none;
   color: var(--muted);
@@ -167,23 +167,45 @@
    where the answer stands with its face and its foot. The rule is drawn down the middle of the face's column, where the
    steps' marks stand, so the words keep the conversation's lane (a border and padding pushed them off it, item 1182).
    An update that wears the face has the face in that place instead. */
-.run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either], :has(> .turn-face)) {
+:root:not([data-work="messages"]) .run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either], :has(> .turn-face)) {
   background: linear-gradient(var(--border-strong), var(--border-strong)) no-repeat calc(28px / 2 - 1px) 0 / 2px 100%;
   border-radius: 0;
 }
 
 /* No bubble on a phone (run.css gives its words one): the words start on the conversation's lane, as the answer's. */
-.run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]) > .prose {
+:root:not([data-work="messages"]) .run-thread :is(.bubble.say, .turn-say).say-progress:not([data-either]) > .prose {
   padding-inline: 0;
+}
+
+/* "Messages only" (item 1976): the run told as a conversation, as Grok Bot tells its work. What the run says on the way
+   to its calls is one of its messages, drawn as one, and a call that turns it to other work, which its own words did not
+   tell, is one of Dot's short messages too (`say-narration`, from the run's `narration` events); the steps fold out as
+   with "What it is doing", and the line under the conversation says what it does now and for how long. A line of a call
+   shows in this choice alone, never beside the steps it tells. */
+:root:not([data-work="messages"]) .say-narration,
+:root[data-work="messages"] .run-thread.steps-shown .say-narration {
+  display: none;
+}
+
+.work-status-time {
+  display: none;
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-work="messages"] .work-status[data-state="working"] .work-status-time:not(:empty) {
+  display: inline;
 }
 
 /* What the run saved to memory is the run's bookkeeping, not what it says: with "What it is doing" chosen it stands with
    the steps, out of the conversation until they are shown (item 830). */
-:root[data-work="status"] .run-thread:not(.steps-shown) .note.memory-line {
+:root:is([data-work="status"], [data-work="messages"]) .run-thread:not(.steps-shown) .note.memory-line {
   display: none;
 }
 
-:root[data-work="status"] .work-status:is([data-state="working"], [data-state="over"]) {
+:root:is([data-work="status"], [data-work="messages"]) .work-status:is([data-state="working"], [data-state="over"]) {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -200,8 +222,8 @@
 
 /* A run that is over and took no step has nothing to show; one that has an answer offers its steps in the answer's
    foot, where the pointer rests (item 842), and the line goes. */
-:root[data-work="status"] .run-thread:not(:has(details.steps, details.thought)) .work-status[data-state="over"],
-:root[data-work="status"] .run-thread:has(.answer-steps) .work-status[data-state="over"] {
+:root:is([data-work="status"], [data-work="messages"]) .run-thread:not(:has(details.steps, details.thought)) .work-status[data-state="over"],
+:root:is([data-work="status"], [data-work="messages"]) .run-thread:has(.answer-steps) .work-status[data-state="over"] {
   display: none;
 }
 
@@ -209,7 +231,7 @@
   display: none;
 }
 
-:root[data-work="status"] .run-thread:has(details.steps, details.thought) .answer-steps {
+:root:is([data-work="status"], [data-work="messages"]) .run-thread:has(details.steps, details.thought) .answer-steps {
   display: inline-flex;
 }
 
@@ -236,7 +258,7 @@
 
 /* The line of the work is the agent typing (item 843): its face in the place the answer's takes, its words where the
    words of the messages start, close under the message before it rather than a section's gap away. */
-:root[data-work="status"] .run-thread > .work-status {
+:root:is([data-work="status"], [data-work="messages"]) .run-thread > .work-status {
   margin-top: var(--space-2);
 }
 

@@ -2065,6 +2065,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     active,
     queued: status === "queued",
     face: actorFace(agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id, "working", null),
+    startedAt: run.created_at,
     onToggle: (shown) => {
       // The steps open or fold above what was pressed: it stays where the reader's finger is, and the conversation
       // moves around it (the owner's word: Show the steps threw the chat up). The press is the line or an answer's

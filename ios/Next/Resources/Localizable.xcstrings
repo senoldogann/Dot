@@ -476,6 +476,17 @@
         }
       }
     },
+    "%lld min": {
+      "comment": "Work line: how long the run has worked, in whole minutes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dk"
+          }
+        }
+      }
+    },
     "%lld minutes before an event": {
       "comment": "Watcher: how long before an event a calendar watcher tells",
       "localizations": {
@@ -578,6 +589,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld rapor · %@ sn"
+          }
+        }
+      }
+    },
+    "%lld s": {
+      "comment": "Work line: how long the run has worked, in seconds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sn"
           }
         }
       }
@@ -6576,6 +6598,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekrana baktı"
+          }
+        }
+      }
+    },
+    "Looking at %@": {
+      "comment": "Chat message of Dot's: a page it looks at; the argument is its site",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ inceleniyor"
           }
         }
       }

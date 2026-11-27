@@ -2012,4 +2012,7 @@ export const EN_APP = {
   // Added by hand, for sentences that need their own word order.
   "errors.faultShort": "Stopped: Dot could not finish",
   "errors.faultNext": "Dot could not finish this task. What was done stays. Send a message here to go on, or press Continue.",
+  // Added by hand, for sentences that need their own word order.
+  "layout.messagesOnly": "Messages only",
+  "layout.dotTellsWhatItTurns": "Dot tells what it turns to in short messages, as a person would, with one line of what it does now and for how long; press the line for the steps.",
 };

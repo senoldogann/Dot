@@ -2013,4 +2013,7 @@ export const TR_APP = {
   // Added by hand, for sentences that need their own word order.
   "errors.faultShort": "Durdu: Dot bitiremedi",
   "errors.faultNext": "Dot bu görevi bitiremedi. Yapılanlar kalır. Devam etmek için buraya bir mesaj yazın ya da Devam et'e basın.",
+  // Added by hand, for sentences that need their own word order.
+  "layout.messagesOnly": "Yalnızca mesajlar",
+  "layout.dotTellsWhatItTurns": "Dot neye yöneldiğini bir insan gibi kısa mesajlarla anlatır; altında şimdi ne yaptığını ve ne kadardır sürdüğünü söyleyen tek satır olur; adımlar için satıra basın.",
 };

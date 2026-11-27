@@ -193,7 +193,7 @@ export const EN_VIEWS = {
   "views.appearance.density": "Density",
   "views.appearance.howCloseTheRowsCards": "How close the rows, cards and lists sit.",
   "views.appearance.workInAChat": "Work in a chat",
-  "views.appearance.whatAConversationShowsWhile": "What a conversation shows while Dot works: every step it takes, or one line of what it does now.",
+  "views.appearance.whatAConversationShowsWhile": "What a conversation shows while Dot works: every step it takes, one line of what it does now, or only its messages.",
   "views.appearance.foldSteps": "Fold steps",
   "views.appearance.sidePanel": "Side panel",
   "views.appearance.onWideWindowsAChat": "On wide windows a chat shows its details, plan and screenshots in a panel beside the conversation.",

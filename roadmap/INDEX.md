@@ -6,11 +6,14 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1982](1982.md) | design | 2026-11-27 | Several tasks at once in one chat: design |
 | [1981](1981.md) | done | 2026-11-27 | A run that ended for a fault says what happened in a plain sentence, with the program's words under Details |
 | [1980](1980.md) | done | 2026-11-27 | A stopped run keeps the words it had streamed, with a quiet "Stopped" note under them |
 | [1979](1979.md) | done | 2026-11-27 | An approval card says what Dot wants to do and why it asks in plain words, with the policy's words folded |
 | [1978](1978.md) | done | 2026-11-27 | An English line is no longer capitals under a Turkish page: the question card's header is plain |
 | [1977](1977.md) | done | 2026-11-27 | The web UI speaks Turkish on every screen, and a check fails for a line of English that is not in the catalogue |
+| [1976](1976.md) | done | 2026-11-27 | A chat told as a conversation: Dot's short messages of what it turns to, and the live line with its face and time |
+| [1974](1974.md) | done | 2026-11-26 | The Desktop section's batch line is back: a batch's result is the run's look |
 | [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |
 | [1972](1972.md) | done | 2026-11-26 | Swipe a message to quote it |
 | [1971](1971.md) | done | 2026-11-26 | The pre-push hook checks the prompt surface before it asks a model |

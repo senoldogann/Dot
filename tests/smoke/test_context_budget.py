@@ -147,7 +147,10 @@ BUDGET_TOKENS: int = 33_700
 # reads 8,465 now.
 # Raised by 150 for the Code section of item 1501 above (system 8,919 measured here).
 # Raised by 150 for the security testing line of the character (item 1887): system 9,178 measured here.
-SYSTEM_BUDGET_TOKENS: int = 9_200
+# Raised by 50 for the Desktop section's batch line of item 1960, put back by item 1974: the result of a batch is the
+# run's look, which took the tool eval's "no look after a change the result shows" from 3/10 to 13/20 on the owner's
+# model, each look saved being a model turn of thousands of tokens (system 9,234 measured here, on main of item 1931).
+SYSTEM_BUDGET_TOKENS: int = 9_250
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).

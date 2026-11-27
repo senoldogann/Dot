@@ -194,7 +194,7 @@ export const TR_VIEWS = {
   "views.appearance.density": "Yoğunluk",
   "views.appearance.howCloseTheRowsCards": "Satırların, kartların ve listelerin ne kadar yakın durduğu.",
   "views.appearance.workInAChat": "Sohbette çalışma",
-  "views.appearance.whatAConversationShowsWhile": "Dot çalışırken bir sohbetin gösterdiği: attığı her adım ya da şimdi yaptığının tek satırı.",
+  "views.appearance.whatAConversationShowsWhile": "Dot çalışırken bir sohbetin gösterdiği: attığı her adım, şimdi yaptığının tek satırı ya da yalnızca mesajları.",
   "views.appearance.foldSteps": "Adımları daralt",
   "views.appearance.sidePanel": "Yan panel",
   "views.appearance.onWideWindowsAChat": "Geniş pencerelerde bir sohbet, ayrıntılarını, planını ve ekran görüntülerini sohbetin yanındaki bir panelde gösterir.",

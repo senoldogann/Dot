@@ -10,11 +10,13 @@ const INSPECTOR_KEY = "dot.inspector";
 const SIDEBAR_KEY = "dot.sidebar";
 const DENSITY_KEY = "dot.density";
 const WORK_KEY = "dot.work";
-// What a chat shows of a run's work (item 663): every step, or one line of what the run does now (workstatus.js); the
-// choice is `data-work` on the page, which run.css reads.
+// What a chat shows of a run's work (item 663): every step, one line of what the run does now (workstatus.js), or the
+// run told as a conversation (item 1976): Dot's short messages of what it turns to, and that line under them; the choice
+// is `data-work` on the page, which run.css reads.
 export const WORK_SHOWN = [
   { id: "steps", label: t("layout.everyStep"), hint: t("layout.itsThoughtsCommandsAndSteps") },
   { id: "status", label: t("layout.whatItIsDoing"), hint: t("layout.oneLineThatSaysWhat") },
+  { id: "messages", label: t("layout.messagesOnly"), hint: t("layout.dotTellsWhatItTurns") },
 ];
 // What a chat shows of the work until the owner chooses (item 830): the conversation, as people chat, with one line of
 // what the run does now; the steps are a press away.
@@ -95,7 +97,7 @@ function isWork(id) {
   return WORK_SHOWN.some((option) => option.id === id);
 }
 
-/** What a chat shows of a run's work now: "steps" or "status". */
+/** What a chat shows of a run's work now: "steps", "status" or "messages". */
 export function currentWork() {
   const id = document.documentElement.dataset.work;
   return isWork(id) ? id : DEFAULT_WORK;
