@@ -1,5 +1,4 @@
 import DotEngine
-import QuickLook
 import SwiftUI
 
 /// The run inspector, "This chat" (plan §4.1, the owner's shots `dotnext-inspector-problem.png` and of 2026-11-26): plain
@@ -13,8 +12,14 @@ import SwiftUI
 ///   cap and what like tasks spend; Dot holds no price per model, so there is no money (the footer says so);
 /// - the helpers, each opening its own chat (the plan is the pill's Plan n/m and its sheet, not a section here: the
 ///   owner's word of 2026-11-27, item 1996);
-/// - the changes, each file's diff in Quick Look and, for a file as the runs left it, Undo (asked first);
+/// - the changes, each file opening on its change read by its format (`ChangeSheet`; an image or a PDF in the file
+///   preview) and, for a file as the runs left it, Undo (asked first);
 /// - the commands that run in the background with Stop (`DELETE /threads/{id}/terminals/{sid}`).
+///
+/// Every section starts folded, its header a row with its count or its one fact (item 2017: the owner's shot of
+/// 2026-11-27, a sheet that was all Changes); a tap opens it. What is open is kept while the sheet is up (a helper's
+/// chat opened from it and closed again finds it as it was) and forgotten when it closes, as iOS's own disclosure rows
+/// in a sheet are.
 struct RunInspector: View {
     let thread: String
     let close: () -> Void
@@ -25,7 +30,9 @@ struct RunInspector: View {
     @State private var recap: Loadable<RecapView> = .loading
     @State private var costs: Loadable<RunCosts> = .loading
     @State private var terminals: [TerminalView] = []
-    @State private var preview: URL?
+    @State private var shownChange: ShownChange?
+    @State private var shownFile: OpenedFile?
+    @State private var opened: Set<InspectorPart> = []
     @State private var undoing: FileChange?
     @State private var undone: Set<String> = []
     @State private var stopped: Set<String> = []
@@ -39,13 +46,16 @@ struct RunInspector: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.xs) {
-                if let failure { Notice(tone: .failure, message: failure, dismiss: { self.failure = nil }) }
-                GroupedSection(header: String(localized: "Messages", comment: "Chat settings section: what a chat shows"), footer: nil) {
+            VStack(alignment: .leading, spacing: 0) {
+                if let failure { Notice(tone: .failure, message: failure, dismiss: { self.failure = nil }).padding(.vertical, Space.xs) }
+                FoldSection(
+                    header: String(localized: "Messages", comment: "Chat settings section: what a chat shows"), badge: showsSteps ? onWord : offWord, footer: nil,
+                    open: isOpen(.messages)
+                ) {
                     ToggleRow(
                         systemImage: "list.bullet.indent", title: String(localized: "Show steps", comment: "Settings switch: a chat shows its runs' tool calls and thoughts (item 1915)"),
                         description: String(localized: "For this chat; Settings › Chat sets it for every chat.", comment: "This chat sheet: the Show steps switch is this chat's own (item 1915)"),
-                        isOn: Binding(get: { model.stepsOverrides[thread] ?? showStepsEverywhere }, set: { model.stepsOverrides[thread] = $0 }))
+                        isOn: Binding(get: { showsSteps }, set: { model.stepsOverrides[thread] = $0 }))
                     .accessibilityIdentifier("inspector.showSteps")
                 }
                 if let run {
@@ -55,7 +65,7 @@ struct RunInspector: View {
                     costSection
                 } else {
                     EmptyState(
-                        title: String(localized: "Nothing ran yet", comment: "Inspector: the chat has no run"), systemImage: "circle.dotted",
+                        title: String(localized: "Nothing ran yet", comment: "Inspector: the chat has no run"), systemImage: "list.bullet.rectangle",
                         detail: String(localized: "What a run did and cost shows here once one started.", comment: "Inspector empty state detail"), actionTitle: nil, action: {})
                 }
                 helpersSection
@@ -68,7 +78,8 @@ struct RunInspector: View {
         }
         .refreshable { await load() }
         .task(id: run?.id) { await load() }
-        .quickLookPreview($preview)
+        .sheet(item: $shownChange) { shown in ChangeSheet(file: shown.file, close: { shownChange = nil }) }
+        .sheet(item: $shownFile) { shown in FilePreviewSheet(path: shown.path, close: { shownFile = nil }) }
         .confirmationDialog(
             String(localized: "Undo the change to this file?", comment: "Inspector: confirmation of a file's undo"),
             isPresented: Binding(get: { undoing != nil }, set: { if !$0 { undoing = nil } }), titleVisibility: .visible, presenting: undoing
@@ -86,7 +97,7 @@ struct RunInspector: View {
     // MARK: Sections
 
     private func runSection(_ run: RunRecord) -> some View {
-        InspectorSection(header: String(localized: "Run", comment: "Inspector section: the newest run"), footer: nil) {
+        FoldSection(header: String(localized: "Run", comment: "Inspector section: the newest run"), badge: statusWords(run.status), footer: nil, open: isOpen(.run)) {
             FactRow(title: String(localized: "State", comment: "Inspector row: the run's status"), value: statusWords(run.status))
             FactRow(
                 title: String(localized: "Started", comment: "Inspector row: when the run started"),
@@ -107,7 +118,7 @@ struct RunInspector: View {
         let parts: ModelParts = modelParts(ref)
         let label: String = model.models.flatMap(\.models).first { $0.ref == ref }?.label ?? parts.model
         let effort: String? = choices.map(\.effort) ?? run.effort
-        return InspectorSection(header: String(localized: "Model for this chat", comment: "Inspector section: the chat's model"), footer: nil) {
+        return FoldSection(header: String(localized: "Model for this chat", comment: "Inspector section: the chat's model"), badge: label, footer: nil, open: isOpen(.model)) {
             // "DeepSeek V4.1 Flash · Max", and who serves it on a row of its own.
             FactRow(
                 title: String(localized: "Model", comment: "Inspector row: the model and reasoning level of this chat"),
@@ -123,7 +134,7 @@ struct RunInspector: View {
 
     @ViewBuilder private func recapSection(_ run: RunRecord) -> some View {
         if case .loaded(let read) = recap, read.enabled {
-            InspectorSection(header: String(localized: "Recap", comment: "Inspector section: the run's recap"), footer: recapFooter(read)) {
+            FoldSection(header: String(localized: "Recap", comment: "Inspector section: the run's recap"), badge: nil, footer: recapFooter(read), open: isOpen(.recap)) {
                 if let written = read.recap {
                     Text(written.text).textRole(.body).foregroundStyle(Tone.text).textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -157,9 +168,10 @@ struct RunInspector: View {
         case .failed:
             EmptyView()
         case .loaded(let cost):
-            InspectorSection(
-                header: String(localized: "Cost", comment: "Inspector section: what the run cost"),
-                footer: String(localized: "Dot keeps no prices, so a task's cost is its time and tokens.", comment: "Inspector: why the cost shows no money")
+            FoldSection(
+                header: String(localized: "Cost", comment: "Inspector section: what the run cost"), badge: durationWords(Int(cost.minutes * 60), locale: locale),
+                footer: String(localized: "Dot keeps no prices, so a task's cost is its time and tokens.", comment: "Inspector: why the cost shows no money"),
+                open: isOpen(.cost)
             ) {
                 FactRow(title: String(localized: "Time", comment: "Inspector cost row: the run's wall time"), value: durationWords(Int(cost.minutes * 60), locale: locale))
                 if cost.stats.time.modelSeconds > 0 {
@@ -184,7 +196,10 @@ struct RunInspector: View {
     @ViewBuilder private var helpersSection: some View {
         let helpers: [HelperView] = view?.helpers ?? []
         if !helpers.isEmpty {
-            InspectorSection(header: String(localized: "Helpers", comment: "Inspector section: the chat's helpers"), footer: nil) {
+            FoldSection(
+                header: String(localized: "Helpers", comment: "Inspector section: the chat's helpers"), badge: helpers.count.formatted(.number.locale(locale)), footer: nil,
+                open: isOpen(.helpers)
+            ) {
                 ForEach(helpers, id: \.runId) { helper in
                     NavigationLink {
                         ChatScreen(thread: helper.threadId, initialPanel: nil, editsFirstQueued: false)
@@ -207,13 +222,16 @@ struct RunInspector: View {
 
     @ViewBuilder private var changesSection: some View {
         let files: [FileChange] = changes?.files ?? []
-        InspectorSection(header: String(localized: "Changes", comment: "Inspector section: what the runs changed"), footer: unrecoverableWords) {
+        FoldSection(
+            header: String(localized: "Changes", comment: "Inspector section: what the runs changed"), badge: files.count.formatted(.number.locale(locale)),
+            footer: unrecoverableWords, open: isOpen(.changes)
+        ) {
             if files.isEmpty {
                 Text(String(localized: "No file changed yet.", comment: "Inspector: no changes")).textRole(.body).foregroundStyle(Tone.secondary).rowInsets()
             }
             ForEach(files, id: \.path) { file in
                 HStack(spacing: Space.s) {
-                    Button { preview = diffFile(file) } label: {
+                    Button { show(file) } label: {
                         HStack(spacing: Space.s) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text((file.path as NSString).lastPathComponent).textRole(.body).foregroundStyle(Tone.text).lineLimit(1)
@@ -226,6 +244,7 @@ struct RunInspector: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(String(localized: "Shows the change", comment: "VoiceOver hint of a changed file row"))
+                    .accessibilityIdentifier("inspector.change")
                     if undone.contains(file.path) {
                         Text(String(localized: "Undone", comment: "Inspector: a file's change was taken back")).textRole(.body).foregroundStyle(Tone.secondary)
                     } else if canUndo(file) {
@@ -244,7 +263,10 @@ struct RunInspector: View {
         let commands: [TerminalView] = terminals.filter { $0.background && !$0.ended && !stopped.contains($0.id) }
         let others: [DotEngine.BackgroundWork] = (view?.background ?? []).filter { $0.kind != "command" }
         if !commands.isEmpty || !others.isEmpty {
-            InspectorSection(header: String(localized: "Working in the background", comment: "Inspector section: the chat's background commands, helpers and loops"), footer: nil) {
+            FoldSection(
+                header: String(localized: "Working in the background", comment: "Inspector section: the chat's background commands, helpers and loops"),
+                badge: (commands.count + others.count).formatted(.number.locale(locale)), footer: nil, open: isOpen(.background)
+            ) {
                 ForEach(commands) { command in
                     HStack(spacing: Space.s) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -382,15 +404,25 @@ struct RunInspector: View {
         return min(1, Double(used) / Double(window))
     }
 
-    private func diffFile(_ file: FileChange) -> URL? {
-        let name: String = (file.path as NSString).lastPathComponent + ".diff"
-        let url: URL = FileManager.default.temporaryDirectory.appending(path: name)
-        do {
-            try Data(file.diff.utf8).write(to: url, options: .atomic)
-            return url
-        } catch {
-            return nil
+    /// Opens a change: an image or a PDF as it is now in the file preview, anything else read by its format.
+    private func show(_ file: FileChange) {
+        if case .media = changeLayout(file) {
+            shownFile = OpenedFile(path: file.path)
+        } else {
+            shownChange = ShownChange(file: file)
         }
+    }
+
+    private var showsSteps: Bool { model.showsSteps(of: thread, everywhere: showStepsEverywhere) }
+    private var onWord: String { String(localized: "On", comment: "This chat sheet: a folded section's switch is on") }
+    private var offWord: String { String(localized: "Off", comment: "This chat sheet: a folded section's switch is off") }
+
+    private func isOpen(_ part: InspectorPart) -> Binding<Bool> {
+        Binding(
+            get: { opened.contains(part) },
+            set: { open in
+                if open { opened.insert(part) } else { opened.remove(part) }
+            })
     }
 
     private func statusWords(_ status: String) -> String {
@@ -481,6 +513,71 @@ struct InspectorSection<Content: View>: View {
             if let footer {
                 Text(footer).textRole(.footnote).foregroundStyle(Tone.tertiary).padding(.top, Space.xs)
             }
+        }
+    }
+}
+
+/// A section of "This chat", for which of them are open.
+enum InspectorPart: Hashable {
+    case messages
+    case run
+    case model
+    case recap
+    case cost
+    case helpers
+    case changes
+    case background
+}
+
+/// A change opened in its sheet.
+struct ShownChange: Identifiable {
+    let file: FileChange
+    var id: String { file.path }
+}
+
+/// A section that starts folded (item 2017): its header is a 44 pt row, the name in ink, its count or its one fact
+/// in the secondary ink and a chevron that turns as it opens; open, its rows follow as `InspectorSection` draws them. A
+/// hairline closes each section.
+struct FoldSection<Content: View>: View {
+    let header: String
+    let badge: String?
+    let footer: String?
+    @Binding var open: Bool
+    @ViewBuilder let content: () -> Content
+    @Environment(\.displayScale) private var displayScale: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { open.toggle() }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                    Text(header).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text)
+                    Spacer(minLength: Space.s)
+                    if let badge {
+                        Text(badge).textRole(.body).foregroundStyle(Tone.secondary).tabularNumbers().lineLimit(1)
+                    }
+                    Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                }
+                .rowInsets()
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(RowPressStyle())
+            .accessibilityLabel(badge.map { "\(header), \($0)" } ?? header)
+            .accessibilityValue(
+                open
+                    ? String(localized: "Expanded", comment: "VoiceOver: a folded section of This chat is open")
+                    : String(localized: "Collapsed", comment: "VoiceOver: a folded section of This chat is closed")
+            )
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("inspector.section")
+            if open {
+                InspectorSection(header: nil, footer: footer, content: content)
+                    .padding(.bottom, Space.xs)
+            }
+            Rectangle().fill(Tone.separator).frame(height: 1 / displayScale)
         }
     }
 }

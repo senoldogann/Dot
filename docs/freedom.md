@@ -26,7 +26,9 @@ theirs), and a call's `tool_result` event keeps `waited_s`, the time it spent at
 that path breaks the contract as an ask does. Outside the gate, a desktop step that would take the Mac's own pointer or
 keyboard while the owner is at the Mac waits for them to step away (item 1890, the owner's own rule of 2026-11-25,
 `[desktop] input_only_when_away`): it asks nothing, in every mode, and is in
-[Browser and computer use](browser-and-computer-use.md).
+[Browser and computer use](browser-and-computer-use.md). The background driver of `[desktop] background_driver` (item
+2007) changes how such a step is sent, not what the gate answers about it (`test_freedom_contract.py` classifies
+every desktop row alike with it on).
 
 ## The exceptions, with the code that makes each
 
@@ -52,6 +54,15 @@ or free run deny something it allowed is a regression too.
 - A step of a yolo run that read outside content whose words would send a secret Dot holds out of the Mac is refused;
   free mode records it instead (item 1097).
 - The desktop tools stay away from password managers and Keychain Access in every mode.
+- **A run nobody started keeps the sandbox in yolo and free mode** (item 2016, the owner's word of 2026-11-27,
+  `[shell] sandbox_unattended`, on by default): the processes of a run of a schedule, a watcher, a hook, Dot's own
+  initiative and what goes on from them (`SwitchedSandbox.for_run`, `policy/sandbox.py`; which run it is,
+  `unattended_origin` in `agent/manager.py`) can neither read nor change Dot's own files and `[policy] sealed_paths`,
+  nor what Dot loads and runs, nor hand work to launchd, Shortcuts or Launch Services, nor reach the clipboard
+  ([Safety](safety.md)). macOS refuses such a step (`Operation not permitted`); the gate asks nothing new, waits for
+  nothing and decides every call as before, and the rest of the task's reach (the network, the owner's files, their
+  programs) is unchanged. This is the one thing such a run no longer does. A run the owner started has no sandbox in
+  yolo, as before.
 - **A hand-off past the hop limit refuses nothing in yolo and free mode** (item 1741). Every hand-off from one agent to
   another (a run another run delegated or messaged, a work order's attempt, the lead's run woken by its agent's answer,
   a thing on Dot's list a run put there) is one hop further than the run it came from (`runs.hops`, set by Dot and never

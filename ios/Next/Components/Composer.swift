@@ -137,6 +137,8 @@ struct ComposerView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     @State private var preparing: Task<Void, Never>?
+    /// The re-encoding of each video on show, so that the × of one gives that export up and not the whole pick.
+    @State private var exports: [UUID: Task<ComposerAttachment, any Error>] = [:]
     @State private var mediaError: String?
     @State private var trimming: ComposerAttachment?
 
@@ -194,7 +196,7 @@ struct ComposerView: View {
                     picking = nil
                     switch result {
                     case .success(.photo(let image)): prepare([image], load: ComposerAttachment.photo)
-                    case .success(.movie(let file)): prepare([file], load: { try await ComposerAttachment.video($0, name: "Camera.mov") })
+                    case .success(.movie(let file)): prepare([file], load: { try await loadVideo($0, name: "Camera.mov") })
                     case .success(nil): break
                     case .failure(let error): mediaError = error.localizedDescription
                     }
@@ -291,7 +293,7 @@ extension ComposerView {
     private func loadPhotoItem(_ item: PhotosPickerItem) async throws -> ComposerAttachment {
         if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) || $0.conforms(to: .video) }) {
             guard let movie = try await item.loadTransferable(type: MovieFile.self) else { throw ComposerMediaError.invalidVideo("Video") }
-            return try await ComposerAttachment.video(movie, name: movie.originalName)
+            return try await loadVideo(movie, name: movie.originalName)
         }
         // Decoded at the upload size, never at a camera's 12 MP (item 1926).
         guard let data = try await item.loadTransferable(type: Data.self), let image = ImageSizing.decoded(data, longest: ImageSizing.upload) else {
@@ -313,7 +315,11 @@ extension ComposerView {
                 do {
                     let attachment: ComposerAttachment = try await load(item)
                     try Task.checkCancellation()
-                    attachments.append(attachment)
+                    // A video's tile is on show already, as it is made ready (``loadVideo``).
+                    if !attachments.contains(where: { $0.id == attachment.id }) { attachments.append(attachment) }
+                } catch is CancellationError {
+                    // The whole pick given up (the composer left), or one video (its × was pressed): the rest goes on.
+                    if Task.isCancelled { return }
                 } catch {
                     guard !Task.isCancelled else { return }
                     errors.append(error.localizedDescription)
@@ -323,11 +329,34 @@ extension ComposerView {
         }
     }
 
+    /// A video added: its tile (first frame, length, a ring) is on show at once, and is made ready in its place while the
+    /// file is re-encoded. A video that fails or is given up leaves no tile.
+    private func loadVideo(_ movie: MovieFile, name: String) async throws -> ComposerAttachment {
+        let id: UUID = UUID()
+        let shown: ComposerAttachment = try await ComposerAttachment.exportingVideo(movie, name: name, id: id)
+        attachments.append(shown)
+        let progress: ExportProgress? = shown.exportProgress
+        let export: Task<ComposerAttachment, any Error> = Task { try await ComposerAttachment.video(movie, name: name, id: id, progress: progress) }
+        exports[id] = export
+        defer { exports[id] = nil }
+        do {
+            let ready: ComposerAttachment = try await withTaskCancellationHandler { try await export.value } onCancel: { export.cancel() }
+            try Task.checkCancellation()
+            // The owner took the tile away while it was made: nothing is added in its place.
+            guard let index = attachments.firstIndex(where: { $0.id == id }) else { throw CancellationError() }
+            attachments[index] = ready
+            return ready
+        } catch {
+            attachments.removeAll { $0.id == id }
+            throw error
+        }
+    }
+
     private func prepareReplacement(_ id: UUID, video: MovieFile, name: String) {
         preparing = Task {
             defer { preparing = nil }
             do {
-                let attachment: ComposerAttachment = try await ComposerAttachment.video(video, name: name)
+                let attachment: ComposerAttachment = try await ComposerAttachment.video(video, name: name, id: id, progress: nil)
                 try Task.checkCancellation()
                 if let index = attachments.firstIndex(where: { $0.id == id }) { attachments[index] = attachment }
             } catch {
@@ -343,7 +372,7 @@ extension ComposerView {
                 prepare([data]) { bytes in
                     let file: MovieFile = MovieFile(fileExtension: "mp4")
                     try bytes.write(to: file.url)
-                    return try await ComposerAttachment.video(file, name: "Sample.mp4")
+                    return try await loadVideo(file, name: "Sample.mp4")
                 }
                 return
             }
@@ -380,8 +409,7 @@ extension ComposerView {
         if let model, let openSettings {
             Button(action: openSettings) {
                 HStack(spacing: Space.xxs) {
-                    Image(providerMarkAsset(providerOfModel(model.ref, in: app.models))).resizable().renderingMode(.template).scaledToFit()
-                        .frame(width: 20, height: 20).foregroundStyle(Tone.text)
+                    modelMarkImage(model)
                     if !dynamicTypeSize.isAccessibilitySize { Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph) }
                 }
                 .padding(.horizontal, Space.xs)
@@ -392,6 +420,15 @@ extension ComposerView {
             .accessibilityLabel(String(localized: "Model: \(chipWords(model))", comment: "VoiceOver: the composer's model button; the argument is the model and effort"))
             .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
             .accessibilityIdentifier("composer.model")
+        }
+    }
+
+    @ViewBuilder private func modelMarkImage(_ choice: ModelChoice) -> some View {
+        switch modelMark(ref: choice.ref, provider: providerOfModel(choice.ref, in: app.models)) {
+        case .asset(let name):
+            Image(name).resizable().renderingMode(.template).scaledToFit().frame(width: 20, height: 20).foregroundStyle(Tone.text)
+        case .symbol(let name):
+            Image(systemName: name).frame(width: 20, height: 20).foregroundStyle(Tone.text).accessibilityHidden(true)
         }
     }
 
@@ -418,9 +455,11 @@ extension ComposerView {
             HStack(spacing: Space.xs) {
                 ForEach(attachments) { attachment in
                     ComposerAttachmentChip(attachment: attachment, trim: { trimming = attachment }, remove: {
+                        // A video being re-encoded is given up with its tile; the rest of the pick goes on.
+                        exports[attachment.id]?.cancel()
                         attachments.removeAll { $0.id == attachment.id }
                     })
-                    .disabled(preparing != nil)
+                    .disabled(preparing != nil && attachment.exportProgress == nil)
                 }
             }
             .padding(.horizontal, Space.m)
@@ -553,19 +592,18 @@ struct DocumentScanner: UIViewControllerRepresentable {
     }
 }
 
-/// How the link to the Mac stands in the pill while the chat is not live (item 1931, after another coding agent's app).
+/// A lasting problem with the link to the Mac, said quietly in the capsule's status place (item 1931; the owner's report
+/// of 2026-11-27: a blip, a reconnection that mends or a chat being brought up to date shows nowhere, and the header
+/// always keeps the bot's face and name).
 enum LinkLine: Equatable, Sendable {
-    /// The link broke and is being opened again, to the paired Mac by its name.
-    case reconnecting(mac: String)
-    /// The link is up and the chat is being brought up to date.
-    case syncing
+    /// The link broke and has not come back, to the paired Mac by its name.
+    case unreachable(mac: String)
     /// The phone has no link.
     case offline
 
     var words: String {
         switch self {
-        case .reconnecting(let mac): String(localized: "Reconnecting to \(mac)…", comment: "Chat pill: the link to the Mac broke and is being opened again; the argument is the Mac's name")
-        case .syncing: String(localized: "Syncing messages…", comment: "Chat pill: the chat is being brought up to date")
+        case .unreachable(let mac): String(localized: "Can't reach \(mac)", comment: "Chat capsule: the link to the Mac broke a while ago and has not come back; the argument is the Mac's name")
         case .offline: String(localized: "Offline", comment: "Chat subtitle: the phone has no link")
         }
     }
@@ -603,8 +641,8 @@ struct WorkingSummary: Equatable, Sendable {
 /// The capsule is one pill for everything about the chat's work, thin dividers between its segments (item 1880, the
 /// owner's reference app): "Working 1m 50s" or "Waiting on 2 helpers" | Stop | Plan 1/5 | queued | helpers done/total.
 /// Each segment is its own button, at least 44 pt each way. It stays one line at the default text size: in words where
-/// they fit, else Stop, the plan and the queue as their glyphs with the numbers and "Working" as its spinner before the
-/// clock (the smallest iPhone with every segment shown). At the accessibility sizes the segments stack, as glyphs.
+/// they fit, else Stop, the plan and the queue as their glyphs with the numbers and "Working" as its clock alone (the
+/// smallest iPhone with every segment shown). No segment spins: the ticking clock says the run works. At the accessibility sizes the segments stack, as glyphs.
 struct FloatingWorkingControl: View {
     let summary: WorkingSummary
     let showsScrollToBottom: Bool
@@ -624,7 +662,7 @@ struct FloatingWorkingControl: View {
                         capsule(glyphs: true)
                     } else {
                         // One line always: in words where they fit, else Stop, the plan and the queue as their glyphs and
-                        // the status as its spinner and clock (the smallest iPhone with every segment shown).
+                        // the status as its clock (the smallest iPhone with every segment shown).
                         ViewThatFits(in: .horizontal) {
                             capsule(glyphs: false)
                             capsule(glyphs: true)
@@ -648,21 +686,19 @@ struct FloatingWorkingControl: View {
 
     private var compact: Bool { dynamicTypeSize.isAccessibilitySize }
 
-    /// The pill; with `glyphs`, Stop, the plan and the queue are their glyphs with the numbers, "Working" is its spinner
-    /// before the clock, and the segments sit closer.
+    /// The pill; with `glyphs`, Stop, the plan and the queue are their glyphs with the numbers, "Working" is its clock
+    /// alone, and the segments sit closer.
     private func capsule(glyphs: Bool) -> some View {
         let inset: CGFloat = glyphs ? Space.xs : Space.s
         let layout: AnyLayout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
             if let link = summary.link {
-                // The link's state in the status's place while it is not live (item 1931): the spinner while it comes
-                // back, a quiet glyph while there is none.
+                // The link's state in the status's place while it is not live (item 1931): its words while it comes
+                // back, a quiet glyph before them while there is none.
                 segment(action: openStatus, label: link.words, inset: inset) {
                     HStack(spacing: Space.xxs + 1) {
                         if link == .offline {
                             Image(systemName: "wifi.slash").textRole(.label).foregroundStyle(Tone.tertiary)
-                        } else {
-                            ProgressView().controlSize(.mini).tint(Tone.secondary)
                         }
                         Text(link.words).textRole(.label).fontWeight(.medium).foregroundStyle(Tone.secondary).lineLimit(1)
                     }
@@ -676,11 +712,15 @@ struct FloatingWorkingControl: View {
                 TimelineView(.periodic(from: summary.since ?? .distantPast, by: 1)) { context in
                     let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
                     segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", "), inset: inset) {
+                        // No spinner (the owner's report of 2026-11-27): the words and the ticking clock say the run
+                        // works; a status that is not work (asks, failed) keeps its mark.
                         HStack(spacing: Space.xxs + 1) {
                             if let activity = summary.activity {
                                 ActivityWord(text: activity)
-                            } else if glyphs, clock != nil, status == .working {
-                                ProgressView().controlSize(.mini).tint(Tone.secondary)
+                            } else if status == .working || status == .starting {
+                                if !(glyphs && clock != nil) {
+                                    Text(status.word).textRole(.label).fontWeight(.medium).foregroundStyle(status.tone.color).lineLimit(1).fixedSize()
+                                }
                             } else {
                                 StatusWord(status: status)
                             }
@@ -769,17 +809,14 @@ struct FloatingWorkingControl: View {
     }
 }
 
-/// What a run does now, as the capsule's status word: the working spinner and one short line.
+/// What a run does now, as the capsule's status word ("Waiting on 2 helpers"): its own width and no more, so that Stop,
+/// the plan and the helpers keep their room, and no spinner (the owner's report of 2026-11-27).
 struct ActivityWord: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: Space.xxs + 1) {
-            ProgressView().controlSize(.mini).tint(Tone.secondary)
-            Text(text).textRole(.label).fontWeight(.medium).lineLimit(1).truncationMode(.tail).frame(maxWidth: 200, alignment: .leading)
-        }
-        .foregroundStyle(ChatStatus.working.tone.color)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(text)
+        Text(text).textRole(.label).fontWeight(.medium).lineLimit(1).fixedSize()
+            .foregroundStyle(ChatStatus.working.tone.color)
+            .accessibilityLabel(text)
     }
 }

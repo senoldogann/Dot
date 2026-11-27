@@ -221,16 +221,20 @@ _TITLE_CHARS: int = 80
 _RECORD_ID: re.Pattern[str] = re.compile(r"\b[a-z]{2,4}_[a-z0-9]{8}_[0-9a-f]{6}\b")
 _BEFORE_MARK: re.Pattern[str] = re.compile(r"\s+([.,;:!?])")
 _SENTENCE_END: re.Pattern[str] = re.compile(r"(?<=[.!?])\s|\n")
+# A one-word label the goal opens with ("Task:", "Görev:"): the title is what follows it.
+_LEADING_LABEL: re.Pattern[str] = re.compile(r"^\s*\w+:\s+(?=\S)")
 # The arguments a step's target is read from, the first that is there.
 _TARGET_KEYS: tuple[str, ...] = ("command", "url", "path", "file", "query", "goal", "name")
 _TARGET_CHARS: int = 80
 
 
 def helper_title(goal: str) -> str:
-    """A helper's title for a list (item 1686): the first sentence of its goal, the ids of Dot's records (``run_...``,
-    ``thr_...``) taken out, at most :data:`_TITLE_CHARS` cut at a word."""
-    first: str = _SENTENCE_END.split(goal.strip(), maxsplit=1)[0]
+    """A helper's title for a list (item 1686): the first sentence of its goal, a label it opens with ("Task: ...")
+    left out and its first letter made capital, the ids of Dot's records (``run_...``, ``thr_...``) taken out, at most
+    :data:`_TITLE_CHARS` cut at a word."""
+    first: str = _SENTENCE_END.split(_LEADING_LABEL.sub("", goal.strip(), count=1), maxsplit=1)[0]
     words: str = _BEFORE_MARK.sub(r"\1", " ".join(_RECORD_ID.sub("", first).split()))
+    words = words[:1].upper() + words[1:]
     if len(words) <= _TITLE_CHARS:
         return words
     return words[: _TITLE_CHARS - 1].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"

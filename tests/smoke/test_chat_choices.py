@@ -15,6 +15,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from chat_settings import menu, open_for
 from model_menu import expect_chosen, model_box, offered, pick
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
@@ -169,7 +170,11 @@ def _pill(page: Page, name: str) -> Locator:
 
 
 def _menu(page: Page, label: str) -> Locator:
-    return page.locator(f".dock .composer-popover[aria-label='{label}']")
+    """The choices a menu named `label` held: the agent's still in its menu, the others in the chat's settings (item
+    2015)."""
+    if label == "Bot":
+        return page.locator(f".dock .composer-popover[aria-label='{label}']")
+    return menu(page, label)
 
 
 async def _shows(page: Page, mode: str, model: str, level: str, approvals: str) -> None:
@@ -292,11 +297,11 @@ async def test_a_chat_keeps_what_its_composer_chose_after_a_reload_and_in_anothe
             # levels at High, and Auto approvals.
             await page.locator(".dock textarea").type("/research")
             await page.locator(".dock textarea").press("Tab")
-            await _pill(page, "model").click()
+            await open_for(page.locator(".dock"), page, "model")
             await _menu(page, "Model").get_by_role("option").filter(has_text="thinker").click()
-            await _pill(page, "reasoning").click()
+            await open_for(page.locator(".dock"), page, "reasoning")
             await _menu(page, "Reasoning").get_by_role("option", name="High").click()
-            await _pill(page, "options").click()
+            await open_for(page.locator(".dock"), page, "options")
             await _menu(page, "Options").locator(".pop-option[data-mode='auto']").click()
             await page.keyboard.press("Escape")
             await _shows(page, "Research", "thinker", "High", "Auto")

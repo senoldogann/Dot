@@ -341,7 +341,8 @@ async def test_an_update_streams_under_the_line_and_a_message_steps_it_aside(own
 # A run that works without a word on the way (item 1976): it lists a folder, runs a command of a few seconds, answers.
 _SILENT_TURNS: tuple[ScriptedTurn, ...] = (
     ScriptedTurn(text="", calls=(ScriptedCall(tool="list_dir", arguments={"path": "."}),)),
-    ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 6"}),)),
+    # Long enough for the page to open on a loaded Mac while the run still works (a run of 6 s ended first, 2026-11-27).
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 20"}),)),
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
 )
 
@@ -349,31 +350,30 @@ _SILENT_TURNS: tuple[ScriptedTurn, ...] = (
 async def test_messages_only_tells_the_calls_as_dots_messages_and_the_line_says_how_long(
     own_home: Path, tmp_path: Path
 ) -> None:
-    """Item 1976: with "Messages only" a call that turns the run to other work is one of Dot's short messages, the line
-    says how long the run has worked; with "What it is doing" neither shows."""
+    """Item 1976 and the owner's word of 2026-11-27: with "Messages only" a call is no message of its own; the one live
+    line says what the run does ("Running sleep 6…") and how long it has worked; with "What it is doing" no time
+    shows."""
     async with _served(own_home, _SILENT_TURNS) as (manager, address, port):
         run: RunRecord = await _start(manager)
         async with async_playwright() as playwright:
             browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
             try:
                 page: Page = await _open(browser, port, address, run.id, "messages", 390)
-                told: Locator = page.locator(".say-narration")
-                await expect(told).to_have_text(["List folder", "Running a command"])
-                await expect(told.last).to_be_visible()
                 await expect(page.locator("details.steps")).to_be_hidden()
                 line: Locator = page.locator(".work-status")
                 await expect(line).to_have_attribute("data-state", "working")
+                await expect(line.locator(".work-status-words")).to_have_text(re.compile(r"^Running "))
+                await expect(page.locator(".say-narration")).to_have_count(0)
                 await expect(line.locator(".work-status-time")).to_have_text(re.compile(r"^· \d+ s$"))
                 await page.screenshot(path=str(tmp_path / "messages.png"))
                 other: Page = await _open(browser, port, address, run.id, "status", 390)
                 await expect(other.locator(".work-status")).to_have_attribute("data-state", "working")
-                await expect(other.locator(".say-narration").first).to_be_hidden()
                 await expect(other.locator(".work-status-time")).to_be_hidden()
-                async with asyncio.timeout(30):
+                async with asyncio.timeout(60):
                     assert (await manager.wait(run.id)).status == "done"
-                # Over, the lines stay as the conversation, and the steps are one press away.
+                # Over, the answer stands, no line of a call beside it, and the steps are one press away.
                 await expect(page.locator(".answer .prose")).to_have_text("Done.")
-                await expect(told.last).to_be_visible()
+                await expect(page.locator(".say-narration")).to_have_count(0)
                 await page.close()
                 await other.close()
             finally:
@@ -435,7 +435,40 @@ async def test_messages_only_shows_no_step_a_failed_one_neither(own_home: Path, 
                 await expect(page.locator(".answer .prose")).to_have_text("Done.")
                 assert await page.locator("details.steps").count() >= 1, "the run has its steps"
                 await expect(page.locator("details.steps")).to_be_hidden()
-                await expect(page.get_by_text("no-such-file-1996.txt")).to_be_hidden()
+                # No step's row in sight, the failed read's neither, and no line of a call (item 2019).
+                await expect(page.locator(".tool-sum").locator("visible=true")).to_have_count(0)
+                await expect(page.locator(".say-narration")).to_have_count(0)
                 await page.close()
+            finally:
+                await browser.close()
+
+
+async def test_a_routines_message_is_one_compact_row_that_unfolds_its_words(own_home: Path, tmp_path: Path) -> None:
+    """Owner 2026-11-27: the message a schedule, a watcher or a hook sent into a chat is one compact row, "Routine" and
+    its title, never the owner's bubble; a press unfolds the whole message. On a desktop's and a phone's width."""
+    goal: str = "A new mail from the bank came. Read it and tell me if it needs an answer today."
+    async with _served(own_home, _SILENT_TURNS) as (manager, address, port):
+        run: RunRecord = await manager.start(
+            goal, "task", SCRIPTED_MODEL, None, "watcher", None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(30):
+            assert (await manager.wait(run.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+            try:
+                for width in (1440, 390):
+                    page: Page = await _open(browser, port, address, run.id, "messages", width)
+                    row: Locator = page.locator(".routine")
+                    await expect(row.locator(".routine-label")).to_have_text("Routine")
+                    await expect(row.locator(".routine-title")).to_have_text("A new mail from the bank came")
+                    await expect(page.locator(".bubble.user")).to_have_count(0)
+                    head: Locator = row.locator(".routine-head")
+                    box = await head.bounding_box()
+                    assert box is not None and box["height"] >= 44, box
+                    await expect(row.locator(".routine-prompt")).to_be_hidden()
+                    await head.click()
+                    await expect(row.locator(".routine-prompt")).to_have_text(goal)
+                    await page.screenshot(path=str(tmp_path / f"routine-{width}.png"))
+                    await page.close()
             finally:
                 await browser.close()

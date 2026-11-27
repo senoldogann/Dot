@@ -194,17 +194,17 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
                 page: Page = await _open(browser, address, latest.id, width, scheme)
                 panel: Locator = page.locator(".inspector")
                 tabs: Locator = panel.locator(".inspector-tab")
-                await expect(tabs).to_have_text(["Task", "Changes", "Plan", "Agents 7", "Screen"])
+                await expect(tabs).to_have_text(["Task", "Changes", "Plan", "Bots 7", "Screen"])
                 # Every tab wears its icon.
                 await expect(panel.locator(".inspector-tab > svg.icon")).to_have_count(5)
-                agents_tab: Locator = panel.get_by_role("tab", name="Agents")
+                agents_tab: Locator = panel.get_by_role("tab", name="Bots")
                 await agents_tab.click()
                 await expect(agents_tab).to_have_attribute("aria-selected", "true")
                 shown: Locator = panel.locator(".inspector-panel:not([hidden])")
                 # The Lineage stands over who the chat is with (items 846 and 1331); "Previous agents" under the task
                 # that leads says how many failed and how many there are, and opens the rows of those that ended.
-                await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Agent"])
-                previous: Locator = shown.get_by_role("button", name=re.compile("^Previous agents"))
+                await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Bot"])
+                previous: Locator = shown.get_by_role("button", name=re.compile("^Previous bots"))
                 await expect(previous).to_have_text(re.compile(r"1 failed\s*7"))
                 await expect(shown.locator(".lineage-lead")).to_have_count(1)
                 await expect(shown.locator(".agent-row").first).to_be_hidden()
@@ -240,12 +240,12 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
             # A chat without helpers says where they would show, and its tab counts nothing.
             page = await _open(browser, address, lone.id, 1280, "light")
             panel = page.locator(".inspector")
-            agents_tab = panel.get_by_role("tab", name="Agents")
+            agents_tab = panel.get_by_role("tab", name="Bots")
             await agents_tab.click()
-            await expect(agents_tab).to_have_text("Agents")
+            await expect(agents_tab).to_have_text("Bots")
             shown = panel.locator(".inspector-panel:not([hidden])")
             await expect(shown.locator(".hint")).to_have_text(
-                "When Dot hands part of the work to a subagent, it shows here."
+                "When Dot hands part of the work to a helper, it shows here."
             )
             await expect(shown.locator(".agent-row")).to_have_count(0)
             await page.close()
@@ -270,9 +270,9 @@ async def test_a_row_of_the_agents_tab_shows_its_helpers_card_on_a_rest_wide_and
             for scheme in ("light", "dark"):
                 page: Page = await _open(browser, address, parent.id, 1280, scheme)
                 panel: Locator = page.locator(".inspector")
-                await panel.get_by_role("tab", name="Agents").click()
+                await panel.get_by_role("tab", name="Bots").click()
                 shown: Locator = panel.locator(".inspector-panel:not([hidden])")
-                await shown.get_by_role("button", name=re.compile("^Previous agents")).click()
+                await shown.get_by_role("button", name=re.compile("^Previous bots")).click()
                 rows: Locator = shown.locator(".agent-row")
                 card: Locator = shown.locator(".helper-card")
                 await expect(rows).to_have_count(2)
@@ -314,8 +314,8 @@ async def test_a_row_of_the_agents_tab_shows_its_helpers_card_on_a_rest_wide_and
             # A finger has no rest to show it by: on a phone the row only opens.
             page = await _open(browser, address, parent.id, 390, "dark", touch=True)
             panel = page.locator(".inspector")
-            await panel.get_by_role("tab", name="Agents").click()
-            await panel.get_by_role("button", name=re.compile("^Previous agents")).click()
+            await panel.get_by_role("tab", name="Bots").click()
+            await panel.get_by_role("button", name=re.compile("^Previous bots")).click()
             row: Locator = panel.locator(".inspector-panel:not([hidden]) .agent-row").first
             await expect(row).to_be_visible()
             await row.hover()
@@ -348,9 +348,9 @@ async def test_a_list_that_cannot_be_read_says_so_and_not_what_it_would_say_of_a
             await page.goto(f"{address}/#/runs/{run.id}")
             panel: Locator = page.locator(".inspector")
             await expect(panel).to_be_visible()
-            await panel.get_by_role("tab", name="Agents").click()
+            await panel.get_by_role("tab", name="Bots").click()
             shown: Locator = panel.locator(".inspector-panel:not([hidden])")
-            await expect(shown.locator(".lineage-problem")).to_contain_text("The agents could not be loaded")
+            await expect(shown.locator(".lineage-problem")).to_contain_text("The bots could not be loaded")
             await expect(shown.locator(".lineage-note")).to_be_hidden()
             await expect(shown.locator(".lineage-previous")).to_be_hidden()
             await page.close()

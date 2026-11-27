@@ -8,6 +8,7 @@ import { api } from "./api.js";
 import { clip, duration, el, setText } from "./dom.js";
 import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, confirmDialog } from "./ui.js";
+import { t } from "./i18n.js";
 
 const TERMINALS_CHANGED = "terminals_changed";
 const COMMAND_CHARS = 120;
@@ -30,11 +31,11 @@ export function backgroundWork({ threadId, onChange }) {
     "div",
     { class: "background-unread", hidden: true },
     problem,
-    el("button", { class: "btn sm ghost", type: "button", onclick: () => load() }, "Read again"),
+    el("button", { class: "btn sm ghost", type: "button", onclick: () => load() }, t("background.readAgain")),
   );
   const element = el(
     "section",
-    { class: "background-work", role: "region", "aria-label": "Commands at work", "aria-live": "polite", hidden: true },
+    { class: "background-work", role: "region", "aria-label": t("background.commandsAtWork"), "aria-live": "polite", hidden: true },
     unread,
     list,
   );
@@ -47,8 +48,8 @@ export function backgroundWork({ threadId, onChange }) {
     const time = el("span", { class: "background-time" }, took(session, now));
     const stop = el(
       "button",
-      { class: "btn ghost sm", type: "button", "aria-label": `Stop ${command}`, onclick: () => stopSession(session) },
-      "Stop",
+      { class: "btn ghost sm", type: "button", "aria-label": t("background.stopCommand", { command }), onclick: () => stopSession(session) },
+      t("background.stop"),
     );
     shown.push({ session, time });
     return el(
@@ -58,9 +59,9 @@ export function backgroundWork({ threadId, onChange }) {
       el(
         "span",
         { class: "background-label" },
-        el("span", { class: "background-word" }, "Running: "),
+        el("span", { class: "background-word" }, t("background.running")),
         el("span", { class: "background-command" }, command),
-        session.background ? el("span", { class: "visually-hidden" }, ". Dot is told when it ends") : null,
+        session.background ? el("span", { class: "visually-hidden" }, t("background.dotIsToldWhenIt")) : null,
       ),
       time,
       stop,
@@ -94,7 +95,7 @@ export function backgroundWork({ threadId, onChange }) {
       unread.hidden = true;
       paint(sessions.filter((session) => !session.ended));
     } catch (error) {
-      problem.textContent = `The commands at work could not be read: ${error.message}`;
+      problem.textContent = t("background.theCommandsAtWorkCould", { message: error.message });
       unread.hidden = false;
       element.hidden = false;
       onChange({ count: shown.length, problem: true });
@@ -103,9 +104,9 @@ export function backgroundWork({ threadId, onChange }) {
 
   async function stopSession(session) {
     const confirmed = await confirmDialog({
-      title: "Stop this command?",
-      message: `It ends with everything it started, and Dot is not told: ${clip(session.command, COMMAND_CHARS)}`,
-      confirmLabel: "Stop",
+      title: t("background.stopThisCommand"),
+      message: t("background.itEndsWithEverythingIt", { clip: clip(session.command, COMMAND_CHARS) }),
+      confirmLabel: t("background.stop"),
       danger: true,
       focusCancel: true,
     });

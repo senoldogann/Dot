@@ -93,7 +93,7 @@ SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     (
         "Content-Security-Policy",
         "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; "
-        "manifest-src 'self'; frame-src 'self'; "
+        "media-src blob:; manifest-src 'self'; frame-src 'self'; "
         # The desktop shell's bridge (Tauri IPC) is a connection the page makes; a browser never sees these sources.
         "connect-src 'self' ipc: http://ipc.localhost; "
         "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",

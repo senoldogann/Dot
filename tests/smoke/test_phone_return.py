@@ -99,7 +99,7 @@ _SLOW_S: float = 0.6
 _NEWER_WAIT_S: float = 5.0
 # The longest a page's caches may take to hold what a test waits for.
 _UNTIL_S: float = 15.0
-_WORDS: tuple[str, ...] = ("Reconnecting", "Connection lost", "Connecting")
+_WORDS: tuple[str, ...] = ("Can't reach", "Reconnecting", "Connection lost", "Connecting")
 # What the pages of an updated daemon are, as the status a page reads tells it.
 _OTHER_PAGES: str = "0" * 16
 
@@ -416,7 +416,7 @@ async def _chat_page(context: BrowserContext, proxy: Proxy, run: RunRecord) -> P
     await page.clock.install()
     await page.goto(ui_url("127.0.0.1", proxy.port, TOKEN))
     await page.goto(f"http://127.0.0.1:{proxy.port}/#/runs/{run.id}")
-    await expect(page.locator(".capsule")).to_contain_text("Working", timeout=15_000)
+    await expect(page.locator(".capsule")).to_contain_text("Waiting on 2 helpers", timeout=15_000)
     await expect(page.locator(".helpers-body")).to_contain_text("Running sleep", timeout=15_000)
     await page.wait_for_timeout(1_500)
     return page

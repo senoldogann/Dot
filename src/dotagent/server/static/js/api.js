@@ -7,6 +7,7 @@ import { noteCopy, noteReached, noteUnreachable, phoneScreen } from "./linkfacts
 import { isKeptWrite, nextStep, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from "./retryrules.js";
 import { CONNECT_TIMEOUT_MS, createParser, IDLE_TIMEOUT_MS, reconnectWait } from "./sseframes.js";
 import { toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 const TOKEN_KEY = "dot.token";
 // The daemon proves that it holds the token before a request carries it there (`GET /api/proof`, `daemon_proof` in
@@ -180,7 +181,7 @@ function messageOf(status, data, text) {
     }
     // A value Dot's own rule refused says why in its own words; any other complaint is the validator's.
     const reasons = errors.map(ownReason);
-    return reasons.every((reason) => reason !== null) ? reasons.join("; ") : `What you entered is not valid (${describeValidation(errors)})`;
+    return reasons.every((reason) => reason !== null) ? reasons.join("; ") : t("api.whatYouEnteredIsNot", { describeValidation: describeValidation(errors) });
   }
   return text !== "" ? `HTTP ${status}: ${text.slice(0, 200)}` : `HTTP ${status}`;
 }
@@ -236,7 +237,7 @@ async function proofOf(nonce) {
  */
 async function proveDaemon() {
   if (globalThis.crypto?.subtle === undefined) {
-    throw new ApiError(0, "This browser cannot check that this address is really your Dot, so it sent nothing. Use the address Settings › Phone gives.", {
+    throw new ApiError(0, t("api.thisBrowserCannotCheckThat"), {
       path: "/proof",
     });
   }
@@ -257,7 +258,7 @@ async function proveDaemon() {
   const text = await response.text();
   const data = response.ok ? parseJson(text) : null;
   if (data === null || typeof data !== "object" || typeof data.proof !== "string") {
-    throw new ApiError(0, "Something other than Dot answers at this address, so this browser sent it nothing. Check the address.", {
+    throw new ApiError(0, t("api.somethingOtherThanDotAnswers"), {
       path: "/proof",
       status: response.status,
       start: text.slice(0, 80),
@@ -267,7 +268,7 @@ async function proveDaemon() {
     if (authLostHandler !== null) {
       authLostHandler();
     }
-    throw new ApiError(401, "This Dot does not use that access key, so this browser sent it nothing. Sign in again.", {
+    throw new ApiError(401, t("api.thisDotDoesNotUse"), {
       path: "/proof",
     });
   }
@@ -330,7 +331,7 @@ function resilient() {
 
 /** The error a cancelled read ends with, the page's own (a chat left): nothing is told of it. */
 function cancelled(signal) {
-  return signal?.reason instanceof Error ? signal.reason : new DOMException("The read was cancelled.", "AbortError");
+  return signal?.reason instanceof Error ? signal.reason : new DOMException(t("api.theReadWasCancelled"), "AbortError");
 }
 
 /** Settles after `ms`; at once, rejected, when `signal` aborts. */
@@ -389,7 +390,7 @@ function untilLinkUp(signal) {
 /** One try of a read: `ask` with the time a read has. A try that outruns it ends as a request with no answer does. */
 async function tryRead(path, signal, outcome) {
   const limit = new AbortController();
-  const timer = setTimeout(() => limit.abort(new ApiError(0, UNREACHABLE, { path, cause: "no answer in time" })), READ_TIMEOUT_MS);
+  const timer = setTimeout(() => limit.abort(new ApiError(0, UNREACHABLE, { path, cause: t("api.noAnswerInTime") })), READ_TIMEOUT_MS);
   const cancel = () => limit.abort(cancelled(signal));
   signal?.addEventListener("abort", cancel, { once: true });
   if (signal?.aborted) {
@@ -511,7 +512,7 @@ export async function request(method, path, body, signal) {
     // is kept and sent again with its key, which the daemon answers with what the first made. Any other write may take
     // as long as it takes (a side answer, a voice, a file), and is left to.
     const limit = new AbortController();
-    const timer = setTimeout(() => limit.abort(new ApiError(0, UNREACHABLE, { path, cause: "no answer in time" })), WRITE_TIMEOUT_MS);
+    const timer = setTimeout(() => limit.abort(new ApiError(0, UNREACHABLE, { path, cause: t("api.noAnswerInTime") })), WRITE_TIMEOUT_MS);
     try {
       return await ask(method, path, body, limit.signal);
     } finally {
@@ -651,7 +652,7 @@ async function ask(method, path, body, signal, outcome) {
   try {
     return JSON.parse(text);
   } catch (cause) {
-    throw new ApiError(response.status, "Dot answered in a way this page cannot read. Try again in a moment.", {
+    throw new ApiError(response.status, t("api.dotAnsweredInAWay"), {
       path,
       start: text.slice(0, 80),
       cause: String(cause),
@@ -698,7 +699,7 @@ export async function pairWithCode(code) {
   }
   const data = parseJson(await response.text());
   if (data === null || typeof data !== "object" || typeof data.token !== "string") {
-    throw new ApiError(response.status, "Something other than Dot answered, so the code was not used. Check the address.", { path });
+    throw new ApiError(response.status, t("api.somethingOtherThanDotAnswered"), { path });
   }
   return data.token;
 }
@@ -800,13 +801,13 @@ export async function* sse(path, signal, onOpen, awayMs, options = {}) {
     const away = awayAt !== null && Date.now() - awayAt >= awayMs;
     awayAt = null;
     if (away || Date.now() - heardAt >= BACK_SILENCE_MS) {
-      cut.abort(new ApiError(0, "Dot stopped sending updates while this page was away.", { path }));
+      cut.abort(new ApiError(0, t("api.dotStoppedSendingUpdatesWhile"), { path }));
     }
   };
   document.addEventListener("visibilitychange", back);
   let reader = null;
   try {
-    watch(connectMs, "Dot did not answer in time.");
+    watch(connectMs, t("api.dotDidNotAnswerIn"));
     const headers = { ...authHeaders(), Accept: "text/event-stream" };
     if (options.lastId !== undefined && options.lastId > 0) {
       headers["Last-Event-ID"] = String(options.lastId);
@@ -820,7 +821,7 @@ export async function* sse(path, signal, onOpen, awayMs, options = {}) {
     const decoder = new TextDecoder();
     const parser = createParser();
     for (;;) {
-      watch(idleMs, "Dot stopped sending updates.");
+      watch(idleMs, t("api.dotStoppedSendingUpdates"));
       const { done, value } = await reader.read();
       clearTimeout(silence);
       // A frame cut by the end of the stream is no event: the stream is made again after the last whole one.
@@ -927,7 +928,7 @@ function withAfter(path, after) {
 export function eventNotShown(path, message, error) {
   console.error("an event could not be shown", { path, id: message.id, event: message.event, error });
   const why = error instanceof Error ? error.message : String(error);
-  tellOutOfDate("Part of this page could not be updated. Reload the page to see it.", `${message.event}: ${why}`);
+  tellOutOfDate(t("api.partOfThisPageCould"), `${message.event}: ${why}`);
 }
 
 /** Tell in a toast that part of the page is out of date, at most every few seconds. */
@@ -1070,6 +1071,60 @@ export async function blobUrl(path) {
     throw await errorOf(response, path);
   }
   return URL.createObjectURL(await response.blob());
+}
+
+/**
+ * The first `bytes` of the file the daemon answers at `path` as a `Blob` (a `Range` read, token in the header): a video's
+ * tile reads its first frame and its length from the start of the file without fetching all of it (item 1992).
+ */
+export async function partialBlob(path, bytes) {
+  await proven();
+  let response;
+  try {
+    response = await fetch(`/api${path}`, { headers: { ...authHeaders(), Range: `bytes=0-${bytes - 1}` }, cache: "no-store" });
+  } catch (cause) {
+    throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
+  }
+  if (!response.ok) {
+    throw await errorOf(response, path);
+  }
+  return response.blob();
+}
+
+/**
+ * Send `file` as the raw body of `PUT /api{path}` and tell `progress` (0 to 1) how much has gone, which `fetch` cannot:
+ * the tile of a video fills its ring with it (item 1992). Answers what the daemon answers, as `api.put` does.
+ */
+export async function uploadFile(path, file, progress) {
+  await proven();
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", `/api${path}`);
+    for (const [name, value] of Object.entries(authHeaders())) {
+      request.setRequestHeader(name, value);
+    }
+    request.setRequestHeader("Content-Type", file.type === "" ? "application/octet-stream" : file.type);
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) {
+        progress(event.loaded / event.total);
+      }
+    });
+    request.addEventListener("error", () => {
+      noteUnreachable();
+      reject(new ApiError(0, UNREACHABLE, { path, cause: "the upload could not be sent" }));
+    });
+    request.addEventListener("load", async () => {
+      const answer = new Response(request.responseText, { status: request.status, headers: { "Content-Type": request.getResponseHeader("Content-Type") ?? "application/json" } });
+      if (!answer.ok) {
+        reject(await errorOf(answer, path));
+        return;
+      }
+      sharedReads.clear();
+      flights.clear();
+      resolve(JSON.parse(request.responseText));
+    });
+    request.send(file);
+  });
 }
 
 /** A `blob:` URL for a frame of a screencast, a JPEG sent in base64, which the caller revokes. A plain loop decodes it

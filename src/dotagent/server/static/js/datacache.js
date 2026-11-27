@@ -22,6 +22,7 @@ import {
   snapshotOf,
   touch,
 } from "./cacherules.js";
+import { t } from "./i18n.js";
 
 // The version of the database's layout of stores (not the records': LAYOUT is that): 2 added the outbox (item 1523).
 const DB_VERSION = 2;
@@ -60,7 +61,7 @@ let claimedFor = null;
 export function inTime(promise, fallback, ms = ANSWER_WITHIN_MS) {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
-      unavailable("it did not answer in time", null);
+      unavailable(t("datacache.itDidNotAnswerIn"), null);
       resolve(fallback);
     }, ms);
     promise.then(
@@ -196,7 +197,7 @@ export function claim(token) {
     await committed(transaction);
     return true;
   })().catch((error) => {
-    unavailable("it could not be opened", error);
+    unavailable(t("datacache.itCouldNotBeOpened"), error);
     return false;
   });
   const mine = inTime(claimed, false);
@@ -227,7 +228,7 @@ export function forget() {
       empty(transaction);
       await committed(transaction);
     } catch (error) {
-      unavailable("it could not be emptied", error);
+      unavailable(t("datacache.itCouldNotBeEmptied"), error);
     }
   })();
 }
@@ -258,7 +259,7 @@ async function flushList(key) {
     written.set(key, waiting.text);
     lastWrite.set(key, Date.now());
   } catch (error) {
-    unavailable("a list could not be kept", error);
+    unavailable(t("datacache.aListCouldNotBe"), error);
   }
 }
 
@@ -316,7 +317,7 @@ async function readList(path) {
     }
     return { value: listFor(path, record.value), savedAt: record.savedAt };
   } catch (error) {
-    unavailable("a list could not be read", error);
+    unavailable(t("datacache.aListCouldNotBe2"), error);
     return null;
   }
 }
@@ -329,7 +330,7 @@ function dropList(key) {
       transaction.objectStore("lists").delete(key);
       return committed(transaction);
     })
-    .catch((error) => unavailable("a list that does not read could not be dropped", error));
+    .catch((error) => unavailable(t("datacache.aListThatDoesNot"), error));
 }
 
 /**
@@ -364,7 +365,7 @@ export async function keepChat(source) {
     await committed(transaction);
     return true;
   } catch (error) {
-    unavailable("a chat could not be kept", error);
+    unavailable(t("datacache.aChatCouldNotBe"), error);
     return false;
   }
 }
@@ -385,7 +386,7 @@ export async function dropChat(id) {
     }
     await committed(transaction);
   } catch (error) {
-    unavailable("a chat that does not read could not be dropped", error);
+    unavailable(t("datacache.aChatThatDoesNot"), error);
   }
 }
 
@@ -418,7 +419,7 @@ async function readChat(id) {
     await committed(transaction);
   } catch (error) {
     // A record the store cannot hand over (a clone that fails) is as good as one that does not read.
-    unavailable("a chat could not be read", error);
+    unavailable(t("datacache.aChatCouldNotBe2"), error);
     await dropChat(id);
     return null;
   }

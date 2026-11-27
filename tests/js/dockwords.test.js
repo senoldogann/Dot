@@ -15,6 +15,7 @@ function state(changes = {}) {
     reconnecting: false,
     plan: null,
     helpers: { live: 0, waitedFor: 0, letGo: 0 },
+    waits: false,
     loops: { count: 0, rhythm: null, problem: false },
     queue: { count: 0, held: false, problem: false, sending: false },
     running: { count: 0, problem: false },
@@ -33,8 +34,8 @@ test("a chat with nothing to say has no capsule", () => {
 test("a run at work says how long it has worked, with its Stop", () => {
   const segments = dockSegments(state({ status: "running", took: 36 }));
   assert.deepEqual(ids(segments), ["status", "stop"]);
-  assert.equal(segments[0].label, "Working · 36 s");
-  assert.equal(segments[0].short, "36 s");
+  assert.equal(segments[0].label, "Working · 36s");
+  assert.equal(segments[0].short, "36s");
   assert.equal(segments[0].tone, "work");
   assert.equal(segments[1].label, "Stop");
   assert.equal(segments[1].name, "Stop the task");
@@ -56,7 +57,7 @@ test("a run that was told to stop says it stops, and offers no Stop", () => {
 test("a lost stream says it reconnects, over the time, and keeps the Stop of a run that works", () => {
   const working = dockSegments(state({ status: "running", took: 36, reconnecting: true }));
   assert.deepEqual(ids(working), ["status", "stop"]);
-  assert.equal(working[0].label, "Reconnecting…");
+  assert.equal(working[0].label, "Can't reach Dot");
   assert.equal(working[0].tone, "warn");
   // With no run to stop, the capsule is the one segment that says it.
   assert.deepEqual(ids(dockSegments(state({ reconnecting: true }))), ["status"]);
@@ -72,10 +73,25 @@ test("helpers that work are counted, and the name says whether the run waits for
   const waited = dockSegments(state({ status: "running", helpers: { live: 2, waitedFor: 2, letGo: 0 } })).find((segment) => segment.id === "helpers");
   assert.equal(waited?.label, "2 helpers");
   assert.equal(waited?.short, "2");
-  assert.equal(waited?.name, "2 helpers. Waiting on 2 subagents");
+  assert.equal(waited?.name, "2 helpers. Waiting on 2 helpers");
   const loose = dockSegments(state({ status: "running", helpers: { live: 1, waitedFor: 0, letGo: 1 } })).find((segment) => segment.id === "helpers");
   assert.equal(loose?.label, "1 helper");
-  assert.equal(loose?.name, "1 helper. 1 subagent keeps working in the background");
+  assert.equal(loose?.name, "1 helper. 1 helper keeps working in the background");
+});
+
+test("the status says it waits on helpers only while the run has stopped for them, and Working beside them", () => {
+  const helpers = { live: 2, waitedFor: 2, letGo: 0 };
+  const beside = dockSegments(state({ status: "running", took: 40, helpers, waits: false }));
+  assert.equal(beside[0].label, "Working · 40s", "the run works beside its helpers");
+  assert.ok(beside.some((segment) => segment.id === "helpers"), "the helpers keep their own segment");
+  const waits = dockSegments(state({ status: "running", took: 40, helpers, waits: true }));
+  assert.deepEqual([waits[0].label, waits[0].short, waits[0].tone], ["Waiting on 2 helpers", "Waiting on 2 helpers", "work"]);
+  assert.deepEqual(ids(waits), ["status", "stop", "helpers"]);
+  // Helpers it let go hold nothing: with none waited for, it works.
+  const loose = dockSegments(state({ status: "running", took: 40, helpers: { live: 1, waitedFor: 0, letGo: 1 }, waits: true }));
+  assert.equal(loose[0].label, "Working · 40s");
+  // A wait for the owner says that, whatever the helpers do.
+  assert.equal(dockSegments(state({ status: "blocked", helpers, waits: true }))[0].label, "Waiting for you");
 });
 
 test("one loop says how often it repeats, a loop of many words and several say how many", () => {

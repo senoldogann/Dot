@@ -615,3 +615,53 @@ def test_a_link_in_a_message_has_no_chip_and_reads_at_aa_on_every_ground_it_stan
     in_bubble: str = _mix_oklab(pairs["--accent-strong"][scheme], resolved("--on-msg-me"), int(mine.group(1)) / 100)
     ratio = contrast(in_bubble, resolved("--msg-me"))
     assert ratio >= 4.5, f"a link ({in_bubble}) in the owner's bubble: {ratio:.2f} < 4.5"
+
+
+def test_the_question_cards_header_is_not_set_in_capitals() -> None:
+    """A CSS uppercase turns an English "is" under ``lang="tr"`` into "İS" (item 1978, 2026-11-26 review): the header of
+    the card that asks is in sentence case, so a line of another language is never changed by the sheet."""
+    sheet: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    rule: re.Match[str] | None = re.search(r"\n\.asks-title \{([^}]*)\}", sheet)
+    assert rule is not None, "the sheet has no rule for the header of the card that asks"
+    assert "text-transform" not in rule.group(1)
+
+
+@pytest.mark.parametrize("look", [look for look, _ in _LOOKS])
+@pytest.mark.parametrize("scheme", [0, 1], ids=["light", "dark"])
+def test_every_chart_mark_of_a_chat_card_reads_at_3_to_1_on_every_surface(look: str, scheme: int) -> None:
+    """Item 1967: the hues of a card chart's marks (``--card-mark-1`` to ``-5``) hold 3:1, the level of graphics."""
+    pairs: dict[str, tuple[str, str]] = _pairs(look)
+    marks: dict[str, tuple[str, str]] = {
+        name: (a, b) for name, a, b in _PAIR.findall(_themes_text()) if "card-mark" in name
+    }
+    assert sorted(marks) == [f"--card-mark-{n}" for n in range(1, 6)]
+    short: list[str] = [
+        f"{name} on {surface}: {contrast(marks[name][scheme], pairs[surface][scheme]):.2f} < 3"
+        for name in marks
+        for surface in _SURFACES
+        if contrast(marks[name][scheme], pairs[surface][scheme]) < 3
+    ]
+    assert short == [], short
+
+
+@pytest.mark.parametrize("look", [look for look, _ in _LOOKS])
+@pytest.mark.parametrize("scheme", [0, 1], ids=["light", "dark"])
+def test_the_colours_of_code_read_at_aa_on_every_surface_and_on_a_line_added_or_removed(look: str, scheme: int) -> None:
+    """Item 2017: a change's code is coloured with ``--code-keyword``, ``-string``, ``-number`` and ``-key``, declared
+    once in the base look; each reads at 4.5:1 on every surface and on the tints of a line added or removed."""
+    pairs: dict[str, tuple[str, str]] = _pairs(look)
+    marks: dict[str, tuple[str, str]] = {
+        name: (a, b) for name, a, b in _PAIR.findall(_themes_text()) if name.startswith("--code-")
+    }
+    assert sorted(marks) == ["--code-key", "--code-keyword", "--code-number", "--code-string"]
+    short: list[str] = [
+        f"{name} on {ground}: {contrast(marks[name][scheme], pairs[ground][scheme]):.2f} < 4.5"
+        for name in marks
+        for ground in (*_SURFACES, "--ok-weak", "--bad-weak")
+        if contrast(marks[name][scheme], pairs[ground][scheme]) < 4.5
+    ]
+    assert short == [], short
+
+
+def _themes_text() -> str:
+    return (_CSS / "themes.css").read_text(encoding="utf-8")

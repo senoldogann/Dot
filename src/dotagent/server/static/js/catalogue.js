@@ -6,29 +6,30 @@
 // tries first, and signs in to in this browser on the service's own page when it asks.
 
 import { api } from "./api.js";
-import { clip, el, plural } from "./dom.js";
+import { clip, el, } from "./dom.js";
 import { markContent, markTile } from "./marks.js";
 import { field } from "./panels.js";
 import { attempt, confirmDialog, formDialog } from "./ui.js";
+import { t, tCount } from "./i18n.js";
 
 export const STATE_WORDS = {
-  allowed: "Allowed",
-  not_asked: "Not asked yet",
-  not_open: "Not checked",
-  refused: "Refused",
-  not_installed: "Not installed",
-  signed_in: "Signed in",
-  signed_out: "Not signed in",
-  lent: "Your Chrome",
-  synced: "Syncing",
-  not_synced: "Not syncing",
+  allowed: t("catalogue.allowed"),
+  not_asked: t("catalogue.notAskedYet"),
+  not_open: t("catalogue.notChecked"),
+  refused: t("catalogue.refused"),
+  not_installed: t("catalogue.notInstalled"),
+  signed_in: t("catalogue.signedIn"),
+  signed_out: t("catalogue.notSignedIn"),
+  lent: t("catalogue.yourChrome"),
+  synced: t("catalogue.syncing"),
+  not_synced: t("catalogue.notSyncing"),
 };
 export const CONNECTED_STATES = new Set(["allowed", "signed_in", "synced", "lent"]);
-export const STEP_LABELS = { ask: "Allow", settings: "Open System Settings", sign_in: "Sign in", open_app: "Open" };
-export const MCP_STATE_WORDS = { ready: "Ready", left_out: "Left out", disabled: "Off", trying: "Trying…", signing_in: "Waiting for your sign-in" };
+export const STEP_LABELS = { ask: t("catalogue.allow"), settings: t("catalogue.openSystemSettings"), sign_in: t("catalogue.signIn"), open_app: t("catalogue.open") };
+export const MCP_STATE_WORDS = { ready: t("catalogue.ready"), left_out: t("catalogue.leftOut"), disabled: t("catalogue.off"), trying: t("catalogue.trying"), signing_in: t("catalogue.waitingForYourSignIn") };
 export const MCP_STATE_TONES = { ready: "b-ok", left_out: "b-bad", trying: "b-info", signing_in: "b-warn" };
 // What each way is called on a service's page, and on its tile when it is the service's first.
-export const WAY_NAMES = { mcp: "Connected app", mac: "Mac app", web: "Dot's browser", folder: "Synced folder", vault: "1Password" };
+export const WAY_NAMES = { mcp: t("catalogue.connectedApp"), mac: t("catalogue.macApp"), web: t("catalogue.dotSBrowser"), folder: t("catalogue.syncedFolder"), vault: "1Password" };
 // Where a service account token for 1Password is made (item 493), at 1password.com.
 const VAULT_TOKEN_HELP = "https://start.1password.com/developer-tools/infrastructure-secrets/serviceaccount/";
 // While Dot tries a server or waits for a sign-in, the page asks how it stands this often.
@@ -45,29 +46,29 @@ export function pluginMark(plugin) {
  * started on this Mac. */
 function mcpWords(service) {
   if (service === undefined || service === null) {
-    return "Connected app";
+    return t("catalogue.connectedApp");
   }
   if (service.kind === "local") {
-    return service.secrets.length > 0 ? "On this Mac · Key" : "On this Mac";
+    return service.secrets.length > 0 ? t("catalogue.onThisMacKey") : t("catalogue.onThisMac");
   }
   if (service.secrets.length > 0) {
-    return "Key";
+    return t("catalogue.key");
   }
-  return service.signs_in ? "Sign in" : "Open to all";
+  return service.signs_in ? t("catalogue.signIn") : t("catalogue.openToAll");
 }
 
 /** Where a service of the catalogue stands before it is added, in a badge's words (item 408). */
 export function serviceWords(service) {
   if (service === undefined || service === null) {
-    return "Open to all";
+    return t("catalogue.openToAll");
   }
   if (service.kind === "local") {
-    return "On this Mac";
+    return t("catalogue.onThisMac");
   }
   if (service.secrets.length > 0) {
-    return "Takes a key";
+    return t("catalogue.takesAKey");
   }
-  return service.signs_in ? "Signs in" : "Open to all";
+  return service.signs_in ? t("catalogue.signsIn") : t("catalogue.openToAll");
 }
 
 /**
@@ -80,7 +81,7 @@ function toolsDialog(offered) {
     const ticks = [];
     const dialog = el("dialog", { class: "modal import-dialog", "aria-labelledby": "tools-title" });
     const go = el("button", { class: "btn primary", type: "button", onclick: () => dialog.close("ok") });
-    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel");
+    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, t("catalogue.cancel"));
     const count = el("span", { class: "hint" });
     const chosen = new Set(offered.allow.length === 0 ? offered.tools.map((tool) => tool.name) : offered.allow);
     const all = el("input", {
@@ -95,9 +96,9 @@ function toolsDialog(offered) {
 
     function paint() {
       const picked = ticks.filter((tick) => tick.box.checked).length;
-      go.textContent = picked === 0 ? "Save" : `Save ${picked}`;
+      go.textContent = picked === 0 ? t("catalogue.save") : t("catalogue.savePicked", { picked });
       go.disabled = picked === 0;
-      count.textContent = `${picked} of ${ticks.length}`;
+      count.textContent = t("catalogue.pickedOfLength", { picked, length: ticks.length });
       all.checked = picked === ticks.length;
       all.indeterminate = picked > 0 && picked < ticks.length;
     }
@@ -116,10 +117,10 @@ function toolsDialog(offered) {
       el(
         "div",
         { class: "modal-body" },
-        el("h3", { id: "tools-title" }, `Choose the actions of ${offered.server}`),
-        el("p", { class: "muted" }, `It offers ${plural(offered.tools.length, "action", "actions")}. The ones you tick are offered to the tasks that start next; with all of them ticked, so are the actions it adds later.`),
+        el("h3", { id: "tools-title" }, t("catalogue.chooseTheActionsOfServer", { server: offered.server })),
+        el("p", { class: "muted" }, t("catalogue.itOffersPartTheOnes", { part: tCount(offered.tools.length, "catalogue.countAction", "catalogue.countActions") })),
         count,
-        el("label", { class: "import-row" }, all, el("span", { class: "import-row-main" }, el("span", { class: "import-row-name" }, "All actions"))),
+        el("label", { class: "import-row" }, all, el("span", { class: "import-row-main" }, el("span", { class: "import-row-name" }, t("catalogue.allActions")))),
         el("div", { class: "import-list" }, rows),
       ),
       el("div", { class: "modal-actions" }, cancel, go),
@@ -204,7 +205,7 @@ export function createCatalogue(onChange) {
       if (way.kind === "vault") {
         // Its page says what Connect makes and offers a token instead (item 493): the step is that page (`page`).
         if (vault !== null && !vault.connected) {
-          return { label: "Connect", key: "vault", keyed: true, page: true, take: async () => undefined };
+          return { label: t("catalogue.connect"), key: "vault", keyed: true, page: true, take: async () => undefined };
         }
         continue;
       }
@@ -216,19 +217,19 @@ export function createCatalogue(onChange) {
           const service = now.service;
           if (service !== undefined && service !== null && service.secrets.length > 0) {
             const button = () => document.querySelector(`[data-plugin="${plugin.id}"] .plugin-add`);
-            return { label: "Add", key: `mcp:${way.ref}`, keyed: true, take: () => askSecrets(service, button) };
+            return { label: t("catalogue.add"), key: `mcp:${way.ref}`, keyed: true, take: () => askSecrets(service, button) };
           }
-          return { label: "Add", key: `mcp:${way.ref}`, keyed: false, take: () => add({ service: way.ref, name: null, address: null, secrets: {} }) };
+          return { label: t("catalogue.add"), key: `mcp:${way.ref}`, keyed: false, take: () => add({ service: way.ref, name: null, address: null, secrets: {} }) };
         }
         if (now.server.state === "signing_in" && now.server.link !== null) {
-          return { label: "Sign in", link: now.server.link };
+          return { label: t("catalogue.signIn"), link: now.server.link };
         }
         if (now.server.state === "trying" || now.server.state === "signing_in") {
           return null;
         }
         if (now.server.state === "left_out" && now.server.origin === "connected") {
           const server = now.server;
-          return { label: server.signs_in ? "Sign in again" : "Try again", key: `server:${server.name}`, keyed: false, take: () => connectAgain(server) };
+          return { label: server.signs_in ? t("catalogue.signInAgain") : t("catalogue.tryAgain"), key: `server:${server.name}`, keyed: false, take: () => connectAgain(server) };
         }
         continue;
       }
@@ -268,13 +269,13 @@ export function createCatalogue(onChange) {
       return null;
     }
     if (!vault.connected) {
-      return el("span", { class: "badge b-muted" }, vault.cli === null ? "Not installed" : "Not connected");
+      return el("span", { class: "badge b-muted" }, vault.cli === null ? t("catalogue.notInstalled") : t("catalogue.notConnected"));
     }
     if (vault.error !== null) {
-      return el("span", { class: "badge b-bad" }, "Cannot read");
+      return el("span", { class: "badge b-bad" }, t("catalogue.cannotRead"));
     }
     const logins = vault.vaults.reduce((sum, one) => sum + one.logins, 0);
-    return el("span", { class: "badge b-ok" }, plural(logins, "login", "logins"));
+    return el("span", { class: "badge b-ok" }, tCount(logins, "catalogue.countLogin", "catalogue.countLogins"));
   }
 
   /** Ask for a service account token for 1Password, on its page, in a dialog (items 493 and 615): a password field,
@@ -282,12 +283,12 @@ export function createCatalogue(onChange) {
    * emptied as the dialog closes. Resolves once the dialog is closed. `returnFocus` finds the button the dialog gives
    * the focus back to when the page was drawn again meanwhile. */
   function askVault(returnFocus) {
-    const input = el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": "1Password: service account key" });
+    const input = el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": t("catalogue.1passwordServiceAccountKey") });
     return formDialog({
-      title: "Use a service account key",
-      description: "A key you made at 1password.com that reads a vault of yours. Dot keeps it on this Mac.",
-      body: field("Service account key", input, el("a", { href: VAULT_TOKEN_HELP, target: "_blank", rel: "noopener noreferrer" }, "Make one that reads a vault of yours")),
-      submitLabel: "Connect",
+      title: t("catalogue.useAServiceAccountKey"),
+      description: t("catalogue.aKeyYouMadeAt"),
+      body: field(t("catalogue.serviceAccountKey"), input, el("a", { href: VAULT_TOKEN_HELP, target: "_blank", rel: "noopener noreferrer" }, t("catalogue.makeOneThatReadsA"))),
+      submitLabel: t("catalogue.connect"),
       size: "narrow",
       returnFocus,
       onSubmit: () => pasteVaultToken(input.value.trim()),
@@ -315,9 +316,9 @@ export function createCatalogue(onChange) {
 
   async function disconnectVault() {
     const sure = await confirmDialog({
-      title: "Disconnect 1Password from Dot?",
-      message: "Tasks fill in no login from it any more, and Dot forgets the service account's key. The vault and the service account stay in 1Password, whose page removes them.",
-      confirmLabel: "Disconnect",
+      title: t("catalogue.disconnect1passwordFromDot"),
+      message: t("catalogue.tasksFillInNoLogin"),
+      confirmLabel: t("catalogue.disconnect"),
       focusCancel: true,
     });
     if (!sure) {
@@ -354,12 +355,12 @@ export function createCatalogue(onChange) {
       el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": `${service.name}: ${secret.label}` }),
     ]);
     return formDialog({
-      title: `Add ${service.name}`,
-      description: "Dot tries the connection before it keeps it, and keeps the key on this Mac.",
+      title: t("catalogue.addName", { name: service.name }),
+      description: t("catalogue.dotTriesTheConnectionBefore"),
       body: inputs.map(([secret, input]) =>
-        field(secret.label, input, secret.help === null ? "" : el("a", { href: secret.help, target: "_blank", rel: "noopener noreferrer" }, "Where to get one")),
+        field(secret.label, input, secret.help === null ? "" : el("a", { href: secret.help, target: "_blank", rel: "noopener noreferrer" }, t("catalogue.whereToGetOne"))),
       ),
-      submitLabel: "Add",
+      submitLabel: t("catalogue.add"),
       size: "narrow",
       returnFocus,
       onSubmit: () => add({ service: service.id, name: null, address: null, secrets: Object.fromEntries(inputs.map(([secret, input]) => [secret.name, input.value])) }),
@@ -433,12 +434,12 @@ export function createCatalogue(onChange) {
   async function remove(server, service) {
     // One added from another agent of this Mac is taken back from Dot alone (item 497): the agent keeps it.
     const sure = await confirmDialog({
-      title: `Remove ${service ? service.name : server.name} from Dot?`,
+      title: t("catalogue.removeValueFromDot", { value: service ? service.name : server.name }),
       message:
         server.origin === "elsewhere"
-          ? "Dot stops it now and its actions leave the tasks that start after; the app it came from keeps it."
-          : "Its actions leave the tasks that start after, and Dot forgets its address and its sign-in.",
-      confirmLabel: "Remove",
+          ? t("catalogue.dotStopsItNowAnd")
+          : t("catalogue.itsActionsLeaveTheTasks"),
+      confirmLabel: t("catalogue.remove"),
       focusCancel: true,
     });
     if (!sure) {
@@ -456,9 +457,9 @@ export function createCatalogue(onChange) {
    * start after, and its folder goes to the Trash. */
   async function removePlugin(server) {
     const sure = await confirmDialog({
-      title: `Remove the plugin ${server.plugin} from Dot?`,
-      message: "Its connected apps stop now and its skills leave the tasks that start after. Its folder goes to the Trash, where you can put it back.",
-      confirmLabel: "Remove",
+      title: t("catalogue.removeThePluginPluginFrom", { plugin: server.plugin }),
+      message: t("catalogue.itsConnectedAppsStopNow"),
+      confirmLabel: t("catalogue.remove"),
       focusCancel: true,
     });
     if (!sure) {

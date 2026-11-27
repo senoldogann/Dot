@@ -39,7 +39,7 @@ export function openViewer({ title, content, page, onClose }) {
   const out = el("button", { class: "viewer-tool", type: "button", "aria-label": t("viewer.zoomOut"), title: t("viewer.zoomOut") }, icon("minus"));
   const into = el("button", { class: "viewer-tool", type: "button", "aria-label": t("viewer.zoomIn"), title: t("viewer.zoomIn") }, icon("plus"));
   const fit = el("button", { class: "viewer-tool viewer-fit", type: "button", "aria-label": t("viewer.fit"), title: t("viewer.fit") }, t("viewer.fit"));
-  const close = el("button", { class: "viewer-tool viewer-close", type: "button", "aria-label": t("dialog.close"), title: t("dialog.close") }, icon("x"));
+  const close = el("button", { class: "viewer-tool viewer-close", type: "button", "aria-label": t("viewer.close"), title: t("viewer.close") }, icon("x"));
   // What a zoomed page is covered with, so that the gestures reach the viewer and not the page.
   // A picture has none: a tap on it must reach it, and only one beside it closes the viewer.
   const glass = page ? el("div", { class: "viewer-glass", hidden: true }) : null;

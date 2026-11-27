@@ -25,11 +25,12 @@ test("each Turkish sentence fills the places its English one fills, and none is 
   }
 });
 
-test("a subagent is an alt ajan in every Turkish line, never a yardımcı (item 1331)", () => {
-  const named = Object.entries(EN).filter(([, english]) => /subagent/i.test(english));
-  assert.ok(named.length >= 8, "the lines that name a subagent are found");
-  for (const [key] of named) {
-    assert.doesNotMatch(TR[key], /yardımcı/i, key);
+test("a helper is a yardımcı in every Turkish line, never an alt ajan: the owner's plain word, as the iPhone app says it (item 2011)", () => {
+  const named = Object.entries(EN).filter(([, english]) => /\bhelpers?\b/i.test(english));
+  assert.ok(named.length >= 8, "the lines that name a helper are found");
+  for (const [key, english] of Object.entries(EN)) {
+    assert.doesNotMatch(english, /subagent/i, key);
+    assert.doesNotMatch(TR[key], /alt ajan/i, key);
   }
 });
 

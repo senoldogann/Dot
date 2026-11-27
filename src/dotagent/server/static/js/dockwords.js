@@ -2,7 +2,7 @@
 // each, from what the page knows of the run. A segment is there only when it has something to say, and with none the
 // capsule is not drawn. Pure, so that it runs under Node without a page.
 
-import { duration } from "./dom.js";
+import { elapsed } from "./dom.js";
 import { t, tCount } from "./i18n.js";
 
 // A loop's rhythm of more words than this ("on Mon, Wed and Fri at 18:30") is left to its sheet: the segment says how
@@ -18,6 +18,7 @@ const RHYTHM_CHARS = 18;
  * @property {boolean} reconnecting the page lost the run's stream and has not got it back
  * @property {{ done: number, total: number } | null} plan how far the run's plan has come
  * @property {{ live: number, waitedFor: number, letGo: number }} helpers the helpers that work (waitcounts.js)
+ * @property {boolean} waits the run has stopped and only waits for its helpers (`waitsOnHelpers`, waitcounts.js)
  * @property {{ count: number, rhythm: string | null, problem: boolean }} loops the loops of the chat; `rhythm` is how often
  *   the one loop repeats, in few words
  * @property {{ count: number, held: boolean, problem: boolean, sending: boolean }} queue the messages queued for after the run
@@ -36,8 +37,8 @@ const RHYTHM_CHARS = 18;
  */
 
 /**
- * The status segment: how long the run has worked, or that it waits for the owner, waits to start, stops or has lost
- * its stream.
+ * The status segment: how long the run has worked, or that it waits for the owner, waits on its helpers (only while it
+ * has stopped for them, the owner's report of 2026-11-27), waits to start, stops or has lost its stream.
  * @param {DockState} state
  * @returns {DockSegment}
  */
@@ -58,7 +59,12 @@ function statusSegment(state) {
     const label = t("work.waitingForYou");
     return { id: "status", label, short: label, name: label, tone: "waiting", sheet: false };
   }
-  const took = duration(Math.max(state.took, 0));
+  const { waitedFor } = state.helpers;
+  if (state.waits && waitedFor > 0) {
+    const label = tCount(waitedFor, "capsule.waitOne", "capsule.waitMany");
+    return { id: "status", label, short: label, name: label, tone: "work", sheet: false };
+  }
+  const took = elapsed(state.took);
   const label = t("dock.working", { took });
   return { id: "status", label, short: took, name: label, tone: "work", sheet: false };
 }

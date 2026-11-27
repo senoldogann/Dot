@@ -70,7 +70,9 @@ final class ChatUITests: XCTestCase {
         ).firstMatch
         XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
         library.tap()
-        let duration: XCUIElement = app.staticTexts["composer.videoDuration"]
+        // The video stands as a tile (its first frame, the length at its foot, a × at its corner), item 1992.
+        XCTAssertTrue(app.otherElements["composer.videoTile"].waitForExistence(timeout: 15), app.debugDescription)
+        let duration: XCUIElement = app.staticTexts["tile.duration"]
         XCTAssertTrue(duration.waitForExistence(timeout: 15))
         XCTAssertTrue(duration.label.hasPrefix("0:01"), duration.label)
         app.buttons["Remove Sample.mp4"].tap()
@@ -91,6 +93,32 @@ final class ChatUITests: XCTestCase {
         XCTAssertNotEqual(second, first, "the clock moved on its own: \(first) -> \(second)")
         let third: String = nextLabel(of: status, after: second, within: 2.5)
         XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
+    }
+
+    /// The owner's report of 2026-11-27: the capsule says "Waiting on N helpers" only while the main run has stopped for
+    /// them (`n2-helpers`: its step's one open call is a delegate); while it works beside its helper (`n2-chat`) it says
+    /// "Working". No spinner on either, and the status takes only its words' width, so that Stop, the plan and the helpers
+    /// keep their room.
+    func testTheCapsuleSaysWaitingOnlyWhileTheRunWaitsAndSpinsNothing() {
+        for (scene, words) in [("n2-helpers", "Waiting on 1 helper"), ("n2-chat", "Working, ")] {
+            let app: XCUIApplication = launch(scene)
+            let status: XCUIElement = app.buttons["capsule.status"]
+            XCTAssertTrue(status.waitForExistence(timeout: 10), scene)
+            XCTAssertTrue(status.label.hasPrefix(words), "\(scene): \(status.label)")
+            let stop: XCUIElement = app.buttons["capsule.stop"]
+            let people: XCUIElement = app.buttons["capsule.helpers"]
+            XCTAssertTrue(stop.exists && people.exists, scene)
+            let spinners: [XCUIElement] = app.activityIndicators.allElementsBoundByIndex.filter { $0.frame.intersects(status.frame) }
+            XCTAssertTrue(spinners.isEmpty, "\(scene): no spinner in the capsule: \(spinners.map { $0.frame })")
+            print("capsule \(scene): status \(status.frame) stop \(stop.frame) helpers \(people.frame)")
+            XCTAssertLessThanOrEqual(status.frame.width, 180, "\(scene): the status keeps to its words: \(status.frame)")
+            XCTAssertLessThanOrEqual(stop.frame.minX - status.frame.maxX, 2, "\(scene): Stop follows at once: \(status.frame) \(stop.frame)")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "capsule-\(scene)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
     }
 
     /// The element's label once it differs from `label`, read every 100 ms (an `XCTNSPredicateExpectation` reads it about
@@ -338,6 +366,75 @@ final class ChatUITests: XCTestCase {
         add(sheet)
     }
 
+    /// Owner 2026-11-27: an empty state is in the app's own type, so Settings › Appearance's text size reaches it (the
+    /// system's empty-state view kept its own larger title), and its glyph is still (no dotted circle like a spinner).
+    func testAnEmptyStateFollowsTheChosenTextSize() {
+        var heights: [CGFloat] = []
+        for size in ["xSmall", "xxxLarge"] {
+            let app: XCUIApplication = launch("n2-offline", defaults: ["-textSize", size])
+            let title: XCUIElement = app.staticTexts["Can't reach your Mac"]
+            XCTAssertTrue(title.waitForExistence(timeout: 10))
+            heights.append(title.frame.height)
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "empty-state-\(size)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+        XCTAssertGreaterThan(heights[1], heights[0] * 1.3, "the title grows with the chosen text size: \(heights)")
+    }
+
+    /// bubble; a tap unfolds the whole message. At AX3 too, where the title may wrap and nothing is cut off the screen.
+    func testARoutinesMessageIsOneCompactRowThatUnfoldsItsWords() {
+        for extra in [[String](), ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge"]] {
+            let app: XCUIApplication = launch("n2-routine", defaults: ["-showSteps", "NO", "-stepsOverrides", "{}"] + extra)
+            let row: XCUIElement = app.buttons["routine.row"]
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            XCTAssertEqual(row.label, "Routine: Site build check")
+            XCTAssertFalse(app.staticTexts["You: Find out why the site's build fails on CI and fix it"].exists, "no owner's bubble")
+            XCTAssertGreaterThanOrEqual(row.frame.height, 44 - 0.01)
+            XCTAssertLessThanOrEqual(row.frame.maxX, app.windows.firstMatch.frame.maxX, "\(row.frame)")
+            row.tap()
+            let unfolded: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", "Find out why the site's build fails on CI and fix it"), object: row)
+            XCTAssertEqual(XCTWaiter.wait(for: [unfolded], timeout: 3), .completed, "a tap shows the whole message: \(String(describing: row.value))")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "routine-row-\(extra.isEmpty ? "L" : "AX3")"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
+    /// sheet), with ✕; the helper's chat shows its steps as the chat that started it does unless it chose itself.
+    func testAHelperOfTheStreamOpensAsASheetAndShowsItsStepsAsItsParent() {
+        for parentShows in [false, true] {
+            let overrides: String = "<dict><key>thr_fixture</key><\(parentShows)/></dict>"
+            let app: XCUIApplication = launch("n2-chat", defaults: ["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", overrides])
+            let group: XCUIElement = app.buttons["helpers.group"]
+            XCTAssertTrue(group.waitForExistence(timeout: 10))
+            group.tap()
+            let row: XCUIElement = app.buttons.matching(identifier: "helper.row").matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            row.tap()
+            let close: XCUIElement = app.buttons["helperChat.close"]
+            XCTAssertTrue(close.waitForExistence(timeout: 5), "the helper's chat is a sheet with ✕, not a pushed chat")
+            XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5))
+            let step: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "dentist.example")).firstMatch
+            XCTAssertEqual(step.waitForExistence(timeout: 2), parentShows, "the helper's steps follow its parent's Show steps (\(parentShows))")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "helper-sheet-steps-\(parentShows)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            close.tap()
+            let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: close)
+            XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed, "✕ closes the sheet")
+            app.terminate()
+        }
+    }
+
+    /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
+    /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// does; a tap shows the steps and a second folds them back.
     func testTheLiveLineSaysTheWorkAndATapShowsTheSteps() {
@@ -502,6 +599,10 @@ final class ChatUITests: XCTestCase {
         for _ in 0..<4 where !thought.exists { app.swipeUp() }
         XCTAssertTrue(thought.waitForExistence(timeout: 10), "the steps show first")
         app.buttons["Changes and files"].tap()
+        // The sections of This chat start folded (item 2017).
+        let messages: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == 'inspector.section' AND label BEGINSWITH 'Messages,'")).firstMatch
+        XCTAssertTrue(messages.waitForExistence(timeout: 5))
+        messages.tap()
         let toggle: XCUIElement = app.switches["inspector.showSteps"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "1")
@@ -580,13 +681,17 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
-    /// Item 1931: with no link, the pill says Offline in the status's place (after the second that keeps a blip from
-    /// flickering), and offers no Stop.
+    /// Item 1931 and the owner's report of 2026-11-27: with no link, the capsule says Offline in the status's place once
+    /// it lasted a few seconds, and offers no Stop; the header keeps the bot's face and name, no link words.
     func testThePillSaysOfflineWithoutALink() {
         let app: XCUIApplication = launch("n2-offline-saved")
         let link: XCUIElement = app.buttons["capsule.link"]
-        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        XCTAssertTrue(link.waitForExistence(timeout: 15))
         XCTAssertEqual(link.label, "Offline")
+        for words in ["Syncing", "Reconnecting", "Offline ·"] {
+            XCTAssertFalse(
+                app.navigationBars.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", words)).firstMatch.exists, "no link words in the header: \(words)")
+        }
         XCTAssertFalse(app.buttons["capsule.stop"].exists, "nothing to stop over no link")
         let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         shot.name = "pill-offline"
@@ -596,32 +701,98 @@ final class ChatUITests: XCTestCase {
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
         let app: XCUIApplication = launch("n2-asks")
-        XCTAssertTrue(app.staticTexts["Your answer is needed"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["1 of 2"].exists, "a count for several asks")
+        XCTAssertTrue(app.staticTexts["User input needed"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["1 / 2"].exists, "a count for several asks")
         XCTAssertTrue(app.buttons["Allow once"].exists)
         XCTAssertTrue(app.buttons["Always allow in this chat"].exists)
         XCTAssertFalse(app.textFields["composer.field"].exists, "the dock stands in the composer's place")
         app.buttons["Next ask"].tap()
-        XCTAssertTrue(app.staticTexts["2 of 2"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["2 / 2"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Which day suits you for the dentist?"].exists)
         XCTAssertTrue(app.buttons["Stop"].exists, "Stop stays reachable")
         app.buttons["Fold what Dot asked"].tap()
         XCTAssertTrue(app.textFields["composer.field"].waitForExistence(timeout: 3), "folded, the composer is back")
     }
 
-    func testQuestionsArePickedAndSentWithOneSubmit() {
+    /// Item 2001, after another coding agent's question card: three questions page in one card ("1 / 3", never wrapped);
+    /// a single-select pick rings its card, a multi-select one takes several and lets one go, an own answer is written;
+    /// one "Submit answers" waits until every question has an answer and keeps the picks while paging.
+    func testThreeQuestionsPageInOneCardWithSingleMultiAndWrittenAnswers() {
         let app: XCUIApplication = launch("n2-question")
         XCTAssertTrue(app.staticTexts["Fill in the pending answers"].waitForExistence(timeout: 10))
+        // The fixture's live picture floats over the card's arrows: folded first, so the taps reach them.
+        let hidePicture: XCUIElement = app.buttons["Hide the live picture"]
+        if hidePicture.waitForExistence(timeout: 3) { hidePicture.tap() }
+        let counter: XCUIElement = app.staticTexts["1 / 3"]
+        XCTAssertTrue(counter.exists, "the count")
+        XCTAssertLessThan(counter.frame.height, 30, "the count stays on one line: \(counter.frame)")
         let submit: XCUIElement = app.buttons["ask.submit"]
-        XCTAssertFalse(submit.isEnabled, "nothing picked yet")
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch.tap()
-        XCTAssertTrue(submit.isEnabled)
-        XCTAssertEqual(submit.label, "Submit answer")
+        XCTAssertEqual(submit.label, "Submit answers")
+        XCTAssertFalse(submit.isEnabled, "nothing answered yet")
+        // Single select: the pick is the selected card, a second pick moves it.
+        let close: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch
+        let keep: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Keep them on")).firstMatch
+        keep.tap()
+        close.tap()
+        XCTAssertTrue(close.isSelected)
+        XCTAssertFalse(keep.isSelected, "one answer for a single-select question")
+        XCTAssertFalse(submit.isEnabled, "two questions still wait")
+        // Multi select (the third question): two picks, then one let go; both stay selected until then.
         app.buttons["Next ask"].tap()
-        let tuesday: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Tuesday afternoon (Recommended)")).firstMatch
-        XCTAssertTrue(tuesday.waitForExistence(timeout: 3))
-        tuesday.tap()
-        XCTAssertEqual(submit.label, "Submit 2 answers", "the pick of the first question is kept while paging")
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 3))
+        app.buttons["Next ask"].tap()
+        XCTAssertTrue(app.staticTexts["3 / 3"].waitForExistence(timeout: 3))
+        let memory: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "#1199")).firstMatch
+        let webhook: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "#1188")).firstMatch
+        XCTAssertTrue(memory.waitForExistence(timeout: 3))
+        memory.tap()
+        webhook.tap()
+        XCTAssertTrue(memory.isSelected && webhook.isSelected, "several options at once")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "question-card-multi"
+        shot.lifetime = .keepAlways
+        add(shot)
+        webhook.tap()
+        XCTAssertFalse(webhook.isSelected, "a second tap lets an option go")
+        XCTAssertFalse(submit.isEnabled, "the second question still waits")
+        // Paging back keeps what was picked.
+        app.buttons["Previous ask"].tap()
+        app.buttons["Previous ask"].tap()
+        XCTAssertTrue(app.staticTexts["1 / 3"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch.isSelected)
+        // Free text: the second question is answered in words, the last answer Submit waited for.
+        app.buttons["Next ask"].tap()
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 3))
+        let written: XCUIElement = app.descendants(matching: .any).matching(identifier: "ask.written").firstMatch
+        XCTAssertTrue(written.waitForExistence(timeout: 3))
+        written.tap()
+        written.typeText("Friday at noon")
+        XCTAssertTrue(submit.isEnabled, "every question has an answer")
+    }
+
+    /// Item 2001: at AX3, in Turkish and dark, the card's options grow with their words (nothing cut) and the count
+    /// stays on one line.
+    func testTheQuestionCardGrowsAtAX3InTurkishAndDark() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-question", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-colorScheme", "dark",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
+        ]
+        app.launch()
+        let counter: XCUIElement = app.staticTexts["1 / 3"]
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertLessThan(counter.frame.height, 60, "the count stays on one line at AX3: \(counter.frame)")
+        let options: XCUIElementQuery = app.buttons.matching(identifier: "ask.option")
+        XCTAssertTrue(options.firstMatch.waitForExistence(timeout: 5))
+        for index in 0..<options.count {
+            let option: XCUIElement = options.element(boundBy: index)
+            XCTAssertGreaterThanOrEqual(option.frame.height.rounded(), 44)
+            XCTAssertLessThanOrEqual(option.frame.maxX, app.windows.firstMatch.frame.maxX, "nothing pushed off the edge")
+        }
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "question-card-ax3-tr-dark"
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 
     func testSlashOpensTheCommandsPanelFilteredAsTheOwnerTypes() {

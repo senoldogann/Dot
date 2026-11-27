@@ -25,8 +25,8 @@ command itself over its output (one that carries more than its command, a workin
 whole); a read wears an eye and a write a sheet of paper, and each says what it did ("Read notes.txt") without its
 tool's name, which a call keeps only where its words do not say what it is (item 506). A page
 the turn's run showed with `show_page` stands where it came, in its frame
-(item 426). That line opens and folds on a click while the run still works and after it ends,
-and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
+(item 426); the cards it showed with `show_cards` (item 1967) stand there too. That line opens and folds on a click while
+the run still works and after it ends, and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
 Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
 chooses between **Every step** and **What it is doing**, the default since item 830 (a browser that had Dot open before
@@ -66,20 +66,17 @@ pressed. Approvals, questions, notes and the messages stay in sight either way; 
 steps, with **What it is doing** (item 830), and an agent's message is folded until you open it, in either choice
 (item 859). The choice is kept by the browser. A third choice, **Messages only** (item 1976, after Grok Bot's chats),
 tells the run as a conversation: the steps and thoughts fold out as with *What it is doing*; what the run says on the way
-to its calls is drawn as one of its messages and stays where it was said; and a call that turns the run to other work
-which its own words did not tell is one of Dot's short messages too, in the words the line uses for it ("Searching the
-web for “GistSmith contact”", "Looking at gistsmith.com", "Running a command"). The line under them says what the run
-does now and for how long ("Reading README.md… · 2 min"). Those lines come from the daemon's `narration` events
-(`agent/narration.py`), one beside a call's `tool_call` in every harness (Dot's own loop, Claude Code, OpenCode, whose own tools are told as the Dot tool that does the same): no model
-is asked for them and the model never reads them, so they cost no token. A stretch of one kind of work is one line: a
-call of a kind one of the run's four newest lines told is not told again, but for a search of other words or a page on
-another site; a line names a page by its site, a file by its name and a search by its words, never a command's text. Over
-the owner's 279 runs of two weeks that made a median of one line a run on Claude Code (at most 17) and six on OpenCode
-(at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
-the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
-may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
+to its calls is drawn as one of its messages and stays where it was said; a call is never a message of its own (the
+owner's word of 2026-11-27: stacked "Code run" and "Running a command" lines read as noise): the one line under the
+conversation says what the run does now, in plain words and never by a tool's name ("Running a command… · 2 min",
+"Reading README.md… · 2 min"; a tool with no phrase of its own is "Working"). The daemon still records a `narration` event
+beside a call's `tool_call` (`agent/narration.py`), in every harness; no model is asked for it, and neither the web
+nor the iPhone draws it as a line. On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
 the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
-behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A run
+behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A helper's chat
+shows its steps as the chat that started it does, unless its own This chat sheet chose, and opens as the bottom sheet
+from the chat's helpers row as from its Agents sheet; a helper is listed by its goal's first sentence, a label it opens
+with ("Task:") left out, and what it does names a file by its name, never its path. A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
@@ -431,6 +428,28 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   that run has ended. `POST /api/threads/{id}/stop` stops every task of the chat (a lane names its chat), each as its
   own Stop would, so each holds its queue, and a request the fast model was still being asked about starts nothing.
   Deleting a chat deletes its lanes. With `chat_tasks = 1` all of this is as before.
+- Where a message goes in a chat with several tasks (item 2012, slice 2): with `chat_tasks` above 1, a message sent
+  to a chat (or one of its lanes) of Dot's own with the owner, with no agent, one-message level or picks, goes where
+  it belongs, in this order. A message that is only a stop (*dur*, *durdur*, *stop*) while a task works stops every
+  task of the chat; quoting one task's message, that task alone, and nothing when that task does not work. A quote of a task's message (the Quote of the pages
+  and the phone) goes to that task, found by the quoted words: steered into its run at work, else its next message.
+  `/new <words>` starts a new task. With no task at work and none waiting on the owner (a question card left
+  unanswered, or a reply ending with a question within the last day), it goes to the thread it was sent to, as
+  before. Otherwise the fast model is asked which open task it belongs to, or whether it is a new one, shown the
+  owner's own words of each task and a task's question only when the run that asked read nothing a third party
+  wrote. The thread it was sent to takes it as before; another task at work gets it in its queue (the model never
+  steers a run), as words carried from that task's run, which start its next run carried when they start; another
+  task that ended asking starts its next run with the words carried from its last run. Either way the run starts as
+  tainted as that run ended and the words clear nothing a thread kept marked; a new one starts a lane. A doubt, a model that
+  fails or 12 seconds without a verdict queues it where it was sent. A task that would start while the chat has
+  `chat_tasks` at work, by any of these ways or where it was sent, waits in that thread's queue, held for a free
+  task, and starts when one of the chat's tasks
+  ends; a Stop of the chat turns that hold into the owner's. The queue's answer says where the message went
+  (`routed`). **Move** (`POST /api/queue/{id}/move`, and `POST /api/runs/{id}/move` for a task's run at work, which
+  is stopped first) sends a message to another task of the same chat, as the owner's own word, or to a new task
+  (`to_thread_id: null`). It is checked as a queued message is before anything moves; a message with picks, for one
+  level, for an agent, following a reaction, or answering a question card stays where it is. After a restart of the
+  daemon a queue held for a free task waits for the owner's **Resume**.
 - A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
@@ -470,7 +489,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   whose campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
   each, a video or a sound up to 200 MB, sent as the raw body of `PUT /api/attachments/stream` and written to disk as
-  it arrives, as is any file over 2 MB, item 1933). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
+  it arrives, as is any file over 2 MB, item 1933). A video stands in the box, as on Dot Next, as a tile: its first
+  frame, a play glyph, its length at the foot, a ring that fills while it goes up and a × at its corner; over a sent
+  message the same tile stands, and a click on it plays the video full screen (Escape, the × or a click outside closes
+  it), read from `GET /api/attachments/{id}/media` (item 1992). The frame and the length are read from the first 4 MB of
+  the file; a video whose index lies past them (a file some cameras and editors write) is a plain tile that plays all
+  the same. In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
   thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
   the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it
@@ -506,7 +530,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the packages and builds of a project such as `node_modules`, item 1088; a full path in words may go through a folder
   of capitalised words such as `Application Support`), and the eye on a file's row in the
   Changes tab, which shows the file as it is now without opening its diff. The Task tab's list of the conversation's files went
-  with item 544. The panel takes half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
+  with item 544. A file's row in the Changes tab (and in the iPhone app's This chat sheet, whose
+  sections all start folded with their count) opens on its change read by its format (item 2017): a file changed
+  as a diff in a monospaced view that never wraps (it scrolls sideways), with both line numbers, a + or − and a green or
+  red tint for a line added or removed, a hunk's head as a quiet band and the code coloured by its language (Python,
+  JavaScript, TypeScript, Swift, JSON, TOML, YAML, shell, Markdown, HTML and XML, CSS, Rust, Go); a file the runs made
+  as the file, numbered from 1 with no sign on each line, a Markdown file formatted with its source a press away and
+  JSON laid out in its own key order; an image or a PDF opens as the file it is now. The rows are drawn as they come
+  into view, so a file of thousands of lines opens at once. The panel takes half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
   daemon draws with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused
   rather than drawn (item 386). A Word document, an Excel
   workbook and a presentation show first as macOS's Quick Look draws them (item 268), as Finder would: their fonts,
@@ -702,7 +733,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Appearance      | `theme_read`, `theme_apply`, `theme_undo` |
 | Worktrees       | `track_coding_work` |
-| Pages           | `show_page`                                                                                                        |
+| Pages           | `show_page`, `show_cards` (item 1967)                                                                              |
 | Drafts          | `draft_message`                                                                                                    |
 | Mail, calendars | `mail_search`, `mail_read`, `calendar_events`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
 | Skills          | `skill`, `find_help`; `skill_save` (item 893, tool group `skills`): how the owner said to do a kind of work, kept   |
@@ -854,7 +885,7 @@ When you are to pick between things that are seen (a layout, a logo, a design), 
 drawn side by side on one page, each tappable, Dot's pick marked. A page that loads another page in its frame is closed,
 with Show it again. A page of up to 500,000 characters is kept in the database under an id that cannot be guessed, which
 is all it takes to read it (`GET /pages/<id>`, no token, never cached); it goes with its chat, and with the events of
-its run under `dotx prune`. `dotx run` prints the page's address. The tool is in a group of its own, `pages`. The system
+its run under `dotx prune`. `dotx run` prints the page's address. The tool is in the group `pages`, with `show_cards`. The system
 prompt asks for a page whenever an answer holds something with a shape (figures to compare, a trend, a ranking, a share,
 a timeline, the steps of a process, how parts connect, a place or a layout), rather than a long list or figures in text,
 one page a question and none for a single number. It asks for a page that lives: animated in (bars that grow, lines that
@@ -893,6 +924,17 @@ written in as base64 too, so it takes as much room. The pages of one step are sh
 the calls, so they stand in the conversation in that order (item 1721). The
 tool's answer gives the page's address on this Mac (`/pages/<id>`), which the run's browser may open to see what it
 showed (item 601, [Browser](browser-and-computer-use.md)).
+
+**Cards in the conversation (item 1967).** `show_cards(cards)` shows up to six validated cards, in order, as one stored
+`cards_shown` event that the web UI draws live and in history: a post draft (platform, account, text, up to four raster
+images; copy, edit and cancel), a chart (line, bar, area, pie or scatter, with its data table), a table, a choice and an
+image gallery. The call is a `meta` action of no risk, so it asks nothing in any mode. A card is data: it carries no
+markup and no approval, and nothing is sent or published by it. Images are workspace rasters named by a relative path,
+read through a held path under the rules of `show_page`'s files and stored with the other images. A choice, like a
+page's, writes its words into your message box and sends nothing: the words are the run's own, which a run that read
+untrusted pages can word, so only your send makes them your message; while the box holds a half-written message the tap
+is refused, so that draft is never lost. The phone's app and the channels do not draw cards
+yet (the system prompt does not ask for them until they do); the run's answer must not depend on one.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the
@@ -1121,10 +1163,12 @@ helper off and Dot resumed it. A helper is not resumed when `[agent] resume` is 
 restarts), or when a call that pays, sends or posts for you was cut while it ran (a second try could send twice): its
 chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the
 work again rather than taking it as a failed part. A helper the run still waited for when the daemon stopped ends with
-that run, whose own resume note names the cut `delegate` call. The line over the
-composer says "Waiting on N subagents" only while the run is blocked on them, "N subagents keep working in the
-background" once it was released, and nothing when none work; on a phone (item 1383) the same words are the first line
-of the sheet that the capsule's **N helpers** segment opens, which also names what each helper does now and has
+that run, whose own resume note names the cut `delegate` call. The bar over the
+composer says "Waiting on N helpers" in place of Working only while the run has stopped for them (every call of its
+step that has no answer yet waits on a helper; while a command of the same step still runs, or the model thinks, it
+says Working and the helpers keep their own part), with no spinner, and the line over it says what the first helper
+does now; "N helpers keep working in the background" once it was released, and nothing when none work; on a phone
+(item 1383) the capsule's status says the same, and its **N helpers** segment opens a sheet whose first line it is, which also names what each helper does now and has
 **Details** and **Stop**. Calls of `fan_out`, `message_agent` and the work orders
 keep waiting as before. The helper of a run of one of your agents carries the agent's id (item 553): its tools are those the
 agent is bound to, as its parent's are, and its prompt holds the agent's instructions. A step it hands to you, or a

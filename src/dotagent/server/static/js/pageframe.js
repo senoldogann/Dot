@@ -138,15 +138,15 @@ function openLink(frame, url) {
   try {
     address = new URL(url);
   } catch {
-    return "the link is not an address";
+    return t("pageframe.theLinkIsNotAn");
   }
   if (address.protocol !== "http:" && address.protocol !== "https:") {
-    return "only web addresses are opened";
+    return t("pageframe.onlyWebAddressesAreOpened");
   }
   // A click in the frame counts here too, and leaves the frame with the focus: a page's script cannot open a link
   // without a click of the user's, nor with one the user made elsewhere on the page.
   if (navigator.userActivation?.isActive !== true || document.activeElement !== frame) {
-    return "no click of the user in the page asked for it";
+    return t("pageframe.noClickOfTheUser");
   }
   window.open(address.href, "_blank", "noopener,noreferrer");
   return null;
@@ -165,15 +165,15 @@ function writeChoice(frame, params) {
     .join("\n")
     .trim();
   if (text === "") {
-    return "the choice has no words";
+    return t("pageframe.theChoiceHasNoWords");
   }
   if (navigator.userActivation?.isActive !== true || document.activeElement !== frame) {
-    return "no click of the user in the page asked for it";
+    return t("pageframe.noClickOfTheUser");
   }
   // The page of the run takes it (it cancels the event) when it has a box to write in.
   const event = new CustomEvent(PAGE_ANSWER_EVENT, { cancelable: true, detail: { text: text.slice(0, ANSWER_CHARS) } });
   if (window.dispatchEvent(event)) {
-    return "there is no message box here to write it in";
+    return t("pageframe.thereIsNoMessageBox");
   }
   // A choice made full screen is made: the dialog closes on the box.
   frame.closest("dialog")?.close();
@@ -295,8 +295,8 @@ export function pageCard(pageId, title) {
   const address = `/pages/${encodeURIComponent(pageId)}`;
   const show = () => {
     const frame = pageFrame(pageId, address, title, (shown) => {
-      const again = el("button", { class: "btn sm ghost", type: "button" }, t("shownPage.retry"));
-      const left = el("div", { class: "shown-page-left" }, el("span", null, t("shownPage.left")), again);
+      const again = el("button", { class: "btn sm ghost", type: "button" }, t("pageframe.showItAgain"));
+      const left = el("div", { class: "shown-page-left" }, el("span", null, t("pageframe.thePageLoadedAnotherPage")), again);
       again.addEventListener("click", () => left.replaceWith(show()));
       shown.replaceWith(left);
     });
@@ -309,11 +309,11 @@ export function pageCard(pageId, title) {
     });
     return frame;
   };
-  const full = el("button", { class: "shown-page-tool", type: "button", "aria-label": t("shownPage.fullScreen"), title: t("shownPage.fullScreen") }, icon("maximize"));
+  const full = el("button", { class: "shown-page-tool", type: "button", "aria-label": t("pageframe.fullScreen"), title: t("pageframe.fullScreen") }, icon("maximize"));
   full.addEventListener("click", () => showFull(pageId, address, title, full));
   const open = el(
     "a",
-    { class: "shown-page-tool shown-page-open", href: address, target: "_blank", rel: "noopener noreferrer", "aria-label": t("shownPage.openInBrowser"), title: t("shownPage.openInBrowser") },
+    { class: "shown-page-tool shown-page-open", href: address, target: "_blank", rel: "noopener noreferrer", "aria-label": t("pageframe.openInYourBrowser"), title: t("pageframe.openInYourBrowser") },
     icon("external"),
   );
   open.addEventListener("click", () => {

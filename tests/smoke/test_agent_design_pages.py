@@ -246,7 +246,7 @@ async def test_the_editor_keeps_what_the_agent_never_does_and_the_page_saves_it(
         await expect(never).to_have_value("")
         await never.fill("Work inbound leads\nSend a message itself")
         await page.get_by_role("button", name="Save changes").click()
-        await expect(page.locator(".toast")).to_contain_text("Agent saved.")
+        await expect(page.locator(".toast")).to_contain_text("Bot saved.")
         record = (await client.get(f"/api/agents/{agent['id']}")).json()["record"]
         assert record["refuses"] == "Work inbound leads\nSend a message itself"
         # Opened again, the editor shows it as saved.
@@ -269,7 +269,7 @@ async def test_a_template_asks_its_questions_at_use_and_its_agent_starts_with_th
     playwright, browser = await _launch(runtime)
     try:
         page: Page = await _open(browser, client, "/agents", 1280)
-        await page.get_by_role("group", name="Ready-made agents").get_by_role("button", name="Single agents").click()
+        await page.get_by_role("group", name="Ready-made bots").get_by_role("button", name="Single bots").click()
         await page.get_by_role("button", name="Use the template Sales Outbound").click()
         dialog: Locator = page.get_by_role("dialog")
         await expect(dialog).to_contain_text("Set up Sales Outbound")
@@ -287,7 +287,7 @@ async def test_a_template_asks_its_questions_at_use_and_its_agent_starts_with_th
         )
         # Closing the dialog makes nothing; on a phone it fits the screen.
         phone: Page = await _open(browser, client, "/agents", 390, phone=True)
-        await phone.get_by_role("group", name="Ready-made agents").get_by_role("button", name="Single agents").click()
+        await phone.get_by_role("group", name="Ready-made bots").get_by_role("button", name="Single bots").click()
         await phone.get_by_role("button", name="Use the template Talent Scout").click()
         await expect(phone.get_by_role("dialog")).to_contain_text("Set up Talent Scout")
         assert await phone.evaluate(_SIDEWAYS) <= 0

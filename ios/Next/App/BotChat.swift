@@ -133,12 +133,15 @@ struct BotChatScreen: View {
 
     @ViewBuilder private func content(_ bot: Bot) -> some View {
         let shown: String? = botChatThread(
-            chosen: chosen, route: route.thread, held: held, latest: bot.latest?.summary.id, deleted: { model.chats[$0]?.freshness == .deleted })
-        if let key = shown, model.startingChats[key] != nil {
-            StartingChat(key: key)
-        } else if let thread = shown {
+            chosen: chosen, route: route.thread, held: held, latest: bot.latest?.summary.id,
+            // A chat being deleted is gone from the moment the delete is under way, not once its own stream says so (item
+            // 1985: while twenty chats were deleted, Dot's screen opened the one it held and waited on it, "Syncing…").
+            deleted: { model.goneChats.contains($0) || model.chats[$0]?.freshness == .deleted })
+        if let thread = shown {
+            // A chat this phone started keeps the screen's identity from its first send to the daemon's name for it (item
+            // 2025): the key, then the thread that key was named; nothing is pushed or drawn anew at the swap.
             ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
-                .id(thread)
+                .id(model.startedChats.first { $0.value == thread }?.key ?? thread)
                 .onAppear { if chosen == nil, route.thread == nil, held != thread { held = thread } }
         } else {
             // A bot with no chat yet: the new chat in place; its first message opens the chat, as a pushed one does.
@@ -186,11 +189,11 @@ struct BotChatScreen: View {
     }
 }
 
-/// The header of a bot's chat: "‹ N", the pill, "⋯". `find` and `library` are the chat's own (none on a bot with no chat).
+/// The header of a bot's chat: "‹ N", the pill, "⋯". The pill is always the bot's face and name: how the link stands
+/// is the capsule's, and only a lasting problem (the owner's report of 2026-11-27). `find` and `library` are the chat's
+/// own (none on a bot with no chat).
 struct BotHeader: ToolbarContent {
     let chat: BotChat
-    /// The chat's state line when it is not live ("Offline · saved 4 min ago"), under the name in the pill.
-    let subtitle: String?
     let find: (() -> Void)?
     let library: (() -> Void)?
 
@@ -214,10 +217,7 @@ struct BotHeader: ToolbarContent {
             Button(action: chat.openProfile) {
                 HStack(spacing: Space.xs) {
                     BotFace(id: chat.record.id, look: chat.record.look, size: 26)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(chat.record.name).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
-                        if let subtitle { Text(subtitle).textRole(.micro).foregroundStyle(Tone.secondary).lineLimit(1) }
-                    }
+                    Text(chat.record.name).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
                 }
                 .padding(.leading, Space.xs)
                 .padding(.trailing, Space.m)
@@ -284,7 +284,9 @@ func findMatches(_ items: [TranscriptItem], words: String) -> [String] {
 /// Whether an item, or an item a fold holds, has the words.
 private func holds(_ item: TranscriptItem, _ wanted: String) -> Bool {
     switch item {
-    case .owner(_, let text, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
+    case .owner(_, let text, _, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
+    // A routine's row is found by the title it shows and by its words.
+    case .automation(_, let title, let prompt): title.localizedStandardContains(wanted) || prompt.localizedStandardContains(wanted)
     case .work(let fold): fold.items.contains { holds($0, wanted) }
     default: false
     }

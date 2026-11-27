@@ -194,6 +194,14 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertLessThanOrEqual(abs(edit.frame.midX - app.windows.firstMatch.frame.midX), 1, "Edit sits under the avatar, centred")
         XCTAssertGreaterThanOrEqual(edit.frame.height, 44)
 
+        // Its Activity is the real page, scoped to its work (item 2022), not a "next version" placeholder.
+        app.buttons["profile.activity"].tap()
+        XCTAssertTrue(app.navigationBars["Activity"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Activity comes in the next version"].exists)
+        shot(app, "profile-activity")
+        app.navigationBars["Activity"].buttons.firstMatch.tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 10), "back on the profile")
+
         edit.tap()
         let nameField: XCUIElement = app.textFields["botEdit.name"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 10), "the edit page")
@@ -236,7 +244,8 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertTrue(scribe.waitForExistence(timeout: 60), "Scribe, the seeded bot, on the home")
         scribe.tap()
         let pill: XCUIElement = app.buttons["botChat.pill"]
-        XCTAssertTrue(pill.waitForExistence(timeout: 30), "Scribe's chat header")
+        if !pill.waitForExistence(timeout: 30) { shot(app, "no-pill") }
+        XCTAssertTrue(pill.exists, "Scribe's chat header")
         pill.tap()
         XCTAssertTrue(app.buttons["profile.workOrders"].waitForExistence(timeout: 20), "the profile's Work group")
     }
@@ -279,6 +288,7 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20))
         XCTAssertEqual(rows.count, 2)
         XCTAssertTrue(rows.element(boundBy: 0).label.contains("Draft the weekly note") && rows.element(boundBy: 0).label.contains("Handed out"), rows.element(boundBy: 0).label)
+        XCTAssertTrue(rows.element(boundBy: 0).label.contains("handed out"), "when it was handed out, as the web's row says: \(rows.element(boundBy: 0).label)")
         XCTAssertTrue(rows.element(boundBy: 1).label.contains("Accepted"), rows.element(boundBy: 1).label)
         XCTAssertTrue(app.staticTexts["Open"].exists && app.staticTexts["Finished"].exists, "the two sections")
         assertAligned([rows.element(boundBy: 0), rows.element(boundBy: 1)], in: app, "work orders")
@@ -293,9 +303,15 @@ final class BotsLiveUITests: XCTestCase {
         // Objectives.
         XCTAssertTrue(objectives.waitForExistence(timeout: 10))
         objectives.tap()
-        let objective: XCUIElement = app.buttons["work.objective"]
-        XCTAssertTrue(objective.waitForExistence(timeout: 20))
+        let objectiveRows: XCUIElementQuery = app.buttons.matching(identifier: "work.objective")
+        XCTAssertTrue(objectiveRows.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertEqual(objectiveRows.count, 2, "the active objective and the finished one the web hides")
+        let objective: XCUIElement = objectiveRows.element(boundBy: 0)
         XCTAssertTrue(objective.label.contains("Keep the weekly note short") && objective.label.contains("Active"), objective.label)
+        XCTAssertTrue(objective.label.contains("Judged by: Under 200 words"), "how it is judged, as the web's row says: \(objective.label)")
+        XCTAssertTrue(objective.label.contains("Next: Draft this Friday's note"), "the next step of one with no progress yet: \(objective.label)")
+        XCTAssertTrue(objectiveRows.element(boundBy: 1).label.contains("Done"), objectiveRows.element(boundBy: 1).label)
+        assertAligned([objective, objectiveRows.element(boundBy: 1)], in: app, "objectives")
         shot(app, "work-objectives")
         objective.tap()
         XCTAssertTrue(app.staticTexts["Under 200 words, every Friday."].waitForExistence(timeout: 10), "how progress is judged")
@@ -310,8 +326,8 @@ final class BotsLiveUITests: XCTestCase {
         let hands: XCUIElementQuery = app.buttons.matching(identifier: "work.handoff")
         XCTAssertTrue(hands.firstMatch.waitForExistence(timeout: 20))
         XCTAssertEqual(hands.count, 2)
-        XCTAssertTrue(hands.element(boundBy: 0).label.contains("Which topics fit this week?") && hands.element(boundBy: 0).label.contains("Reply"), hands.element(boundBy: 0).label)
-        XCTAssertTrue(hands.element(boundBy: 1).label.contains("Is the offsite date final?") && hands.element(boundBy: 1).label.contains("Waiting for a reply"), hands.element(boundBy: 1).label)
+        XCTAssertTrue(hands.element(boundBy: 0).label.contains("Dot → Scribe") && hands.element(boundBy: 0).label.contains("Which topics fit this week?") && hands.element(boundBy: 0).label.contains("Reply"), hands.element(boundBy: 0).label)
+        XCTAssertTrue(hands.element(boundBy: 1).label.contains("Is the offsite date final?") && hands.element(boundBy: 1).label.contains("Dot is working on it"), hands.element(boundBy: 1).label)
         assertAligned([hands.element(boundBy: 0), hands.element(boundBy: 1)], in: app, "hand-offs")
         shot(app, "work-handoffs")
         hands.element(boundBy: 0).tap()
@@ -347,37 +363,39 @@ final class BotsLiveUITests: XCTestCase {
 
     /// Dark with Turkish words, and the largest accessibility size: the three pages keep every row inside the screen and
     /// a hit target; the shots go to the result bundle for the report.
-    func testTheWorkPagesHoldInDarkTurkishAndAtTheLargestAccessibilitySize() throws {
-        let variants: [(String, [String])] = [
-            ("dark-tr", ["-colorScheme", "dark", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR"]),
-            ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]),
-        ]
-        for (name, extra) in variants {
-            let app: XCUIApplication = try launch(extra: extra)
-            openScribeProfile(app)
-            let window: CGRect = app.windows.firstMatch.frame
-            for id in ["profile.workOrders", "profile.objectives", "profile.handoffs"] {
-                let row: XCUIElement = app.buttons[id]
-                for _ in 0..<6 where !row.isHittable { app.swipeUp() }
-                XCTAssertGreaterThanOrEqual(row.frame.height, 44, "\(name) \(id)")
-                XCTAssertLessThanOrEqual(row.frame.maxX, window.maxX, "\(name) \(id): inside the screen")
+    func testTheWorkPagesHoldInDarkAndTurkish() throws {
+        try checkWorkPages("dark-tr", ["-colorScheme", "dark", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR"])
+    }
+
+    func testTheWorkPagesHoldAtTheLargestAccessibilitySize() throws {
+        try checkWorkPages(
+            "ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"])
+    }
+
+    private func checkWorkPages(_ name: String, _ extra: [String]) throws {
+        let app: XCUIApplication = try launch(extra: extra)
+        openScribeProfile(app)
+        let window: CGRect = app.windows.firstMatch.frame
+        for id in ["profile.workOrders", "profile.objectives", "profile.handoffs"] {
+            let row: XCUIElement = app.buttons[id]
+            for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+            XCTAssertGreaterThanOrEqual(row.frame.height, 44, "\(name) \(id)")
+            XCTAssertLessThanOrEqual(row.frame.maxX, window.maxX, "\(name) \(id): inside the screen")
+        }
+        shot(app, "work-profile-\(name)")
+        for (id, rowId) in [("profile.workOrders", "work.order"), ("profile.objectives", "work.objective"), ("profile.handoffs", "work.handoff")] {
+            let entry: XCUIElement = app.buttons[id]
+            for _ in 0..<6 where !entry.isHittable { app.swipeUp() }
+            entry.tap()
+            let rows: XCUIElementQuery = app.buttons.matching(identifier: rowId)
+            XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20), "\(name) \(rowId)")
+            for index in 0..<rows.count {
+                XCTAssertGreaterThanOrEqual(rows.element(boundBy: index).frame.height, 44, "\(name) \(rowId)")
+                XCTAssertLessThanOrEqual(rows.element(boundBy: index).frame.maxX, window.maxX, "\(name) \(rowId): inside the screen")
             }
-            shot(app, "work-profile-\(name)")
-            for (id, rowId) in [("profile.workOrders", "work.order"), ("profile.objectives", "work.objective"), ("profile.handoffs", "work.handoff")] {
-                let entry: XCUIElement = app.buttons[id]
-                for _ in 0..<6 where !entry.isHittable { app.swipeUp() }
-                entry.tap()
-                let rows: XCUIElementQuery = app.buttons.matching(identifier: rowId)
-                XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20), "\(name) \(rowId)")
-                for index in 0..<rows.count {
-                    XCTAssertGreaterThanOrEqual(rows.element(boundBy: index).frame.height, 44, "\(name) \(rowId)")
-                    XCTAssertLessThanOrEqual(rows.element(boundBy: index).frame.maxX, window.maxX, "\(name) \(rowId): inside the screen")
-                }
-                shot(app, "\(rowId)-\(name)")
-                app.navigationBars.buttons.element(boundBy: 0).tap()
-                XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 10))
-            }
-            app.terminate()
+            shot(app, "\(rowId)-\(name)")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 10))
         }
     }
 }

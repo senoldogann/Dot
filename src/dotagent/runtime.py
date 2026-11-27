@@ -66,6 +66,7 @@ from dotagent.core.paths import (
     web_research_dir,
     workspace_dir,
 )
+from dotagent.desktop.cua import starter_of
 from dotagent.desktop.pointer import PointerOverlay
 from dotagent.desktop.presence import mac_presence
 from dotagent.dot_app import app_path, build_path, runtime_path
@@ -108,6 +109,7 @@ from dotagent.tools.appearance import build_appearance_tools
 from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.campaign import build_campaign_tools
+from dotagent.tools.cards import build_cards_tool
 from dotagent.tools.codes import build_code_tools
 from dotagent.tools.coding_work import build_coding_work_tool
 from dotagent.tools.consult import build_consult_tools
@@ -257,8 +259,9 @@ class Runtime:
     protected: tuple[Path, ...]
     # What the agent may read but never change (:func:`_dot_paths`).
     dot_paths: tuple[Path, ...]
-    # Where the processes of a run start outside yolo (:mod:`dotagent.policy.sandbox`), as [shell] sandbox said at start
-    # or as the owner switched it since (item 262).
+    # Where the processes of a run start (:mod:`dotagent.policy.sandbox`): an owner's run's outside yolo, as [shell]
+    # sandbox said at start or as the owner switched it since (item 262); a run's nobody started in every mode while
+    # [shell] sandbox_unattended holds (item 2016).
     sandbox: SwitchedSandbox
     shell_env: dict[str, str]
     # The web push key pair the daemon signs with (item 52).
@@ -322,6 +325,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_recon_tool(), build_security_tool()),
         build_meta_tools(),
         build_page_tools(),
+        (build_cards_tool(),),
         build_image_tools(),
         build_appearance_tools(),
         (build_coding_work_tool(),),
@@ -475,7 +479,7 @@ async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths
     ``[policy] sealed_paths`` (the data of the browsers, Mail and Messages: item 531) and from changing ``dot_paths``, a
     search out of every ``protected`` location too, and both from changing anything in Dot's home or its logs but the
     workspace (item 676). It is built whatever [shell] sandbox says, so that Settings can switch it on later, and
-    checked to start when it is on."""
+    checked to start when it or [shell] sandbox_unattended (item 2016) is on."""
     sealed: tuple[Path, ...] = await asyncio.to_thread(
         expand_protected, config.policy.sealed_paths, _guarded_files(config)
     )
@@ -486,9 +490,9 @@ async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths
     # The profile matches paths: a hard link to a sealed file made outside the sandbox is a path it does not name.
     for linked, names in (await asyncio.to_thread(hard_linked, sealed)).items():
         log.warning("sealed_file_has_other_names", path=str(linked), names=names)
-    if config.shell.sandbox:
+    if config.shell.sandbox or config.shell.sandbox_unattended:
         await check_sandbox(built)
-    return SwitchedSandbox(built, config.shell.sandbox)
+    return SwitchedSandbox(built, config.shell.sandbox, config.shell.sandbox_unattended)
 
 
 @dataclass(frozen=True)
@@ -676,6 +680,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
                 browsers.chrome_pids,
                 PointerOverlay(config.desktop.show_pointer),
                 mac_presence(config.desktop.away_after_s),
+                starter_of(config.desktop),
             ),
             safari=SafariDesk(),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),

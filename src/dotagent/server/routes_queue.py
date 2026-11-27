@@ -9,6 +9,7 @@ from contextlib import suppress
 from fastapi import APIRouter
 
 from dotagent.agent.attachments import StoredAttachment, load_attachment, load_attachments
+from dotagent.agent.lanes import RoutedMessage
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.core.errors import NotFoundError
 from dotagent.core.logs import get_logger
@@ -17,6 +18,7 @@ from dotagent.server import UI_SOURCE
 from dotagent.server.context import ServerContext
 from dotagent.server.sending import send_once
 from dotagent.server.views import (
+    MoveRequest,
     QueuedFile,
     QueuedMessageView,
     QueueEditRequest,
@@ -83,9 +85,32 @@ def queue_router(ctx: ServerContext) -> APIRouter:
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
 
         async def queue() -> str:
+            plain: bool = request.agent_id is None and request.once is None and not _picked(request)
+            # A chat with several tasks (item 2012) sends a plain message where it belongs: a stop, a quote, `/new`, or
+            # the open task the fast model names; what nothing settles is queued here, as before.
+            if plain and ctx.runtime.config.agent.chat_tasks > 1:
+                routed: RoutedMessage | None = await ctx.manager.route_message(
+                    thread_id,
+                    request.text,
+                    files,
+                    resolved_mode(request.mode, request.text),
+                    request.model,
+                    request.effort,
+                    request.speed,
+                    request.approvals,
+                    request.goal_mode,
+                    UI_SOURCE,
+                )
+                if routed is not None:
+                    routes.append(routed)
+                    if routed.kind == "new" and routed.run_id is not None:
+                        started.append(await store.get_run(routed.run_id))
+                        return routed.run_id
+                    # Only a new task is a start the same message sent again should say (``beside_run_id``).
+                    return routed.message_id or routed.thread_id
             # A request of its own, sent while the chat's run works, starts at once in a chat of its own (item 915):
             # not one for an agent, for one message's level, or with picks, which the queue carries to its run.
-            if request.agent_id is None and request.once is None and not _picked(request):
+            elif plain:
                 beside: RunRecord | None = await ctx.manager.start_beside(
                     thread_id,
                     request.text,
@@ -101,6 +126,8 @@ def queue_router(ctx: ServerContext) -> APIRouter:
                 if beside is not None:
                     started.append(beside)
                     return beside.id
+            # What starts here, where it was sent, waits for a free task of a chat with several (item 2012).
+            await ctx.manager.hold_for_free_task(thread_id)
             message: QueuedMessage = await ctx.manager.queue(
                 thread_id,
                 request.text,
@@ -120,8 +147,11 @@ def queue_router(ctx: ServerContext) -> APIRouter:
             return message.id
 
         started: list[RunRecord] = []
+        routes: list[RoutedMessage] = []
         target: str = await send_once(store, "queue", request.key, queue)
         shown: QueueView = await view(thread_id)
+        if routes:
+            shown = shown.model_copy(update={"routed": routes[0]})
         # The same message sent again with its key (an answer that was lost) says the chat it started the first time,
         # so that the page learns of it then too (the pre-push review): the target of such a sending is a run's id.
         if not started and target.startswith("run_"):
@@ -155,6 +185,18 @@ def queue_router(ctx: ServerContext) -> APIRouter:
         """Send a queued message to the run at work on its chat now, and take it out of the queue; 409 when no run
         works there."""
         return await view(await ctx.manager.steer_queued(message_id))
+
+    @router.post("/queue/{message_id}/move")
+    async def move_queued(message_id: str, request: MoveRequest) -> RoutedMessage:
+        """Move a message the router put in a task's queue to another task of its chat, or to a new task (item 2012,
+        **Move**); 409 while it starts as its task's next run, 422 for a task of another chat."""
+        return await ctx.manager.move_queued(message_id, request.to_thread_id)
+
+    @router.post("/runs/{run_id}/move")
+    async def move_run(run_id: str, request: MoveRequest) -> RoutedMessage:
+        """Stop a task's run at work that the router started for the wrong task and send its words to another task of
+        its chat, or to a new task (item 2012, **Move**); 409 for a run not at work."""
+        return await ctx.manager.move_run(run_id, request.to_thread_id)
 
     @router.post("/threads/{thread_id}/queue/resume")
     async def resume_queue(thread_id: str) -> QueueView:

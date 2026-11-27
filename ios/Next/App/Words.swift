@@ -76,19 +76,30 @@ func stepWords(tool: String, target: String) -> String {
         return String(localized: "Waiting for a helper", comment: "Capsule and helper row: the run's step talks to or waits for a helper")
     }
     switch kind {
-    case .read, .edit, .command, .search, .web, .wait:
+    case .command:
+        // A command's own words are no line for a row (owner 2026-11-27: no raw paths in rows).
+        return String(localized: "Running a command", comment: "Work line: a command")
+    case .read, .edit, .search, .web, .wait:
+        // A file by its name, never its whole path.
+        let shown: String = kind == .read || kind == .edit ? fileName(of: target) : target
         let line: String = toolLine(
-            ToolEntry(id: "", tool: tool, kind: kind, target: target, args: "", output: "", state: .running, images: [], startedAt: 0, endedAt: nil))
+            ToolEntry(id: "", tool: tool, kind: kind, target: shown, args: "", output: "", state: .running, images: [], startedAt: 0, endedAt: nil))
         return line == tool || line.hasPrefix(tool + " · ") ? String(localized: "Working", comment: "Status word: a run is at work") : line
     default:
         return String(localized: "Working", comment: "Status word: a run is at work")
     }
 }
 
+/// The last part of a path ("…/memory-merge/C8.md" → "C8.md"); a text with no slash as it is.
+func fileName(of path: String) -> String {
+    let trimmed: String = path.trimmingCharacters(in: CharacterSet(charactersIn: "/ `\"'"))
+    return trimmed.split(separator: "/").last.map(String.init) ?? trimmed
+}
+
 /// Whether a step starts or talks to a helper: Dot's `delegate` and `message_agent`, a CLI harness's `Task` or `Agent`.
 /// Named exactly: a tool that only has "agent" in its name (`agent_status`, an MCP tool) is no wait on a helper.
 func isHelperStep(_ tool: String) -> Bool {
-    ["delegate", "message_agent", "task", "agent"].contains(tool.lowercased())
+    helperWaitTools.contains(tool.lowercased())
 }
 
 /// The glyph of a tool call by its kind.

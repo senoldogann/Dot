@@ -107,7 +107,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
-   Work (Work orders, Objectives and Hand-offs, each to read: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
+   Work (Work orders, Objectives, with those done or let go below the active ones, and Hand-offs with the two faces and "From → To", each to read, and
+   laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
    and writes none, so the phone only reads, and scopes them to the bot itself: an agent's page has the orders given to it,
    the objectives those serve and the messages to or from it; Dot's own has every order and objective and the messages it sent
    or was sent, not those between two other agents; all within the newest 60 orders and 60 objectives the daemon sends), a ⋯ menu with Pause bot and Resume bot for an agent (`POST /api/agents/{id}/pause|resume`, item 465), then
@@ -170,7 +171,7 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    (`GET /api/runs/{id}/events?tail=400`; an older Dot answers with the run's first events and no
    `X-Dot-Events-Tail` header, and the app then reads the pages as before) and says that some steps are not shown. One
    thin line under the status bar says when the phone has no link (*Offline — showing saved chats · last updated 3 min
-   ago*, or *Offline — 2 waiting to send*), when Dot cannot be reached for more than a moment (*Reconnecting…*) and when
+   ago*, or *Offline — 2 waiting to send*), when Dot cannot be reached for more than a moment (*Can't reach Dot*) and when
    the phone's key was refused; it never covers what is read. **What is done with no link is kept and sent when it
    returns, once and in order**: a message shows at once under the chat as *Waiting to send* (with *Retry now* and
    *Edit*) and goes with the key Dot starts a message once by (`POST /api/threads/{id}/queue` sent again after an answer
@@ -326,7 +327,7 @@ On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-
 of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General,
 Appearance, Rules, Memory, Vault and Snapshots, then the groups Agents (Agents, Models, Browser, Web search, Scheduled tasks,
 Campaigns, Self-improvement; the sidebar has no Schedules icon, so its page is a row here), Connections (Connectors, Plugins,
-Skills, AI services, Phone, Channels, Hooks), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
+Skills, AI services, Phone, Channels, Hooks), Maintenance (System, Self-repair, Diagnostics, Speed) and About (Open source licences), and under them the first
 steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its
@@ -357,11 +358,11 @@ agent's page wear the same bar (item 1123). An agent's page
 is its conversation (item 1272): it loads as a chat does, Dot's three dots in the middle, its face, name and box stand
 in the middle of the room under the bar, and its way back is the list of chats, or the agents' page it was opened from.
 Over the composer there is one row and nothing stacked (item 1383, which ended the bar of item 401, the line that waited
-on the subagents, the queue, the loops and the commands at work, five panes one upon the other at different widths): a
+on the helpers, the queue, the loops and the commands at work, five panes one upon the other at different widths): a
 capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
-never a layer over it. Its segments are the run's status with its Stop (**Working · 36 s**, **Waiting for you**,
-**Reconnecting…**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
+never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
+**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
 "Working") and at 320 px, with everything to say, takes a second line that keeps the status and the Stop in words, never
@@ -396,18 +397,19 @@ reasoning level in small words, not the approvals, which the owner read as a par
 long name gives way to an ellipsis and the level stays whole. A tap on it opens the chat's settings (item 1202), a
 sheet from the foot of the screen with Close, the title and Done at its head: the default's row with Change, the
 favourites, then a section per provider that opens and folds (the chosen model's open, the others saying how many
-models they hold), each model with a tick and a star; under them the Options, Reasoning, Mode and Approvals as rows
-that say their value and open in place, and How Dot works with its switches; the search of the models stays at the
+models they hold), each model with a tick and a star; under them the Options as one card in the iPhone app's order and
+words: Reasoning (the model's own levels in full words, opening in place), Fast mode as a switch only for a model that
+has it, Approvals, and Plan first as a switch; then Mode, and How Dot works with its switches; the search of the models stays at the
 sheet's foot. A pick keeps the sheet open; Done, Close, a tap on the dim above it or a drag of its head down puts it
 away. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
-tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A subagent's row, in the card of the group it belongs to, is two lines at this width, as on a wide window (items
+tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A helper's row, in the card of the group it belongs to, is two lines at this width, as on a wide window (items
 1281 and 1331; item 401 made it one, which left the name the line and the goal three letters): its face, the job as its
 title, then what it does now, each cut by an ellipsis rather than wrapped, with the word of its state over its time at the
 right and the chevron; the way to its own page shows on the row once it is open, not as a second icon on every closed one. The
 group's own head is one line. The details rise from the foot
 as a sheet with a grabber, and a drag of its head down closes it; its Agents tab opens on the Lineage (item 1332: the
-task and its subagents, each with how long it has worked and a dot for how it stands) and says of each agent its state,
+task and its helpers, each with how long it has worked and a dot for how it stands) and says of each agent its state,
 its model and what it does now, or did last for one that ended (on a wide window too). The Screen tab with nothing yet says in the same empty panel as the
 other tabs that Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the
 setting that turns it on. Dot's computer opens over the whole screen, with the page's address and who has control (Take
@@ -611,11 +613,11 @@ for a lost link would hold what the owner sends.
   not its run), so that it goes in order with what else was done there. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
   could not reach Dot and the words stay in the box.
 - **The line (item 1524).** One thin line stands under the bar, and has no height while nothing is said. The states that
-  last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Reconnecting…*
+  last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Can't reach Dot*
   floats over the room the conversation leaves under the bar, as the notes of a lost stream always did (item 328), so that
   what is read never moves when it comes or goes: *Offline: showing saved chats, last updated 3 min ago*
   (the copy a chat is drawn from, and how old it is, kept true by a clock that runs only while it is shown), *Offline: 2
-  waiting to send* (what the outbox holds, which says more than the copy does), *Reconnecting…* (Dot not reached for more
+  waiting to send* (what the outbox holds, which says more than the copy does), *Can't reach Dot* (Dot not reached for more
   than a moment on a link that is there; a break that mends at once says nothing), and *This phone's key was refused*
   with **Pair again**, on the sign-in screen the refused key leads to, which takes the owner to the field where the code
   of Settings › Phone is typed. What it says is one pure function of the facts (`js/linewords.js`, English and Turkish),
@@ -637,6 +639,18 @@ key, read from a file as it is sent and written to the Mac's disk as it arrives,
 goes as base64 in JSON (`POST /api/attachments`), up to 20 MiB. Only a video over 200 MiB (about 15 minutes) gets
 **Trim video** on its chip, to choose a shorter part. Files show their name, type and size. Up to 10 attachments go
 with a message.
+
+In the composer a photo or a video stands as a tile: the picture (a video's first frame), its length at the foot, a play
+glyph over a video and a × at the corner; while a video is re-encoded its tile is already there with a ring that fills
+(item 1992). In the chat the owner's message shows what it carried above its words: a photo as its picture, a video as a
+tile with its length that plays full screen on a tap, a sound or any other file as a chip with its name and size. The
+files come from the run's `attachments` event (the first message) and the `steer` event (a message sent into a run),
+and a video is played from `GET /api/attachments/{id}/media`, which serves it in ranges so that it starts at once and
+can be moved through. The chat of a run older than the newest the phone holds shows no tiles until it is opened. The
+web page shows the same tiles in its box and over a sent message ([Runs](runs.md#tools)). The model button in the
+composer wears the provider's mark; a DeepSeek, Kimi, GLM, Qwen or MiniMax model that a gateway
+(OpenCode Go, OpenRouter, Ollama) hosts wears a neutral symbol instead of the gateway's, which for OpenCode Go is a
+plain block.
 
 After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
 The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer
@@ -1039,8 +1053,8 @@ The card is drawn from the last read, kept in the same file, before the network 
 ### The Activity tab of Dot Next (item 1826)
 
 The iPhone app's Activity tab shows what the owner needs away from the Mac to watch, answer or direct Dot's own work;
-the setup of it (the brief's time, a watcher's choices, the model that looks for work) stays on the Mac. The tab shows all of Dot's. The screen can also be limited to one agent (`ActivityScreen(agent:)`), for the agents'
-profiles the app is to get (no screen opens it so limited yet): it then lists that agent's runs and rows alone (by the
+the setup of it (the brief's time, a watcher's choices, the model that looks for work) stays on the Mac. The tab shows all of Dot's, and so does Dot's profile › Activity. An agent's profile › Activity opens the screen
+limited to that agent (`ActivityScreen(agent:)`, item 2022): it then lists that agent's runs and rows alone (by the
 row's `actor_id` and the run's `agent_id`), leaves out what belongs to Dot as a whole and Mark as read, never marks the
 moment, and counts that agent's runs among the fifty newest the daemon lists, so in a busy week the counts can be lower
 than what it did. Each part is

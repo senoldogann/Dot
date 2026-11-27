@@ -7,12 +7,13 @@
 // and a forgotten note waits in a trash (memorylife.js).
 
 import { api, query } from "../api.js";
-import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
+import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, } from "../dom.js";
 import { icon } from "../icons.js";
 import { changesSection, orderControl, proposedSection, trashSection, waitingSection } from "../memorylife.js";
 import { moreButton } from "../menu.js";
 import { emptyPanel, field, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { t, tCount } from "../i18n.js";
 
 const PAGE_SIZE = 30;
 // The most notes the route reads at once (MemoriesQuery in server/views.py).
@@ -30,10 +31,10 @@ const QUOTE_CHARS = 160;
 // content. A lesson is a note tagged "lesson" (agent/lessons.py); "preference" and "preferences" are the tags the page's own
 // example uses.
 const FILTERS = [
-  { id: "all", label: "All", hint: "Every note" },
-  { id: "lessons", label: "Lessons", hint: "The notes tagged lesson: what a task taught Dot" },
-  { id: "preferences", label: "Preferences", hint: "The notes tagged preference or preferences" },
-  { id: "outside", label: "From outside content", hint: "The notes saved while a task read content other people can write" },
+  { id: "all", label: t("views.memory.all"), hint: t("views.memory.everyNote") },
+  { id: "lessons", label: t("views.memory.lessons"), hint: t("views.memory.theNotesTaggedLessonWhat") },
+  { id: "preferences", label: t("views.memory.preferences"), hint: t("views.memory.theNotesTaggedPreferenceOr") },
+  { id: "outside", label: t("views.memory.fromOutsideContent"), hint: t("views.memory.theNotesSavedWhileA") },
 ];
 const FILTER_TESTS = {
   all: () => true,
@@ -43,9 +44,9 @@ const FILTER_TESTS = {
 };
 // What an empty filter says about itself.
 const FILTER_EMPTY = {
-  lessons: "A note tagged lesson shows here: Dot writes one when a task taught it something.",
-  preferences: "Tag a note preference or preferences and it shows here.",
-  outside: "A note saved while a task read content other people can write shows here.",
+  lessons: t("views.memory.aNoteTaggedLessonShows"),
+  preferences: t("views.memory.tagANotePreferenceOr"),
+  outside: t("views.memory.aNoteSavedWhileA"),
 };
 
 /** "work, Mac ,work" becomes ["work", "Mac"]: trimmed, without blanks or repeats. */
@@ -72,8 +73,8 @@ export function scoreLine(score) {
   }
   return el(
     "span",
-    { title: `${score.done} ended done, ${score.failed} failed` },
-    `Handed to ${plural(score.handed, "task", "tasks")}, ${score.done} done`,
+    { title: t("views.memory.doneEndedDoneFailedFailed", { done: score.done, failed: score.failed }) },
+    t("views.memory.handedToPartDoneDone", { part: tCount(score.handed, "views.memory.countTask", "views.memory.countTasks"), done: score.done }),
   );
 }
 
@@ -83,31 +84,31 @@ let agentNames = {};
 // Who saved a note, by its origin (item 1864), which Dot sets from the run that saved it: a note stored before origins
 // were kept, whose run is gone, has none and says "a task".
 const ORIGIN_TASKS = {
-  chat: "a task in a chat",
-  schedule: "a scheduled task",
-  watcher: "a watcher's task",
-  helper: "a helper task",
-  initiative: "Dot on its own",
+  chat: t("views.memory.aTaskInAChat"),
+  schedule: t("views.memory.aScheduledTask"),
+  watcher: t("views.memory.aWatcherSTask"),
+  helper: t("views.memory.aHelperTask"),
+  initiative: t("views.memory.dotOnItsOwn"),
 };
 
 /** When a note was saved and by whom: "Saved 2h ago by a scheduled task" (the task leads to its run), by the nightly reflection, or by you. */
 function savedLine(record) {
   const by =
     record.origin === "reflection" || record.source_run === "reflection"
-      ? " by the nightly reflection"
+      ? t("views.memory.byTheNightlyReflection")
       : record.source_run
-        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, ORIGIN_TASKS[record.origin] ?? "a task")]
-        : " by you";
-  return el("span", { title: dateTimeFull(record.created_at) }, "Saved ", ago(record.created_at), by);
+        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, ORIGIN_TASKS[record.origin] ?? t("views.memory.aTask"))]
+        : t("views.memory.byYou");
+  return el("span", { title: dateTimeFull(record.created_at) }, t("views.memory.saved"), ago(record.created_at), by);
 }
 
 /** Whose lesson a note is, and how often runs used it. */
 function usedLine(record) {
-  const whose = record.agent_id === null ? null : el("span", null, `${agentNames[record.agent_id] ?? "An agent"}'s lesson`);
+  const whose = record.agent_id === null ? null : el("span", null, t("views.memory.valueSLesson", { value: agentNames[record.agent_id] ?? t("views.memory.anAgent") }));
   const used =
     record.used_count > 0
-      ? el("span", { title: dateTimeFull(record.last_used_at) }, `used ${plural(record.used_count, "time", "times")}, last ${ago(record.last_used_at)}`)
-      : el("span", null, "not used yet");
+      ? el("span", { title: dateTimeFull(record.last_used_at) }, t("views.memory.usedPartLastAgo", { part: tCount(record.used_count, "views.memory.countTime", "views.memory.countTimes"), ago: ago(record.last_used_at) }))
+      : el("span", null, t("views.memory.notUsedYet"));
   return [whose, used];
 }
 
@@ -122,17 +123,17 @@ function lifespan(record) {
       : el(
           "span",
           { title: dateTimeFull(record.expires_at) },
-          record.expires_at * 1000 > Date.now() ? `Holds until ${dateTime(record.expires_at)}` : `Ran out ${dateTime(record.expires_at)}`,
+          record.expires_at * 1000 > Date.now() ? t("views.memory.holdsUntilDatetime", { dateTime: dateTime(record.expires_at) }) : t("views.memory.ranOutDatetime", { dateTime: dateTime(record.expires_at) }),
         );
   const replaced =
-    record.replaced_by !== null && record.tags.includes("rest") ? el("span", { title: record.replaced_by }, "Replaced by another note") : null;
-  const merged = record.merged_into === null ? null : el("span", { title: record.merged_into }, "Merged into another note");
+    record.replaced_by !== null && record.tags.includes("rest") ? el("span", { title: record.replaced_by }, t("views.memory.replacedByAnotherNote")) : null;
+  const merged = record.merged_into === null ? null : el("span", { title: record.merged_into }, t("views.memory.mergedIntoAnotherNote"));
   return [until, replaced, merged];
 }
 
 /** Since when a note rests, for the notes that rest by a date (item 584): nothing for one awake. */
 function restedLine(rested) {
-  return rested === undefined ? null : el("span", { title: dateTimeFull(rested) }, `Resting since ${dateTime(rested)}`);
+  return rested === undefined ? null : el("span", { title: dateTimeFull(rested) }, t("views.memory.restingSinceDatetime", { dateTime: dateTime(rested) }));
 }
 
 /** What a merged note says of the notes it was made of (item 584): how many, and that the merge can be taken back. */
@@ -141,9 +142,9 @@ function mergedBadge(record) {
     ? null
     : el(
         "span",
-        { class: "badge b-muted", title: "The nightly reflection merged notes that said the same into this one; Undo the merge brings them back." },
+        { class: "badge b-muted", title: t("views.memory.theNightlyReflectionMergedNotes") },
         icon("layers"),
-        `Merged from ${plural(record.merged_from.length, "note", "notes")}`,
+        t("views.memory.mergedFromPart", { part: tCount(record.merged_from.length, "views.memory.countNote", "views.memory.countNotes") }),
       );
 }
 
@@ -168,26 +169,26 @@ function memoryRow({ record, similarity, score, rested }, actions) {
   const pinned = record.pinned_at !== null;
   // One action a row (item 848): its "…" holds the pin, Edit, the merge's Undo and Forget.
   const more = moreButton({
-    name: "this note",
+    name: t("views.memory.thisNote"),
     items: () => [
-      { label: pinned ? "Take the pin off" : "Pin it", icon: "pin", run: () => actions.pin(record) },
-      { label: "Edit", icon: "pencil", run: () => actions.edit(record) },
-      ...(record.merged_from.length === 0 ? [] : [{ label: "Undo the merge", icon: "undo", run: () => actions.unmerge(record) }]),
+      { label: pinned ? t("views.memory.takeThePinOff") : t("views.memory.pinIt"), icon: "pin", run: () => actions.pin(record) },
+      { label: t("views.memory.edit"), icon: "pencil", run: () => actions.edit(record) },
+      ...(record.merged_from.length === 0 ? [] : [{ label: t("views.memory.undoTheMerge"), icon: "undo", run: () => actions.unmerge(record) }]),
       "separator",
-      { label: "Forget", icon: "trash", danger: true, run: () => actions.forget(record) },
+      { label: t("views.memory.forget"), icon: "trash", danger: true, run: () => actions.forget(record) },
     ],
   });
   const match =
     similarity === null
       ? null
-      : el("span", { class: `badge ${similarity >= STRONG_MATCH ? "b-ok" : "b-muted"}` }, `${Math.round(similarity * 100)}% match`);
+      : el("span", { class: `badge ${similarity >= STRONG_MATCH ? "b-ok" : "b-muted"}` }, t("views.memory.roundMatch", { round: Math.round(similarity * 100) }));
   /** The badges of a note, folded or open: its match, its pin, a run's wish that it go everywhere, its merge and its taint. */
   const badges = () => [
     match,
-    pinned ? el("span", { class: "badge b-muted", title: "A pinned note never rests." }, icon("pin"), "Pinned") : null,
+    pinned ? el("span", { class: "badge b-muted", title: t("views.memory.aPinnedNoteNeverRests") }, icon("pin"), t("views.memory.pinned")) : null,
     // A pinned note a task saved while reading outside content is handed to no task until the owner vouches for its words.
     pinned && record.tainted
-      ? el("span", { class: "badge b-warn", title: "Tasks are not handed this note: a task that had read outside content wrote it. Edit and save it to vouch for its words." }, "Not handed to tasks")
+      ? el("span", { class: "badge b-warn", title: t("views.memory.tasksAreNotHandedThis") }, t("views.memory.notHandedToTasks"))
       : null,
     // A run's core note goes to every run only once the owner pins it; till then it goes where it fits (item 613).
     !pinned && record.source_run !== null && record.tags.includes("core")
@@ -195,15 +196,15 @@ function memoryRow({ record, similarity, score, rested }, actions) {
           "span",
           {
             class: "badge b-muted note-asks",
-            title: "A task asked that this note go to every task. Pin it and it does; until then it goes to the tasks it fits.",
+            title: t("views.memory.aTaskAskedThatThis"),
           },
-          "Always, once pinned",
+          t("views.memory.alwaysOncePinned"),
         )
       : null,
     mergedBadge(record),
-    record.proposed ? el("span", { class: "badge b-muted", title: "A task proposed new words for this note: see Changes tasks proposed." }, "Change proposed") : null,
+    record.proposed ? el("span", { class: "badge b-muted", title: t("views.memory.aTaskProposedNewWords") }, t("views.memory.changeProposed")) : null,
     record.tainted
-      ? el("span", { class: "badge b-warn", title: "The task that saved it had read content other people can write." }, icon("alert"), "From outside content")
+      ? el("span", { class: "badge b-warn", title: t("views.memory.theTaskThatSavedIt") }, icon("alert"), t("views.memory.fromOutsideContent"))
       : null,
   ];
   /** The button that opens or folds the note, its words saying which. */
@@ -214,7 +215,7 @@ function memoryRow({ record, similarity, score, rested }, actions) {
         class: "note-toggle",
         type: "button",
         "aria-expanded": String(open),
-        "aria-label": open ? "Fold the note" : "Open the note",
+        "aria-label": open ? t("views.memory.foldTheNote") : t("views.memory.openTheNote"),
         onclick: () => {
           actions.fold.toggle(record.id);
           paintRow();
@@ -304,15 +305,15 @@ function placeChildren(parent, nodes) {
 /** What saving a note led to: remembered or merged, and the notes that say nearly the same. */
 function outcomeNodes(saved, actions) {
   const verdict = saved.created
-    ? "Remembered."
-    : "Dot already remembers exactly this note; the tags were merged into it.";
+    ? t("views.memory.remembered")
+    : t("views.memory.dotAlreadyRemembersExactlyThis");
   const nodes = [el("div", { class: "note" }, icon("check"), el("span", null, verdict))];
   if (saved.similar.length > 0) {
     nodes.push(
       el(
         "div",
         { class: "note-similar", dataset: { similar: "yes" } },
-        el("div", { class: "note warn" }, icon("alert"), el("span", null, "Similar notes exist. Forget the ones that this note replaces:")),
+        el("div", { class: "note warn" }, icon("alert"), el("span", null, t("views.memory.similarNotesExistForgetThe"))),
         setCard(...saved.similar.map((hit) => memoryRow(hit, actions))),
       ),
     );
@@ -344,18 +345,18 @@ export function mount(root, ctx) {
     class: "textarea",
     rows: "3",
     maxlength: "20000",
-    placeholder: "Remember something… e.g. I prefer short answers, and my invoices live in ~/Documents/Invoices.",
-    "aria-label": "Note",
+    placeholder: t("views.memory.rememberSomethingEGI"),
+    "aria-label": t("views.memory.note"),
   });
   const tags = el("input", {
     class: "input",
     type: "text",
     autocomplete: "off",
-    placeholder: "work, preferences",
-    title: "Optional, separated by commas",
-    "aria-label": "Tags",
+    placeholder: t("views.memory.workPreferences"),
+    title: t("views.memory.optionalSeparatedByCommas"),
+    "aria-label": t("views.memory.tags"),
   });
-  const add = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Remember");
+  const add = el("button", { class: "btn primary", type: "button" }, icon("plus"), t("views.memory.remember"));
   const outcome = el("div", { class: "note-outcome", hidden: true });
   const search = el("input", {
     class: "input",
@@ -363,12 +364,12 @@ export function mount(root, ctx) {
     autocomplete: "off",
     spellcheck: "false",
     maxlength: "500",
-    placeholder: "Search notes",
-    "aria-label": "Search notes",
+    placeholder: t("views.memory.searchNotes"),
+    "aria-label": t("views.memory.searchNotes"),
   });
   const count = el("span", { class: "note-count" });
   const holder = el("div", null, inlineLoading());
-  const more = el("button", { class: "note-more", type: "button" }, "Show more notes");
+  const more = el("button", { class: "note-more", type: "button" }, t("views.memory.showMoreNotes"));
   const lookedNote = el("p", { class: "note-looked", hidden: true });
   const foot = el("div", { class: "note-foot", hidden: true }, lookedNote, more);
   const awakeRows = el("div", { class: "note-rows" });
@@ -376,11 +377,11 @@ export function mount(root, ctx) {
   const restingHead = el(
     "div",
     { class: "note-rest-head", dataset: { resting: "" } },
-    el("div", { class: "note-rest-title" }, "Resting"),
+    el("div", { class: "note-rest-title" }, t("views.memory.resting")),
     el(
       "div",
       { class: "set-row-lead" },
-      "Tasks no longer start with these: no task was handed them lately, they did not help, their time ran out, or another note replaced them. A search can still find the ones that have not run out.",
+      t("views.memory.tasksNoLongerStartWith"),
     ),
   );
   const restingRows = el("div", { class: "note-rows" });
@@ -394,7 +395,7 @@ export function mount(root, ctx) {
 
   function countText() {
     if (shownQuery !== "") {
-      return `${plural(hits.length, "result", "results")} for “${clip(shownQuery, 40)}”`;
+      return t("views.memory.partForClip", { part: tCount(hits.length, "views.memory.countResult", "views.memory.countResults"), clip: clip(shownQuery, 40) });
     }
     return mode === "filtered" ? `${hits.length} of ${total}` : String(total);
   }
@@ -412,11 +413,11 @@ export function mount(root, ctx) {
     lookedNote.hidden = !(mode === "filtered" && lookedAt < total);
     lookedNote.textContent =
       order === "changed"
-        ? `Looked through the newest ${lookedAt} of ${total} notes.`
-        : `Looked through the first ${lookedAt} of ${total} notes in this order.`;
+        ? t("views.memory.lookedThroughTheNewestLookedat", { lookedAt, total })
+        : t("views.memory.lookedThroughTheFirstLookedat", { lookedAt, total });
     more.hidden = allDrawn();
     foot.hidden = more.hidden && lookedNote.hidden;
-    orderBox.setDisabled(mode === "search" ? "A search lists the notes by how well they match." : null);
+    orderBox.setDisabled(mode === "search" ? t("views.memory.aSearchListsTheNotes") : null);
     const rows = new Map();
     const rowOf = (hit) => {
       const shown = JSON.stringify(hit);
@@ -434,11 +435,11 @@ export function mount(root, ctx) {
       placeChildren(restingRows, asleep);
       placeChildren(holder, [...(awake.length > 0 ? [awakeRows] : []), ...(asleep.length > 0 ? [restingHead, restingRows] : [])]);
     } else if (shownQuery !== "") {
-      holder.replaceChildren(emptyPanel("search", "Nothing matches", filter === "all" ? "Try other words or a shorter query." : "Try other words, a shorter query or another filter."));
+      holder.replaceChildren(emptyPanel("search", t("views.memory.nothingMatches"), filter === "all" ? t("views.memory.tryOtherWordsOrA") : t("views.memory.tryOtherWordsAShorter")));
     } else if (filter !== "all") {
-      holder.replaceChildren(emptyPanel("search", "No notes here", FILTER_EMPTY[filter]));
+      holder.replaceChildren(emptyPanel("search", t("views.memory.noNotesHere"), FILTER_EMPTY[filter]));
     } else {
-      holder.replaceChildren(emptyPanel("brain", "Nothing remembered yet", "Add a note above, or ask Dot to remember something during a task."));
+      holder.replaceChildren(emptyPanel("brain", t("views.memory.nothingRememberedYet"), t("views.memory.addANoteAboveOr")));
     }
   }
 
@@ -533,12 +534,12 @@ export function mount(root, ctx) {
       if (error.status !== 404) {
         throw error;
       }
-      shown = el("div", { class: "note note-gone" }, icon("info"), el("span", null, "This note is no longer in memory: it was forgotten since."));
+      shown = el("div", { class: "note note-gone" }, icon("info"), el("span", null, t("views.memory.thisNoteIsNoLonger")));
     }
     if (disposed) {
       return;
     }
-    asked.replaceChildren(setSection({ title: "The note from the conversation", body: setCard(shown) }));
+    asked.replaceChildren(setSection({ title: t("views.memory.theNoteFromTheConversation"), body: setCard(shown) }));
     asked.hidden = false;
   }
 
@@ -571,9 +572,9 @@ export function mount(root, ctx) {
 
   async function forgetNote(record) {
     const confirmed = await confirmDialog({
-      title: "Forget this note?",
+      title: t("views.memory.forgetThisNote"),
       message: clip(record.content, QUOTE_CHARS),
-      confirmLabel: "Forget",
+      confirmLabel: t("views.memory.forget"),
       danger: true,
       focusCancel: true,
     });
@@ -581,7 +582,7 @@ export function mount(root, ctx) {
       return;
     }
     await api.del(`/memories/${record.id}`);
-    toast("ok", "Forgotten.");
+    toast("ok", t("views.memory.forgotten"));
     for (const node of root.querySelectorAll("[data-memory]")) {
       if (node.dataset.memory === record.id) {
         node.remove();
@@ -603,7 +604,7 @@ export function mount(root, ctx) {
   async function pinNote(record) {
     const pinned = record.pinned_at === null;
     await api.put(`/memories/${encodeURIComponent(record.id)}/pin`, { pinned });
-    toast("ok", pinned ? "Pinned: this note never rests." : "The pin is off: this note may rest again.");
+    toast("ok", pinned ? t("views.memory.pinnedThisNoteNeverRests") : t("views.memory.thePinIsOffThis"));
     await reload();
     await loadAsked();
     await refreshLife();
@@ -612,16 +613,16 @@ export function mount(root, ctx) {
   /** Take back the merge that made a note, after a yes: its sources wake apart and it goes to the trash. */
   async function unmergeNote(record) {
     const confirmed = await confirmDialog({
-      title: "Undo this merge?",
-      message: `${plural(record.merged_from.length, "note", "notes")} ${record.merged_from.length === 1 ? "comes" : "come"} back on ${record.merged_from.length === 1 ? "its" : "their"} own, and the nightly reflection does not merge ${record.merged_from.length === 1 ? "it" : "them"} again. The merged note goes to the trash.`,
-      confirmLabel: "Undo the merge",
+      title: t("views.memory.undoThisMerge"),
+      message: t(record.merged_from.length === 1 ? "views.memory.unmergeOne" : "views.memory.unmergeMany", { count: record.merged_from.length }),
+      confirmLabel: t("views.memory.undoTheMerge"),
       focusCancel: true,
     });
     if (!confirmed) {
       return;
     }
     await api.post(`/memories/${encodeURIComponent(record.id)}/unmerge`, {});
-    toast("ok", "The merge is undone.");
+    toast("ok", t("views.memory.theMergeIsUndone"));
     await reload();
     await loadAsked();
     await refreshLife();
@@ -629,7 +630,7 @@ export function mount(root, ctx) {
 
   async function editNote(record, text, tagList) {
     await api.patch(`/memories/${record.id}`, { content: text, tags: tagList });
-    toast("ok", "Note updated.");
+    toast("ok", t("views.memory.noteUpdated"));
     // The daemon took the change: reading the notes again failing says nothing of the save, so it does not fail the
     // dialog (the review of item 615); the page shows what it read last.
     try {
@@ -643,15 +644,15 @@ export function mount(root, ctx) {
   /** The words and tags of a note, in a dialog (item 615); the notes are read again once the daemon took the change. The
    * Remember box at the head of the page stays where it is: it is the page's main input. */
   function openEdit(record) {
-    const words = el("textarea", { class: "textarea", rows: "6", maxlength: "20000", "aria-label": "Note" });
+    const words = el("textarea", { class: "textarea", rows: "6", maxlength: "20000", "aria-label": t("views.memory.note") });
     words.value = record.content;
-    const tagInput = el("input", { class: "input", type: "text", autocomplete: "off", "aria-label": "Tags" });
+    const tagInput = el("input", { class: "input", type: "text", autocomplete: "off", "aria-label": t("views.memory.tags") });
     tagInput.value = record.tags.join(", ");
     formDialog({
-      title: "Edit note",
-      description: "What Dot remembers, in your words. Tags say what it is about.",
-      body: [field("Note", words, ""), field("Tags", tagInput, "Optional, separated by commas.")],
-      submitLabel: "Save",
+      title: t("views.memory.editNote"),
+      description: t("views.memory.whatDotRemembersInYour"),
+      body: [field(t("views.memory.note"), words, ""), field(t("views.memory.tags"), tagInput, t("views.memory.optionalSeparatedByCommas2"))],
+      submitLabel: t("views.memory.save"),
       // The notes are drawn again once one is saved: the row's own "…" is found anew.
       returnFocus: () => document.querySelector(`[data-memory="${record.id}"] .row-more`),
       onSubmit: async () => {
@@ -669,7 +670,7 @@ export function mount(root, ctx) {
   // Which notes are open (item 937): folded until opened, all of them while "Open all" holds, but those folded since.
   let allOpen = false;
   const flipped = new Set();
-  const expandAll = el("button", { class: "btn ghost sm note-expand", type: "button", "aria-pressed": "false" }, "Open all");
+  const expandAll = el("button", { class: "btn ghost sm note-expand", type: "button", "aria-pressed": "false" }, t("views.memory.openAll"));
   const rowActions = {
     forget: (record) => attempt(() => forgetNote(record)),
     edit: (record) => openEdit(record),
@@ -687,7 +688,7 @@ export function mount(root, ctx) {
   expandAll.addEventListener("click", () => {
     allOpen = !allOpen;
     flipped.clear();
-    expandAll.textContent = allOpen ? "Fold all" : "Open all";
+    expandAll.textContent = allOpen ? t("views.memory.foldAll") : t("views.memory.openAll");
     expandAll.setAttribute("aria-pressed", String(allOpen));
     rowsShown = new Map();
     paint();
@@ -758,7 +759,7 @@ export function mount(root, ctx) {
     drawn = PAGE_SIZE;
     attempt(reload);
   });
-  narrowing.element.setAttribute("aria-label", "Show notes");
+  narrowing.element.setAttribute("aria-label", t("views.memory.showNotes"));
   add.addEventListener("click", () => attempt(save));
   more.addEventListener("click", () => attempt(showMore));
   search.addEventListener("input", reloadSoon);
@@ -782,19 +783,19 @@ export function mount(root, ctx) {
     class: "textarea",
     rows: "3",
     maxlength: "6000",
-    placeholder: "One line each, for example: I read Turkish; answer me in Turkish.",
-    "aria-label": "Your lines",
+    placeholder: t("views.memory.oneLineEachForExample"),
+    "aria-label": t("views.memory.yourLines"),
   });
-  const saveOwn = el("button", { class: "btn", type: "button" }, "Save your lines");
+  const saveOwn = el("button", { class: "btn", type: "button" }, t("views.memory.saveYourLines"));
   const ownerHint = el("span", { class: "hint" });
   function paintOwner(section) {
     dotLines.replaceChildren(
       ...(section.dot_lines.length === 0
-        ? [el("li", { class: "muted" }, "Nothing yet. The nightly reflection writes these lines from your notes and the day's tasks.")]
+        ? [el("li", { class: "muted" }, t("views.memory.nothingYetTheNightlyReflection"))]
         : section.dot_lines.map((line) => el("li", null, line))),
     );
     ownLines.value = section.owner_lines.join("\n");
-    ownerHint.textContent = section.updated_at > 0 ? `Updated ${ago(section.updated_at)}` : "";
+    ownerHint.textContent = section.updated_at > 0 ? t("views.memory.updatedAgo", { ago: ago(section.updated_at) }) : "";
     ownerSection.hidden = false;
   }
   async function loadOwner() {
@@ -804,7 +805,7 @@ export function mount(root, ctx) {
     attempt(async () => {
       const lines = ownLines.value.split("\n").map((line) => line.trim()).filter((line) => line !== "");
       paintOwner(await api.put("/memories/owner", { lines }));
-      toast("ok", "Your lines are kept; the reflection never rewrites them.");
+      toast("ok", t("views.memory.yourLinesAreKeptThe"));
     }),
   );
 
@@ -817,37 +818,37 @@ export function mount(root, ctx) {
   function learningRow(name, work) {
     const went =
       work.last_success !== null
-        ? `last went well ${ago(work.last_success)}`
+        ? t("views.memory.lastWentWellAgo", { ago: ago(work.last_success) })
         : work.last_failure === null
-          ? "nothing recorded yet"
-          : "has not gone well yet";
-    const failing = work.failures_in_row > 0 ? `; failed ${plural(work.failures_in_row, "time", "times")} in a row since: ${work.last_error}` : "";
+          ? t("views.memory.nothingRecordedYet")
+          : t("views.memory.hasNotGoneWellYet");
+    const failing = work.failures_in_row > 0 ? t("views.memory.failedPartInARow", { part: tCount(work.failures_in_row, "views.memory.countTime", "views.memory.countTimes"), last_error: work.last_error }) : "";
     return setRow({ title: name, lead: `${went}${failing}` });
   }
   function paintLearning(view) {
     learningCard.replaceChildren(
       ...(view.health === null
-        ? [setRow({ title: "Nothing yet", lead: "The first reflection, or the lessons or skill of a task, start the record." })]
+        ? [setRow({ title: t("views.memory.nothingYet"), lead: t("views.memory.theFirstReflectionOrThe") })]
         : [
-            learningRow("The nightly reflection", view.health.reflection),
-            learningRow("Lessons from tasks", view.health.lessons),
-            learningRow("Skills from tasks", view.health.playbooks),
+            learningRow(t("views.memory.theNightlyReflection"), view.health.reflection),
+            learningRow(t("views.memory.lessonsFromTasks"), view.health.lessons),
+            learningRow(t("views.memory.skillsFromTasks"), view.health.playbooks),
             // A step its schedule keeps from running is off, not failing, and says so though it once ran (item 613: the
             // page said it last went well days after it was switched off); it is switched on on its page (item 721).
             !view.harness_on
               ? setRow({
-                  title: "The nightly self-improvement",
+                  title: t("views.memory.theNightlySelfImprovement"),
                   lead: el(
                     "span",
                     null,
-                    view.health.harness.last_success === null ? "off. " : `off; it last went well ${ago(view.health.harness.last_success)}. `,
-                    "Switch it on in Settings › Self-improvement.",
+                    view.health.harness.last_success === null ? t("views.memory.off") : t("views.memory.offItLastWentWell", { ago: ago(view.health.harness.last_success) }),
+                    t("views.memory.switchItOnInSettings"),
                   ),
                 })
-              : learningRow("The nightly self-improvement", view.health.harness),
+              : learningRow(t("views.memory.theNightlySelfImprovement"), view.health.harness),
           ]),
     );
-    learningHint.textContent = view.stalled === null ? "" : `Learning has stopped: ${view.stalled}`;
+    learningHint.textContent = view.stalled === null ? "" : t("views.memory.learningHasStoppedStalled", { stalled: view.stalled });
     learningSection.hidden = false;
   }
   async function loadLearning() {
@@ -859,39 +860,39 @@ export function mount(root, ctx) {
     el(
       "div",
       { class: "note-compose" },
-      el("label", { class: "note-tags" }, el("span", { class: "note-tags-label" }, "Tags"), tags),
+      el("label", { class: "note-tags" }, el("span", { class: "note-tags-label" }, t("views.memory.tags")), tags),
       // The key is a keyboard's: a touch screen has none, and the line says only what a note holds (item 576).
-      el("span", { class: "note-compose-hint", title: "⌘ or Ctrl + Enter keeps the note" }, "One fact per note", el("span", { class: "note-compose-keys" }, " · ⌘↵")),
+      el("span", { class: "note-compose-hint", title: t("views.memory.orCtrlEnterKeepsThe") }, t("views.memory.oneFactPerNote"), el("span", { class: "note-compose-keys" }, " · ⌘↵")),
       add,
     ),
     outcome,
   );
   composer.classList.add("note-composer");
   const notesSection = setSection({
-    title: ["Notes", count],
+    title: [t("views.memory.notes"), count],
     actions: el("div", { class: "note-tools" }, narrowing.element, el("label", { class: "note-search" }, icon("search"), search)),
     body: el("div", { class: "set-card note-card" }, el("div", { class: "note-bar" }, expandAll, orderBox.element), holder, foot),
   });
   notesSection.classList.add("notes-section");
   const ownerSection = setSection({
-    title: "What Dot knows about you",
+    title: t("views.memory.whatDotKnowsAboutYou"),
     actions: ownerHint,
     body: setCard(
-      setRow({ title: "Learned by reflection", body: dotLines }),
+      setRow({ title: t("views.memory.learnedByReflection"), body: dotLines }),
       setRow({
-        title: "Your lines",
-        lead: "Corrections and facts in your own words; Dot's lines above never contradict them.",
+        title: t("views.memory.yourLines"),
+        lead: t("views.memory.correctionsAndFactsInYour"),
         body: el("div", { class: "owner-edit" }, ownLines, el("div", { class: "owner-save" }, saveOwn)),
       }),
     ),
   });
   ownerSection.hidden = true;
-  const learningSection = setSection({ title: "How learning fares", actions: learningHint, body: learningCard });
+  const learningSection = setSection({ title: t("views.memory.howLearningFares"), actions: learningHint, body: learningCard });
   learningSection.hidden = true;
   learningSection.dataset.learning = "";
   learningSection.classList.add("learning-section");
 
-  ctx.head.setLead("Notes Dot keeps between tasks. It recalls the ones that fit the task at hand.");
+  ctx.head.setLead(t("views.memory.notesDotKeepsBetweenTasks"));
   root.append(asked, el("div", { class: "set-sections" }, composer, changes.element, waiting.element, proposed.element, notesSection, trash.element, ownerSection, learningSection));
   attempt(reload);
   attempt(refreshLife);

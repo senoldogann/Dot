@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from chat_settings import close_settings, menu, open_for
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -138,18 +139,28 @@ def _pill(page: Page, name: str) -> Locator:
 
 
 def _menu(page: Page, label: str) -> Locator:
-    return page.locator(f".composer .composer-popover[aria-label='{label}']")
+    """The choices a menu named `label` held: the agent's still in its menu, the others in the chat's settings (item
+    2015)."""
+    if label == "Bot":
+        return page.locator(f".composer .composer-popover[aria-label='{label}']")
+    return menu(page, label)
 
 
 async def _pick(page: Page, pill: str, menu: str, option: str) -> None:
-    await _pill(page, pill).click()
+    """Pick `option`: in the agent's menu, or in the chat's settings, which stay open until Done (item 2015)."""
+    if pill == "agent":
+        await _pill(page, pill).click()
+        await _menu(page, menu).get_by_role("option", name=option).first.click()
+        await expect(_menu(page, menu)).to_be_hidden()
+        return
+    await open_for(page, page, pill)
     await _menu(page, menu).get_by_role("option", name=option).first.click()
-    await expect(_menu(page, menu)).to_be_hidden()
+    await close_settings(page)
 
 
 async def _keep_going(page: Page) -> Locator:
     """Keep going's switch, in the Options menu opened (its Execution group)."""
-    await _pill(page, "options").click()
+    await open_for(page, page, "options")
     return _menu(page, "Options").get_by_role("switch", name="Keep going until done")
 
 
@@ -222,7 +233,7 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             # again too.
             await page.locator(GOAL).type("/research")
             await page.locator(GOAL).press("Tab")
-            await _pick(page, "agent", "Agent", "Scout")
+            await _pick(page, "agent", "Bot", "Scout")
             await _pick(page, "reasoning", "Reasoning", "Ultrathink")
             await page.locator(GOAL).fill(WORDS)
             await _away_and_back(page, served)
@@ -231,7 +242,7 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             await expect(_pill(page, "agent")).to_contain_text("Scout")
             await expect(_pill(page, "model")).to_contain_text("deep")
             await expect(_pill(page, "reasoning")).to_contain_text("Ultrathink")
-            await _pill(page, "reasoning").click()
+            await open_for(page, page, "reasoning")
             chosen: Locator = _menu(page, "Reasoning").locator("[role=option][aria-selected=true]")
             await expect(chosen).to_have_count(2)
             await expect(chosen.first).to_contain_text("High")

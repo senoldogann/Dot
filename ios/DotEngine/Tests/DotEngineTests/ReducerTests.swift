@@ -325,7 +325,28 @@ final class ReducerTests: XCTestCase {
         let (chat, _): (ChatProjection, Int) = live(revision: 2, runs: [record("run_a", status: "done", at: 1), report])
         let items: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none)
         XCTAssertEqual(items.first { $0.id == "u:run_r" }, .note(id: "u:run_r", text: "A helper that worked in the background ended"))
-        XCTAssertEqual(items.first { $0.id == "u:run_a" }, .owner(id: "u:run_a", text: "goal of run_a", delivery: nil))
+        XCTAssertEqual(items.first { $0.id == "u:run_a" }, .owner(id: "u:run_a", text: "goal of run_a", delivery: nil, files: []))
+    }
+
+    func testTheFilesAMessageCarriedStandOnItsOwnersRowAndOnTheRowOfEachSteerThatBroughtSome() {
+        var (chat, connection): (ChatProjection, Int) = live(revision: 2, runs: [record("run_a", status: "running", at: 1)])
+        let video: JSONValue = .object(["id": .string("att_v"), "name": .string("Walk.mp4"), "kind": .string("video"), "size": .int(14_000_000)])
+        let note: JSONValue = .object(["id": .string("att_n"), "name": .string("notes.txt"), "kind": .string("text"), "size": .int(10)])
+        for frame: StreamFrame in [
+            .event(event(10, "run_a", "attachments", ["files": .array([video])])),
+            .event(event(11, "run_a", "steer", ["text": .string("And this"), "files": .array([note])])),
+            .event(event(12, "run_a", "steer", ["text": .string("No files"), "files": .array([])])),
+        ] {
+            chat = ChatReducer.frame(chat, frame, connection: connection).0
+        }
+        let items: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none)
+        XCTAssertEqual(
+            items.first { $0.id == "u:run_a" },
+            .owner(id: "u:run_a", text: "goal of run_a", delivery: nil, files: [AttachedFile(id: "att_v", name: "Walk.mp4", kind: "video", size: 14_000_000)]))
+        XCTAssertEqual(
+            items.first { $0.id == "s:11" },
+            .owner(id: "s:11", text: "And this", delivery: nil, files: [AttachedFile(id: "att_n", name: "notes.txt", kind: "text", size: 10)]))
+        XCTAssertEqual(items.first { $0.id == "s:12" }, .owner(id: "s:12", text: "No files", delivery: nil, files: []))
     }
 
     func testRepliesThatRestateTheAnswerAreShownOnceAsTheAnswer() {

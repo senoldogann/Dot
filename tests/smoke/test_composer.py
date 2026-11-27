@@ -15,6 +15,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from chat_settings import close_settings, open_row, open_settings, pick_model
 from PIL import Image
 from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
@@ -101,7 +102,9 @@ _HARBOUR_PNG: str = (
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false',
+        # No floor of free space: an upload is not refused by how full this Mac's disk is (item 1938 has its own test).
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n'
+        "[agent]\ngoal_mode = false\n\n[store]\nmin_free_gb = 0",
         encoding="utf-8",
     )
     (home / "skills" / "scan-catalogue").mkdir(parents=True)
@@ -233,162 +236,120 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
             await browser.close()
 
 
-async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
+async def test_the_model_opens_the_chats_settings_and_a_draft_survives_a_navigation(
     runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
+    """Item 2015: the model's pill is the one choice in the bar on every width, as DotNext's chip; it opens the chat's
+    settings, which hold the models, the reasoning, the mode, the approvals and how Dot works. One row while the words
+    are short (the mark and its chevron), the words over the controls once they are long (the mark, the name, the level
+    in grey)."""
     host: str = client.base_url.host
     port: int | None = client.base_url.port
     assert port is not None
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            # A phone's box has the model's pill alone (item 1121): `_phone_box_rests_until_used` reads it.
-            for width in (1280,):
-                page: Page = await browser.new_page(viewport={"width": width, "height": 900})
-                refused: list[str] = []
-                page.on("console", _collect_refusals(refused))
-                await page.route("**/api/models", _with_a_thinking_model)
-                await page.goto(ui_url(host, port, TOKEN))
-                goal = page.locator(GOAL)
-                popover = page.locator(".composer .composer-popover[aria-label='Model']")
-                await expect(popover).to_be_hidden()
-                # The Model pill (item 108) wears the mark of its provider, an SVG of the page's own, and the model's
-                # name.
-                model_pill = page.locator(".composer-pill[data-pill='model']")
-                await expect(model_pill).to_contain_text("scripted")
-                mark = model_pill.locator(".provider-mark")
-                await expect(mark).to_have_attribute("data-provider", "ollama")
-                # Drawn inline (item 959): no mask the page repaints anew as the composer grows under each key.
-                await expect(mark.locator("svg")).to_have_count(1)
-                # Read as the page settles: the pill is drawn again once the models come, and a mark read while it was
-                # taken out has no style at all ("" on a slow runner).
-                await expect(mark).to_have_css("mask-image", "none")
-                served: httpx.Response = await client.get("/icons/providers/ollama.svg")
-                assert served.status_code == 200, served.status_code
-                assert served.headers["content-type"].startswith("image/svg+xml"), served.headers["content-type"]
-                # The scripted model offers no reasoning levels, so the Reasoning pill is away.
-                reasoning_pill = page.locator(".composer-pill[data-pill='reasoning']")
-                await expect(reasoning_pill).to_be_hidden()
-                # The menu: the daemon's default ticked, every model with its mark; a pick closes it and names the
-                # model.
-                await model_pill.click()
-                await expect(popover).to_be_visible()
-                await expect(popover.locator("[role=option][aria-selected=true]")).to_contain_text("Default (scripted)")
-                await expect(popover.locator("[role=option] .provider-mark").first).to_have_attribute(
-                    "data-provider", "ollama"
-                )
-                await page.screenshot(path=str(tmp_path / f"model-menu-{width}.png"), animations="disabled")
-                await popover.get_by_role("option", name="thinker").click()
-                await expect(popover).to_be_hidden()
-                await expect(model_pill).to_contain_text("thinker")
-                # A model with levels brings the Reasoning pill: the daemon's level until one is picked, then the one
-                # picked.
-                await expect(reasoning_pill).to_contain_text("Medium")
-                # The level is bars beside the model's name (item 1330): three of the four filled for the default
-                # Medium, the second of the three levels offered; the words are for a screen reader.
-                bars = reasoning_pill.locator(".level-bars")
-                await expect(bars).to_have_count(1)
-                await expect(bars.locator("rect[data-on]")).to_have_count(3)
-                await reasoning_pill.click()
-                levels = page.locator(".composer .composer-popover[aria-label='Reasoning']")
-                await expect(levels.locator("[role=option]")).to_have_count(4)
-                await expect(levels.locator("[role=option][aria-selected=true]")).to_contain_text("Default (Medium)")
-                await page.screenshot(path=str(tmp_path / f"reasoning-menu-{width}.png"), animations="disabled")
-                await levels.get_by_role("option", name="High", exact=True).click()
-                await expect(levels).to_be_hidden()
-                await expect(reasoning_pill).to_contain_text("High")
-                await expect(bars.locator("rect[data-on]")).to_have_count(4)
-                # Back to the daemon's default: the Reasoning pill goes again.
-                await model_pill.click()
-                await popover.get_by_role("option", name="Default (scripted)").click()
-                await expect(reasoning_pill).to_be_hidden()
-                assert await model_pill.get_attribute("aria-expanded") == "false"
-                # The Mode pill is away on Auto (item 495), where the message's words settle the mode; a mode named
-                # with its command brings it, with the mode's icon and name, its menu Auto and the three modes with
-                # what each does.
-                mode_pill = page.locator(".composer-pill[data-pill='mode']")
-                await expect(mode_pill).to_be_hidden()
-                await goal.type("/task")
-                await goal.press("Tab")
-                await expect(mode_pill).to_contain_text("Task")
-                await mode_pill.click()
-                modes = page.locator(".composer .composer-popover[aria-label='Mode']")
-                await expect(modes.locator("[role=option]")).to_have_count(4)
-                await modes.get_by_role("option", name="Chat").click()
-                await expect(modes).to_be_hidden()
-                await expect(mode_pill).to_contain_text("Chat")
-                await expect(mode_pill.locator("[data-icon='message']")).to_have_count(1)
-                await expect(goal).to_be_focused()
-                # A chat has neither goal mode nor Keep going:
-                await expect(page.get_by_role("button", name="Add files")).to_be_visible()
-                await expect(page.locator(".composer .composer-popover[aria-label='Add']")).to_have_count(0)
-                options_pill = page.locator(".composer-pill[data-pill='options']")
-                await options_pill.click()
-                chat_options = page.locator(".composer .composer-popover[aria-label='Options']")
-                await expect(chat_options.get_by_role("switch", name="Goal mode")).to_be_hidden()
-                await expect(chat_options.get_by_role("switch", name="Keep going until done")).to_be_hidden()
-                await page.keyboard.press("Escape")
-                await mode_pill.click()
-                await modes.get_by_role("option", name="Task").click()
-                await expect(mode_pill).to_contain_text("Task")
-                # The "+" opens the file picker directly; Options carries Approvals and Execution
-                # (Keep going, Goal mode, Plan first).
-                await expect(page.get_by_role("button", name="Add files")).to_be_visible()
-                await expect(options_pill).to_contain_text("Edits")
-                await options_pill.click()
-                popover = page.locator(".composer .composer-popover[aria-label='Options']")
-                await expect(popover.get_by_role("group", name="Approvals")).to_be_visible()
-                keep_going = popover.get_by_role("switch", name="Keep going until done")
-                await expect(keep_going).to_be_visible()
-                await expect(popover.get_by_role("switch", name="Goal mode")).to_be_visible()
-                # Switched on, it makes the task a campaign: goal mode steps aside and the line under the frame says so.
-                await keep_going.click()
-                await expect(keep_going).to_have_attribute("aria-checked", "true")
-                await expect(popover.get_by_role("switch", name="Goal mode")).to_be_hidden()
-                await expect(page.locator(".composer-stack > .composer-note")).to_be_visible()
-                await keep_going.click()
-                await expect(popover.get_by_role("switch", name="Goal mode")).to_be_visible()
-                await page.screenshot(path=str(tmp_path / f"options-menu-{width}.png"), animations="disabled")
-                # The four modes, strictest first, each with its icon and what it does (item 398).
-                modes: Locator = popover.get_by_role("listbox", name="Approval mode").get_by_role("option")
-                assert await modes.evaluate_all("(rows) => rows.map((row) => row.dataset.mode)") == [
-                    "supervised",
-                    "ask",
-                    "auto",
-                    "yolo",
-                ]
-                await expect(modes.locator(".pop-option-text > span:first-child")).to_have_text(
-                    ["Supervised", "Auto-accept edits", "Auto", "Ask only to pay or send"]
-                )
-                await popover.locator(".pop-option[data-mode='yolo']").click()
-                await expect(options_pill).to_contain_text("Pay or send")
-                # YOLO warns of nothing (item 500): the pill wears no tint and the menu carries no note.
-                await expect(options_pill).not_to_have_attribute("data-tone", "warn")
-                await expect(popover.locator(".note.warn")).to_have_count(0)
-                # The four modes show whole, with no scroll, where the window has the room.
-                assert await popover.evaluate("(menu) => menu.scrollHeight <= menu.clientHeight")
-                await expect(options_pill.locator("[data-icon='lockOpen']")).to_have_count(1)
-                await popover.locator(".pop-option[data-mode='supervised']").click()
-                await expect(options_pill).to_contain_text("Supervised")
-                await expect(options_pill.locator("[data-icon='lock']")).to_have_count(1)
-                await popover.locator(".pop-option[data-mode='ask']").click()
-                await expect(options_pill).to_contain_text("Edits")
-                await expect(options_pill).to_have_attribute("title", "Approvals: Auto-accept edits")
-                await expect(options_pill.locator("[data-icon='pencil']")).to_have_count(1)
-                # A click outside (on the empty page under the composer) closes the menu.
-                await page.mouse.click(width - 20, 880)
-                await expect(popover).to_be_hidden()
-                # A draft keeps: the text typed and not sent is there again after a walk to another page.
-                await goal.fill("keep me for later")
-                await page.goto(f"http://{host}:{port}/#/agents")
-                await page.goto(f"http://{host}:{port}/#/runs")
-                await expect(page.locator(GOAL)).to_have_value("keep me for later")
-                await page.locator(GOAL).fill("")
-                await page.goto(f"http://{host}:{port}/#/agents")
-                await page.goto(f"http://{host}:{port}/#/runs")
-                await expect(page.locator(GOAL)).to_have_value("")
-                assert refused == [], refused
-                await page.close()
+            width: int = 1280
+            page: Page = await browser.new_page(viewport={"width": width, "height": 900})
+            refused: list[str] = []
+            page.on("console", _collect_refusals(refused))
+            await page.route("**/api/models", _with_a_thinking_model)
+            await page.goto(ui_url(host, port, TOKEN))
+            goal = page.locator(GOAL)
+            composer = page.locator(".composer").first
+            # The pill wears the mark of its provider, an SVG of the page's own (items 108 and 959).
+            model_pill = page.locator(".composer-pill[data-pill='model']")
+            await expect(model_pill).to_contain_text("scripted")
+            mark = model_pill.locator(".provider-mark")
+            await expect(mark).to_have_attribute("data-provider", "ollama")
+            await expect(mark.locator("svg")).to_have_count(1)
+            await expect(mark).to_have_css("mask-image", "none")
+            served: httpx.Response = await client.get("/icons/providers/ollama.svg")
+            assert served.status_code == 200, served.status_code
+            assert served.headers["content-type"].startswith("image/svg+xml"), served.headers["content-type"]
+            # One row at rest: the name is for a screen reader, the chevron shows; no other choice is in the bar.
+            await expect(composer).to_have_attribute("data-shape", "compact")
+            name_box = await model_pill.locator(".composer-pill-value").bounding_box()
+            assert name_box is not None and name_box["width"] <= 1, name_box
+            await expect(model_pill.locator(":scope > .icon").last).to_be_visible()
+            for pill in ("mode", "reasoning", "options"):
+                await expect(page.locator(f".composer-pill[data-pill='{pill}']")).to_be_hidden()
+            # The settings: the daemon's default ticked, every model with its mark; a pick keeps them open.
+            sheet: Locator = await open_settings(page, page)
+            await expect(sheet.locator("[role=option][aria-selected=true]").first).to_contain_text("Default (scripted)")
+            await page.screenshot(path=str(tmp_path / f"chat-settings-{width}.png"), animations="disabled")
+            await sheet.get_by_role("option", name="thinker").first.click()
+            await expect(sheet).to_be_visible()
+            # A model with levels: the Reasoning row offers the daemon's level and the three it has.
+            levels: Locator = await open_row(sheet, "Reasoning")
+            await expect(levels.locator("[role=option]")).to_have_count(4)
+            await expect(levels.locator("[role=option][aria-selected=true]")).to_contain_text("Default (Medium)")
+            await levels.get_by_role("option", name="High", exact=True).click()
+            await close_settings(page)
+            # Long words open the box: the model is named, with its level in grey after it.
+            await goal.fill("Look at this repository and tell me what it does")
+            await expect(composer).to_have_attribute("data-shape", "expanded")
+            await expect(model_pill.locator(".composer-pill-value")).to_have_text("thinker")
+            await expect(model_pill.locator(".composer-pill-extra")).to_have_text("High")
+            await goal.fill("")
+            await expect(composer).to_have_attribute("data-shape", "compact")
+            # Back to the daemon's default.
+            await pick_model(page, page, "Default (scripted)")
+            await expect(model_pill).to_contain_text("scripted")
+            # The mode, from the words and from the Mode row: a mode named with its command is said after the name.
+            await goal.type("/task")
+            await goal.press("Tab")
+            await expect(model_pill.locator(".composer-pill-extra")).to_contain_text("Task")
+            sheet = await open_settings(page, page)
+            modes: Locator = await open_row(sheet, "Mode")
+            await expect(modes.locator("[role=option]")).to_have_count(4)
+            await modes.get_by_role("option", name="Chat").click()
+            await expect(model_pill.locator(".composer-pill-extra")).to_contain_text("Chat")
+            # A chat has neither goal mode nor Keep going.
+            await expect(sheet.get_by_role("switch", name="Goal mode")).to_have_count(0)
+            await expect(sheet.get_by_role("switch", name="Keep going until done")).to_have_count(0)
+            await modes.get_by_role("option", name="Task").click()
+            # How Dot works holds Keep going and goal mode; Keep going steps goal mode aside, said under the frame.
+            keep_going: Locator = sheet.get_by_role("switch", name="Keep going until done")
+            await expect(keep_going).to_be_visible()
+            await expect(sheet.get_by_role("switch", name="Goal mode")).to_be_visible()
+            await keep_going.click()
+            await expect(keep_going).to_have_attribute("aria-checked", "true")
+            await expect(sheet.get_by_role("switch", name="Goal mode")).to_be_hidden()
+            await expect(page.locator(".composer-stack > .composer-note")).to_be_attached()
+            await keep_going.click()
+            await expect(sheet.get_by_role("switch", name="Goal mode")).to_be_visible()
+            # The approvals, strictest first; YOLO leaves its lock in the bar, as the run asks nothing in it.
+            approvals: Locator = await open_row(sheet, "Approvals")
+            rows: Locator = approvals.get_by_role("listbox", name="Approval mode").get_by_role("option")
+            assert await rows.evaluate_all("(rows) => rows.map((row) => row.dataset.mode)") == [
+                "supervised",
+                "ask",
+                "auto",
+                "yolo",
+            ]
+            await approvals.locator(".pop-option[data-mode='yolo']").click()
+            await close_settings(page)
+            options_pill = page.locator(".composer-pill[data-pill='options']")
+            await expect(options_pill).to_be_visible()
+            await expect(options_pill).not_to_have_attribute("data-tone", "warn")
+            sheet = await open_settings(page, page)
+            approvals = await open_row(sheet, "Approvals")
+            await approvals.locator(".pop-option[data-mode='ask']").click()
+            await close_settings(page)
+            await expect(options_pill).to_be_hidden()
+            await expect(options_pill).to_have_attribute("title", "Approvals: Auto-accept edits")
+            # A draft keeps: the text typed and not sent is there again after a walk to another page.
+            await goal.fill("keep me for later")
+            await page.goto(f"http://{host}:{port}/#/agents")
+            await page.goto(f"http://{host}:{port}/#/runs")
+            await expect(page.locator(GOAL)).to_have_value("keep me for later")
+            await page.locator(GOAL).fill("")
+            await page.goto(f"http://{host}:{port}/#/agents")
+            await page.goto(f"http://{host}:{port}/#/runs")
+            await expect(page.locator(GOAL)).to_have_value("")
+            assert refused == [], refused
+            await page.close()
         finally:
             await browser.close()
 
@@ -414,10 +375,6 @@ _BAR: str = """(() => {
     });
   return { right: composer.right, bottom: composer.bottom, parts };
 })()"""
-# The bar is as tall as its pills; on a phone they are sized for a finger (item 273).
-_BAR_PX: int = 32
-_PHONE_BAR_PX: int = 36
-_PHONE_PX: int = 720
 
 
 async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
@@ -446,67 +403,45 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            # A phone's line (items 1120 and 1121) is `_phone_box_rests_until_used`'s.
+            # The same capsule at every width (item 2015); a phone's line is `_phone_box_rests_until_used`'s too.
             for width in (1280, 800):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
                 await page.route("**/api/models", _with_a_thinking_model)
                 await page.goto(ui_url(host, port, TOKEN))
                 await expect(page.locator(".composer-pill[data-pill='agent']")).to_be_visible()
-                await page.locator(".composer-pill[data-pill='model']").click()
-                await (
-                    page.locator(".composer-popover[aria-label='Model']").get_by_role("option", name="thinker").click()
-                )
-                await expect(page.locator(".composer-pill[data-pill='reasoning']")).to_be_visible()
+                await pick_model(page, page, "thinker")
+                sheet: Locator = await open_settings(page, page)
+                approvals: Locator = await open_row(sheet, "Approvals")
+                await approvals.locator(".pop-option[data-mode='yolo']").click()
+                await close_settings(page)
                 options_pill = page.locator(".composer-pill[data-pill='options']")
-                await options_pill.click()
-                await page.locator(".composer-popover[aria-label='Options'] .pop-option[data-mode='yolo']").click()
-                await page.mouse.click(width - 20, 880)
-                await expect(page.locator(".composer-popover[aria-label='Options']")).to_be_hidden()
                 await page.mouse.move(0, 0)
+                # One row at rest: the "+", the words, the agent, the model's mark, YOLO's lock, the microphone and the
+                # send on one centre line; the reasoning and the mode are in the settings, not in the bar.
                 bar: dict[str, float | list[list[str | float]]] = await page.evaluate(_BAR)
                 right, parts = bar["right"], bar["parts"]
                 assert isinstance(right, float | int)
-                # On Auto (item 495) the bar has no mode pill; Chrome has speech recognition, so it has a microphone.
-                # The choices are always in sight (item 1330): no button of their own beside the "+".
-                wide: bool = width > _PHONE_PX
-                assert isinstance(parts, list) and len(parts) == 8, (width, bar)
+                assert isinstance(parts, list), (width, bar)
                 by_name: dict[str, list[float]] = {str(part[0]): [float(value) for value in part[1:]] for part in parts}
-                named: set[str] = {"plus", "mic", "send", "field", "agent", "model", "reasoning", "options"}
-                assert set(by_name) == named, bar
-                # The pills keep one line at every width, and their height is the bar's (item 273); on a wide window the
-                # approvals stand under the box, at its right, quiet words on no ground (item 1330).
-                line = ("agent", "model", "reasoning") if wide else ("agent", "model", "reasoning", "options")
-                pills = [by_name[name] for name in line]
-                assert max(float(pill[0]) for pill in pills) - min(float(pill[0]) for pill in pills) <= 1, (width, bar)
-                height_px = _BAR_PX if width > _PHONE_PX else _PHONE_BAR_PX
-                assert all(round(float(pill[4])) == height_px for pill in pills), (width, bar)
-                if wide:
-                    assert float(by_name["options"][2]) >= float(bar["bottom"]) - 1, (width, bar)
+                assert set(by_name) == {"plus", "mic", "send", "field", "agent", "model", "options"}, (width, bar)
+                centre: float = by_name["send"][0]
+                assert all(abs(float(part[1]) - centre) <= 1 for part in parts), (width, bar)
                 assert all(float(part[2]) <= right + 0.5 for part in parts), (width, bar)
-                plus, send, field = by_name["plus"], by_name["send"], by_name["field"]
-                # The microphone is as tall as the "+" (item 574).
-                mic = by_name["mic"]
-                assert round(float(mic[4])) == height_px, (width, bar)
-                if width > _PHONE_PX:
-                    # The desk keeps the box above its controls: one line of pills, the field over it, and the
-                    # microphone on the send's line, left of it.
-                    assert max(abs(float(plus[0]) - float(pill[0])) for pill in pills) <= 1, (width, bar)
-                    assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
-                    assert float(field[3]) < float(pills[0][2]) - 1, (width, bar)
-                    assert abs(float(mic[0]) - float(send[0])) <= 1 and float(mic[1]) < float(send[1]), (width, bar)
-                else:
-                    # The phone puts the "+" and the send beside the box, and the pills on the line under it (item 374);
-                    # the microphone is on the line of the pills, so that the words of an empty box keep their room.
-                    assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
-                    assert float(pills[0][2]) > float(plus[3]) - 1, (width, bar)
-                    assert abs(float(field[3]) - float(plus[3])) <= 2, (width, bar)
-                    assert abs(float(mic[0]) - float(pills[0][0])) <= 1, (width, bar)
-                    assert float(mic[1]) <= float(send[1]), (width, bar)
-                # On Auto (item 495) the mode has no pill at any width, and the Options pill shows YOLO with no tint
-                # (item 500).
+                # Long words: the words over the controls, which keep one line, the model named with its level.
+                await page.locator(GOAL).fill("Look at this repository and say what it does")
+                await expect(page.locator(".composer").first).to_have_attribute("data-shape", "expanded")
+                bar = await page.evaluate(_BAR)
+                parts = bar["parts"]
+                assert isinstance(parts, list)
+                by_name = {str(part[0]): [float(value) for value in part[1:]] for part in parts}
+                field = by_name.pop("field")
+                line = list(by_name.values())
+                assert max(part[0] for part in line) - min(part[0] for part in line) <= 1, (width, bar)
+                assert field[3] < min(part[2] for part in line) - 1, (width, bar)
+                await expect(page.locator(".composer-pill[data-pill='model'] .composer-pill-extra")).to_be_visible()
+                await page.locator(GOAL).fill("")
                 await expect(page.locator(".composer-pill[data-pill='mode']")).to_be_hidden()
                 await expect(options_pill).not_to_have_attribute("data-tone", "warn")
-                # Closed, the pill rests with no fill; its colour fades there, so the check waits for it to settle.
                 await expect(options_pill).to_have_css("background-color", "rgba(0, 0, 0, 0)")
                 await page.locator(".composer-stack").screenshot(path=str(tmp_path / f"bar-{width}.png"))
                 await page.close()
@@ -698,10 +633,9 @@ async def test_video_from_the_plus_menu_and_drag_and_drop_reaches_the_run(
             )
             await page.goto(ui_url(client.base_url.host, port, TOKEN))
             composer: Locator = page.locator(".composer")
-            await composer.locator(".plus-button").click()
-            async with page.expect_file_chooser() as choosing:
-                await page.get_by_role("menuitem", name="Add files").click()
-            await (await choosing.value).set_files(_VIDEO_SAMPLE)
+            # The picker's own input: whether the "+" is a menu or the picker itself depends on the mode an earlier
+            # test of this module left the daemon in, and this test is about what a video does, not the "+".
+            await composer.locator("input[type=file]").set_input_files(_VIDEO_SAMPLE)
             await expect(composer.locator(".attach-chip.ready")).to_have_count(1)
             transfer = await page.evaluate_handle(
                 """bytes => {
@@ -732,6 +666,62 @@ async def test_video_from_the_plus_menu_and_drag_and_drop_reaches_the_run(
             await browser.close()
 
 
+@pytest.mark.parametrize(("width", "height"), [(1440, 900), (390, 844)], ids=["desktop", "phone"])
+async def test_a_video_is_a_tile_with_its_length_in_the_box_and_over_the_sent_message_and_plays_full_screen(
+    runtime: Runtime, client: httpx.AsyncClient, width: int, height: int
+) -> None:
+    """Item 1992, on the web as on DotNext: a video added stands as a tile (its first frame, a play glyph, its length, a
+    ×), the same tile stands over the message once sent, and a click plays it full screen until Escape."""
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": width, "height": height})
+            await page.goto(ui_url(client.base_url.host, port, TOKEN))
+            composer: Locator = page.locator(".composer")
+            # The picker's own input: the "+" is a menu on a desktop and the picker itself on a phone.
+            await composer.locator("input[type=file]").set_input_files(_VIDEO_SAMPLE)
+            tile: Locator = composer.locator(".attach-chip.picture.ready")
+            await expect(tile).to_have_count(1)
+            await expect(tile.locator(".media-length")).to_have_text("0:01")
+            await expect(tile.locator(".media-play")).to_be_visible()
+            await expect(tile.locator(".attach-thumb")).to_have_attribute("src", re.compile("^data:image/jpeg"))
+            await expect(tile.get_by_role("button", name="Remove attachment-sample.mp4")).to_be_visible()
+            await expect(tile.get_by_role("button", name="Play video attachment-sample.mp4")).to_be_visible()
+            await page.locator(GOAL).fill("What happens in this video")
+            async with page.expect_response(
+                lambda answer: answer.url.endswith("/api/runs") and answer.request.method == "POST"
+            ) as sent:
+                await page.locator(GOAL).press("Enter")
+            assert (await sent.value).status == 201
+            sent_tile: Locator = page.locator(".sent-video").first
+            await expect(sent_tile).to_be_visible()
+            await expect(sent_tile.locator(".media-length")).to_have_text("0:01")
+            await expect(sent_tile.locator(".sent-picture-image")).to_have_attribute(
+                "src", re.compile("^data:image/jpeg")
+            )
+            await expect(sent_tile.locator(".media-play")).to_be_visible()
+            assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), (
+                "no sideways scroll"
+            )
+            box = await sent_tile.bounding_box()
+            assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+            await sent_tile.click()
+            player: Locator = page.locator(".player-overlay")
+            await expect(player).to_be_visible()
+            await expect(player.locator("video")).to_have_attribute("src", re.compile("^blob:"))
+            # Polled here: wait_for_function fails under the page's CSP once it has to wait (see the memory notes).
+            deadline: float = time.monotonic() + 15
+            while not await page.evaluate("document.querySelector('.player-video').readyState >= 1"):
+                assert time.monotonic() < deadline, "the video never loaded its start"
+                await asyncio.sleep(0.2)
+            await page.keyboard.press("Escape")
+            await expect(player).to_have_count(0)
+        finally:
+            await browser.close()
+
+
 async def _phone_box_has_its_line(browser: Browser, host: str, port: int) -> None:
     """Items 1120, 1121 and 1330 on a phone's width: the box is the words with, on the line under them, the "+", the
     model's pill, the microphone and the send, always in sight; the model's pill alone stands for the choices, and its
@@ -744,19 +734,28 @@ async def _phone_box_has_its_line(browser: Browser, host: str, port: int) -> Non
     for part in (".plus-button", ".composer-field", ".btn.send", ".mic-button", ".composer-pill[data-pill='model']"):
         await expect(composer.locator(part)).to_be_visible()
     await expect(composer.locator(".composer-pill[data-pill='options']")).to_be_hidden()
-    # The words over the line; on it the "+", the model, the microphone and the send, on one centre line, the
-    # microphone as tall as the send and left of it (read in one frame).
-    rects: list[list[float]] = await composer.evaluate(
+    # At rest one row (item 2015): the "+", the words, the model's mark, the microphone and the send on one centre line,
+    # the microphone as tall as the send and left of it (read in one frame).
+    measure: str = (
         "box => ['.composer-field', '.plus-button', \".composer-pill[data-pill='model']\", '.mic-button', '.btn.send']"
         ".map((part) => { const r = box.querySelector(part).getBoundingClientRect();"
         " return [r.top, r.bottom, r.left, r.right, r.height]; })"
     )
+    rects: list[list[float]] = await composer.evaluate(measure)
     field, plus, pill, mic, send = rects
-    centres: list[float] = [(part[0] + part[1]) / 2 for part in (plus, pill, mic, send)]
+    centres: list[float] = [(part[0] + part[1]) / 2 for part in (field, plus, pill, mic, send)]
+    assert max(centres) - min(centres) <= 2, rects
+    assert round(mic[4]) == round(send[4]) == 36, rects
+    assert plus[3] <= field[2] and field[3] <= pill[2] and pill[3] <= mic[2] and mic[3] <= send[2] + 1, rects
+    # Long words: the words over the line, on which the "+", the model, the microphone and the send stand.
+    await composer.locator("textarea").fill("Look at this repository and say what it does")
+    await expect(composer).to_have_attribute("data-shape", "expanded")
+    rects = await composer.evaluate(measure)
+    field, plus, pill, mic, send = rects
+    centres = [(part[0] + part[1]) / 2 for part in (plus, pill, mic, send)]
     assert max(centres) - min(centres) <= 2, rects
     assert all(part[0] >= field[1] - 1 for part in (plus, pill, mic, send)), rects
-    assert round(mic[4]) == round(send[4]) == 36, rects
-    assert plus[3] <= pill[2] and pill[3] <= mic[2] and mic[3] <= send[2] + 1, rects
+    await composer.locator("textarea").fill("")
     await model.click()
     # The chat's settings (item 1202): a sheet with the models, then the Mode and the Approvals as rows that open in
     # place.
@@ -803,15 +802,20 @@ async def test_the_words_have_their_own_line_and_the_runs_choices_stand_in_the_b
                 await expect(composer).not_to_have_attribute("data-quiet", "")
                 await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_visible()
                 await expect(composer.locator(".choices-toggle")).to_have_count(0)
-                # The words on a line of their own, the "+" under them, read in one frame.
+                # Short words share the row with the "+" and the send (item 2015); long ones take a line of their
+                # own, the "+" under them, read in one frame.
                 plus: Locator = composer.locator(".plus-button")
                 field: Locator = composer.locator(".composer-field")
                 await expect(field).to_be_visible()
+                await expect(composer).to_have_attribute("data-shape", "compact")
+                await composer.locator("textarea").fill("Look at this repository and say what it does")
+                await expect(composer).to_have_attribute("data-shape", "expanded")
                 edges: list[float] = await composer.evaluate(
                     "box => [box.querySelector('.plus-button').getBoundingClientRect().top,"
                     " box.querySelector('.composer-field').getBoundingClientRect().bottom]"
                 )
                 assert edges[0] >= edges[1] - 2, edges
+                await composer.locator("textarea").fill("")
                 # The microphone and the send side by side from the start: more can still be dictated after words.
                 mic: Locator = composer.locator(".mic-button")
                 send: Locator = composer.locator(".btn.send")
@@ -836,11 +840,13 @@ async def test_the_words_have_their_own_line_and_the_runs_choices_stand_in_the_b
                 await expect(page.get_by_role("menuitem", name="Model and options")).to_have_count(0)
                 await page.keyboard.press("Escape")
                 options: Locator = composer.locator(".composer-pill[data-pill='options']")
+                await expect(options).to_be_hidden()
+                # YOLO chosen in the chat's settings: its lock stays in the bar, with no tint.
+                sheet: Locator = await open_settings(composer, page)
+                approvals: Locator = await open_row(sheet, "Approvals")
+                await approvals.locator(".pop-option[data-mode='yolo']").click()
+                await close_settings(page)
                 await expect(options).to_be_visible()
-                # YOLO chosen: its pill says so with no tint.
-                await options.click()
-                await page.locator(".composer-popover .pop-option[data-mode='yolo']").click()
-                await page.keyboard.press("Escape")
                 await expect(options).to_contain_text("Pay or send")
                 await expect(options).not_to_have_attribute("data-tone", "warn")
                 # On a line of 440 px or less (the bar's own width, which its container query reads) its open lock

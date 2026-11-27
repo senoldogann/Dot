@@ -2,6 +2,7 @@
 // result keeps (`tool_result`'s `decision`). Pure, so it can be read alone (tests/js/why.test.js).
 
 import { flagWords } from "./flagwords.js";
+import { t } from "./i18n.js";
 
 // The kinds of action that only observe (policy/types.py READ_ONLY_KINDS): a plain allow of the preset is not worth a
 // line on them, as nearly every step of a run is one.
@@ -26,22 +27,22 @@ function sentence(decision) {
   const reason = bare(decision.reason);
   switch (decision.answered_by) {
     case "reviewer":
-      return `The reviewer approved it. Dot's safety rules asked because ${reason}.`;
+      return t("why.theReviewerApprovedItDot", { reason });
     case "user":
-      return decision.source === "supervised" ? "Supervised: you approved it." : `You approved it. Dot's safety rules asked because ${reason}.`;
+      return decision.source === "supervised" ? t("why.supervisedYouApprovedIt") : t("why.youApprovedItDotS", { reason });
     default:
       if (decision.source === "rule") {
-        return `Allowed by your rule “${reason}”.`;
+        return t("why.allowedByYourRuleReason", { reason });
       }
       if (decision.source === "preset") {
         // The aggressive preset's reason is its own name: said once, not as "the aggressive preset: aggressive preset".
-        return reason.toLowerCase() === `${decision.preset} preset` ? `Allowed by the ${decision.preset} safety level.` : `Allowed by the ${decision.preset} safety level: ${reason}.`;
+        return reason.toLowerCase() === `${decision.preset} preset` ? t("why.allowedByThePresetSafety", { preset: decision.preset }) : t("why.allowedByThePresetSafety2", { preset: decision.preset, reason });
       }
-      return `Allowed: ${reason}.`;
+      return t("why.allowedReason", { reason });
   }
 }
 
 /** The words of why a step ran, with the flags its action raised. */
 export function whyText(decision, flags) {
-  return flags.length === 0 ? sentence(decision) : `${sentence(decision)} It counts as: ${flags.map(flagWords).join(", ")}.`;
+  return flags.length === 0 ? sentence(decision) : t("why.sentenceItCountsAsJoin", { sentence: sentence(decision), join: flags.map(flagWords).join(", ") });
 }

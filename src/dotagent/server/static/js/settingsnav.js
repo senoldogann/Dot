@@ -10,6 +10,7 @@ import { el, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { LAST_CHAT_KEY, readPref } from "./prefs.js";
 import { matchesSearch, SETTINGS_GROUPS, settingsHref, tabAt, tabOf } from "./settingstabs.js";
+import { t } from "./i18n.js";
 
 // The chat the owner was on last, which main.js keeps; Back to chats leads there.
 // What the phone needs asked of Tailscale is read again no sooner than this: a tab's visit should not ask it each time.
@@ -24,8 +25,8 @@ const NAV_VALUES = new Set(["memory", "vault", "phone", "schedules"]);
  * again), `focusClose()` and `dispose()`.
  */
 export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
-  const hide = el("button", { class: "icon-btn", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse }, icon("panelLeft"));
-  const back = el("a", { class: "settings-back", href: homeHref, onclick: onNavigate }, icon("arrowLeft"), el("span", null, "Back to chats"));
+  const hide = el("button", { class: "icon-btn", type: "button", title: t("settingsnav.hideSidebar"), "aria-label": t("settingsnav.hideSidebar"), onclick: onCollapse }, icon("panelLeft"));
+  const back = el("a", { class: "settings-back", href: homeHref, onclick: onNavigate }, icon("arrowLeft"), el("span", null, t("settingsnav.backToChats")));
   const values = new Map([...NAV_VALUES].map((id) => [id, el("span", { class: "snav-value" })]));
   // A row of the page it names, by its id (the open one is marked): its small mark and its name.
   const links = new Map();
@@ -56,13 +57,13 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
     type: "search",
     autocomplete: "off",
     spellcheck: "false",
-    placeholder: "Search",
-    "aria-label": "Search settings",
+    placeholder: t("settingsnav.search"),
+    "aria-label": t("settingsnav.searchSettings"),
   });
-  const empty = el("p", { class: "snav-empty", hidden: true }, "No setting matches.");
+  const empty = el("p", { class: "snav-empty", hidden: true }, t("settingsnav.noSettingMatches"));
   const element = el(
     "nav",
-    { class: "settings-nav", "aria-label": "Settings" },
+    { class: "settings-nav", "aria-label": t("settingsnav.settings") },
     el("div", { class: "settings-nav-top", "data-tauri-drag-region": "" }, hide),
     el("label", { class: "snav-search" }, icon("search"), search, el("kbd", { class: "snav-key", "aria-hidden": "true" }, "/")),
     el("div", { class: "snav-groups" }, groups.map((group) => group.section), empty),
@@ -152,7 +153,7 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
     if (phone.status === "fulfilled" && phone.value !== null) {
       phoneReadAt = Date.now();
       const reached = phone.value.tailnet.reached;
-      values.get("phone").replaceChildren(...(reached ? [el("span", { class: "snav-dot", title: "A phone reaches Dot" })] : []));
+      values.get("phone").replaceChildren(...(reached ? [el("span", { class: "snav-dot", title: t("settingsnav.aPhoneReachesDot") })] : []));
     }
   }
 

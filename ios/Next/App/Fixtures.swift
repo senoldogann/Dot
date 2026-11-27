@@ -41,6 +41,12 @@
         case restated = "n2-restated"
         /// A page in the transcript, loaded from the UI test's loopback server.
         case shownPage = "n2-shown-page"
+        /// The main run has stopped and only waits for a helper it delegated to (its newest step's one open call is a
+        /// delegate): the capsule says "Waiting on 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
+        /// beside its helper and says "Working".
+        case helpersWait = "n2-helpers"
+        /// The first run a schedule fired (owner 2026-11-27): its message is the routine's compact row, not a bubble.
+        case routine = "n2-routine"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -104,7 +110,10 @@
                   "args":{"header":"MCP","question":"Playwright and chrome-devtools start with every launch of Dot and were not used in 14 days. Close them?","multiple":false,
                     "options":[{"label":"Keep them on","description":"Nothing changes."},{"label":"Close both","description":"Dot's own browser tools do the same; launches get faster. One tap in Settings › Connectors turns them back on.","recommended":true}]}},
                  {"id":"apr_q2","run_id":"run_b","created_at":2,"status":"pending","tool":"ask_user","severity":"question","summary":"q",
-                  "args":{"header":"Appointment","question":"Which day suits you for the dentist?","options":[{"label":"Tuesday afternoon","recommended":true},{"label":"Thursday morning"}]}}]
+                  "args":{"header":"Appointment","question":"Which day suits you for the dentist?","options":[{"label":"Tuesday afternoon","recommended":true},{"label":"Thursday morning"}]}},
+                 {"id":"apr_q3","run_id":"run_b","created_at":3,"status":"pending","tool":"ask_user","severity":"question","summary":"q",
+                  "args":{"header":"Approval","question":"Six pull requests passed the security review and the pre-push review. Which ones shall I merge?","multiple":true,
+                    "options":[{"label":"#1199 Memory kinds","description":"Adds a note kind column to the database. A backup is taken first; the first start takes 36 s once."},{"label":"#1188 Webhook","description":"A signed outside trigger, reachable only from your network by default."},{"label":"#1204 Several tasks (part 1)","description":"Adds a chat lane column, off by default: nothing changes until it is turned on."}]}}]
                 """#
             case .secret:
                 #"""
@@ -134,24 +143,30 @@
                 self == .queue || self == .editing || self == .work
                 ? #"[{"id":"q1","thread_id":"thr_fixture","position":1,"text":"Connect everything to real data, as a Grok-like assistant would, and keep the tool calls visible","created_at":1,"source":"phone"},{"id":"q2","thread_id":"thr_fixture","position":2,"text":"Then send me the screenshots of the new designs","created_at":2,"source":"phone"}]"#
                 : "[]"
+            let sourceA: String = self == .routine ? "schedule" : "phone"
+            let schedules: String =
+                self == .routine
+                ? #"[{"schedule":{"record":{"id":"sch_1","name":"Site build check","goal":"Find out why the site's build fails on CI and fix it"}},"loop":false}]"#
+                : "[]"
             return """
                 {"revision":7,
                  "thread":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"agent_id":null},
                  "summary":null,
                  "runs":[
-                   {"id":"run_a","thread_id":"thr_fixture","goal":"Find out why the site's build fails on CI and fix it","mode":"task","model":"claude_code:opus","status":"done","created_at":\(now - 3000),"finished_at":\(now - 2866),"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":48210,"output_tokens":3120,"approvals":"auto"},
+                   {"id":"run_a","thread_id":"thr_fixture","goal":"Find out why the site's build fails on CI and fix it","mode":"task","model":"claude_code:opus","status":"done","created_at":\(now - 3000),"finished_at":\(now - 2866),"result":"","parent_run_id":null,"source":"\(sourceA)","effort":"medium","input_tokens":48210,"output_tokens":3120,"approvals":"auto"},
                    {"id":"run_b","thread_id":"thr_fixture","goal":"Book me the dentist for next week, afternoons if you can.","mode":"task","model":"claude_code:opus","status":"\(runB)","created_at":\(now - 2475),"finished_at":null,"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":3212154,"output_tokens":8132,"approvals":"auto"}
                  ],
                  "older":false,"newest":null,"newest_events":[],"newest_events_cut":false,
                  "queue":{"held":false,"messages":\(queue),"beside_run_id":"run_b","beside_thread_id":null},
                  "asks":\(asks),
                  "helpers":[
-                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
+                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":\(self == .helpersWait),"stop":"/api/runs/run_h1/cancel"},
                    {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"claude_code","model":"sonnet","effort":"low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
                  ],
                  "background":[],
                  "reactions":[{"run_id":"run_a","message":"answer","reaction":"good"}],
-                 "drafts":[]}
+                 "drafts":[],
+                 "schedules":\(schedules)}
                 """
         }
 
@@ -190,6 +205,12 @@
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"done","result":"Booked Tuesday 14:00."}}"#)
             case .shownPage:
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 50),"kind":"page_shown","data":{"page_id":"page_0123456789ABCDEFGHIJKLMN","title":"Sales by month"}}"#)
+            case .helpersWait:
+                events.append(contentsOf: [
+                    #"{"id":29,"run_id":"run_b","ts":\#(b + 44),"kind":"tool_result","data":{"call_id":"b4","ok":true,"text":"ready"}}"#,
+                    #"{"id":30,"run_id":"run_b","ts":\#(b + 45),"kind":"assistant","data":{"text":"","step":5,"tool_calls":["delegate"]}}"#,
+                    #"{"id":31,"run_id":"run_b","ts":\#(b + 46),"kind":"tool_call","data":{"call_id":"b5","tool":"delegate","args":{"goal":"Check the dentist's free slots"}}}"#,
+                ])
             case .restated:
                 events.append(contentsOf: [
                     #"{"id":30,"run_id":"run_b","ts":\#(b + 50),"kind":"assistant","data":{"text":"Booked: Tuesday at 14:00 with Dr. Lind. ","step":5,"tool_calls":[]}}"#,
@@ -247,7 +268,7 @@
 
         private func rowsJSON(now: Double) -> String {
             """
-            [{"summary":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"pinned_at":null,"run_count":2,"latest_run_id":"run_b","latest_status":"running","latest_created_at":\(now - 2475),"unread":false,"actor_id":null,"last_message":"Book me the dentist","last_role":"user"},"revision":7,"asks":\(self == .asks || self == .question ? 2 : 0)}]
+            [{"summary":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"pinned_at":null,"run_count":2,"latest_run_id":"run_b","latest_status":"running","latest_created_at":\(now - 2475),"unread":false,"actor_id":null,"last_message":"Book me the dentist","last_role":"user"},"revision":7,"asks":\(self == .asks ? 2 : self == .question ? 3 : 0)}]
             """
         }
     }

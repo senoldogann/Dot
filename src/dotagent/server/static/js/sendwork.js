@@ -4,6 +4,7 @@
 import { api } from "./api.js";
 import { BUSY_SEND, settingValue } from "./appearance/settings.js";
 import { toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 /**
  * Send `text` to the run at work of `where` (items 898 and 1245), as a message in its chat goes: it waits in the chat's
@@ -43,7 +44,7 @@ export async function sendToWork({ where, text, choices, frame, owner, keys, ctx
       // The agent works and the owner chose Steer: the message reaches that run, as one sent in its chat does. A
       // steer joins the run under way, which keeps what it has (item 259): picks wait for a new task, and say so.
       if (frame.picks.count() > 0) {
-        toast("ok", "Sent to the task under way, which keeps what it has. Plugins, skills and Plan first wait for a message that starts a new task.");
+        toast("ok", t("sendwork.sentToTheTaskUnder"));
       }
       const steer = { text, attachments: attachments.ids() };
       await api.post(`/runs/${encodeURIComponent(where.working)}/steer`, { ...steer, key: keys.of("steer", where.working, steer) });

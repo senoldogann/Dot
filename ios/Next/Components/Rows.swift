@@ -209,10 +209,12 @@ struct InkSwitchStyle: ToggleStyle {
                     .fill(configuration.isOn ? Tone.action : Tone.nested)
                     .frame(width: 51, height: 31)
                     .overlay(alignment: configuration.isOn ? .trailing : .leading) {
+                        // White on both sides, as the system's switch: a dark knob on a grey track read as on.
                         Circle()
-                            .fill(configuration.isOn ? Tone.onAction : Tone.text)
-                            .frame(width: 25, height: 25)
-                            .padding(3)
+                            .fill(configuration.isOn ? Tone.onAction : Color.white)
+                            .shadow(color: .black.opacity(configuration.isOn ? 0 : 0.18), radius: 2, y: 1)
+                            .frame(width: 27, height: 27)
+                            .padding(2)
                     }
                     .frame(minWidth: Metric.hit, minHeight: Metric.hit)
                     .contentShape(Rectangle())
@@ -233,4 +235,55 @@ struct InkSwitchStyle: ToggleStyle {
                 : String(localized: "Off", comment: "VoiceOver value of a switch that is off"))
         .accessibilityAction { configuration.isOn.toggle() }
     }
+}
+
+/// One choice of a `MenuPickerRow`: its value and its words.
+struct MenuChoice<Value: Hashable>: Identifiable {
+    let value: Value
+    let title: String
+    var id: Value { value }
+}
+
+/// A row whose value is one of a few named choices, as iOS Settings draws it: the title, the chosen value and ↕ on the
+/// right; a tap opens the system's menu of every choice in full words with a ✓ on the chosen one, so that no choice is
+/// cut however many there are (a segmented control of six cut "Extra high", the owner's report of 2026-11-27). At the
+/// accessibility sizes the value stands under the title.
+struct MenuPickerRow<Value: Hashable>: View {
+    let title: String
+    let choices: [MenuChoice<Value>]
+    @Binding var selection: Value
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+
+    var body: some View {
+        Menu {
+            Picker(title, selection: $selection) {
+                ForEach(choices) { choice in Text(choice.title).tag(choice.value) }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: Space.s) {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        Text(title).textRole(.body).foregroundStyle(Tone.text)
+                        Text(chosenTitle).textRole(.footnote).foregroundStyle(Tone.secondary)
+                    }
+                    Spacer(minLength: 0)
+                } else {
+                    Text(title).textRole(.body).foregroundStyle(Tone.text)
+                    Spacer(minLength: Space.s)
+                    Text(chosenTitle).textRole(.body).foregroundStyle(Tone.secondary).lineLimit(1)
+                }
+                Symbol(name: "chevron.up.chevron.down", context: .chevron).foregroundStyle(Tone.glyph)
+            }
+            .padding(.horizontal, Space.groupedGutter)
+            .padding(.vertical, Space.s)
+            .frame(minHeight: Metric.row)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(RowPressStyle())
+        .accessibilityLabel(title)
+        .accessibilityValue(chosenTitle)
+    }
+
+    private var chosenTitle: String { choices.first { $0.value == selection }?.title ?? "" }
 }

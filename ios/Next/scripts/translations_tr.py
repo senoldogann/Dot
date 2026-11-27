@@ -8,6 +8,8 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # A tool row of Dot's own: cards shown in the chat (item 1967).
+    "Show cards": "Kart göster",
     "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",
     "Not sent: an attachment could not be read on this phone": "Gönderilmedi: eklerden biri bu telefonda okunamadı",
     "Upload cancelled": "Yükleme iptal edildi",
@@ -23,6 +25,10 @@ TR: dict[str, str] = {
     "At most 10 attachments can go with a message.": "Bir mesajla en fazla 10 ek gönderebilirsiniz.",
     "%@ is %@. The limit is 20 MiB per attachment.": "%@ boyutu %@. Ek başına sınır 20 MiB.",
     "%@ is %@. The limit is 200 MiB for a video or a sound.": "%@ boyutu %@. Video veya ses için sınır 200 MiB.",
+    "Photo %@": "Fotoğraf %@",
+    "Play video %@": "%@ videosunu oynat",
+    "Video %@, %@": "Video %@, %@",
+    "Video %@": "Video %@",
     "Could not prepare %@ as a video.": "%@ video olarak hazırlanamadı.",
     "Could not read %@. Choose a file.": "%@ okunamadı. Bir dosya seçin.",
     "The image could not be read.": "Görüntü okunamadı.",
@@ -949,8 +955,6 @@ TR: dict[str, str] = {
     'What %@ did': '%@ ne yaptı',
     'All chats': 'Tüm sohbetler',
     'the Agents page': 'Ajanlar sayfası',
-    'Activity comes in the next version': 'Etkinlik bir sonraki sürümde geliyor',
-    'What Dot does on its own (schedules, helpers, drafts that wait) will show here.': "Dot'un kendi başına yaptıkları (zamanlanmış görevler, yardımcılar, bekleyen taslaklar) burada görünecek.",
     'What should it do?': 'Ne yapmalı?',
     'You': 'Sen',
     'Your Mac': "Mac'in",
@@ -1217,6 +1221,12 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "User input needed": "Senden bir cevap bekleniyor",
+        "%lld / %lld": "%lld / %lld",
+        "Submit answers": "Yanıtları gönder",
+        "Default (%@)": "Varsayılan (%@)",
+        "Favourite": "Favori",
+        "Can't reach %@": "%@ cihazına ulaşılamıyor",
         "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
         "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
         "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
@@ -1616,7 +1626,6 @@ TR.update(
     {
         "%lld min": "%lld dk",
         "%lld s": "%lld sn",
-        "Looking at %@": "%@ inceleniyor",
     }
 )
 
@@ -1634,7 +1643,10 @@ TR.update(
         "due in %@": "%@ sonra bitiyor",
         "%@ late": "%@ gecikti",
         "Let go": "Bırakıldı",
-        "Written after Dot read content from outside.": "Dot dışarıdan içerik okuduktan sonra yazıldı.",
+        "Written after Dot read content from outside": "Dot dışarıdan içerik okuduktan sonra yazıldı",
+        "handed out %@": "%@ verildi",
+        "Judged by: %@": "Ölçüt: %@",
+        "%@ is working on it": "%@ üzerinde çalışıyor",
         "Work orders": "İş emirleri",
         "No work orders yet": "Henüz iş emri yok",
         "When Dot hands a bot a piece of work, it shows here with where it stands.": "Dot bir bota iş verdiğinde, durumuyla birlikte burada görünür.",
@@ -1668,7 +1680,6 @@ TR.update(
         "Sent to others": "Başkalarına gönderilen",
         "Today's messages between bots, newest first.": "Botlar arasındaki bugünkü mesajlar, en yeni önce.",
         "Reply: %@": "Yanıt: %@",
-        "Waiting for a reply": "Yanıt bekleniyor",
         "Hand-off": "Devir",
         "From": "Gönderen",
         "Sent at": "Gönderilme saati",
@@ -1683,7 +1694,44 @@ TR.update(
         "Resume bot": "Botu sürdür",
     }
 )
+# A change opened from This chat, its folded sections (CH1, item 2017).
+TR.update(
+    {
+        "No diff to show": "Gösterilecek fark yok",
+        "Loading the change": "Değişiklik yükleniyor",
+        "View": "Görünüm",
+        "Formatted": "Biçimli",
+        "Source": "Kaynak",
+        "Deleted": "Silindi",
+        "New · %lld lines": "Yeni · %lld satır",
+        "Lines from %lld": "%lld. satırdan itibaren",
+        "Added, line %lld: %@": "Eklendi, satır %1$lld: %2$@",
+        "Removed, line %lld: %@": "Silindi, satır %1$lld: %2$@",
+        "Line %lld: %@": "Satır %1$lld: %2$@",
+        # In the catalogue since item 1967 without its line here, which stopped apply_translations.py.
+        "Show cards": "Kart göster",
+    }
+)
+EN_PLURALS.update({"New · %lld lines": ("New · %lld line", "New · %lld lines")})
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+# Chat settings as inset groups, the capsule without a spinner (the owner's report of 2026-11-27).
+
+# HS1 (2026-11-27): empty states in the app's own type.
+TR.update(
+    {
+        "Check the spelling or try a new search.": "Yazımı kontrol edin ya da yeni bir arama deneyin.",
+    }
+)
+
+# HS1 (2026-11-27): a routine's message in a chat.
+TR.update(
+    {
+        "Routine": "Rutin",
+        "Routine: %@": "Rutin: %@",
+        "Hides the message": "Mesajı gizler",
+        "Shows the whole message": "Mesajın tamamını gösterir",
+    }
+)
 
 # PG1: pages shown in the conversation.
 TR.update(
@@ -1693,3 +1741,6 @@ TR.update(
         "The page could not be shown.": "Sayfa gösterilemedi.",
     }
 )
+
+# A new chat's first send opens the one chat screen (item 2025).
+TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})

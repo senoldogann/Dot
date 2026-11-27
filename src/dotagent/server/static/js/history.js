@@ -1,20 +1,21 @@
 // What a conversation holds outside one run: the runs before it in the thread, each as the question and its answer, so a
 // follow-up reads as the next turn of one chat.
 
-import { t } from "./i18n.js";
+import { t, tCount } from "./i18n.js";
 import { api, query } from "./api.js";
 import { visibleInConversation } from "./chatnoise.js";
-import { compact, el, plural, repeatsAnswer } from "./dom.js";
+import { compact, el, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
-  needsAside, outcomeOf, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+  needsAside, outcomeOf, routineMessage, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+import { chatCardRenderer, POST_DRAFT_SETTLED } from "./chatcards.js";
+import { ROUTINE_SOURCES } from "./routinewords.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { sourcesRow } from "./sources.js";
 import { countKinds, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, toolRow } from "./tools.js";
-import { narrationPhrase } from "./workstatus.js";
 
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read before the page is drawn (items 374 and 708), side by side: they stand right
@@ -104,7 +105,7 @@ export function workOrderNote(goal) {
  * run's own page does, how many failed or were cut off. */
 function stepsBlock(batch) {
   const kinds = countKinds(batch.tools);
-  const troubles = [batch.failed > 0 ? `${batch.failed} failed` : "", batch.cut > 0 ? `${batch.cut} cut off` : ""];
+  const troubles = [batch.failed > 0 ? t("history.failedFailed", { failed: batch.failed }) : "", batch.cut > 0 ? t("history.cutCutOff", { cut: batch.cut }) : ""];
   const said = troubles.filter((words) => words !== "").join(" · ");
   const head = el(
     "summary",
@@ -168,8 +169,8 @@ function flowNotShown(past, flow, error) {
       "div",
       { class: "note" },
       icon("alert"),
-      el("span", null, `What this task did could not be shown: ${error.message}`),
-      el("a", { class: "small", href: `#/runs/${past.id}` }, "Open task"),
+      el("span", null, t("history.whatThisTaskDidCould", { message: error.message })),
+      el("a", { class: "small", href: `#/runs/${past.id}` }, t("history.openTask")),
     ),
   );
   flow.hidden = false;
@@ -190,6 +191,7 @@ function steerMessage(block, reaction) {
  * `asked`, the turn's message, and a message that steered the run stands where it came (item 403), as on the run's
  * own page. What the run said stands with the button and the chips of the reactions (item 586) when `reactions` is given. */
 function drawFlow(past, flow, asked, events, reactions) {
+  const richCards = chatCardRenderer();
   const answer = (past.result ?? "").trim();
   const blocks = [];
   let batch = null;
@@ -217,8 +219,6 @@ function drawFlow(past, flow, asked, events, reactions) {
   // Dot's reaction (item 664) stands on the latest message of yours when it came: the turn's own, or a steer since.
   let reaction = null;
   let reactedTo = null;
-  // Whether the newest step wrote words, which tell its calls (item 1976).
-  let stepSaid = false;
   for (const event of events) {
     // A compaction is not a turn of the conversation: one short line, and its record under the details toggle.
     if (!visibleInConversation(event)) {
@@ -227,18 +227,13 @@ function drawFlow(past, flow, asked, events, reactions) {
       continue;
     }
     if (event.kind === "narration") {
-      // A line of the run told as a conversation (item 1976), drawn with "Messages only" alone and none beside the step's
-      // own words; it ends no batch of steps, which stay as they were with the steps shown.
-      if (!stepSaid) {
-        blocks.push({ told: narrationPhrase(event.data.tool, event.data.args ?? {}) });
-      }
+      // A call's line is the live line's alone (owner 2026-11-27): never one of the conversation's messages.
       continue;
     }
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
       // Only words drawn tell the step's calls: those the answer restates are not drawn here.
-      stepSaid = said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer);
-      if (stepSaid) {
+      if (said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer)) {
         batch = null;
         blocks.push({ say: said, step: event.data.step, progress: narrates(event.data.tool_calls ?? []) });
       }
@@ -277,6 +272,14 @@ function drawFlow(past, flow, asked, events, reactions) {
     } else if (event.kind === "dot_reaction") {
       reaction = event.data.reaction;
       reactedTo = [...blocks].reverse().find((block) => block.steer !== undefined) ?? null;
+    } else if (event.kind === POST_DRAFT_SETTLED) {
+      richCards.settle(event);
+    } else if (event.kind === "cards_shown") {
+      batch = null;
+      const node = richCards.show(event);
+      if (node !== null) {
+        blocks.push({ cards: node });
+      }
     } else if (event.kind === "page_shown") {
       // A page the run showed (`show_page`, item 193) stands where it came, in its frame, as on the run's own page.
       batch = null;
@@ -317,10 +320,10 @@ function drawFlow(past, flow, asked, events, reactions) {
     }
   }
   const nodes = blocks.map((block) =>
-    block.told !== undefined
-      ? el("div", { class: "turn-told say-narration", role: "article", "aria-label": t("outcome.update") }, prose(block.told))
-      : block.internal !== undefined
+    block.internal !== undefined
       ? internalRecord(block.internal)
+      : block.cards !== undefined
+      ? block.cards
       : block.page !== undefined
       ? pageCard(block.page.id, block.page.title)
       : block.picture !== undefined
@@ -456,7 +459,7 @@ function turn(past, editFromHereOf, known, signal, reactions) {
     answerMessage({ actorId: past.agent_id ?? "dot", status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null, reactions, runId: past.id });
   let answer = ended
     ? answerAs(past.status)
-    : el("div", { class: "note" }, icon("clock"), el("span", null, "This task is still going."), el("a", { class: "small", href }, "Open task"));
+    : el("div", { class: "note" }, icon("clock"), el("span", null, t("history.thisTaskIsStillGoing")), el("a", { class: "small", href }, t("history.openTask")));
   // Once the run's events are read: a run that stopped for what only the owner gives waits on them, and says what
   // (item 1061), where its stored status alone said it failed; the pages it read on the web go under its answer (item
   // 1184). Both go in where the answer may be above what is read, so its place is kept (item 708, as for the flow).
@@ -485,12 +488,14 @@ function turn(past, editFromHereOf, known, signal, reactions) {
   const asked = followsReaction(past) || past.source === WELCOME_SOURCE
     ? null
     : past.source === RESUME_SOURCE
-      ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, "Continued where the task above was cut off"))
+      ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, t("history.continuedWhereTheTaskAbove")))
       : past.source === BACKGROUND_SOURCE
         ? backgroundNote(past.goal)
         : past.source === WORK_ORDER_SOURCE
           ? workOrderNote(past.goal)
-          : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
+          : ROUTINE_SOURCES.has(past.source)
+            ? routineMessage({ goal: past.goal, threadId: past.thread_id })
+            : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
   const element = el("section", { class: ended ? "turn" : "turn turn-working" }, asked, ops, answer);
   if (ended) {
     if (known !== undefined) {
@@ -522,19 +527,19 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, rea
   const left = earlier.length - shown.length;
   // A chat of more runs than the page reads says so, with no count and no first run (item 559): it knows neither.
   const note = cut
-    ? el("div", { class: "note" }, icon("list"), el("span", null, `Earlier tasks of this chat are not shown: the page reads its latest ${THREAD_LIMIT}.`))
+    ? el("div", { class: "note" }, icon("list"), el("span", null, t("history.earlierTasksOfThisChat", { THREAD_LIMIT })))
     : left === 0
       ? null
       : el(
           "div",
           { class: "note" },
           icon("list"),
-          el("span", null, `${plural(left, "earlier task is", "earlier tasks are")} not shown.`),
-          el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first task"),
+          el("span", null, t("history.partNotShown", { part: tCount(left, "history.countEarlierTaskIs", "history.countEarlierTasksAre") })),
+          el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, t("history.openTheFirstTask")),
         );
   const history = el(
     "div",
-    { class: "history", role: "region", "aria-label": "Earlier in this conversation" },
+    { class: "history", role: "region", "aria-label": t("history.earlierInThisConversation") },
     note,
     shown.map((past) => turn(past, editFromHereOf, read.get(past.id), signal, reactions)),
   );

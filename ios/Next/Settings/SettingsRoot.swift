@@ -148,7 +148,7 @@ struct SettingsSheet: View {
         let found: [SettingsEntry] = searchSettings(query, in: index.map(\.0))
         return Group {
             if found.isEmpty {
-                ContentUnavailableView.search(text: query).background(Tone.ground)
+                SearchEmptyState(query: query).background(Tone.ground)
             } else {
                 SettingsScroll(title: String(localized: "Settings", comment: "Title of the settings tab")) {
                     GroupedSection(header: nil, footer: nil) {

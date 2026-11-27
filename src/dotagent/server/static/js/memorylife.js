@@ -5,10 +5,11 @@
 // [memory] trash_days and Restore brings it back.
 
 import { api } from "./api.js";
-import { ago, clip, dateTime, dateTimeFull, el, plural } from "./dom.js";
+import { ago, clip, dateTime, dateTimeFull, el, } from "./dom.js";
 import { icon } from "./icons.js";
 import { setCard, setSection } from "./panels.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
+import { t, tCount } from "./i18n.js";
 
 const QUOTE_CHARS = 160;
 const PREVIEW_CHARS = 420;
@@ -18,10 +19,10 @@ const MOST_IDS = 200;
 // How the notes can be listed (MemoryOrder in store/models.py): by when they were changed, by when a run was last handed
 // them, by how often, and the least used first (the notes no run was handed come first).
 const ORDERS = [
-  { id: "changed", label: "Changed last" },
-  { id: "used", label: "Used last" },
-  { id: "most_used", label: "Most used" },
-  { id: "least_used", label: "Least used" },
+  { id: "changed", label: t("memorylife.changedLast") },
+  { id: "used", label: t("memorylife.usedLast") },
+  { id: "most_used", label: t("memorylife.mostUsed") },
+  { id: "least_used", label: t("memorylife.leastUsed") },
 ];
 
 /**
@@ -32,10 +33,10 @@ const ORDERS = [
  * @param {(id: string) => void} onChange
  */
 export function orderControl(selected, onChange) {
-  const select = el("select", { class: "select sm", "aria-label": "Sort the notes by" }, ORDERS.map((order) => el("option", { value: order.id }, order.label)));
+  const select = el("select", { class: "select sm", "aria-label": t("memorylife.sortTheNotesBy") }, ORDERS.map((order) => el("option", { value: order.id }, order.label)));
   select.value = selected;
   select.addEventListener("change", () => onChange(select.value));
-  const element = el("label", { class: "note-order" }, el("span", { class: "note-order-label" }, "Sort by"), select);
+  const element = el("label", { class: "note-order" }, el("span", { class: "note-order-label" }, t("memorylife.sortBy")), select);
   return {
     element,
     value: () => select.value,
@@ -48,7 +49,7 @@ export function orderControl(selected, onChange) {
 
 /** How often runs were handed a note and when last, in words: "used 3 times, last 2d ago" or "never used". */
 function usedWords(record) {
-  return record.used_count > 0 ? `used ${plural(record.used_count, "time", "times")}, last ${ago(record.last_used_at)}` : "never used";
+  return record.used_count > 0 ? t("memorylife.usedPartLastAgo", { part: tCount(record.used_count, "memorylife.countTime", "memorylife.countTimes"), ago: ago(record.last_used_at) }) : t("memorylife.neverUsed");
 }
 
 /**
@@ -85,9 +86,9 @@ export function proposedSection(hooks) {
   let view = null;
   const count = el("span", { class: "life-count" });
   const rows = el("div", { class: "note-rows note-proposed-rows" });
-  const forgetAll = el("button", { class: "btn danger sm", type: "button" }, icon("trash"), "Forget all");
+  const forgetAll = el("button", { class: "btn danger sm", type: "button" }, icon("trash"), t("memorylife.forgetAll"));
   const section = setSection({
-    title: ["Proposed to forget", count],
+    title: [t("memorylife.proposedToForget"), count],
     lead: "",
     actions: forgetAll,
     body: setCard(rows),
@@ -112,21 +113,21 @@ export function proposedSection(hooks) {
         toast("ok", words(done));
       }
       if (skipped > 0) {
-        toast("error", `${plural(skipped, "note was", "notes were")} no longer proposed, and left as they are.`);
+        toast("error", t("memorylife.partNoLongerProposedAnd", { part: tCount(skipped, "memorylife.countNoteWas", "memorylife.countNotesWere") }));
       }
       await load();
       hooks.onDecided();
     }
   }
 
-  const forgetWords = (days) => (done) => `Forgot ${plural(done, "note", "notes")}; ${done === 1 ? "it waits" : "they wait"} ${plural(days, "day", "days")} in the trash, where Restore brings ${done === 1 ? "it" : "them"} back.`;
-  const keepWords = (done) => `Kept ${plural(done, "note", "notes")}: ${done === 1 ? "it wakes" : "they wake"}, and ${done === 1 ? "is" : "are"} proposed again only after as long a rest.`;
+  const forgetWords = (days) => (done) => (done === 1 ? t("memorylife.forgotOne", { days: tCount(days, "memorylife.countDay", "memorylife.countDays") }) : t("memorylife.forgotMany", { count: done, days: tCount(days, "memorylife.countDay", "memorylife.countDays") }));
+  const keepWords = (done) => (done === 1 ? t("memorylife.keptOne") : t("memorylife.keptMany", { count: done }));
 
   async function forgetOne(item) {
     const confirmed = await confirmDialog({
-      title: "Forget this note?",
-      message: `${clip(item.record.content, QUOTE_CHARS)} It goes to the trash and waits ${plural(view.trash_days, "day", "days")}; Restore brings it back.`,
-      confirmLabel: "Forget",
+      title: t("memorylife.forgetThisNote"),
+      message: t("memorylife.clipItGoesToThe", { clip: clip(item.record.content, QUOTE_CHARS), part: tCount(view.trash_days, "memorylife.countDay", "memorylife.countDays") }),
+      confirmLabel: t("memorylife.forget"),
       danger: true,
       focusCancel: true,
     });
@@ -138,9 +139,9 @@ export function proposedSection(hooks) {
   async function forgetEvery() {
     const ids = view.items.map((item) => item.record.id);
     const confirmed = await confirmDialog({
-      title: `Forget ${plural(ids.length, "note", "notes")}?`,
-      message: `The ${ids.length === 1 ? "note" : "notes"} listed under Proposed to forget go to the trash and wait ${plural(view.trash_days, "day", "days")}; Restore brings one back. Nothing is deleted for good before then.`,
-      confirmLabel: `Forget ${ids.length === 1 ? "it" : "all"}`,
+      title: t("memorylife.forgetPart", { part: tCount(ids.length, "memorylife.countNote", "memorylife.countNotes") }),
+      message: t(ids.length === 1 ? "memorylife.forgetAllOneMessage" : "memorylife.forgetAllManyMessage", { days: tCount(view.trash_days, "memorylife.countDay", "memorylife.countDays") }),
+      confirmLabel: ids.length === 1 ? t("memorylife.forgetIt") : t("memorylife.forgetAllLabel"),
       danger: true,
       focusCancel: true,
     });
@@ -157,22 +158,22 @@ export function proposedSection(hooks) {
       return;
     }
     count.textContent = String(view.items.length);
-    forgetAll.lastChild.textContent = view.items.length === 1 ? "Forget it" : `Forget all ${view.items.length}`;
+    forgetAll.lastChild.textContent = view.items.length === 1 ? t("memorylife.forgetIt") : t("memorylife.forgetAllLength", { length: view.items.length });
     lead.querySelector(".set-section-lead")?.remove();
     lead.append(
       el(
         "p",
         { class: "set-section-lead" },
-        `These notes rested for ${plural(view.forget_after_days, "day", "days")}: no task was handed them. Nothing is forgotten until you press Forget; a forgotten note waits ${plural(view.trash_days, "day", "days")} in the trash.`,
+        t("memorylife.theseNotesRestedForPart", { part: tCount(view.forget_after_days, "memorylife.countDay", "memorylife.countDays"), part2: tCount(view.trash_days, "memorylife.countDay", "memorylife.countDays") }),
       ),
     );
     rows.replaceChildren(
       ...view.items.map((item) => {
-        const keep = el("button", { class: "btn ghost sm", type: "button", title: "Keep this note: it wakes and is proposed again only after as long a rest" }, icon("check"), "Keep");
+        const keep = el("button", { class: "btn ghost sm", type: "button", title: t("memorylife.keepThisNoteItWakes") }, icon("check"), t("memorylife.keep"));
         keep.addEventListener("click", () => attempt(() => decide("keep", [item.record.id], keepWords)));
-        const forget = el("button", { class: "btn ghost sm", type: "button", title: "Forget this note: it goes to the trash" }, icon("trash"), "Forget");
+        const forget = el("button", { class: "btn ghost sm", type: "button", title: t("memorylife.forgetThisNoteItGoes") }, icon("trash"), t("memorylife.forget"));
         forget.addEventListener("click", () => attempt(() => forgetOne(item)));
-        const rested = el("span", { title: dateTimeFull(item.rested_since) }, `Resting since ${dateTime(item.rested_since)}`);
+        const rested = el("span", { title: dateTimeFull(item.rested_since) }, t("memorylife.restingSinceDatetime", { dateTime: dateTime(item.rested_since) }));
         return decisionRow(item.record, hooks.noteText, [rested, usedWords(item.record)], [keep, forget]);
       }),
     );
@@ -200,8 +201,8 @@ export function changesSection(hooks) {
   const count = el("span", { class: "life-count" });
   const rows = el("div", { class: "note-rows note-proposed-rows" });
   const section = setSection({
-    title: ["Changes tasks proposed", count],
-    lead: "These are your notes: tasks are handed them as they stand, and a task's change of one waits here for you.",
+    title: [t("memorylife.changesTasksProposed"), count],
+    lead: t("memorylife.theseAreYourNotesTasks"),
     body: setCard(rows),
   });
   section.classList.add("notes-changes");
@@ -227,23 +228,23 @@ export function changesSection(hooks) {
     rows.replaceChildren(
       ...notes.map((record) => {
         const change = record.proposed;
-        const use = el("button", { class: "btn ghost sm", type: "button", title: "Make the proposed words your note's: tasks are handed them from now on" }, icon("check"), "Use it");
-        use.addEventListener("click", () => attempt(() => decide(record, "take", "The note now says what the task proposed.")));
-        const drop = el("button", { class: "btn ghost sm", type: "button", title: "Drop the proposed words: the note stays as it is" }, icon("x"), "Drop");
-        drop.addEventListener("click", () => attempt(() => decide(record, "drop", "Dropped the proposed change; the note stays.")));
+        const use = el("button", { class: "btn ghost sm", type: "button", title: t("memorylife.makeTheProposedWordsYour") }, icon("check"), t("memorylife.useIt"));
+        use.addEventListener("click", () => attempt(() => decide(record, "take", t("memorylife.theNoteNowSaysWhat"))));
+        const drop = el("button", { class: "btn ghost sm", type: "button", title: t("memorylife.dropTheProposedWordsThe") }, icon("x"), t("memorylife.drop"));
+        drop.addEventListener("click", () => attempt(() => decide(record, "drop", t("memorylife.droppedTheProposedChangeThe"))));
         const outside = change.tainted
-          ? el("span", { class: "badge b-warn", title: "The task that proposed it had read content other people can write." }, icon("alert"), "From outside content")
+          ? el("span", { class: "badge b-warn", title: t("memorylife.theTaskThatProposedIt") }, icon("alert"), t("memorylife.fromOutsideContent"))
           : null;
-        const proposedAt = el("span", { title: dateTimeFull(change.at) }, ["Proposed ", ago(change.at), " by ", el("a", { href: `#/runs/${change.run_id}` }, "a task")]);
+        const proposedAt = el("span", { title: dateTimeFull(change.at) }, [t("memorylife.proposed"), ago(change.at), t("memorylife.by"), el("a", { href: `#/runs/${change.run_id}` }, t("memorylife.aTask"))]);
         return el(
           "div",
           { class: "note-row", dataset: { decided: record.id } },
           el(
             "div",
             { class: "note-main" },
-            el("div", { class: "muted" }, "Now"),
+            el("div", { class: "muted" }, t("memorylife.now")),
             hooks.noteText(record.content),
-            el("div", { class: "muted" }, "Proposed"),
+            el("div", { class: "muted" }, t("memorylife.proposed2")),
             // Whole: Use it makes these very words the owner's, so none of them may stay out of sight.
             hooks.noteText(change.content),
             el("div", { class: "note-meta" }, change.tags.map((tag) => el("span", { class: "chip" }, tag)), outside, el("span", { class: "note-when" }, proposedAt)),
@@ -265,11 +266,11 @@ export function changesSection(hooks) {
 
 // Who proposed a note or lesson that waits (item 1865), by the origin of its task (item 1864).
 const WAITING_FROM = {
-  schedule: "a scheduled task",
-  watcher: "a watcher's task",
-  helper: "a helper task",
-  initiative: "Dot on its own",
-  chat: "a task in a chat",
+  schedule: t("memorylife.aScheduledTask"),
+  watcher: t("memorylife.aWatcherSTask"),
+  helper: t("memorylife.aHelperTask"),
+  initiative: t("memorylife.dotOnItsOwn"),
+  chat: t("memorylife.aTaskInAChat"),
 };
 
 /**
@@ -282,8 +283,8 @@ export function waitingSection(hooks) {
   const count = el("span", { class: "life-count" });
   const rows = el("div", { class: "note-rows note-proposed-rows" });
   const section = setSection({
-    title: ["Notes tasks proposed", count],
-    lead: "A scheduled task, a watcher's task or a helper saves nothing on its own: what it would remember waits here, and no task is handed it until you save it.",
+    title: [t("memorylife.notesTasksProposed"), count],
+    lead: t("memorylife.aScheduledTaskAWatcher"),
     body: setCard(rows),
   });
   section.classList.add("notes-waiting");
@@ -313,18 +314,18 @@ export function waitingSection(hooks) {
     count.textContent = String(waiting.length);
     rows.replaceChildren(
       ...waiting.map((item) => {
-        const save = el("button", { class: "btn ghost sm", type: "button", title: "Save it: tasks are handed it from now on" }, icon("check"), "Save");
-        save.addEventListener("click", () => attempt(() => decide(item, "save", item.kind === "note" ? "Saved the note." : "Saved the lesson.")));
-        const dismiss = el("button", { class: "btn ghost sm", type: "button", title: "Dismiss it: it is not saved" }, icon("x"), "Dismiss");
-        dismiss.addEventListener("click", () => attempt(() => decide(item, "dismiss", "Dismissed.")));
+        const save = el("button", { class: "btn ghost sm", type: "button", title: t("memorylife.saveItTasksAreHanded") }, icon("check"), t("memorylife.save"));
+        save.addEventListener("click", () => attempt(() => decide(item, "save", item.kind === "note" ? t("memorylife.savedTheNote") : t("memorylife.savedTheLesson"))));
+        const dismiss = el("button", { class: "btn ghost sm", type: "button", title: t("memorylife.dismissItItIsNot") }, icon("x"), t("memorylife.dismiss"));
+        dismiss.addEventListener("click", () => attempt(() => decide(item, "dismiss", t("memorylife.dismissed"))));
         const from = el("span", { title: dateTimeFull(item.at) }, [
-          item.kind === "note" ? "Note proposed " : "Lesson proposed ",
+          item.kind === "note" ? t("memorylife.noteProposed") : t("memorylife.lessonProposed"),
           ago(item.at),
-          " by ",
-          el("a", { href: `#/runs/${item.run_id}`, title: item.goal }, WAITING_FROM[item.origin] ?? "a task"),
+          t("memorylife.by"),
+          el("a", { href: `#/runs/${item.run_id}`, title: item.goal }, WAITING_FROM[item.origin] ?? t("memorylife.aTask")),
         ]);
         const outside = item.tainted
-          ? el("span", { class: "badge b-warn", title: "The task that proposed it had read content other people can write." }, icon("alert"), "From outside content")
+          ? el("span", { class: "badge b-warn", title: t("memorylife.theTaskThatProposedIt") }, icon("alert"), t("memorylife.fromOutsideContent"))
           : null;
         return el(
           "div",
@@ -355,7 +356,7 @@ export function trashSection(hooks) {
   let view = null;
   const count = el("span", { class: "life-count" });
   const rows = el("div", { class: "note-rows note-proposed-rows" });
-  const section = setSection({ title: ["Forgotten notes", count], lead: "", body: setCard(rows) });
+  const section = setSection({ title: [t("memorylife.forgottenNotes"), count], lead: "", body: setCard(rows) });
   section.classList.add("notes-trash");
   section.dataset.trash = "";
   section.hidden = true;
@@ -363,16 +364,16 @@ export function trashSection(hooks) {
 
   async function restore(item) {
     await api.post(`/memories/trash/${encodeURIComponent(item.record.id)}/restore`, {});
-    toast("ok", "The note is back, awake.");
+    toast("ok", t("memorylife.theNoteIsBackAwake"));
     await load();
     hooks.onDecided();
   }
 
   async function deleteForGood(item) {
     const confirmed = await confirmDialog({
-      title: "Delete this note for good?",
-      message: `${clip(item.record.content, QUOTE_CHARS)} It cannot come back.`,
-      confirmLabel: "Delete for good",
+      title: t("memorylife.deleteThisNoteForGood"),
+      message: t("memorylife.clipItCannotComeBack", { clip: clip(item.record.content, QUOTE_CHARS) }),
+      confirmLabel: t("memorylife.deleteForGood"),
       danger: true,
       focusCancel: true,
     });
@@ -380,7 +381,7 @@ export function trashSection(hooks) {
       return;
     }
     view = await api.del(`/memories/trash/${encodeURIComponent(item.record.id)}`);
-    toast("ok", "Deleted for good.");
+    toast("ok", t("memorylife.deletedForGood"));
     paint();
   }
 
@@ -391,16 +392,16 @@ export function trashSection(hooks) {
     }
     count.textContent = String(view.total);
     lead.querySelector(".set-section-lead")?.remove();
-    const capped = view.items.length < view.total ? ` Showing the newest ${view.items.length}.` : "";
-    lead.append(el("p", { class: "set-section-lead" }, `A note you forgot waits ${plural(view.trash_days, "day", "days")} here, then the nightly reflection deletes it for good.${capped}`));
+    const capped = view.items.length < view.total ? t("memorylife.showingTheNewestLength", { length: view.items.length }) : "";
+    lead.append(el("p", { class: "set-section-lead" }, t("memorylife.aNoteYouForgotWaits", { part: tCount(view.trash_days, "memorylife.countDay", "memorylife.countDays"), capped })));
     rows.replaceChildren(
       ...view.items.map((item) => {
-        const back = el("button", { class: "btn ghost sm", type: "button", title: "Bring this note back, awake" }, icon("undo"), "Restore");
+        const back = el("button", { class: "btn ghost sm", type: "button", title: t("memorylife.bringThisNoteBackAwake") }, icon("undo"), t("memorylife.restore"));
         back.addEventListener("click", () => attempt(() => restore(item)));
-        const gone = el("button", { class: "btn ghost sm", type: "button", title: "Delete this note for good, now" }, icon("trash"), "Delete for good");
+        const gone = el("button", { class: "btn ghost sm", type: "button", title: t("memorylife.deleteThisNoteForGood2") }, icon("trash"), t("memorylife.deleteForGood"));
         gone.addEventListener("click", () => attempt(() => deleteForGood(item)));
-        const forgotten = el("span", { title: dateTimeFull(item.trashed_at) }, `Forgotten ${ago(item.trashed_at)}`);
-        const until = el("span", { title: dateTimeFull(item.purged_at) }, `Deleted for good ${dateTime(item.purged_at)}`);
+        const forgotten = el("span", { title: dateTimeFull(item.trashed_at) }, t("memorylife.forgottenAgo", { ago: ago(item.trashed_at) }));
+        const until = el("span", { title: dateTimeFull(item.purged_at) }, t("memorylife.deletedForGoodDatetime", { dateTime: dateTime(item.purged_at) }));
         return decisionRow(item.record, hooks.noteText, [forgotten, until], [back, gone]);
       }),
     );

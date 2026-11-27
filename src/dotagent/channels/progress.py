@@ -69,6 +69,7 @@ _PLAIN: frozenset[str] = frozenset(
         "schedule_delete",
         "notify",
         "show_page",
+        "show_cards",
         "draft_message",
         "consult",
         "message_agent",

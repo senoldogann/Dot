@@ -2,21 +2,25 @@
 own files.
 
 The shell guard (:mod:`dotagent.policy.shell`) reads a line, not what the programs it starts do: a script a run writes
-and then runs, or code that builds a path, reaches whatever the user's account reaches. So outside yolo the processes of
-a run (a shell command, a terminal session, an AppleScript and what it runs, the search tools' ripgrep) start under
-``sandbox-exec`` with a profile that allows everything but four things: reading or changing Dot's own files (its keys,
-token, settings, database, browser profiles and journals) and the stores no program has any use for (``[policy]
-sealed_paths``: the data of the user's browsers, Mail and Messages, item 531), changing what it loads and runs or its
-emergency stop, changing anything in Dot's home or its logs but the run's workspace (item 676: the daemon opens and
-writes files there with the owner's rights, so a link a command left in their place would have it write elsewhere), and
-renaming or removing a folder above any of them, which would move them away from the paths the profile names. The search
-tools may not read the user's protected locations either: a search has no reason to, while the programs a shell runs
-(ssh, git, a cloud CLI) read their own credentials there, so those stay open to a command and are the guard's to keep.
-macOS refuses such a call with "Operation not permitted", whatever path, symbolic link or letter case names the file. A
-hard link is the exception: the profile matches the path a file has, so a hard link that a process outside the sandbox
-(a yolo run, a run while ``[shell] sandbox = false``) made to one of them earlier is another path to it, which the
-profile does not name; the daemon says so in its log when it starts (:func:`hard_linked`, item 561). ``[shell] sandbox =
-false`` starts them without it, and Settings › Rules switches it while the daemon runs (:class:`SwitchedSandbox`).
+and then runs, or code that builds a path, reaches whatever the user's account reaches. So the processes of a run (a
+shell command, a terminal session, an AppleScript and what it runs, the search tools' ripgrep) start under
+``sandbox-exec``: those of a run the owner started outside yolo, and those of a run nobody started (a schedule's, a
+watcher's, a hook's, Dot's own initiative's) in every mode (item 2016, ``[shell] sandbox_unattended``,
+:meth:`SwitchedSandbox.for_run`). Its profile allows everything but four things: reading or changing Dot's own files
+(its keys, token, settings, database, browser profiles and journals) and the stores no program has any use for
+(``[policy] sealed_paths``: the data of the user's browsers, Mail and Messages, item 531), changing what it loads and
+runs or its emergency stop, changing anything in Dot's home or its logs but the run's workspace (item 676: the daemon
+opens and writes files there with the owner's rights, so a link a command left in their place would have it write
+elsewhere), and renaming or removing a folder above any of them, which would move them away from the paths the profile
+names. The search tools may not read the user's protected locations either: a search has no reason to, while the
+programs a shell runs (ssh, git, a cloud CLI) read their own credentials there, so those stay open to a command and are
+the guard's to keep. macOS refuses such a call with "Operation not permitted", whatever path, symbolic link or letter
+case names the file. A hard link is the exception: the profile matches the path a file has, so a hard link that a
+process outside the sandbox (a yolo run, a run while ``[shell] sandbox = false``) made to one of them earlier is another
+path to it, which the profile does not name; the daemon says so in its log when it starts (:func:`hard_linked`, item
+561). ``[shell] sandbox = false`` starts the processes of the owner's runs without it, and Settings › Rules switches it
+while the daemon runs (:class:`SwitchedSandbox`); ``[shell] sandbox_unattended = false`` has the runs nobody started
+follow that switch and yolo as the owner's do.
 
 A process that has another program act for it would act outside the sandbox, so the profile refuses that too:
 opening an application, a document or an address through Launch Services (``open``, a program's own call), starting the
@@ -62,6 +66,7 @@ from pathlib import Path
 from dotagent.core.errors import ConfigError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
+from dotagent.policy.types import ApprovalMode
 
 SANDBOX_EXEC: str = "/usr/bin/sandbox-exec"
 _CHECKED_PROGRAM: str = "/usr/bin/true"
@@ -242,27 +247,46 @@ async def check_sandbox(sandbox: Sandbox) -> None:
 
 
 class SwitchedSandbox:
-    """Where the processes of a run start outside yolo, as ``[shell] sandbox`` said at the daemon's start or as the
-    owner switched it since in Settings › Rules (item 262). The sandbox is built at start whatever the setting, and
-    checked to start each time it is switched on, so that a Mac without ``sandbox-exec`` refuses the switch rather
-    than every process of a run."""
+    """Where the processes of a run start. A run the owner started: outside yolo, in the sandbox while ``[shell]
+    sandbox`` says so at the daemon's start or as the owner switched it since in Settings › Rules (item 262). A run
+    nobody started (a schedule's, a watcher's, a hook's, Dot's own initiative: item 2016): in the sandbox in every
+    mode, yolo and free mode too, whatever that switch says, while ``[shell] sandbox_unattended`` holds
+    (``unattended``). The sandbox is built at start whatever the settings, and checked to start each time it is
+    switched on, so that a Mac without ``sandbox-exec`` refuses the switch rather than every process of a run."""
 
-    def __init__(self, built: Sandbox, on: bool) -> None:
+    def __init__(self, built: Sandbox, on: bool, unattended: bool) -> None:
         self._built: Sandbox = built
         self._on: bool = on
+        self._unattended: bool = unattended
 
     @property
     def on(self) -> bool:
         return self._on
 
     def current(self) -> Sandbox:
-        """The sandbox a process of a run outside yolo starts in now: the built one, or :data:`UNSANDBOXED` while
-        off."""
+        """The sandbox a process of a run the owner started outside yolo starts in now: the built one, or
+        :data:`UNSANDBOXED` while off."""
         return self._built if self._on else UNSANDBOXED
 
+    def unattended(self) -> Sandbox:
+        """The sandbox what nobody watches starts in (item 2016): the commands of a schedule's or a watcher's check
+        (:func:`dotagent.scheduler.precheck.run_check`, :func:`dotagent.proactive.looks.look_check`). The built one
+        while ``[shell] sandbox_unattended`` holds, whatever the owner's switch says; else as :meth:`current`."""
+        return self._built if self._unattended else self.current()
+
+    def for_run(self, approvals: ApprovalMode, unattended: bool) -> Sandbox:
+        """The sandbox a process of a run in the approval mode ``approvals`` starts in: one nobody started
+        (``unattended``, decided by Dot as the run starts, never by a model) in the built one in every mode while
+        ``[shell] sandbox_unattended`` holds; else a yolo run's without it, whose lines the guard lets change Dot's own
+        files as well, and any other in :meth:`current`."""
+        if unattended and self._unattended:
+            return self._built
+        return UNSANDBOXED if approvals == "yolo" else self.current()
+
     async def switch(self, on: bool) -> None:
-        """Start the processes of runs outside yolo in the sandbox, or without it, from the next one on; a process or a
-        terminal session already started keeps where it started. Switching it on starts its profiles first
+        """Start the processes of the owner's runs outside yolo in the sandbox, or without it, from the next one on; a
+        process or a terminal session already started keeps where it started, and the runs nobody started keep the
+        sandbox while ``[shell] sandbox_unattended`` holds. Switching it on starts its profiles first
         (:func:`check_sandbox`): when they do not start, nothing changes and the error says why."""
         if on:
             await check_sandbox(self._built)

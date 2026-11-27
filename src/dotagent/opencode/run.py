@@ -1039,9 +1039,10 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
         await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(agent.opening.files)}, True)
     ref: ModelRef = parse_model_ref(run.model)
     provider: OpenCodeProvider = await _server_of(runtime, ref)
-    # Outside yolo the agent works in the sandbox of the run's commands, a server of its own (item 677).
+    # The agent works in the sandbox of the run's commands, a server of its own (item 677): outside yolo, and in every
+    # mode for a run nobody started (item 2016).
     server: OpenCodeServer = provider.server.confined(
-        () if run.approvals == "yolo" else runtime.sandbox.current().commands
+        runtime.sandbox.for_run(run.approvals, agent.gate.unattended).commands
     )
     info: ModelInfo = await provider.model_info(ref.model)
     variant: str | None = run.effort if run.effort is not None and run.effort in info.efforts else None

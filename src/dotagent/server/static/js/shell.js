@@ -36,15 +36,15 @@ function buildIndicators() {
     "div",
     { class: "banner", hidden: true, role: "alert" },
     icon("alert"),
-    el("span", { class: "grow" }, "Emergency stop is engaged. Desktop control is blocked until you release it."),
-    el("button", { class: "btn sm", type: "button", onclick: () => attempt(releaseFailsafe) }, "Release"),
+    el("span", { class: "grow" }, t("shell.emergencyStopIsEngagedDesktop")),
+    el("button", { class: "btn sm", type: "button", onclick: () => attempt(releaseFailsafe) }, t("shell.release")),
   );
   const updated = el(
     "div",
     { class: "banner update", hidden: true, role: "status" },
     icon("refresh"),
-    el("span", { class: "grow" }, "Dot was updated since this page was loaded. Load it again to use the new version."),
-    el("button", { class: "btn sm", type: "button", onclick: () => location.reload() }, "Load again"),
+    el("span", { class: "grow" }, t("shell.dotWasUpdatedSinceThis")),
+    el("button", { class: "btn sm", type: "button", onclick: () => location.reload() }, t("shell.loadAgain")),
   );
   return {
     pills: [waiting, connection],
@@ -70,7 +70,7 @@ function buildIndicators() {
         showConnection(false);
       }
       showConnection(snapshot.stream !== "live");
-      connection.title = `Connection to Dot: ${STREAM_LABEL[snapshot.stream]}`;
+      connection.title = t("shell.connectionToDotValue", { value: STREAM_LABEL[snapshot.stream] });
       banner.hidden = snapshot.status === null || !snapshot.status.failsafe_engaged;
       updated.hidden = !snapshot.outdated;
     },
@@ -178,7 +178,7 @@ export function buildShell({ homeRoute }) {
   // pages' own links back are for a wider window.
   function paintOpener() {
     menu.replaceChildren(icon(PHONE.matches ? "chevronLeft" : "panelLeft"));
-    const label = backs() ? "Back" : "Show sidebar";
+    const label = backs() ? t("shell.back") : t("shell.showSidebar");
     menu.title = label;
     menu.setAttribute("aria-label", label);
     // As Back the button opens no panel: it names none and has no open state.
@@ -273,7 +273,7 @@ export function buildShell({ homeRoute }) {
   function cycleScheme() {
     const id = nextScheme();
     chooseScheme(id);
-    toast("ok", `Colour scheme: ${SCHEMES.find((scheme) => scheme.id === id).label}`);
+    toast("ok", t("shell.colourSchemeLabel", { label: SCHEMES.find((scheme) => scheme.id === id).label }));
   }
 
   // A page that knows where its way back leads says it once it is drawn (a run's page, item 401).

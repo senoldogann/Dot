@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from chat_settings import pick_model
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -149,22 +150,6 @@ def _pill(page: Page, name: str) -> Locator:
     return page.locator(f".composer-pill[data-pill='{name}']")
 
 
-def _menu(page: Page, label: str) -> Locator:
-    return page.locator(f".composer .composer-popover[aria-label='{label}']")
-
-
-async def _pick(page: Page, pill: str, menu: str, option: str) -> None:
-    await _pill(page, pill).click()
-    await _menu(page, menu).get_by_role("option", name=option).first.click()
-    await expect(_menu(page, menu)).to_be_hidden()
-
-
-async def _keep_going(page: Page) -> Locator:
-    """Keep going's switch, in the Options menu opened (its Execution group)."""
-    await _pill(page, "options").click()
-    return _menu(page, "Options").get_by_role("switch", name="Keep going until done")
-
-
 async def _away_and_back(page: Page, address: str) -> None:
     """To another page, and back to the home."""
     await page.goto(f"{address}/#/agents")
@@ -195,17 +180,10 @@ async def _old_chat(runtime: Runtime, served: str) -> RunRecord:
     return await _run_of(runtime, made.json()["id"])
 
 
-async def _choose(page: Page, phone: bool, name: str) -> None:
-    """Pick the model `name` in the box: the pill's menu, or on a phone the chat's settings sheet."""
-    if not phone:
-        await _pick(page, "model", "Model", name)
-        return
+async def _choose(page: Page, name: str) -> None:
+    """Pick the model `name` in the box: its pill opens the chat's settings on every width (item 2015)."""
     await page.locator(GOAL).click()
-    await _pill(page, "model").click()
-    sheet: Locator = page.get_by_role("dialog", name="Chat settings")
-    await sheet.get_by_role("option", name=name).first.click()
-    await page.keyboard.press("Escape")
-    await expect(sheet).to_be_hidden()
+    await pick_model(page, page, name)
     await expect(_pill(page, "model")).to_contain_text(name)
 
 
@@ -238,11 +216,15 @@ async def test_a_message_from_the_home_starts_a_new_chat_on_the_model_picked_and
         try:
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
-            await _choose(page, phone, "deep")
+            await _choose(page, "deep")
             await page.locator(GOAL).fill(WORDS)
             await page.get_by_role("button", name="Start").click()
             await page.wait_for_url(re.compile(r"#/runs/[^/]+$"))
             run_id: str = page.url.rpartition("/")[2]
+            # The first send opens the one chat page (item 2025): the message in it and the chat's own composer, as
+            # any chat shows them, not a page of its own for a chat that starts.
+            await expect(page.get_by_text(WORDS).first).to_be_visible()
+            await expect(page.locator(".dock .composer")).to_be_visible()
             assert errors == []
         finally:
             await browser.close()
@@ -262,7 +244,7 @@ async def test_a_chat_the_owner_opened_is_gone_on_in_with_the_model_picked_there
             await page.goto(f"{served}/#/runs/{old.id}")
             box: Locator = page.get_by_role("textbox", name="Message for Dot")
             await expect(box).to_be_visible()
-            await _pick(page, "model", "Model", "deep")
+            await pick_model(page, page, "deep")
             await box.fill(WORDS)
             await page.get_by_role("button", name="Follow up").click()
             await page.wait_for_url(re.compile(r"#/runs/(?!" + old.id + r")[^/]+$"))

@@ -1,3 +1,4 @@
+import AVFoundation
 import DotEngine
 import Foundation
 import Observation
@@ -157,7 +158,10 @@ final class AppModel {
         parts.outbox = outbox
         parts.accepted = accepted
         parts.online = online
-        return parts.pending(in: thread)
+        // A chat this phone started and the daemon has not named yet is shown by its outbox key (item 2025): its first
+        // message is the new chat's own item of the outbox.
+        let starting: [PendingMessage] = startingChats[thread] == nil ? [] : parts.pendingChats.filter { $0.key == thread }
+        return starting + parts.pending(in: thread)
     }
 
     /// New chats not yet in the list, from the outbox and the link.
@@ -194,7 +198,8 @@ final class AppModel {
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
-    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
+    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849). Only these show
+    /// as a starting chat (item 2025); a key left in the outbox from an earlier launch is not one of them.
     var startingChats: [String: String] = [:]
 
     /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
@@ -206,11 +211,26 @@ final class AppModel {
     var stepsOverrides: [String: Bool] = (UserDefaults.standard.dictionary(forKey: "stepsOverrides") as? [String: Bool]) ?? [:] {
         didSet { UserDefaults.standard.set(stepsOverrides, forKey: "stepsOverrides") }
     }
+    /// The chat that started each helper's chat this phone has seen listed, by the helper's chat: a helper's chat shows
+    /// its steps as its parent does unless it chose itself (`showsSteps(of:everywhere:)`). Kept in memory: a helper's chat
+    /// is opened from its parent's, which lists it first.
+    private(set) var helperParents: [String: String] = [:]
+
+    /// Notes that `helpers` work for `parent`; a helper already known is not written again (no redraw for nothing).
+    func noteHelpers(_ helpers: [String], of parent: String) {
+        for helper in helpers where helper != parent && helperParents[helper] != parent { helperParents[helper] = parent }
+    }
+
+    /// Whether `thread` shows its steps: its own choice, else its parent chat's, else Settings › Chat's (item 1915).
+    func showsSteps(of thread: String, everywhere: Bool) -> Bool {
+        DotEngine.showsSteps(of: thread, overrides: stepsOverrides, parents: helperParents, everywhere: everywhere)
+    }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
     }
     @ObservationIgnored let images: NSCache<NSString, UIImage> = NSCache()
+    @ObservationIgnored private let videoPreviews: NSCache<NSString, VideoPreviewBox> = NSCache()
     /// The app's own performance record, sent to the paired Mac (item 1926).
     @ObservationIgnored let perf: PerfReporter = PerfReporter(file: PerfReporter.defaultFile)
     /// Debug builds only: the time each probe message was sent, by its client key (`LatencyProbe`).
@@ -549,14 +569,56 @@ extension AppModel {
         }
     }
 
-    func actions(of run: String) async -> RunActions? {
+    /// The picture of an image a message carried, kept in memory for the session (item 1992).
+    func attachmentPicture(_ id: String) async -> UIImage? {
+        let key: NSString = "att:\(id)" as NSString
+        if let held: UIImage = images.object(forKey: key) { return held }
         guard let engine else { return nil }
-        return try? await engine.api.runActions(run: run)
+        do {
+            let data: Data = try await engine.api.attachmentPicture(id)
+            guard let image: UIImage = ImageSizing.decoded(data, longest: ImageSizing.display) else { return nil }
+            images.setObject(image, forKey: key)
+            return image
+        } catch {
+            logger.warning("an attached picture could not be read id=\(id, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
-    func changes(of run: String) async -> RunChanges? {
+    /// The asset a message's video or sound is played from, streamed from the Mac in ranges with the phone's key.
+    func attachmentAsset(_ id: String) -> AVURLAsset? {
         guard let engine else { return nil }
-        return try? await engine.api.changes(run: run)
+        let media: (url: URL, headers: [String: String]) = engine.api.attachmentMedia(id)
+        // The key AVFoundation reads for the headers of its requests: a player has no other way to carry a bearer token.
+        return AVURLAsset(url: media.url, options: ["AVURLAssetHTTPHeaderFieldsKey": media.headers])
+    }
+
+    /// The first frame and the length of a message's video, kept for the session.
+    func attachmentVideo(_ id: String) async -> VideoPreview? {
+        if let held: VideoPreviewBox = videoPreviews.object(forKey: id as NSString) { return held.preview }
+        guard let asset: AVURLAsset = attachmentAsset(id) else { return nil }
+        do {
+            let duration: Double = try await asset.load(.duration).seconds
+            let generator: AVAssetImageGenerator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 480, height: 480)
+            let frame: CGImage = try await generator.image(at: .zero).image
+            let preview: VideoPreview = VideoPreview(frame: UIImage(cgImage: frame), duration: duration.isFinite ? duration : nil)
+            videoPreviews.setObject(VideoPreviewBox(preview), forKey: id as NSString)
+            return preview
+        } catch {
+            logger.warning("an attached video could not be read id=\(id, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    func actions(of run: String) async -> RunActions? {
+        await read { api throws(DaemonRequestError) in try await api.runActions(run: run) }.value
+    }
+
+    /// What the chat's runs changed; read through the fixture daemon too, so the screen tests open real changes.
+    func changes(of run: String) async -> RunChanges? {
+        await read { api throws(DaemonRequestError) in try await api.changes(run: run) }.value
     }
 
     /// The owner's half-written words of a chat, kept across launches (per-chat drafts).

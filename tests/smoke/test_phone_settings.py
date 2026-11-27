@@ -52,7 +52,7 @@ _TABS: dict[str, str] = {
     "memory": "Memory",
     "vault": "Vault",
     "snapshots": "Snapshots",
-    "agents": "Agents",
+    "agents": "Bots",
     "models": "Models",
     "browser": "Browser",
     "websearch": "Web search",
@@ -69,6 +69,7 @@ _TABS: dict[str, str] = {
     "system": "System",
     "repair": "Self-repair",
     "diagnostics": "Diagnostics",
+    "speed": "Speed",
     "licences": "Open source licences",
 }
 _ROWS: list[str] = list(_TABS.values())
@@ -189,7 +190,7 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                 await page.goto(f"{address}/#/settings")
                 listed: Locator = page.get_by_role("navigation", name="Settings")
                 await expect(listed.get_by_role("heading")).to_have_text(
-                    ["Agents", "Connections", "Maintenance", "About"]
+                    ["Bots", "Connections", "Maintenance", "About"]
                 )
                 rows: Locator = listed.get_by_role("link")
                 await expect(rows.locator(".settings-row-label")).to_have_text(_ROWS)
