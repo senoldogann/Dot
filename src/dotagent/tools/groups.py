@@ -4,7 +4,8 @@ The core group holds what most runs need: the files, the shell, the web, searchi
 skills, the helper models and the meta tools (the plan, questions, finish). The other groups are named after what they
 reach: ``browser`` (Chrome), ``desktop`` (the Mac's applications and AppleScript), ``schedule`` (goals that run later),
 ``memory_admin`` (correcting and forgetting notes), ``pages`` (pages of HTML shown in the conversation), ``drafts`` (an
-email or a message for the owner to send), ``accounts`` (the mail and calendars of the accounts the owner signed in) and
+email or a message for the owner to send), ``accounts`` (the mail and calendars of the accounts the owner signed in, and
+drafts in their mailboxes) and
 one group per MCP server, ``mcp__<server>``. Which groups are on is up to
 the loop; everything here is pure.
 """
@@ -112,7 +113,10 @@ _PURPOSES: dict[str, str] = {
     "replies": "handing a reply to a mail Dot sent to the chat that sent it, where that work goes on",
     "pages": "showing structured cards or HTML in the conversation",
     "images": "making a picture as a PNG: drawn from an SVG or HTML you write, or a photo from Google's picture model",
-    "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
+    "accounts": (
+        "the owner's mail and calendars in the Google and Microsoft accounts they signed in: read, and drafts there "
+        "the owner sends"
+    ),
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
     "todos": "your own list of work to do for the owner later, on your own while the Mac is idle, and their objectives",
     "waits": "waiting in code until a file is there, an address answers or a check passes",

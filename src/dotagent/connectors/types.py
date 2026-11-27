@@ -77,3 +77,20 @@ class EventList(FrozenModel):
 
     events: tuple[CalendarEvent, ...]
     more: bool
+
+
+class OutgoingMail(FrozenModel):
+    """The recipients and the words of a draft in the owner's mailbox (item 2047); the provider fills in the sender."""
+
+    to: tuple[str, ...]
+    cc: tuple[str, ...]
+    subject: str
+    body: str
+
+
+class MailboxDraft(FrozenModel):
+    """A draft in the owner's mailbox: the provider's id of it, and the address that opens it in the provider's own
+    web app, where the owner may change and send it too."""
+
+    remote_id: str
+    link: str

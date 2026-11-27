@@ -500,6 +500,7 @@ def _draft_written(run: RunRecord) -> EventRecord:
         created_at=_NOW,
         decided_at=None,
         error=None,
+        mailbox=None,
     )
     return _event(run.id, DRAFT_CREATED_EVENT, draft.model_dump(mode="json"))
 

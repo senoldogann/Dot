@@ -121,6 +121,7 @@ from dotagent.tools.help import build_find_help_tool
 from dotagent.tools.images import build_image_tools
 from dotagent.tools.judge_items import build_judge_items_tool
 from dotagent.tools.mail_calendar import build_mail_calendar_tools
+from dotagent.tools.mail_drafts import build_mail_draft_tool
 from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.meetings import build_meeting_tools
 from dotagent.tools.memory import build_memory_tools
@@ -311,6 +312,8 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_pipeline_tools(),
         (build_draft_tool(),),
         build_mail_calendar_tools(),
+        # Drafts in the owner's own Gmail or Outlook (item 2047), in the accounts group with the tools that read them.
+        (build_mail_draft_tool(),),
         build_schedule_tools(),
         build_campaign_tools(),
         (build_proof_tool(),),

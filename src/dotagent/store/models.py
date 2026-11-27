@@ -645,9 +645,22 @@ class ObjectiveRecord(FrozenModel):
     workflow: ObjectiveWorkflow
 
 
+class DraftMailbox(FrozenModel):
+    """Where an email draft also is in the owner's own mailbox (item 2047): the account signed in (``provider``,
+    ``account``), the provider's id of the draft, the message it answers (None for a new mail), and the address that
+    opens it in Gmail or Outlook on the web. Its Send goes through that account; without one, through Mail."""
+
+    provider: Literal["google", "microsoft"]
+    account: str
+    remote_id: str
+    reply_to: str | None
+    link: str
+
+
 class DraftRecord(FrozenModel):
     """An email or a message a run wrote for the owner (item 314). Nothing goes out until the owner presses Send, and
-    then with the recipients and words as they stand on the card; ``error`` says why the last send failed."""
+    then with the recipients and words as they stand on the card; ``error`` says why the last send failed; ``mailbox``
+    is the draft's place in a mailbox of the owner's, None for one Mail or Messages sends."""
 
     id: str
     run_id: str
@@ -660,6 +673,7 @@ class DraftRecord(FrozenModel):
     created_at: float
     decided_at: float | None
     error: str | None
+    mailbox: DraftMailbox | None
 
 
 class ShownPage(FrozenModel):

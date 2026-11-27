@@ -85,6 +85,7 @@ from dotagent.store.models import (
     Correspondent,
     DeletedRunRecord,
     DraftChannel,
+    DraftMailbox,
     DraftRecord,
     DraftStatus,
     EventRecord,
@@ -251,7 +252,7 @@ CREATE INDEX IF NOT EXISTS objectives_status ON objectives(status, created_at);
 CREATE TABLE IF NOT EXISTS drafts (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, channel TEXT NOT NULL, recipients TEXT NOT NULL, cc TEXT NOT NULL,
     subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, decided_at REAL,
-    error TEXT
+    error TEXT, mailbox TEXT
 );
 CREATE INDEX IF NOT EXISTS drafts_status ON drafts(status, created_at);
 CREATE TABLE IF NOT EXISTS shown_pages (
@@ -1101,6 +1102,7 @@ def _draft(row: aiosqlite.Row) -> DraftRecord:
         created_at=row["created_at"],
         decided_at=row["decided_at"],
         error=row["error"],
+        mailbox=None if row["mailbox"] is None else DraftMailbox.model_validate_json(row["mailbox"]),
     )
 
 
@@ -1602,6 +1604,9 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     # Whether the run's answer or calls echoed a note it was handed (item 1715): NULL until it ends, and before.
     await _add_columns(connection, "memory_uses", (("echoed", "INTEGER"),))
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
+    # A draft's place in the owner's Gmail or Outlook (item 2047), a DraftMailbox as JSON; NULL for Mail's and
+    # Messages'.
+    await _add_columns(connection, "drafts", (("mailbox", "TEXT"),))
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
     # How a continuing piece of work is done (item 1227; an ``ObjectiveWorkflow`` as JSON): an older objective has none.
     await _add_columns(connection, "objectives", (("workflow", "TEXT NOT NULL DEFAULT '{}'"),))
@@ -5397,9 +5402,17 @@ class Store:
 
     @_writing
     async def add_draft(
-        self, run_id: str, channel: DraftChannel, to: Sequence[str], cc: Sequence[str], subject: str, body: str
+        self,
+        run_id: str,
+        channel: DraftChannel,
+        to: Sequence[str],
+        cc: Sequence[str],
+        subject: str,
+        body: str,
+        mailbox: DraftMailbox | None,
     ) -> DraftRecord:
-        """Keep a draft a run wrote (item 314): it waits for the owner."""
+        """Keep a draft a run wrote (item 314): it waits for the owner. ``mailbox`` is where it also is in the owner's
+        Gmail or Outlook (item 2047)."""
         record: DraftRecord = DraftRecord(
             id=new_id("drf"),
             run_id=run_id,
@@ -5412,10 +5425,11 @@ class Store:
             created_at=time.time(),
             decided_at=None,
             error=None,
+            mailbox=mailbox,
         )
         await self._db.execute(
             "INSERT INTO drafts(id, run_id, channel, recipients, cc, subject, body, status, created_at, decided_at, "
-            "error) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
+            "error, mailbox) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
             (
                 record.id,
                 run_id,
@@ -5426,9 +5440,40 @@ class Store:
                 body,
                 record.status,
                 record.created_at,
+                None if mailbox is None else mailbox.model_dump_json(),
             ),
         )
         await self._db.commit()
+        return record
+
+    @_writing
+    async def rewrite_draft(
+        self,
+        draft_id: str,
+        to: Sequence[str],
+        cc: Sequence[str],
+        subject: str,
+        body: str,
+        mailbox: DraftMailbox | None,
+    ) -> DraftRecord:
+        """A run's new words for its draft that still waits, or whose last send failed (item 2047): it waits again with
+        them; a draft answered meanwhile is a conflict."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE drafts SET status = 'waiting', recipients = ?, cc = ?, subject = ?, body = ?, error = NULL,"
+            " mailbox = ? WHERE id = ? AND status IN ('waiting', 'failed')",
+            (
+                dumps_compact(list(to)),
+                dumps_compact(list(cc)),
+                subject,
+                body,
+                None if mailbox is None else mailbox.model_dump_json(),
+                draft_id,
+            ),
+        )
+        await self._db.commit()
+        record: DraftRecord = await self.get_draft(draft_id)
+        if cursor.rowcount == 0:
+            raise RunConflict(f"the draft is {record.status}, not waiting", {"draft_id": draft_id})
         return record
 
     @_writing

@@ -1,6 +1,10 @@
 """What a draft goes through (item 314): a run writes it, the conversation shows it as a card, and the owner sends it,
 with the recipients and words as they stand on the card then, or discards it. Nothing goes out without the owner's
-press, whatever the run's approvals, a yolo run's too: a draft is how a run has the owner look first."""
+press, whatever the run's approvals, a yolo run's too: a draft is how a run has the owner look first.
+
+An email draft may also be in the owner's own Gmail or Outlook (item 2047), made through the account they signed in:
+the owner opens it there too, and may send it there. Its Send on the card writes the card's words into that draft and
+sends it through the account; its Discard deletes it from the mailbox. Without an account, Mail sends it."""
 
 import re
 from collections.abc import Sequence
@@ -8,14 +12,19 @@ from collections.abc import Sequence
 from pydantic import Field
 
 from dotagent.channels.handles import names_a_handle, paired_handles
-from dotagent.core.errors import DesktopError, InvalidValueError
+from dotagent.connectors import google, graph
+from dotagent.connectors.http import AccountApi
+from dotagent.connectors.types import MailboxDraft, OutgoingMail
+from dotagent.core.errors import AccountApiError, DesktopError, DotError, InvalidValueError, SignInError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.script import run_osascript
 from dotagent.drafts.scripts import SCRIPTS, send_calls
 from dotagent.events import EventBus
+from dotagent.oauth.accounts import Accounts
+from dotagent.oauth.tokens import Account
 from dotagent.store.db import Store
-from dotagent.store.models import DraftChannel, DraftRecord
+from dotagent.store.models import DraftChannel, DraftMailbox, DraftRecord
 
 log = get_logger(__name__)
 
@@ -110,16 +119,145 @@ async def create_draft(
             {"channel": channel},
         )
     record: DraftRecord = await store.add_draft(
-        run_id, channel, [address.strip() for address in to], [address.strip() for address in cc], subject.strip(), body
+        run_id,
+        channel,
+        [address.strip() for address in to],
+        [address.strip() for address in cc],
+        subject.strip(),
+        body,
+        None,
     )
     await bus.emit(run_id, DRAFT_CREATED_EVENT, record.model_dump(mode="json"), True)
     return record
 
 
-async def send_draft(store: Store, bus: EventBus, timeout_s: float, draft_id: str, words: DraftWords) -> DraftRecord:
-    """The owner's press of Send: hand the draft, with ``words``, to its application. It is ``sent``, or ``failed``
-    with what the application said, and the owner may send it again; a draft that no longer waits is a conflict, so
-    that a second press, here or on another screen, sends nothing."""
+async def _send_through_application(claimed: DraftRecord, timeout_s: float) -> str | None:
+    """Hand ``claimed`` to Mail or Messages; why it failed, None when it went."""
+    # The recipients of a message the application took before one failed: a retry would send them the message again.
+    reached: list[str] = []
+    try:
+        for arguments in send_calls(claimed):
+            await run_osascript("AppleScript", SCRIPTS[claimed.channel], arguments, (), timeout_s)
+            if claimed.channel == "message":
+                reached.append(arguments[1])
+    except DesktopError as failure:
+        said: object = failure.context.get("stderr")
+        error: str = f"{failure.message}: {said}" if isinstance(said, str) and said else failure.message
+        if reached:
+            sent: str = ", ".join(reached)
+            error += f"; it was already sent to {sent}, so take them off the recipients before you send it again"
+        log.warning("draft_not_sent", draft_id=claimed.id, channel=claimed.channel, error=error, reached=len(reached))
+        return error
+    return None
+
+
+def mailbox_problem(failure: DotError, account: str) -> str:
+    """What the owner reads of a call to their mailbox that failed: the provider's words, and for a 403, which is a
+    sign-in made before Dot asked to write drafts (item 2047), how to give it that."""
+    if failure.context.get("status") == 403:
+        return (
+            f"{failure.message}. The sign-in of {account} does not let Dot write drafts: sign in to it again in "
+            "Settings › Connectors › Accounts and allow what the provider's page asks"
+        )
+    return failure.message
+
+
+async def _mailbox_api(accounts: Accounts, mailbox: DraftMailbox) -> AccountApi:
+    account: Account = await accounts.account_of(mailbox.account)
+    return AccountApi(accounts, account.provider, account.address)
+
+
+async def write_mailbox_draft(
+    api: AccountApi, mail: OutgoingMail, reply_to: str | None, remote_id: str | None
+) -> MailboxDraft:
+    """``mail`` as a draft of the account's mailbox: a new one, in the thread of ``reply_to`` when it names a message,
+    or the draft ``remote_id`` rewritten."""
+    if api.provider == "google":
+        if remote_id is None:
+            return await google.create_gmail_draft(api, mail, reply_to)
+        return await google.update_gmail_draft(api, remote_id, mail, reply_to)
+    if remote_id is None:
+        return await graph.create_outlook_draft(api, mail, reply_to)
+    return await graph.update_outlook_draft(api, remote_id, mail)
+
+
+async def _send_through_mailbox(accounts: Accounts, claimed: DraftRecord, mailbox: DraftMailbox) -> str | None:
+    """Write the card's words into the mailbox's draft, then send it through the account; why it failed, None when it
+    went. A send whose answer was lost may have gone: the words say so."""
+    mail: OutgoingMail = OutgoingMail(to=claimed.to, cc=claimed.cc, subject=claimed.subject, body=claimed.body)
+    try:
+        api: AccountApi = await _mailbox_api(accounts, mailbox)
+        await write_mailbox_draft(api, mail, mailbox.reply_to, mailbox.remote_id)
+        if api.provider == "google":
+            await google.send_gmail_draft(api, mailbox.remote_id)
+        else:
+            await graph.send_outlook_draft(api, mailbox.remote_id)
+    except (AccountApiError, SignInError) as failure:
+        error: str = mailbox_problem(failure, mailbox.account)
+        if failure.context.get("status") == 404:
+            error += "; the draft is no longer in the mailbox: it was sent or deleted there"
+        log.warning(
+            "draft_not_sent", draft_id=claimed.id, channel=claimed.channel, provider=mailbox.provider, error=error
+        )
+        return error
+    return None
+
+
+async def create_mailbox_draft(
+    store: Store,
+    bus: EventBus,
+    accounts: Accounts,
+    run_id: str,
+    address: str,
+    mail: OutgoingMail,
+    reply_to: str | None,
+) -> DraftRecord:
+    """An email draft of ``run_id`` in the mailbox of the account ``address`` (item 2047), an answer to the message
+    ``reply_to`` in its thread when it names one, and its card in the run's conversation; it waits for the owner. A
+    sign-in that may not write drafts is refused with how to give it that."""
+    account: Account = await accounts.account_of(address)
+    api: AccountApi = AccountApi(accounts, account.provider, account.address)
+    try:
+        made: MailboxDraft = await write_mailbox_draft(api, mail, reply_to, None)
+    except AccountApiError as failure:
+        raise AccountApiError(mailbox_problem(failure, account.address), failure.context) from failure
+    mailbox: DraftMailbox = DraftMailbox(
+        provider=account.provider, account=account.address, remote_id=made.remote_id, reply_to=reply_to, link=made.link
+    )
+    record: DraftRecord = await store.add_draft(run_id, "mail", mail.to, mail.cc, mail.subject, mail.body, mailbox)
+    await bus.emit(run_id, DRAFT_CREATED_EVENT, record.model_dump(mode="json"), True)
+    return record
+
+
+async def rewrite_mailbox_draft(
+    store: Store, bus: EventBus, accounts: Accounts, draft: DraftRecord, mail: OutgoingMail
+) -> DraftRecord:
+    """``draft``, a mailbox's draft that still takes an answer, with ``mail`` in place of its words, in the mailbox and
+    on its card."""
+    mailbox: DraftMailbox | None = draft.mailbox
+    if mailbox is None:
+        raise InvalidValueError(
+            "this draft is not in a mailbox: write a new one", {"draft_id": draft.id, "channel": draft.channel}
+        )
+    api: AccountApi = await _mailbox_api(accounts, mailbox)
+    try:
+        made: MailboxDraft = await write_mailbox_draft(api, mail, mailbox.reply_to, mailbox.remote_id)
+    except AccountApiError as failure:
+        raise AccountApiError(mailbox_problem(failure, mailbox.account), failure.context) from failure
+    rewritten: DraftRecord = await store.rewrite_draft(
+        draft.id, mail.to, mail.cc, mail.subject, mail.body, mailbox.model_copy(update={"link": made.link})
+    )
+    await bus.emit(rewritten.run_id, DRAFT_DECIDED_EVENT, rewritten.model_dump(mode="json"), True)
+    return rewritten
+
+
+async def send_draft(
+    store: Store, bus: EventBus, accounts: Accounts, timeout_s: float, draft_id: str, words: DraftWords
+) -> DraftRecord:
+    """The owner's press of Send: hand the draft, with ``words``, to its application, or to the account whose mailbox
+    holds it. It is ``sent``, or ``failed`` with what the application or the provider said, and the owner may send it
+    again; a draft that no longer waits is a conflict, so that a second press, here or on another screen, sends
+    nothing."""
     draft: DraftRecord = await store.get_draft(draft_id)
     to: tuple[str, ...] = tuple(address.strip() for address in words.to)
     cc: tuple[str, ...] = tuple(address.strip() for address in words.cc)
@@ -132,21 +270,11 @@ async def send_draft(store: Store, bus: EventBus, timeout_s: float, draft_id: st
     if problems:
         raise InvalidValueError(f"the draft cannot be sent: {'; '.join(problems)}", {"draft_id": draft_id})
     claimed: DraftRecord = await store.claim_draft(draft_id, to, cc, words.subject.strip(), words.body)
-    error: str | None = None
-    # The recipients of a message the application took before one failed: a retry would send them the message again.
-    reached: list[str] = []
-    try:
-        for arguments in send_calls(claimed):
-            await run_osascript("AppleScript", SCRIPTS[claimed.channel], arguments, (), timeout_s)
-            if claimed.channel == "message":
-                reached.append(arguments[1])
-    except DesktopError as failure:
-        said: object = failure.context.get("stderr")
-        error = f"{failure.message}: {said}" if isinstance(said, str) and said else failure.message
-        if reached:
-            sent: str = ", ".join(reached)
-            error += f"; it was already sent to {sent}, so take them off the recipients before you send it again"
-        log.warning("draft_not_sent", draft_id=draft_id, channel=claimed.channel, error=error, reached=len(reached))
+    error: str | None = (
+        await _send_through_mailbox(accounts, claimed, claimed.mailbox)
+        if claimed.mailbox is not None
+        else await _send_through_application(claimed, timeout_s)
+    )
     settled: DraftRecord = await store.settle_draft(draft_id, error)
     if error is None:
         log.info("draft_sent", draft_id=draft_id, channel=settled.channel, recipients=len(to) + len(cc))
@@ -154,8 +282,20 @@ async def send_draft(store: Store, bus: EventBus, timeout_s: float, draft_id: st
     return settled
 
 
-async def discard_draft(store: Store, bus: EventBus, draft_id: str) -> DraftRecord:
-    """The owner's press of Discard: the draft is dropped and nothing goes out."""
+async def discard_draft(store: Store, bus: EventBus, accounts: Accounts, draft_id: str) -> DraftRecord:
+    """The owner's press of Discard: the draft is dropped and nothing goes out; one in the owner's mailbox is deleted
+    from it first (one already gone from it, sent or deleted there, is dropped all the same)."""
+    draft: DraftRecord = await store.get_draft(draft_id)
+    if draft.mailbox is not None and draft.status in ("waiting", "failed"):
+        api: AccountApi = await _mailbox_api(accounts, draft.mailbox)
+        try:
+            if api.provider == "google":
+                await google.delete_gmail_draft(api, draft.mailbox.remote_id)
+            else:
+                await graph.delete_outlook_draft(api, draft.mailbox.remote_id)
+        except AccountApiError as failure:
+            if failure.context.get("status") != 404:
+                raise
     discarded: DraftRecord = await store.discard_draft(draft_id)
     await bus.emit(discarded.run_id, DRAFT_DECIDED_EVENT, discarded.model_dump(mode="json"), True)
     return discarded

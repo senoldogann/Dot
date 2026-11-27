@@ -7,6 +7,8 @@ import binascii
 import datetime as dt
 import html
 import re
+from email.message import EmailMessage
+from email.policy import SMTP
 from email.utils import getaddresses
 from urllib.parse import quote
 
@@ -18,12 +20,15 @@ from dotagent.connectors.types import (
     Attendee,
     CalendarEvent,
     EventList,
+    MailboxDraft,
     MailList,
     MailMessage,
     MailSummary,
+    OutgoingMail,
     ProviderAnswer,
 )
 from dotagent.core.errors import AccountApiError
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.web.text import html_to_text
 
 GMAIL: str = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -65,6 +70,24 @@ class _Message(ProviderAnswer):
 
 class _Reference(ProviderAnswer):
     id: str
+
+
+class _ThreadedReference(ProviderAnswer):
+    id: str
+    threadId: str = ""
+
+
+class _Draft(ProviderAnswer):
+    id: str
+    message: _ThreadedReference
+
+
+class _Replied(ProviderAnswer):
+    """The message a draft answers: its thread, and the headers that put the answer in it."""
+
+    id: str
+    threadId: str
+    payload: _Part = Field(default_factory=_Part)
 
 
 class _MessageList(ProviderAnswer):
@@ -271,3 +294,90 @@ async def google_events(api: AccountApi, start: dt.datetime, end: dt.datetime, q
     if query.strip():
         params.append(("q", query.strip()))
     return google_events_of(await api.get(CALENDAR_NAME, CALENDAR_EVENTS, params, {}), CALENDAR_EVENTS)
+
+
+class GmailReply(FrozenModel):
+    """What puts a draft in the thread of the message it answers: Gmail's thread id, and the message's own
+    ``Message-ID`` and ``References``, which the answer's ``In-Reply-To`` and ``References`` name."""
+
+    thread_id: str
+    message_id: str
+    references: str
+
+
+def gmail_reply_of(answer: object, url: str) -> GmailReply:
+    replied: _Replied = read_answer(_Replied, answer, GMAIL_NAME, url)
+    return GmailReply(
+        thread_id=replied.threadId,
+        message_id=_header(replied.payload, "Message-ID"),
+        references=_header(replied.payload, "References"),
+    )
+
+
+def _one_line(text: str) -> str:
+    """A header's value on one line: a line break in it would start a header of its own."""
+    return " ".join(text.split())
+
+
+def gmail_raw(mail: OutgoingMail, reply: GmailReply | None) -> str:
+    """The message of a draft as Gmail's ``raw`` takes it: RFC 5322, base64url. Gmail puts the account's own address in
+    From."""
+    message: EmailMessage = EmailMessage(policy=SMTP)
+    message["To"] = ", ".join(mail.to)
+    if mail.cc:
+        message["Cc"] = ", ".join(mail.cc)
+    message["Subject"] = _one_line(mail.subject)
+    if reply is not None and reply.message_id:
+        message["In-Reply-To"] = _one_line(reply.message_id)
+        message["References"] = _one_line(f"{reply.references} {reply.message_id}")
+    message.set_content(mail.body)
+    return base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
+
+
+def gmail_draft_body(mail: OutgoingMail, reply: GmailReply | None) -> JsonObject:
+    """What Gmail's drafts.create and drafts.update take: the message, in its thread when it answers one."""
+    message: JsonObject = {"raw": gmail_raw(mail, reply)}
+    if reply is not None:
+        message["threadId"] = reply.thread_id
+    return {"message": message}
+
+
+def gmail_draft_of(answer: object, url: str, address: str) -> MailboxDraft:
+    """The draft Gmail's answer to ``url`` names, and the address that opens it in Gmail for ``address``."""
+    draft: _Draft = read_answer(_Draft, answer, GMAIL_NAME, url)
+    link: str = f"https://mail.google.com/mail/u/{quote(address, safe='@')}/#drafts?compose={quote(draft.message.id)}"
+    return MailboxDraft(remote_id=draft.id, link=link)
+
+
+async def gmail_reply(api: AccountApi, message_id: str) -> GmailReply:
+    url: str = f"{GMAIL}/messages/{quote(message_id, safe='')}"
+    params: list[tuple[str, str]] = [
+        ("format", "metadata"),
+        ("metadataHeaders", "Message-ID"),
+        ("metadataHeaders", "References"),
+    ]
+    return gmail_reply_of(await api.get(GMAIL_NAME, url, params, {}), url)
+
+
+async def create_gmail_draft(api: AccountApi, mail: OutgoingMail, reply_to: str | None) -> MailboxDraft:
+    """A draft of ``mail`` in the account's Gmail, in the thread of the message ``reply_to`` when it names one."""
+    reply: GmailReply | None = None if reply_to is None else await gmail_reply(api, reply_to)
+    url: str = f"{GMAIL}/drafts"
+    answer: object | None = await api.write(GMAIL_NAME, "POST", url, gmail_draft_body(mail, reply))
+    return gmail_draft_of(answer, url, api.address)
+
+
+async def update_gmail_draft(api: AccountApi, remote_id: str, mail: OutgoingMail, reply_to: str | None) -> MailboxDraft:
+    """The draft ``remote_id`` with ``mail`` in place of what it held, kept in its thread."""
+    reply: GmailReply | None = None if reply_to is None else await gmail_reply(api, reply_to)
+    url: str = f"{GMAIL}/drafts/{quote(remote_id, safe='')}"
+    answer: object | None = await api.write(GMAIL_NAME, "PUT", url, gmail_draft_body(mail, reply))
+    return gmail_draft_of(answer, url, api.address)
+
+
+async def send_gmail_draft(api: AccountApi, remote_id: str) -> None:
+    await api.write(GMAIL_NAME, "POST", f"{GMAIL}/drafts/send", {"id": remote_id})
+
+
+async def delete_gmail_draft(api: AccountApi, remote_id: str) -> None:
+    await api.write(GMAIL_NAME, "DELETE", f"{GMAIL}/drafts/{quote(remote_id, safe='')}", None)

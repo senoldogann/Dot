@@ -38,7 +38,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import DraftRecord, EventRecord, RunRecord
+from dotagent.store.models import DraftMailbox, DraftRecord, EventRecord, RunRecord
 from dotagent.tools.drafts import DRAFT_TOOL
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
@@ -309,7 +309,9 @@ async def test_a_draft_a_stopped_daemon_was_sending_is_not_sent_again(login_env:
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
         try:
-            draft: DraftRecord = await runtime.store.add_draft("run_x", "mail", ["a@example.com"], [], "Hi", "Hello.")
+            draft: DraftRecord = await runtime.store.add_draft(
+                "run_x", "mail", ["a@example.com"], [], "Hi", "Hello.", None
+            )
             await runtime.store.claim_draft(draft.id, ["a@example.com"], [], "Hi", "Hello.")
             assert await fail_unsettled_drafts(runtime.store, runtime.bus) == 1
             failed: DraftRecord = await runtime.store.get_draft(draft.id)
@@ -319,3 +321,43 @@ async def test_a_draft_a_stopped_daemon_was_sending_is_not_sent_again(login_env:
             assert await fail_unsettled_drafts(runtime.store, runtime.bus) == 0
         finally:
             await close_runtime(runtime)
+
+
+@pytest.mark.browser
+async def test_a_draft_in_the_owners_gmail_names_its_account_and_opens_there(login_env: dict[str, str]) -> None:
+    """Item 2047: a draft made in the owner's own Gmail shows the account it goes from and Open in Gmail, the draft's
+    address there, wide and on a phone; a link that is not https is not drawn."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
+            run: RunRecord = await manager.start(
+                "Write my emails", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, None, False, ()
+            )
+            assert (await _ended(runtime, run.id)).status == "done"
+            link: str = "https://mail.google.com/mail/u/ada@gmail.com/#drafts?compose=17a"
+            for mailbox in (
+                DraftMailbox(provider="google", account="ada@gmail.com", remote_id="r-7", reply_to="m-1", link=link),
+                DraftMailbox(
+                    provider="microsoft", account="ada@outlook.com", remote_id="D1", reply_to=None, link="javascript:x"
+                ),
+            ):
+                draft: DraftRecord = await runtime.store.add_draft(
+                    run.id, "mail", ["bob@example.com"], [], "Re: Invoice", "Paid today.", mailbox
+                )
+                await runtime.bus.emit(run.id, DRAFT_CREATED_EVENT, draft.model_dump(mode="json"), True)
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                screens: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+                for width, scheme in screens:
+                    page: Page = await _open(browser, address, run.id, width, scheme)
+                    gmail: Locator = page.locator(".timeline .draft-card", has_text="ada@gmail.com")
+                    await expect(gmail.locator(".draft-fields")).to_contain_text("ada@gmail.com (Gmail)")
+                    await expect(gmail.get_by_role("link", name="Open in Gmail")).to_have_attribute("href", link)
+                    outlook: Locator = page.locator(".timeline .draft-card", has_text="ada@outlook.com")
+                    await expect(outlook.locator(".draft-fields")).to_contain_text("ada@outlook.com (Outlook)")
+                    await expect(outlook.get_by_role("link")).to_have_count(0)
+                    # On a phone the row of buttons wraps inside the card: nothing wider than the page.
+                    wide: bool = await page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+                    assert not wide
+                    await page.close()
+            finally:
+                await browser.close()

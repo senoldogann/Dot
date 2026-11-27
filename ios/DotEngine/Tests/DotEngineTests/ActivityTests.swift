@@ -160,7 +160,7 @@ final class ActivityTests: XCTestCase {
         let drafts: [DraftView] = try await api().waitingDrafts(limit: 50)
         XCTAssertEqual(drafts.map(\.status), ["failed", "waiting"])
         XCTAssertTrue(drafts.allSatisfy(\.isOpen), "a failed send still waits for the owner")
-        let sent: DraftView = DraftView(id: "d", runId: "r", channel: "mail", to: [], cc: [], subject: "", body: "", status: "sent", createdAt: 0, error: nil)
+        let sent: DraftView = DraftView(id: "d", runId: "r", channel: "mail", to: [], cc: [], subject: "", body: "", status: "sent", createdAt: 0, error: nil, mailbox: nil)
         XCTAssertFalse(sent.isOpen)
         XCTAssertEqual(drafts[0].error, "Messages could not reach the number.")
         XCTAssertTrue(drafts[1].body.contains("\n\n"), "the body keeps its lines")

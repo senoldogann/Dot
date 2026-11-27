@@ -676,9 +676,55 @@
       "title": "DoubtedNote",
       "type": "object"
     },
+    "DraftMailbox": {
+      "additionalProperties": false,
+      "description": "Where an email draft also is in the owner's own mailbox (item 2047): the account signed in (``provider``,\n``account``), the provider's id of the draft, the message it answers (None for a new mail), and the address that\nopens it in Gmail or Outlook on the web. Its Send goes through that account; without one, through Mail.",
+      "properties": {
+        "account": {
+          "title": "Account",
+          "type": "string"
+        },
+        "link": {
+          "title": "Link",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "google",
+            "microsoft"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "remote_id": {
+          "title": "Remote Id",
+          "type": "string"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reply To"
+        }
+      },
+      "required": [
+        "provider",
+        "account",
+        "remote_id",
+        "reply_to",
+        "link"
+      ],
+      "title": "DraftMailbox",
+      "type": "object"
+    },
     "DraftRecord": {
       "additionalProperties": false,
-      "description": "An email or a message a run wrote for the owner (item 314). Nothing goes out until the owner presses Send, and\nthen with the recipients and words as they stand on the card; ``error`` says why the last send failed.",
+      "description": "An email or a message a run wrote for the owner (item 314). Nothing goes out until the owner presses Send, and\nthen with the recipients and words as they stand on the card; ``error`` says why the last send failed; ``mailbox``\nis the draft's place in a mailbox of the owner's, None for one Mail or Messages sends.",
       "properties": {
         "body": {
           "title": "Body",
@@ -729,6 +775,16 @@
           "title": "Id",
           "type": "string"
         },
+        "mailbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DraftMailbox"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "run_id": {
           "title": "Run Id",
           "type": "string"
@@ -767,7 +823,8 @@
         "status",
         "created_at",
         "decided_at",
-        "error"
+        "error",
+        "mailbox"
       ],
       "title": "DraftRecord",
       "type": "object"

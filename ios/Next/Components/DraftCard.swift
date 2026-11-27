@@ -4,7 +4,8 @@ import SwiftUI
 /// The drafts the chat's runs wrote for the owner (web `drafts.js`, item 314): an email or a message that goes out only
 /// when the owner sends it. Each open draft is a card with its recipients, subject and words, Send (asked first, as the
 /// owner's word goes out), Edit (a sheet; Send from there sends the edited words) and Discard (asked first); a decided
-/// draft is one quiet line. A card answered elsewhere (409) reads the draft again and says so.
+/// draft is one quiet line. A card answered elsewhere (409) reads the draft again and says so. An email drafted in the
+/// owner's own Gmail or Outlook (item 2047) names the account it goes from and opens there too.
 struct ChatDrafts: View {
     let thread: String
     @Environment(AppModel.self) private var model: AppModel
@@ -43,7 +44,8 @@ struct DraftCard: View {
         Group {
             if isOpen { card } else { decidedLine }
         }
-        .task(id: record.status) { await load() }
+        // The whole record: a run that writes the draft again changes its words while it still waits (item 2047).
+        .task(id: record) { await load() }
         .sheet(isPresented: $editing) {
             if let draft {
                 DraftEditor(draft: draft, words: words(of: draft), close: { editing = false }, save: { words in
@@ -65,6 +67,9 @@ struct DraftCard: View {
             }
             if let draft {
                 let shown: DraftWords = words(of: draft)
+                if let mailbox = draft.mailbox {
+                    field(String(localized: "Goes from", comment: "Draft card: the account of the owner's the email goes from"), "\(mailbox.account) (\(mailbox.name))")
+                }
                 field(String(localized: "To", comment: "Draft card: the recipients"), shown.to.joined(separator: ", "))
                 if !shown.cc.isEmpty { field(String(localized: "Cc", comment: "Draft card: the copied recipients"), shown.cc.joined(separator: ", ")) }
                 if !shown.subject.isEmpty { field(String(localized: "Subject", comment: "Draft card: the email's subject"), shown.subject) }
@@ -81,6 +86,14 @@ struct DraftCard: View {
                 Text(record.subject).textRole(.body).foregroundStyle(Tone.text)
             }
             if let failure { Text(failure).textRole(.footnote).foregroundStyle(Tone.failure) }
+            // A line of its own, so the row of buttons stays three wide on the narrowest phone.
+            if let mailbox = draft?.mailbox, let place = URL(string: mailbox.link), place.scheme == "https" {
+                Link(destination: place) {
+                    Label(mailbox.provider == "google" ? String(localized: "Open in Gmail", comment: "Draft card: opens the draft in the owner's Gmail") : String(localized: "Open in Outlook", comment: "Draft card: opens the draft in the owner's Outlook"), systemImage: "arrow.up.right.square")
+                        .textRole(.footnote)
+                }
+                .accessibilityIdentifier("draft.open")
+            }
             // At the accessibility sizes the buttons stand one under the other, none cut.
             buttonsLayout {
                 Button(mail ? String(localized: "Send email", comment: "Draft card: sends the email") : String(localized: "Send message", comment: "Draft card: sends the message")) {
@@ -106,7 +119,11 @@ struct DraftCard: View {
                 if let draft { send(words(of: draft)) }
             }
         } message: {
-            Text(String(localized: "It goes out from your Mac as it stands on the card.", comment: "Confirmation of a draft's Send: what happens"))
+            if let mailbox = draft?.mailbox {
+                Text(String(localized: "It goes out from \(mailbox.account) as it stands on the card.", comment: "Confirmation of a draft's Send from the owner's Gmail or Outlook; the argument is the account"))
+            } else {
+                Text(String(localized: "It goes out from your Mac as it stands on the card.", comment: "Confirmation of a draft's Send: what happens"))
+            }
         }
         .confirmationDialog(
             String(localized: "Discard this draft?", comment: "Confirmation of a draft's Discard"), isPresented: $confirmingDiscard, titleVisibility: .visible

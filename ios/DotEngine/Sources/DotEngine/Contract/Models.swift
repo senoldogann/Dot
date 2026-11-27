@@ -493,9 +493,12 @@ public struct DraftRecord: Codable, Sendable, Hashable {
     public let channel: String
     public let subject: String
     public let status: String
+    /// The draft's words: a run that writes the draft again (item 2047) changes them while it still waits, so a card
+    /// that keys on the record reads it again.
+    public let body: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, channel, subject, status
+        case id, channel, subject, status, body
         case runId = "run_id"
     }
 }

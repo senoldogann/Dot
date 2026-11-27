@@ -74,9 +74,9 @@ final class ActivityWordsTests: XCTestCase {
 
     func testADraftWithoutASubjectIsNamedByItsFirstLine() {
         let message: DraftView = DraftView(
-            id: "d", runId: "r", channel: "message", to: ["+90"], cc: [], subject: "", body: "\nRunning late.\nSee you.", status: "waiting", createdAt: 0, error: nil)
+            id: "d", runId: "r", channel: "message", to: ["+90"], cc: [], subject: "", body: "\nRunning late.\nSee you.", status: "waiting", createdAt: 0, error: nil, mailbox: nil)
         XCTAssertEqual(draftTitle(message), "Running late.")
-        let mail: DraftView = DraftView(id: "d", runId: "r", channel: "mail", to: ["a@b.c"], cc: [], subject: "Invoice", body: "Paid.", status: "failed", createdAt: 0, error: "x")
+        let mail: DraftView = DraftView(id: "d", runId: "r", channel: "mail", to: ["a@b.c"], cc: [], subject: "Invoice", body: "Paid.", status: "failed", createdAt: 0, error: "x", mailbox: nil)
         XCTAssertEqual(draftTitle(mail), "Invoice")
         XCTAssertEqual(draftLine(mail).components(separatedBy: " · ").count, 3, "a failed send is said")
     }

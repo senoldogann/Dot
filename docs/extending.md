@@ -457,11 +457,17 @@ security add-generic-password -U -s dot-agent -a DOT_GOOGLE_CLIENT_SECRET -w
 security add-generic-password -U -s dot-agent -a DOT_MS_CLIENT_ID -w
 ```
 
-Google is asked for `gmail.readonly` and `calendar.readonly` (and who you are), Microsoft for `Mail.Read`,
-`Calendars.Read`, `User.Read` and `offline_access`: the account tools only read (item 558; before, Google was asked for
-`gmail.modify` and `calendar` and Microsoft for `Mail.ReadWrite`, `Mail.Send` and `Calendars.ReadWrite`, and an account
-signed in then keeps that grant until you sign in again). A tool that writes will ask for what it needs, and be one that
-asks before it sends. The tokens of each account are in the login Keychain under the
+Google is asked for `gmail.readonly`, `gmail.compose` and `calendar.readonly` (and who you are), Microsoft for
+`Mail.Read`, `Mail.ReadWrite`, `Mail.Send`, `Calendars.Read`, `User.Read` and `offline_access`: the account tools read,
+and write the drafts you send from a card (item 2047). Neither provider has a scope for drafts alone: Gmail's
+`gmail.compose` makes, changes and sends drafts (it cannot delete or change the mailbox's other mail), and Graph makes a
+draft only with `Mail.ReadWrite`, which may change and delete any mail of the account, and sends one with `Mail.Send`.
+So a token read out of the Keychain could send mail as you, and at Microsoft change or delete it; nothing of Dot sends a
+draft but your press of Send on its card, and nothing of Dot deletes mail but your Discard of a card's draft. No
+calendar is written (item 558 took away `gmail.modify`, `calendar` and
+`Calendars.ReadWrite`, asked before). An account signed in before item 2047 keeps its read-only grant until you sign
+in to it again in Settings › Connectors › Accounts, where Google's or Microsoft's page asks you to allow the drafts;
+until then `mail_draft` is refused with that advice. The tokens of each account are in the login Keychain under the
 service `dot-oauth`, in pieces short enough for a line of `security`'s own prompt (Microsoft's run to some kilobytes):
 the item `google:<address>` says which of two slots holds them and how many there are (`a2`), the items
 `google:<address>#a0`, `#a1`… hold the pieces, and new tokens go to the other slot before that item names it, so that
@@ -472,8 +478,8 @@ after more than 10 minutes is turned away. Nothing logs a token, a code or an ad
 
 Runs read the mail and the calendar of each account with `mail_search`, `mail_read` and `calendar_events` (item 424,
 [Runs and tools](runs.md#mail-and-calendars)); the prompt of a run that has one of these tools names the accounts
-signed in (an agent of yours may have none of them, or only some). They only read: an email a run writes for you is a
-draft you send from the conversation.
+signed in (an agent of yours may have none of them, or only some). They only read; an email a run writes for you is a
+draft you send from the conversation, in the account's own Drafts with `mail_draft` (item 2047).
 
 ## MCP servers
 

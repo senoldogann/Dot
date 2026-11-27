@@ -21,7 +21,7 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 async def _draft(store: Store, run_id: str, subject: str) -> DraftRecord:
-    made: DraftRecord = await store.add_draft(run_id, "mail", ["ayse@example.com"], [], subject, f"{subject}.")
+    made: DraftRecord = await store.add_draft(run_id, "mail", ["ayse@example.com"], [], subject, f"{subject}.", None)
     # Each a moment after the one before, so that the newest-first order is the test's own.
     await asyncio.sleep(0.01)
     return made

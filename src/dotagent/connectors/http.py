@@ -1,12 +1,15 @@
 """Calls to the APIs of an account signed in (item 424), as the account, with its access token.
 
-A token the provider turns away before its time (401) is refreshed once and the call made again. A call that could not
-reach the provider, or that it answered with 429 or a 5xx, is made again after the time the provider asks for: these
-calls only read, so a second one changes nothing. Any other answer but 200 is an :class:`AccountApiError` with the
-provider's own words for it; nothing here logs or keeps a token."""
+A token the provider turns away before its time (401) is refreshed once and the call made again. A read that could not
+reach the provider, or that it answered with 429 or a 5xx, is made again after the time the provider asks for: a read
+changes nothing. A write (a draft made, changed, sent or deleted, item 2047) is made again only after a 429, the
+provider's word that it did not take the call: after a 5xx or a lost connection it may have, and a second one could
+make a draft twice or send it twice. Any other answer but a 2xx is an :class:`AccountApiError` with the provider's own
+words for it; nothing here logs or keeps a token."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import urlsplit
 
 import httpx
@@ -16,6 +19,7 @@ from dotagent.connectors.types import ProviderAnswer
 from dotagent.core.errors import AccountApiError
 from dotagent.core.retry import RetryPolicy, retry_async
 from dotagent.core.text import redact_secrets, truncate_middle
+from dotagent.core.types import JsonObject
 from dotagent.oauth.accounts import Accounts
 from dotagent.oauth.providers import ProviderId
 
@@ -36,6 +40,14 @@ class _Busy(Exception):
 
 def _again(error: Exception) -> bool:
     return isinstance(error, _Busy | httpx.TransportError)
+
+
+def _refused_for_now(error: Exception) -> bool:
+    """A write is made again only when the provider said it did not take it (429)."""
+    return isinstance(error, _Busy) and error.response.status_code == 429
+
+
+type WriteMethod = Literal["POST", "PUT", "PATCH", "DELETE"]
 
 
 def wait_asked(response: httpx.Response) -> float | None:
@@ -137,4 +149,46 @@ class AccountApi:
         except httpx.HTTPError as error:
             raise AccountApiError(
                 f"{service} could not be reached", {"path": path_of(url), "error": type(error).__name__}
+            ) from error
+
+    async def write(self, service: str, method: WriteMethod, url: str, body: JsonObject | None) -> object | None:
+        """The JSON ``service`` answers ``method`` of ``url`` with ``body`` (JSON), None for an answer with no body
+        (202, 204); made again only after a 429 (the module's words)."""
+        token: str = await self.accounts.access_token(self.provider, self.address)
+        response: httpx.Response = await self._write(service, method, url, body, token)
+        if response.status_code == 401:
+            token = await self.accounts.refreshed_token(self.provider, self.address, token)
+            response = await self._write(service, method, url, body, token)
+        if not response.is_success:
+            raise refused(service, url, response)
+        if not response.content:
+            return None
+        try:
+            answer: object = response.json()
+            return answer
+        except ValueError as error:
+            raise AccountApiError(f"{service}'s answer was not JSON", {"path": path_of(url)}) from error
+
+    async def _write(
+        self, service: str, method: WriteMethod, url: str, body: JsonObject | None, token: str
+    ) -> httpx.Response:
+        async def once() -> httpx.Response:
+            async with self.accounts.client() as client:
+                response: httpx.Response = await client.request(
+                    method, url, json=body, headers={"Authorization": f"Bearer {token}"}
+                )
+            if response.status_code in _BUSY:
+                raise _Busy(response)
+            return response
+
+        try:
+            return await retry_async(
+                once, _refused_for_now, _wait_of, _RETRY, f"{service.lower().replace(' ', '_')}_{method.lower()}"
+            )
+        except _Busy as busy:
+            raise refused(service, url, busy.response) from busy
+        except httpx.HTTPError as error:
+            raise AccountApiError(
+                f"{service} could not be reached; whether it took the call is not known",
+                {"path": path_of(url), "method": method, "error": type(error).__name__},
             ) from error

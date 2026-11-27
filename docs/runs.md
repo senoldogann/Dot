@@ -756,7 +756,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Worktrees       | `track_coding_work` |
 | Pages           | `show_page`, `show_cards` (item 1967)                                                                              |
 | Drafts          | `draft_message`                                                                                                    |
-| Mail, calendars | `mail_search`, `mail_read`, `calendar_events`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
+| Mail, calendars | `mail_search`, `mail_read`, `calendar_events`, `mail_draft`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
 | Skills          | `skill`, `find_help`; `skill_save` (item 893, tool group `skills`): how the owner said to do a kind of work, kept   |
 | MCP             | `mcp__<server>__<tool>`; the server `web-research` comes with Dot (item 583): `mcp__web-research__web_scrape`, `web_map`, `web_extract` and the crawl tools `web_crawl_start`, `web_crawl_status`, `web_crawl_results`, `web_crawl_cancel` (its search is a rung of `web_search`, item 655) |
 
@@ -1117,8 +1117,24 @@ your answer to each. A list the provider cut says so (more messages match, or th
 run narrows its search rather than taking the first page for all there is. Graph searches no events: with words to look
 for, an Outlook calendar is read a page of 100 events at a time, up to ten pages, and its next pages are followed only
 on Graph's own address, as they carry the account's token. They only read: nothing is sent, moved or marked read, so
-research runs have them too, and the policy sees a read through the network (`network`, `low`). An email for you to send
-is still a draft (`draft_message`).
+research runs have them too, and the policy sees a read through the network (`network`, `low`).
+
+An email for you to send from one of these accounts is a `mail_draft` (item 2047): a draft in that account's own Drafts
+(Gmail's drafts API, Graph's messages), a reply in the thread of a message `mail_search` found (`reply_to`, its id: Gmail
+gets the thread and the `In-Reply-To` and `References` headers, Graph's `createReply` makes it) or a new mail. Its card
+is the one of [Drafts](#drafts), with the account it goes from and **Open in Gmail** or **Open in Outlook**, the
+draft's own address there, so you can change it and send it in the mailbox too. **Send email** on the card writes the
+card's words into that draft and sends it through the account (Gmail's `drafts.send`, Graph's `send`); **Discard**
+deletes it from the mailbox (one already gone from it, sent or deleted there, is dropped all the same). As with
+`draft_message`, nothing goes out before your press, whatever the run's approvals, a `yolo` run's too: the policy sees a
+draft (`notes_write`, `safe`) and a key in it is refused. A run writes again a draft of its chat that still waits by
+calling `mail_draft` with `draft`, its id. Only tasks and chats have the tool, in the `accounts` group. A write to the
+mailbox is made again only after a 429, the provider's word that it did not take it: after a 5xx or a lost connection
+it may have, and a second call could make the draft twice or send it twice, so the card says "Not sent" with
+"whether it took the call is not known" and you look in the Sent folder first. An account signed in before item 2047
+was asked only to read: its drafts are refused (403) with what to do, sign in to it again in Settings › Connectors ›
+Accounts. The tests run against a stand-in of both APIs (`tests/smoke/test_mail_drafts.py`). Another address's email is
+still a `draft_message`.
 
 What they return is written by others, since anyone can send you a mail or an invitation: it comes inside an
 `<account_content …>` fence and marks the run untrusted, as a web page does ([Safety](safety.md)). A token the

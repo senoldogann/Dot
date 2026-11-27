@@ -42,19 +42,30 @@ def test_the_providers_page_asks_for_the_access_with_pkce_and_comes_back_to_this
     assert "offline_access" in MICROSOFT.scopes
 
 
-def test_the_access_asked_for_is_what_the_account_tools_do_which_is_to_read() -> None:
-    """Item 558: Google was asked for ``gmail.modify`` and ``calendar``, Microsoft for ``Mail.ReadWrite``,
-    ``Mail.Send`` and ``Calendars.ReadWrite``, though every account tool only reads. A token read out of the Keychain
-    by a script could then send mail as the owner, and delete or change their events."""
+def test_the_access_asked_for_is_reading_and_the_drafts_the_owner_sends() -> None:
+    """Item 558: Google was asked for ``gmail.modify`` and ``calendar``, Microsoft for ``Calendars.ReadWrite`` too,
+    though the account tools only read. Item 2047 adds the drafts the owner sends from a card: Gmail's
+    ``gmail.compose`` (drafts, and sending them: Gmail has no narrower scope) and Graph's ``Mail.ReadWrite`` and
+    ``Mail.Send``. Nothing that deletes or changes the mailbox's other mail, nor any write to a calendar."""
     assert GOOGLE.scopes == (
         "openid",
         "email",
         "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.compose",
         "https://www.googleapis.com/auth/calendar.readonly",
     )
-    assert MICROSOFT.scopes == ("openid", "email", "offline_access", "User.Read", "Mail.Read", "Calendars.Read")
+    assert MICROSOFT.scopes == (
+        "openid",
+        "email",
+        "offline_access",
+        "User.Read",
+        "Mail.Read",
+        "Mail.ReadWrite",
+        "Mail.Send",
+        "Calendars.Read",
+    )
     for scope in (*GOOGLE.scopes, *MICROSOFT.scopes):
-        assert not any(word in scope for word in ("modify", "send", "Send", "ReadWrite", "compose", "full_access"))
+        assert not any(word in scope for word in ("modify", "Calendars.ReadWrite", "full_access", "mail.google.com"))
         assert scope != "https://www.googleapis.com/auth/calendar"
 
 
