@@ -1187,8 +1187,9 @@ The Files chip of the search on the phone and the web finds the files of the cha
 above. The answer is a list, newest first, of `{"thread_id", "run_id", "kind", "name", "path", "attachment_id", "at"}`,
 each file once per chat: `kind` `attachment` is a file the owner attached to a message (`attachment_id` its upload,
 `path` its name), `made` one a run wrote or edited with `write_file` or `edit_file` in a call that did its job (`path`
-where it is, `~/` for the home folder). A helper's file stands under the chat of the run that started its line, the chat
-the owner sees. Every word of `q`, folded, must be in the file's name (an attachment) or its path (a file made).
+as the call named it, `~/` for the home folder; a path the call gave relative to its folder stays relative). A helper's
+file stands under the chat and the run that started its line, the chat the owner sees (`run_id`, the page the web
+opens). Every word of `q`, folded, must be in the file's name (an attachment) or its path (a file made).
 
 **Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
 `store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and

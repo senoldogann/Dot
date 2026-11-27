@@ -220,9 +220,8 @@ class FileHit(FrozenModel):
     chat (``kind`` ``attachment``, ``attachment_id`` its upload) or one a run of it wrote or edited with ``write_file``
     or ``edit_file`` and that call did its job (``kind`` ``made``, ``attachment_id`` ``None``). ``thread_id`` and
     ``run_id`` are the chat the owner sees and its run that opens it, a helper's file under the run at the root of its
-    line (the web opens ``#/runs/<run_id>``); ``name`` is the file's name,
-    ``path`` where it is (``~/`` for the home folder; an attachment's own name), ``at`` when it was attached or last
-    written."""
+    line (the web opens ``#/runs/<run_id>``); ``name`` is the file's name, ``path`` as the call named it (``~/`` for
+    the home folder; an attachment's own name), ``at`` when it was attached or last written."""
 
     thread_id: str
     run_id: str

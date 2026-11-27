@@ -83,14 +83,14 @@ export function buildSearchFinds({ chatTitle, homeHref, onScope, onFound, onNavi
   function messageRow(hit) {
     const title = chatTitle(hit.thread_id);
     const word = markedWord(hit.snippet);
-    const href = hit.run_id === null ? null : `#/runs/${hit.run_id}`;
+    const href = `#/runs/${hit.run_id}`;
     return el(
       "a",
       {
         class: "side-find",
         href,
         onclick: () => {
-          if (hit.run_id !== null && word !== null) {
+          if (word !== null) {
             findOnOpen(hit.run_id, word, hit.snippet);
           }
           onNavigate();
@@ -161,7 +161,8 @@ export function buildSearchFinds({ chatTitle, homeHref, onScope, onFound, onNavi
     }
     searching = false;
     found = {
-      messages: messages.status === "fulfilled" ? messages.value : [],
+      // A find of a chat with no run has no page to open: it is left out.
+      messages: messages.status === "fulfilled" ? messages.value.filter((hit) => hit.run_id !== null) : [],
       files: files.status === "fulfilled" ? files.value : [],
       bots: agents.status === "fulfilled" ? botsMatching(agents.value, asked) : [],
     };
