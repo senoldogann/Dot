@@ -31,6 +31,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.thread_sync import follow_thread, watch_revisions
+from dotagent.store import db as db_module
 from dotagent.store.db import Store
 from dotagent.store.models import NO_PICKS, EventRecord, RunRecord, ThreadRecord
 
@@ -687,6 +688,30 @@ async def test_the_files_search_finds_attached_and_written_files_under_the_owner
     assert [hit["name"] for hit in ozet.json()] == ["Vergi-Özeti.pdf"]
     none: httpx.Response = await served.http.get("/api/threads/search/files", params={"q": "nothing-named-so"})
     assert none.json() == []
+
+
+async def test_the_files_search_reads_only_its_window_of_the_newest_calls_and_attachments(
+    served: Served, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 2039: the files search reads the newest calls and attachment events, no further back, so a search costs the
+    same on a store of years: with the windows set to two calls and one attachment event, a file written before the
+    last two calls and one attached before the last attachment event are not found, the newer ones are."""
+    monkeypatch.setattr(db_module, "_FILE_CALLS_READ", 2)
+    monkeypatch.setattr(db_module, "_FILE_ATTACHMENTS_READ", 1)
+    store: Store = served.runtime.store
+    chat: ThreadRecord = await store.create_thread("Window", "ui")
+    run: RunRecord = await _run(store, chat.id, None)
+    for name in ("pencere-old.pdf", "pencere-new.pdf"):
+        await store.add_event(run.id, "attachments", {"files": [{"id": "att_1_ab", "name": name, "kind": "pdf"}]})
+    for call, tool, path in (
+        ("c1", "write_file", "/tmp/pencere-old.md"),
+        ("c2", "read_file", "/tmp/other.md"),
+        ("c3", "write_file", "/tmp/pencere-new.md"),
+    ):
+        await store.add_event(run.id, "tool_call", {"call_id": call, "tool": tool, "args": {"path": path}})
+        await store.add_event(run.id, "tool_result", {"call_id": call, "tool": tool, "ok": True})
+    found: httpx.Response = await served.http.get("/api/threads/search/files", params={"q": "pencere"})
+    assert sorted(hit["name"] for hit in found.json()) == ["pencere-new.md", "pencere-new.pdf"]
 
 
 def _said(role: str, content: str) -> Message:
