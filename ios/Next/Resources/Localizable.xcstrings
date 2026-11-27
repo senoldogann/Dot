@@ -4721,17 +4721,6 @@
         }
       }
     },
-    "Dot's setting (%@)": {
-      "comment": "Chat settings: the approval mode configured on the Mac; the argument is its name",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un ayarı (%@)"
-          }
-        }
-      }
-    },
     "Down": {
       "comment": "System: a service is down",
       "localizations": {

@@ -47,10 +47,13 @@ final class ChatListLiveUITests: XCTestCase {
         model.tap()
         app.buttons["Clear the search"].tap()
         if app.keyboards.count > 0 { app.swipeDown() }
-        // The level, one tap on the chosen model's segments (the sheet's Options stand above the providers).
-        let low: XCUIElement = app.buttons["Low"]
-        for _ in 0..<6 where !low.isHittable { app.swipeDown() }
-        XCTAssertTrue(low.exists, "the picked model offers its levels")
+        // The level, from the menu of the chosen model's levels (the sheet's Options stand above the providers; item 2023).
+        let level: XCUIElement = any(app, "chatSettings.reasoning").firstMatch
+        for _ in 0..<6 where !level.isHittable { app.swipeDown() }
+        XCTAssertTrue(level.exists, "the picked model offers its levels")
+        level.tap()
+        let low: XCUIElement = app.buttons["Low"].firstMatch
+        XCTAssertTrue(low.waitForExistence(timeout: 5), "the menu of levels opened")
         low.tap()
         let approvals: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Approvals")).firstMatch
         for _ in 0..<6 where !approvals.isHittable { app.swipeDown() }
