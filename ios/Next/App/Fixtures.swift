@@ -102,7 +102,10 @@
                   "args":{"header":"MCP","question":"Playwright and chrome-devtools start with every launch of Dot and were not used in 14 days. Close them?","multiple":false,
                     "options":[{"label":"Keep them on","description":"Nothing changes."},{"label":"Close both","description":"Dot's own browser tools do the same; launches get faster. One tap in Settings › Connectors turns them back on.","recommended":true}]}},
                  {"id":"apr_q2","run_id":"run_b","created_at":2,"status":"pending","tool":"ask_user","severity":"question","summary":"q",
-                  "args":{"header":"Appointment","question":"Which day suits you for the dentist?","options":[{"label":"Tuesday afternoon","recommended":true},{"label":"Thursday morning"}]}}]
+                  "args":{"header":"Appointment","question":"Which day suits you for the dentist?","options":[{"label":"Tuesday afternoon","recommended":true},{"label":"Thursday morning"}]}},
+                 {"id":"apr_q3","run_id":"run_b","created_at":3,"status":"pending","tool":"ask_user","severity":"question","summary":"q",
+                  "args":{"header":"Approval","question":"Six pull requests passed the security review and the pre-push review. Which ones shall I merge?","multiple":true,
+                    "options":[{"label":"#1199 Memory kinds","description":"Adds a note kind column to the database. A backup is taken first; the first start takes 36 s once."},{"label":"#1188 Webhook","description":"A signed outside trigger, reachable only from your network by default."},{"label":"#1204 Several tasks (part 1)","description":"Adds a chat lane column, off by default: nothing changes until it is turned on."}]}}]
                 """#
             case .secret:
                 #"""
@@ -243,7 +246,7 @@
 
         private func rowsJSON(now: Double) -> String {
             """
-            [{"summary":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"pinned_at":null,"run_count":2,"latest_run_id":"run_b","latest_status":"running","latest_created_at":\(now - 2475),"unread":false,"actor_id":null,"last_message":"Book me the dentist","last_role":"user"},"revision":7,"asks":\(self == .asks || self == .question ? 2 : 0)}]
+            [{"summary":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"pinned_at":null,"run_count":2,"latest_run_id":"run_b","latest_status":"running","latest_created_at":\(now - 2475),"unread":false,"actor_id":null,"last_message":"Book me the dentist","last_role":"user"},"revision":7,"asks":\(self == .asks ? 2 : self == .question ? 3 : 0)}]
             """
         }
     }
