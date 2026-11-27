@@ -145,3 +145,18 @@ async def test_lists_gets_and_reads_mcp_catalogue_with_taint() -> None:
         finally:
             await manager.shutdown()
             await close_runtime(runtime)
+
+
+async def test_a_server_that_cannot_list_resources_stays_connected_without_them() -> None:
+    base: AppConfig = eval_config(load_default_config())
+    config: AppConfig = base.model_copy(
+        update={"mcp": [McpServerConfig(name="notes", command=sys.executable, args=[str(_SERVER), "--fail-lists"])]}
+    )
+    with scratch_home() as home, eval_environment(home, {}):
+        runtime: Runtime = await open_runtime(config, {})
+        try:
+            assert runtime.mcp.catalogue("notes").resources == ()
+            with pytest.raises(McpError, match="has not listed this resource"):
+                await runtime.mcp.read_resource("notes", _URI)
+        finally:
+            await close_runtime(runtime)

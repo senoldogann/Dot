@@ -41,7 +41,7 @@ def _classify(args: ResourceArgs, ctx: ToolContext) -> ActionInfo:
         tool=RESOURCE_TOOL,
         kind="mcp_read",
         risk="low",
-        summary=f"{args.operation} MCP resources",
+        summary=f"{args.operation} MCP resource {args.uri[:200]}".rstrip(),
         target=args.server,
         flags=(),
     )
