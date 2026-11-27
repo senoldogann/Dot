@@ -12,12 +12,13 @@ and the answers runs wait for. ``docs/phone.md`` holds the contract.
 """
 
 import asyncio
+import datetime as dt
 import secrets
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from dotagent.core.errors import InvalidValueError, NotFoundError, ToolExecutionError
 from dotagent.core.logs import get_logger
@@ -36,6 +37,16 @@ _ID_BYTES: int = 9
 # The most an answer may list.
 MOST_EVENTS: int = 100
 _TEXT_MAX: int = 4_000
+_DAY_CHARS: int = len("2026-11-28")
+
+
+def moment(text: str) -> dt.datetime:
+    """The moment ``text`` names, ISO 8601 with its offset; a ValueError for anything else (a day, a moment with no
+    offset), so that an answer the run could not read is refused at the door with a 422."""
+    found: dt.datetime = dt.datetime.fromisoformat(text)
+    if found.utcoffset() is None:
+        raise ValueError(f"a moment with no offset: {text!r}")
+    return found
 
 
 class CalendarEventsAsk(FrozenModel):
@@ -105,6 +116,16 @@ class PhoneEvent(FrozenModel):
     calendar: str = Field(max_length=500)
     organizer: str = Field(max_length=500)
 
+    @model_validator(mode="after")
+    def _times(self) -> Self:
+        if self.all_day:
+            start, end = dt.date.fromisoformat(self.start), dt.date.fromisoformat(self.end)
+            if len(self.start) != _DAY_CHARS or len(self.end) != _DAY_CHARS or end <= start:
+                raise ValueError("an all-day event's start and end are days, the end after the start")
+        elif moment(self.end) < moment(self.start):
+            raise ValueError("an event ends before it starts")
+        return self
+
 
 class EventsAnswer(FrozenModel):
     """The answer of a :class:`CalendarEventsAsk`: the events, and whether the time holds more than are listed."""
@@ -131,6 +152,11 @@ class LocationAnswer(FrozenModel):
     longitude: float = Field(ge=-180.0, le=180.0)
     accuracy_m: float = Field(ge=0.0)
     at: str = Field(max_length=40)
+
+    @model_validator(mode="after")
+    def _at(self) -> Self:
+        moment(self.at)
+        return self
 
 
 # ``denied``: the owner said no to the permission, or took it back in iOS Settings; ``restricted``: the phone's

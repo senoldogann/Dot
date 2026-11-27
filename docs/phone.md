@@ -839,7 +839,8 @@ while its `POST` was on its way. Removing a phone drops its record.
 A run reads the calendars of the owner's iPhone, adds an event or a reminder there, and asks where the phone is, with
 four tools in the group `phone_app`: `phone_calendar_events`, `phone_calendar_add`, `phone_reminder_add` and
 `phone_location`. Dot Next does them on the phone, through EventKit and Core Location (when in use). A run has these tools
-only while a phone is paired (`phones.json` lists one); the group is off at a run's first step, as every group but core,
+only while a phone is paired (`phones.json` lists one; a run does not start while that file cannot be read, as the
+daemon does not, and the error says to fix or delete it); the group is off at a run's first step, as every group but core,
 and is turned on with `use_tools`.
 
 The daemon cannot open a connection to the phone, so the phone holds one open to the daemon: while Dot Next is on the
@@ -869,11 +870,17 @@ The answers, by `kind`:
 - `events`: `events`, each with `id`, `title`, `start`, `end`, `all_day`, `location`, `notes`, `calendar`,
   `organizer`, and `more` (the time holds more than were listed). The run reads them fenced as content others wrote, as
   the calendars of the signed-in accounts, so it is tainted by them.
-- `created`: `id` (the event's or the reminder's on the phone) and `calendar` (the calendar or list it went to).
+- `created`: `id` (the event's or the reminder's on the phone) and `calendar` (the calendar or list it went to). The run
+  reads the name fenced, and is tainted by it: a shared or subscribed calendar is named by someone else.
 - `location`: `latitude`, `longitude`, `accuracy_m`, `at` (a moment).
 - `refused`: `reason` (`denied`: the owner said no, or took it back in iOS Settings › Apps › Dot Next; `restricted`:
   the phone's restrictions forbid it; `failed`: it tried and could not, such as no calendar of that name) and
-  `message`. The run reads where the owner gives the permission back.
+  `message`. The run reads where the owner gives the permission back in Dot's own words, and the phone's `message`
+  fenced, as it may list calendars' names.
+
+A time the run could not read (an all-day event whose `start` or `end` is not a day, a moment with no offset, an event
+that ends before it starts, a location's `at` that is not a moment) makes the answer a 422, and the run goes on waiting
+for one it can read.
 
 Each permission is asked by iOS the first time an ask needs it, never when the app starts: full access to the calendars
 (reading needs it, so an add asks for it too), full access to Reminders, and the location while the app is in use. The

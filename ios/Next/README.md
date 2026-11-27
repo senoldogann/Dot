@@ -132,6 +132,12 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 - `App/`: the shell (the home of bots, PLAN §27: `Home.swift`, a bot's chat `BotChat.swift`, its profile
   `BotProfile.swift` and its Work pages `BotWorkPages.swift`, faces `BotFace.swift`), the gallery, sample content. `scripts/e2e_bots.sh` runs `BotsLiveUITests`
   on a throwaway daemon.
+- `Data/`: the phone's own adapters: dictation, image sizing, the performance record, and `PhoneAsks`, which does Dot's
+  asks on the phone (item 2051, `docs/phone.md` "Dot's asks to the phone"): the calendars read and an event added
+  (EventKit), a reminder added, and where the phone is (Core Location, when in use). iOS asks for each permission the
+  first time an ask needs it (Info.plist's `NSCalendarsFullAccessUsageDescription`,
+  `NSRemindersFullAccessUsageDescription`, `NSLocationWhenInUseUsageDescription`, Turkish in `tr.lproj/InfoPlist.strings`);
+  the engine's `PhoneAskLoop` brings the asks while the app is in front.
 - `Resources/`: the asset catalog (app icon, accent = the ink) and `Localizable.xcstrings`.
 - `Tests/`: `DotNextTests`. `scripts/`: the icon, the strings check, the screenshot harness.
 

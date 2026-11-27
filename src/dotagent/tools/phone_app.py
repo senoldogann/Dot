@@ -11,6 +11,7 @@ the policy as any other, so the run's approval mode decides whether it asks.
 import asyncio
 import datetime as dt
 import secrets
+from collections.abc import Awaitable, Callable
 from typing import Self
 from zoneinfo import ZoneInfo
 
@@ -41,6 +42,7 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
+    fail,
     make_tool,
     mark_untrusted,
     ok,
@@ -242,28 +244,56 @@ def location_text(answer: LocationAnswer, zone: dt.tzinfo) -> str:
     )
 
 
-def refusal_error(tool: str, answer: RefusedAnswer) -> ToolExecutionError:
-    """The error a run reads for a refusal, with where the owner gives the permission back."""
-    said: str = " ".join(answer.message.split())[:300]
+class PhoneRefused(ToolExecutionError):
+    """The phone did not do the ask: ``result`` is what the run reads, its words from the phone fenced and marked as
+    content others may have written (a shared calendar's name in a list of them)."""
+
+    def __init__(self, tool: str, answer: RefusedAnswer, result: ToolResult) -> None:
+        super().__init__(result.text, {"tool": tool, "reason": answer.reason})
+        self.result: ToolResult = result
+
+
+def refusal_result(tool: str, answer: RefusedAnswer, nonce: str) -> ToolResult:
+    """What a run reads of a refusal: Dot's own head line (and where the owner gives the permission back), then the
+    phone's words fenced, since a calendar's or a list's name in them may be someone else's."""
+    said: str = fence_account("the iPhone's answer", answer.message, nonce)
     if answer.reason == "failed":
-        return ToolExecutionError(f"the iPhone could not do it: {said}", {"tool": tool, "reason": answer.reason})
+        return mark_untrusted(fail(f"the iPhone could not do it; it said:\n{said}"))
     where: str = f"iOS Settings › Apps › Dot Next › {_SETTINGS[tool]}"
-    return ToolExecutionError(
-        f"the iPhone refused: {said} ({answer.reason}). Only the owner can allow it, in {where}.",
-        {"tool": tool, "reason": answer.reason},
+    return mark_untrusted(
+        fail(f"the iPhone refused ({answer.reason}): only the owner can allow it, in {where}. It said:\n{said}")
     )
 
 
 async def _asked(ctx: ToolContext, tool: str, ask: PhoneAsk) -> PhoneAnswer:
     answer: PhoneAnswer = await ctx.runtime.phone_link.ask(ask, _ANSWER_S)
     if isinstance(answer, RefusedAnswer):
-        raise refusal_error(tool, answer)
+        raise PhoneRefused(tool, answer, refusal_result(tool, answer, secrets.token_hex(_NONCE_BYTES)))
     return answer
 
 
-def _created_text(where: str, answer: CreatedAnswer) -> str:
-    named: str = f" “{answer.calendar}”" if answer.calendar else ""
-    return f"Added to the iPhone's {where}{named} (id {answer.id})"
+def created_result(where: str, answer: CreatedAnswer, what: str, nonce: str) -> ToolResult:
+    """What a run reads of an add: Dot's own words, and the calendar's or the list's name fenced, since a shared or
+    subscribed one is named by someone else."""
+    head: str = f"Added to the iPhone's {where} (id {answer.id}): {what}."
+    if not answer.calendar:
+        return ok(head)
+    named: str = fence_account(f"the name of the iPhone's {where}", answer.calendar, nonce)
+    return mark_untrusted(ok(f"{head} It went to:\n{named}"))
+
+
+def refusals_read[A: ToolArgs](
+    run: Callable[[A, ToolContext], Awaitable[ToolResult]],
+) -> Callable[[A, ToolContext], Awaitable[ToolResult]]:
+    """``run``, with a refusal of the phone's read by the run as its fenced result rather than as an error's words."""
+
+    async def answered(args: A, ctx: ToolContext) -> ToolResult:
+        try:
+            return await run(args, ctx)
+        except PhoneRefused as refused:
+            return refused.result
+
+    return answered
 
 
 def build_phone_app_tools() -> tuple[RegisteredTool, ...]:
@@ -311,7 +341,7 @@ def build_phone_app_tools() -> tuple[RegisteredTool, ...]:
         if not isinstance(answer, CreatedAnswer):
             raise ToolExecutionError("the iPhone answered with something else", {"answer": answer.kind})
         span: str = f"{ask.start} to {ask.end}" + (" (all day, the end not included)" if ask.all_day else "")
-        return ok(f"{_created_text('calendar', answer)}: “{ask.title}”, {span}.")
+        return created_result("calendar", answer, f"“{ask.title}”, {span}", secrets.token_hex(_NONCE_BYTES))
 
     def classify_reminder(args: ReminderAddArgs, ctx: ToolContext) -> ActionInfo:
         return _action(
@@ -325,7 +355,7 @@ def build_phone_app_tools() -> tuple[RegisteredTool, ...]:
         if not isinstance(answer, CreatedAnswer):
             raise ToolExecutionError("the iPhone answered with something else", {"answer": answer.kind})
         due: str = f", due {ask.due}" if ask.due else ""
-        return ok(f"{_created_text('reminders', answer)}: “{ask.title}”{due}.")
+        return created_result("reminders", answer, f"“{ask.title}”{due}", secrets.token_hex(_NONCE_BYTES))
 
     def classify_location(args: NoArgs, ctx: ToolContext) -> ActionInfo:
         return _action(PHONE_LOCATION_TOOL, "read", "low", "Ask the iPhone where it is")
@@ -348,7 +378,7 @@ def build_phone_app_tools() -> tuple[RegisteredTool, ...]:
             parallel_safe=False,
             timeout_s=_TIMEOUT_S,
             classify=classify_events,
-            run=run_events,
+            run=refusals_read(run_events),
         ),
         make_tool(
             name=PHONE_CALENDAR_ADD_TOOL,
@@ -358,7 +388,7 @@ def build_phone_app_tools() -> tuple[RegisteredTool, ...]:
             parallel_safe=False,
             timeout_s=_TIMEOUT_S,
             classify=classify_add,
-            run=run_add,
+            run=refusals_read(run_add),
         ),
         make_tool(
             name=PHONE_REMINDER_ADD_TOOL,
@@ -368,7 +398,7 @@ def build_phone_app_tools() -> tuple[RegisteredTool, ...]:
             parallel_safe=False,
             timeout_s=_TIMEOUT_S,
             classify=classify_reminder,
-            run=run_reminder,
+            run=refusals_read(run_reminder),
         ),
         make_tool(
             name=PHONE_LOCATION_TOOL,
@@ -378,6 +408,6 @@ def build_phone_app_tools() -> tuple[RegisteredTool, ...]:
             parallel_safe=False,
             timeout_s=_TIMEOUT_S,
             classify=classify_location,
-            run=run_location,
+            run=refusals_read(run_location),
         ),
     )

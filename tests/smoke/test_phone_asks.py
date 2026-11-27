@@ -111,8 +111,40 @@ async def test_the_phone_answers_the_tools_while_dot_next_is_open(own_home: Path
         ask: JsonObject = await phone_side
         assert ask["kind"] == "calendar_add" and ask["all_day"] is True
         assert (ask["start"], ask["end"], ask["title"]) == ("2026-11-28", "2026-11-30", "Dentist")
-        assert not result.is_error and "Added to the iPhone's calendar “Home” (id EK-1)" in result.text
+        assert not result.is_error and result.text.startswith("Added to the iPhone's calendar (id EK-1): “Dentist”")
+        assert result.untrusted and "Home" in result.text, (
+            "the calendar's name is fenced: a shared one is someone else's"
+        )
         assert (gate.shown[-1].kind, gate.shown[-1].target) == ("app_control", "iPhone")
+
+        # An answer whose times cannot be read is refused at the door, and the run goes on waiting.
+        polling = asyncio.ensure_future(client.get("/phone/asks/next", headers=phone))
+        reading = asyncio.ensure_future(
+            _call(runtime, gate, "phone_calendar_events", {"start": "2026-11-28", "end": "2026-11-29"})
+        )
+        bad_id: str = str((await polling).json()["id"])
+        bad_event: JsonObject = {
+            "id": "EK-9",
+            "title": "x",
+            "start": "2026-11-28T09:00:00+00:00",
+            "end": "2026-11-29",
+            "all_day": True,
+            "location": "",
+            "notes": "",
+            "calendar": "",
+            "organizer": "",
+        }
+        bad: httpx.Response = await client.post(
+            f"/phone/asks/{bad_id}",
+            json={"answer": {"kind": "events", "events": [bad_event], "more": False}},
+            headers=phone,
+        )
+        assert bad.status_code == 422, bad.text
+        good: httpx.Response = await client.post(
+            f"/phone/asks/{bad_id}", json={"answer": {"kind": "events", "events": [], "more": False}}, headers=phone
+        )
+        assert good.status_code == 204, good.text
+        assert "no event" in (await reading).text
 
         events: JsonObject = {
             "kind": "events",
@@ -142,8 +174,8 @@ async def test_the_phone_answers_the_tools_while_dot_next_is_open(own_home: Path
         # A refusal reaches the run with where the owner allows it.
         refusal: JsonObject = {"kind": "refused", "reason": "denied", "message": "Reminders are not allowed."}
         phone_side = asyncio.ensure_future(_phone_answers(client, phone, refusal))
-        with pytest.raises(ToolExecutionError, match="Dot Next › Reminders"):
-            await _call(runtime, gate, "phone_reminder_add", {"title": "Call Ada"})
+        refused: ToolResult = await _call(runtime, gate, "phone_reminder_add", {"title": "Call Ada"})
+        assert refused.is_error and refused.untrusted and "Dot Next › Reminders" in refused.text
         assert (await phone_side)["kind"] == "reminder_add"
 
         # An answer of another kind is refused, and the run goes on waiting for the right one.
