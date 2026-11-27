@@ -1038,9 +1038,11 @@ messages and their order stay as they were. Right above the
 composer, the chat's page shows each of its commands at work, with the time it has run and a Stop; the dot of a command
 in the background pulses, as its end will wake Dot. A command stopped there, closed by the run or ended by the daemon's
 stop tells nothing, and neither does one whose end a run has read itself with `terminal_read` before it was told (item
-427): a run that waited for its command and saw it end is not told the same again. A delegated run or a campaign's
-session opens none, having no chat of its own to tell: it is not offered `background`, nor the sentence of `shell` that
-sends a long command there (item 1760), and a call that sets it anyway is refused. Neither does a `dotx` command, which
+427): a run that waited for its command and saw it end is not told the same again. A campaign's session opens none,
+having no chat of its own to tell: it is not offered `background`, nor the sentence of `shell` that sends a long
+command there (item 1760), and a call that sets it anyway is refused. A delegated run is offered `background` for
+one command only, a single `gh pr checks <number or URL> --watch [--fail-fast]` handed to its parent chat (item 2046,
+above); any other command it sets there is refused. Neither does a `dotx` command, which
 ends with its run: a command in the background lives as long as the daemon. The end of a helper that a run stopped waiting for tells the chat
 the same way ([Delegation](#delegation), item 1351).
 
