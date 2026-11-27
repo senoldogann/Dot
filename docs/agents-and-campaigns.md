@@ -60,7 +60,7 @@ command or check it ran and the answer. A report without one, or with one that h
 step on trust alone. The run's page names the bot in the bar's breadcrumb, with its badge, the name a link to its page (items 1234 and 1329); its rows in
 the sidebar wear the badge (item 1327) and those on the home's Today strip the face. A schedule can run as one of your bots (its **Bot** in Settings › Scheduled tasks, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting a bot leaves its chats, its lessons and its
-learned skills to Dot, and switches its schedules off ("switched off: its bot was deleted"), as Dot's with no bot
+learned skills to Dot, and switches its schedules off ("switched off: its agent was deleted"), as Dot's with no bot
 named, so that none goes on firing with every tool; one you switch on again runs as Dot, or as the bot you then pick
 in its form. The dialog says how many of them it switches off: the ones on. A message you queued for it goes with it
 (item 899): it would start as Dot. No bot takes Dot's name, made by you or by a run, nor is a run's bot made with
