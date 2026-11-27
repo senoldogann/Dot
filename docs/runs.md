@@ -1133,7 +1133,9 @@ in that account's Drafts. As with
 draft (`notes_write`, `safe`) and a key in it is refused. A run writes again a draft of its chat that still waits by
 calling `mail_draft` with `draft`, its id; it is read again under the draft's lock, which Send and Discard hold too, so
 a draft you sent or discarded meanwhile is a conflict before anything is written to the mailbox, and the run's words
-never go out in place of the card's. Only tasks and chats have the tool, in the `accounts` group (a research run's
+do not go out in place of the card's. The lock holds within the daemon's process (its runs and its routes); a run of
+`dotx chat` or `dotx resume` runs in its own process, where the check of the draft's status before the write is all
+there is. Only tasks and chats have the tool, in the `accounts` group (a research run's
 prompt does not name it). A write to the mailbox is made again only after a 429, the provider's word that it did not
 take it: after a 5xx or a lost connection it may have, and a second call could make the draft twice or send it twice,
 so the card says "Not sent" with "whether it took the call is not known" and you look in the Sent folder first. An account signed in before item 2047

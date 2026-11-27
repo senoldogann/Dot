@@ -42,14 +42,22 @@ STOPPED_WHILE_SENDING: str = (
 )
 _EMAIL: re.Pattern[str] = re.compile(r"[^@\s<>\",;:()]+@[^@\s<>\",;:()]+\.[^@\s<>\",;:()]+")
 _PHONE: re.Pattern[str] = re.compile(r"\+?[0-9][0-9 ().\-]{4,30}")
-# One writer at a time of a draft in a mailbox (item 2047): a run writing it again, the owner's Send and Discard. A run
-# and the daemon's routes are one process, so the run's write cannot land between Send's write of the card's words and
-# the send itself.
+# One writer at a time of a draft in a mailbox (item 2047): a run writing it again, the owner's Send and Discard. The
+# lock holds within one process: the daemon's runs and its routes, so such a run's write cannot land between Send's
+# write of the card's words and the send itself. A run of `dotx chat` or `dotx resume`, which runs in the command's own
+# process, is not held by it: there the store's check of the draft's status, made before the write, is all there is.
+# A draft's lock is dropped once it is sent or discarded, after which every write of it is a conflict.
 _MAILBOX_LOCKS: dict[str, asyncio.Lock] = {}
+_DECIDED: frozenset[str] = frozenset({"sent", "discarded"})
 
 
 def _mailbox_lock(draft_id: str) -> asyncio.Lock:
     return _MAILBOX_LOCKS.setdefault(draft_id, asyncio.Lock())
+
+
+def _release_decided(draft: DraftRecord) -> None:
+    if draft.status in _DECIDED:
+        _MAILBOX_LOCKS.pop(draft.id, None)
 
 
 class DraftWords(FrozenModel):
@@ -291,6 +299,7 @@ async def send_draft(
             else await _send_through_application(claimed, timeout_s)
         )
         settled: DraftRecord = await store.settle_draft(draft_id, error)
+    _release_decided(settled)
     if error is None:
         log.info("draft_sent", draft_id=draft_id, channel=settled.channel, recipients=len(to) + len(cc))
     await bus.emit(settled.run_id, DRAFT_DECIDED_EVENT, settled.model_dump(mode="json"), True)
@@ -307,6 +316,7 @@ async def discard_draft(store: Store, bus: EventBus, accounts: Accounts, draft_i
         if draft.mailbox is not None and draft.status in ("waiting", "failed"):
             left = await _delete_from_mailbox(accounts, draft.mailbox)
         discarded: DraftRecord = await store.discard_draft(draft_id, left)
+    _release_decided(discarded)
     await bus.emit(discarded.run_id, DRAFT_DECIDED_EVENT, discarded.model_dump(mode="json"), True)
     return discarded
 
@@ -323,7 +333,13 @@ async def _delete_from_mailbox(accounts: Accounts, mailbox: DraftMailbox) -> str
         if failure.context.get("status") == 404:
             return None
         log.warning("mailbox_draft_kept", provider=mailbox.provider, error=failure.message)
-        return f"The draft stays in the Drafts of {mailbox.account}: {mailbox_problem(failure, mailbox.account)}"
+        # A 5xx or a lost answer may come after the provider deleted it.
+        status: object = failure.context.get("status")
+        unknown: bool = isinstance(failure, AccountApiError) and (
+            "error" in failure.context or (isinstance(status, int) and status >= 500)
+        )
+        stays: str = "may stay" if unknown else "stays"
+        return f"The draft {stays} in the Drafts of {mailbox.account}: {mailbox_problem(failure, mailbox.account)}"
     return None
 
 
