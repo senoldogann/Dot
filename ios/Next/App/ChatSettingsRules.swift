@@ -217,17 +217,19 @@ func followsAfterScroll(following: Bool, atEnd: Bool, ownerScrolls: Bool) -> Boo
     return ownerScrolls ? false : following
 }
 
-/// A model's name without its provider's name in front ("Anthropic · Opus 5.5" and "Claude Code: Opus" give "Opus 5.5" and
-/// "Opus"): the provider's mark stands beside it. A label that does not start so, or is no more than the provider's name,
-/// is kept (pure).
+/// A model's name without its provider's name in front ("Anthropic · Opus 5.5", "Claude Code: Opus" and "Anthropic / Opus"
+/// give "Opus 5.5" and "Opus"): the provider's mark stands beside it. Only a separator ends the provider's name: ":", "/" or
+/// "·", or a dash with a space on both sides. A label that does not start so ("Mistral Large", "Mistral-Large" of the
+/// provider Mistral are models' own names), or is no more than the provider's name, is kept (pure).
 func modelNameWithoutProvider(_ label: String, provider: String) -> String {
     let title: String = providerTitle(provider)
-    let marks: String = "·:/-–—"
     guard !title.isEmpty, let range = label.range(of: title, options: [.anchored, .caseInsensitive]) else { return label }
-    // A mark of punctuation must stand between the provider's name and the model's: "Mistral Large" of the provider Mistral
-    // is a model's own name.
-    let tail: Substring = label[range.upperBound...].drop { $0 == " " }
-    guard let mark = tail.first, marks.contains(mark) else { return label }
+    let afterName: Substring = label[range.upperBound...]
+    let tail: Substring = afterName.drop { $0 == " " }
+    guard let mark = tail.first else { return label }
+    let spaced: Bool = afterName.first == " " && tail.dropFirst().first == " "
+    let separates: Bool = "·:/".contains(mark) || (spaced && "-–—".contains(mark))
+    guard separates else { return label }
     let rest: Substring = tail.dropFirst().drop { $0 == " " }
     return rest.isEmpty ? label : String(rest)
 }

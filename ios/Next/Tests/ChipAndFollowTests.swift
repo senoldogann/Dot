@@ -12,6 +12,11 @@ final class ChipAndFollowTests: XCTestCase {
         XCTAssertEqual(modelNameWithoutProvider("Anthropic", provider: "anthropic"), "Anthropic", "a label that is only the provider is kept")
         XCTAssertEqual(modelNameWithoutProvider("Anthropicus 3", provider: "anthropic"), "Anthropicus 3", "a longer word is not the provider")
         XCTAssertEqual(modelNameWithoutProvider("Mistral Large", provider: "mistral"), "Mistral Large", "a model named like its provider keeps its name")
+        XCTAssertEqual(modelNameWithoutProvider("Mistral-Large", provider: "mistral"), "Mistral-Large", "a bare hyphen inside a name is no separator")
+        XCTAssertEqual(modelNameWithoutProvider("Mistral–Large", provider: "mistral"), "Mistral–Large", "nor is a bare dash")
+        XCTAssertEqual(modelNameWithoutProvider("Anthropic: Opus 5.5", provider: "anthropic"), "Opus 5.5")
+        XCTAssertEqual(modelNameWithoutProvider("Anthropic - Opus 5.5", provider: "anthropic"), "Opus 5.5", "a dash with a space on both sides separates")
+        XCTAssertEqual(modelNameWithoutProvider("Anthropic/Opus 5.5", provider: "anthropic"), "Opus 5.5")
     }
 
     func testTheChipsGreyWordsAreTheLevelAndFast() {
