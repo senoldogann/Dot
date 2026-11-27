@@ -250,6 +250,10 @@ targets:
         # reached over the tailnet's HTTPS otherwise.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        # Asked the first time one of Dot's asks needs it (item 2051), never at launch.
+        NSCalendarsFullAccessUsageDescription: Dot reads your calendars and adds events to them when you ask it to, or when a task you gave it needs them.
+        NSRemindersFullAccessUsageDescription: Dot adds reminders to Reminders when you ask it to, or when a task you gave it needs one.
+        NSLocationWhenInUseUsageDescription: Dot looks at where this iPhone is, while Dot Next is open, when you ask it to or a task you gave it needs your location.
         NSCameraUsageDescription: Dot uses the camera to attach photos, videos and scanned pages, and to read your Mac’s pairing code.
         NSMicrophoneUsageDescription: Dot uses the microphone when you dictate a message or record a video to attach. Dictation runs on this iPhone or on your Mac, as selected in Settings › Voice.
         NSPhotoLibraryUsageDescription: Dot opens your photo library when you choose a photo or video to attach.

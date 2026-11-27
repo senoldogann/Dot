@@ -8,6 +8,11 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # The Dot Next app's own asks (item 2051), in the web's words.
+    "iPhone calendar": "iPhone takvimi",
+    "Add to iPhone calendar": "iPhone takvimine ekle",
+    "Add iPhone reminder": "iPhone anımsatıcısı ekle",
+    "iPhone location": "iPhone konumu",
     # A tool row of Dot's own: cards shown in the chat (item 1967).
     "Show cards": "Kart göster",
     "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",

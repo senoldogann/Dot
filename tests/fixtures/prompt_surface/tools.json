@@ -2144,6 +2144,133 @@
     }
   },
   {
+    "description": "Add an event to a calendar on the owner's iPhone. Answers only while Dot Next is open on the owner's iPhone.",
+    "name": "phone_calendar_add",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "calendar": {
+          "default": "",
+          "description": "A calendar's name; empty: the phone's default.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "end": {
+          "default": "",
+          "description": "A moment for a timed event (empty: an hour after start), its last day for an all-day one (empty: the same day).",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "location": {
+          "default": "",
+          "maxLength": 500,
+          "type": "string"
+        },
+        "notes": {
+          "default": "",
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "start": {
+          "description": "A day (2026-11-28) or a moment (2026-11-28T09:00), in the Mac's time zone unless it gives an offset; a day makes it all day.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "start"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "The events of the calendars on the owner's iPhone between two days or moments: when, what, where, which calendar. Answers only while Dot Next is open on the owner's iPhone.",
+    "name": "phone_calendar_events",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "description": "Where it ends, not included: a day (2026-11-29 ends it with the 28th) or a moment.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "How many events at most.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "default": "",
+          "description": "Words the events must have, in their title, place or notes.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "start": {
+          "description": "Where the time starts: a day (2026-11-28) or a moment (2026-11-28T09:00), in the Mac's time zone unless it gives an offset.",
+          "maxLength": 40,
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Where the owner's iPhone is now: latitude, longitude and accuracy. Answers only while Dot Next is open on the owner's iPhone.",
+    "name": "phone_location",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Add a reminder to the Reminders of the owner's iPhone. Answers only while Dot Next is open on the owner's iPhone.",
+    "name": "phone_reminder_add",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "due": {
+          "default": "",
+          "description": "When it is due: a day (2026-11-28) or a moment (2026-11-28T09:00), in the Mac's time zone unless it gives an offset; empty: none.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "list": {
+          "default": "",
+          "description": "A reminders list's name; empty: the phone's default.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "notes": {
+          "default": "",
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "description": "Write down a mail or message to a client right before you send it; never send one without it. Refused if it was sent, or its last try's result is unseen.",
     "name": "pipeline_begin",
     "parameters": {

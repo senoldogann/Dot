@@ -1,3 +1,6 @@
 "NSCameraUsageDescription" = "Dot, fotoğraf ve video eklemek, belge taramak ve Mac’inizin eşleştirme kodunu okumak için kamerayı kullanır.";
 "NSMicrophoneUsageDescription" = "Dot, mesaj dikte ederken veya eklemek için video kaydederken mikrofonu kullanır. Dikte, Ayarlar › Ses’teki seçiminize bağlı olarak bu iPhone’da veya Mac’inizde çalışır.";
 "NSPhotoLibraryUsageDescription" = "Dot, eklemek için bir fotoğraf veya video seçtiğinizde fotoğraf arşivinizi açar.";
+"NSCalendarsFullAccessUsageDescription" = "Dot, siz istediğinizde ya da verdiğiniz bir iş gerektirdiğinde takvimlerinizi okur ve onlara etkinlik ekler.";
+"NSRemindersFullAccessUsageDescription" = "Dot, siz istediğinizde ya da verdiğiniz bir iş gerektirdiğinde Anımsatıcılar’a anımsatıcı ekler.";
+"NSLocationWhenInUseUsageDescription" = "Dot, Dot Next açıkken, siz istediğinizde ya da verdiğiniz bir iş konumunuzu gerektirdiğinde bu iPhone’un nerede olduğuna bakar.";

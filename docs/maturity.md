@@ -55,6 +55,7 @@ content of a run is copied here, only counts and dates.
 | Meetings (Google Meet) | unproven | Both tries, on 2026-11-12, failed before Dot was admitted | Meet never worked live |
 | Meetings (Teams, Zoom) | unproven | Not built | |
 | The iPhone app (DotNext) | unproven | Being rewritten; not yet passed its parity list on the real phone | |
+| The iPhone's calendars, reminders and location (`phone_calendar_*`, `phone_reminder_add`, `phone_location`, item 2051) | unproven | New: tests only (a fake phone on a served daemon, DotEngine's contract tests) | Not yet tried on the owner's real iPhone |
 | A schedule's or watcher's check (item 1855) | unproven | New: tests only | |
 | Dollar estimates (item 1856) | unproven | New: tests only | |
 <!-- maturity:end -->
