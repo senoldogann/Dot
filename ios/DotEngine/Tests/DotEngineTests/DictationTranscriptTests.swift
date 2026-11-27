@@ -40,6 +40,13 @@ final class DictationTranscriptTests: XCTestCase {
         XCTAssertEqual(heard.text, "Hello there")
     }
 
+    func testWordsSaidAgainAfterAPauseAreKeptTwice() {
+        // The same words in the next utterance are the owner's own, said again: a closed utterance is never compared.
+        let heard: DictationTranscript = feed([("No", true), ("No", false), ("No", true)])
+        XCTAssertEqual(heard.closed, ["No", "No"])
+        XCTAssertEqual(heard.text, "No No")
+    }
+
     func testARevisionReplacesOnlyTheLiveUtterance() {
         let heard: DictationTranscript = feed([("First part", true), ("I scream", false), ("Ice cream", false)])
         XCTAssertEqual(heard.text, "First part Ice cream")
