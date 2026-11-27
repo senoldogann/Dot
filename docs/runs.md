@@ -919,8 +919,9 @@ a `shell` command is, a line typed in parts as a whole. Typing never holds Dot: 
 for it, up to 64 KB, and past that `terminal_send` fails with an error that says so until the program reads. A key a line editor acts upon (Tab, an arrow, a Ctrl- shortcut
 other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; once a line has run, the program may be
 in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
-sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
-when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
+sessions whose program runs (3; 0 removes the tools); one whose program ended does not count, and stays to be read, its
+exit status with it, until a read or `terminal_close` closes it (item 1990). Each is closed after `terminal_idle_s`
+without use (30 minutes) and all of them when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
 **A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
 answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the
