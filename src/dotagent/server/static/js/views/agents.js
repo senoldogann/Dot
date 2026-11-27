@@ -9,6 +9,7 @@
 // agent under the list's "…". A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
+import { agentHandoffs, agentObjectives, agentOrders, orderOpen } from "../botwork.js";
 import { emptyBoxWords } from "../composershape.js";
 import { sendToWork } from "../sendwork.js";
 import { AGENTS_CHANGED_EVENT, api } from "../api.js";
@@ -1407,6 +1408,32 @@ export function homeSection(key, title, rows, folds, toggle) {
   );
 }
 
+/** The agent's work (item 2035), three rows as the phone's bot profile has them: its open work orders, its active
+ * objectives and today's hand-offs, each counted, each a link to its own page. */
+function workSection(agentId, counts) {
+  const row = (kind, mark, title, count, words) =>
+    el(
+      "a",
+      { class: "list-row agent-work-row", href: `#/agents/${agentId}/${kind}`, dataset: { work: kind } },
+      icon(mark),
+      el("span", { class: "row-title" }, title),
+      el("span", { class: "row-meta" }, count > 0 ? words : t("views.agentwork.none")),
+      icon("chevron"),
+    );
+  return el(
+    "div",
+    { class: "home-today-section", "data-section": "work" },
+    el("h2", { class: "section-label" }, t("views.agentwork.work")),
+    el(
+      "div",
+      { class: "home-today-list card" },
+      row("orders", "list", t("workorders.workOrders"), counts.orders, t("views.agentwork.openCount", { count: counts.orders })),
+      row("objectives", "target", t("views.agentwork.objectives"), counts.objectives, t("views.agentwork.activeCount", { count: counts.objectives })),
+      row("handoffs", "branch", t("views.team.handoffs"), counts.handoffs, t("views.agentwork.todayCount", { count: counts.handoffs })),
+    ),
+  );
+}
+
 function mountPage(root, ctx, agentId) {
   // The agent's bar is glass from the page's first frame, while the agent is read (item 1123).
   setStageGlass();
@@ -1599,7 +1626,7 @@ function mountPage(root, ctx, agentId) {
   async function load() {
     const mine = ++ticket;
     try {
-      const [detail, schedules, templates] = await Promise.all([
+      const [detail, schedules, templates, work] = await Promise.all([
         api.get(`/agents/${agentId}`),
         api.get("/schedules"),
         // The template of its name, for the schedule it suggests (item 722); a list that cannot be read offers none.
@@ -1607,12 +1634,20 @@ function mountPage(root, ctx, agentId) {
           console.warn("the templates could not be listed", error);
           return [];
         }),
+        // What the agent is handed and passes on (item 2035), counted on its page as the phone's profile counts it.
+        Promise.all([api.get("/work-orders"), api.get("/objectives"), api.get("/team")]),
       ]);
       const own = schedules.filter((view) => view.record.options.agent_id === agentId);
       const name = detail.record.name.trim().toLowerCase();
       const template = templates.find((each) => each.name.toLowerCase() === name && each.cron !== "") ?? null;
       const suggested = template !== null && !own.some((view) => view.record.goal === template.task) ? template : null;
-      return disposed || mine !== ticket ? null : { ...detail, schedules: own, suggested };
+      const [orders, objectives, team] = work;
+      const counts = {
+        orders: agentOrders(agentId, orders).filter(orderOpen).length,
+        objectives: agentObjectives(agentId, orders, objectives).filter((objective) => objective.status === "active").length,
+        handoffs: (({ received, sent }) => received.length + sent.length)(agentHandoffs(agentId, team.messages)),
+      };
+      return disposed || mine !== ticket ? null : { ...detail, schedules: own, suggested, work: counts };
     } catch (error) {
       if (!disposed && mine === ticket) {
         page.replaceChildren(errorPanel(error, () => attempt(reload)));
@@ -1643,6 +1678,7 @@ function mountPage(root, ctx, agentId) {
       },
     });
     const parts = [
+      workSection(detail.record.id, detail.work),
       homeSection(
         "schedules",
         t("views.agents.schedules"),
