@@ -161,5 +161,16 @@
   "⌘Enter": "the name of a key or a browser's error, compared by the program",
   "title, pull_request.title": "An example of dotted field paths in the Hooks form's placeholder: names of JSON fields, not words",
   "{name}": "The literal `{name}` the Hooks form's help names as a place of the template, passed into the sentence as a value",
-  "the upload could not be sent": "the cause kept in an ApiError's context for the log, not a line of the screen"
+  "the upload could not be sent": "the cause kept in an ApiError's context for the log, not a line of the screen",
+  "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda match case nonlocal not or pass raise return self try while with yield": "the keywords of a language the change view colours, never shown as words",
+  "abstract any as boolean declare enum implements interface keyof never number private protected public readonly string type unknown": "the keywords of a language the change view colours, never shown as words",
+  "actor any as associatedtype async await break case catch class continue default defer do else enum extension fallthrough false fileprivate final for func guard if import in init inout internal is let mutating nil nonisolated open override private protocol public repeat rethrows return self Self some static struct subscript super switch throw throws true try typealias var weak where while": "the keywords of a language the change view colours, never shown as words",
+  "as async await break const continue crate dyn else enum extern false fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use where while": "the keywords of a language the change view colours, never shown as words",
+  "async await break case catch class const continue debugger default delete do else export extends false finally for from function if import in instanceof let new null of return static super switch this throw true try typeof undefined var void while yield": "the keywords of a language the change view colours, never shown as words",
+  "break case chan const continue default defer else fallthrough for func go goto if import interface map nil package range return select struct switch type var true false": "the keywords of a language the change view colours, never shown as words",
+  "if then else elif fi for while until do done case esac function in return export local readonly set unset source exit trap shift": "the keywords of a language the change view colours, never shown as words",
+  "important": "the keywords of a language the change view colours, never shown as words",
+  "true false": "the keywords of a language the change view colours, never shown as words",
+  "true false null": "the keywords of a language the change view colours, never shown as words",
+  "true false null yes no on off": "the keywords of a language the change view colours, never shown as words"
 }

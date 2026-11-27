@@ -285,6 +285,8 @@ func findMatches(_ items: [TranscriptItem], words: String) -> [String] {
 private func holds(_ item: TranscriptItem, _ wanted: String) -> Bool {
     switch item {
     case .owner(_, let text, _, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
+    // A routine's row is found by the title it shows and by its words.
+    case .automation(_, let title, let prompt): title.localizedStandardContains(wanted) || prompt.localizedStandardContains(wanted)
     case .work(let fold): fold.items.contains { holds($0, wanted) }
     default: false
     }

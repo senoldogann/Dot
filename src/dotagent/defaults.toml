@@ -730,10 +730,15 @@ terminal_idle_s = 1800.0
 # (open), start neither launchctl, shortcuts nor lsregister, reach neither the Shortcuts service nor the Launch
 # Services database they would hand the work to, create no job of launchd, and write nothing into
 # ~/Library/LaunchAgents (best-effort, as the guard is; Apple Events are not covered, which docs/safety.md says).
-# false starts them without it; the shell guard still reads every line. The processes of a yolo run start without it
-# whatever this says.
+# false starts them without it; the shell guard still reads every line. The processes of a yolo run the owner started
+# start without it whatever this says.
 # Settings › Rules switches it while the daemon runs, from the next command on, and writes it here.
 sandbox = true
+# The processes of a run nobody started (a schedule's, a watcher's, a hook's, a run of Dot's own initiative, and what
+# goes on from one of them) start in that sandbox in every mode, yolo and free mode included, whatever sandbox says
+# (item 2016). It seals Dot's own files and nothing else of the task's reach, and asks nothing. false has them follow
+# sandbox and yolo as the owner's runs do.
+sandbox_unattended = true
 
 [web]
 # "auto" climbs a ladder of engines until one answers: the owner's SearXNG instance when searxng_url is set (its own

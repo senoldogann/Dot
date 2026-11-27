@@ -129,6 +129,8 @@ final class ChatActionsLiveUITests: XCTestCase {
         openChat(app, "write: e2e")
         app.buttons["Changes and files"].tap()
         XCTAssertTrue(app.navigationBars["This chat"].waitForExistence(timeout: 10))
+        // The sections start folded (item 2017): the cost, the changes and the recap are opened.
+        for name in ["Cost", "Changes", "Recap"] { openSection(app, name) }
         XCTAssertTrue(app.staticTexts["Tokens in"].waitForExistence(timeout: 15), "the cost section")
         XCTAssertTrue(app.staticTexts["dotnext-e2e-note.txt"].exists, "the changed file")
         shot(app, "inspector-top")
@@ -155,6 +157,7 @@ final class ChatActionsLiveUITests: XCTestCase {
         // A command in the background: Stop in the inspector.
         openChat(app, "bg: e2e")
         app.buttons["Changes and files"].tap()
+        openSection(app, "Working in the background")
         let stop: XCUIElement = app.buttons["inspector.stopCommand"]
         for _ in 0..<3 where !(stop.exists && stop.isHittable) { app.swipeUp() }
         XCTAssertTrue(stop.waitForExistence(timeout: 15), "the background command with Stop")
@@ -175,5 +178,13 @@ final class ChatActionsLiveUITests: XCTestCase {
         // The helper's own chat, pushed in the sheet (item 1880): its title is the helper's goal.
         XCTAssertTrue(app.navigationBars.staticTexts.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "wait for the test")).firstMatch.waitForExistence(timeout: 15))
         shot(app, "helper-chat")
+    }
+
+    /// Opens a folded section of This chat by its header ("Changes, 1"), scrolling to it when it is below.
+    private func openSection(_ app: XCUIApplication, _ name: String) {
+        let header: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == 'inspector.section' AND (label == %@ OR label BEGINSWITH %@)", name, name + ",")).firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 15), "the \(name) section")
+        for _ in 0..<3 where !header.isHittable { app.swipeUp() }
+        header.tap()
     }
 }

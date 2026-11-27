@@ -3323,34 +3323,147 @@ dialog.modal.file-dialog .file-picture img {
   rotate: 90deg;
 }
 
-.diff {
-  max-height: 420px;
+/* A change opened (item 2017): code that scrolls sideways and never wraps, its numbers kept at the left, a line
+   added or removed tinted with its sign, a hunk's head a quiet band; the colours of the code are themes.css's --code-* tokens. */
+.change-body > .note {
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.code-view {
+  --code-ground: var(--surface-2);
+  max-height: min(60vh, 520px);
   margin: var(--space-1) 0 var(--space-2);
   overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface-2);
+  background: var(--code-ground);
   font: var(--code-size) / var(--code-leading) var(--mono);
   font-weight: var(--code-weight);
 }
 
-.diff-line {
-  display: block;
-  min-width: max-content;
-  padding: 0 var(--space-2);
+.code-lines {
+  display: grid;
+  width: max-content;
+  min-width: 100%;
+}
+
+.code-row {
+  display: flex;
+  background: var(--row-ground, var(--code-ground));
   white-space: pre;
 }
 
-.diff-add {
-  background: var(--ok-weak);
+.code-added {
+  --row-ground: var(--ok-weak);
 }
 
-.diff-del {
-  background: var(--bad-weak);
+.code-removed {
+  --row-ground: var(--bad-weak);
 }
 
-.diff-hunk {
+.code-nums {
+  position: sticky;
+  left: 0;
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  background: var(--row-ground, var(--code-ground));
+  color: var(--faint);
+  user-select: none;
+}
+
+.code-num {
+  min-width: var(--num-width);
+  text-align: end;
+}
+
+.code-sign {
+  flex: none;
+  width: 2ch;
+  color: var(--faint);
+  user-select: none;
+}
+
+.code-added .code-sign {
+  color: var(--ok);
+}
+
+.code-removed .code-sign {
+  color: var(--bad);
+}
+
+.code-text {
+  padding-right: var(--space-3);
+}
+
+.code-view[data-signed="false"] .code-text {
+  padding-left: var(--space-1);
+}
+
+.code-hunk {
+  padding: var(--space-1) var(--space-2);
+  border-block: 1px solid var(--border);
   color: var(--muted);
+  font-family: var(--font);
+  font-size: var(--text-xs);
+}
+
+.code-hunk-text {
+  position: sticky;
+  left: var(--space-2);
+}
+
+.code-more {
+  height: 1px;
+}
+
+.tok-keyword {
+  color: var(--code-keyword);
+}
+
+.tok-string {
+  color: var(--code-string);
+}
+
+.tok-comment {
+  color: var(--faint);
+}
+
+.tok-number {
+  color: var(--code-number);
+}
+
+.tok-key {
+  color: var(--code-key);
+}
+
+.tok-heading {
+  color: var(--text);
+  font-weight: var(--weight-title);
+}
+
+.change-new {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.change-new .code-view {
+  margin: 0;
+}
+
+.change-tabs {
+  justify-self: start;
+}
+
+.change-markdown .file-markdown {
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
 .inspector-scrim {

@@ -389,7 +389,8 @@ answer keeps its words, Ollama's too.
   run's approval mode, and asks you, the review model or nobody as for any run; a refusal tells the agent why, and it
   goes on. A subagent it asks for is refused, as its session would not be the run's. An edit is weighed by every file
   it writes (a patch of several files by the one your policy weighs most), and a command in the folder it runs in.
-  Outside `yolo` the server and all it runs work in Dot's sandbox, as Dot's own commands do (Settings › Rules ›
+  Outside `yolo`, and in every mode for a run nobody started (item 2016), the server and all it runs work in Dot's
+  sandbox, as Dot's own commands do (Settings › Rules ›
   Advanced › Keep Dot's commands in a safe box, item 677): from a home of their own (`opencode/sandboxed`), whose
   data, state and cache they write and whose config they do not, and nothing it starts reaches the server's own port
   (where the password its environment holds would answer its own asks); a `yolo` run's agent works in the other server,

@@ -69,6 +69,13 @@
   --warn-border: light-dark(#e8c27a, #5c4513);
   --bad: light-dark(#b91c1c, #f87171);
   --bad-weak: light-dark(#fdecec, #2b1313);
+  /* The colours of code in a change's view (item 2017): keywords, strings, numbers and keys, each reading at AA on
+     every surface and on a line added or removed, in every look (the paper look inherits them); a comment is in the
+     faint ink. DotNext's ChangeTone holds the same values. */
+  --code-keyword: light-dark(#a3123a, #ff8fa3);
+  --code-string: light-dark(#0b5a2a, #8fd9a8);
+  --code-number: light-dark(#0b4f9c, #8cc4ff);
+  --code-key: light-dark(#6b2fb3, #cfa8ff);
   --bad-border: light-dark(#f0b4b4, #6a2626);
   --on-bad: light-dark(#ffffff, #1a0505);
   /* The ground of a filled destructive button, with white on it in both schemes (item 1325): red, not the salmon that
