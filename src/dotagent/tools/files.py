@@ -70,7 +70,7 @@ _NOT_ALLOWED: re.Pattern[str] = re.compile(r"^rg: (the literal .+ is not allowed
 # cannot read: models write Python's or PCRE's syntax, a look-ahead or a "\n" across lines.
 _PATTERN_SYNTAX: str = (
     "Rust regex syntax, as ripgrep reads it: no look-around ((?=, (?!, (?<=, (?<!) and no backreferences, and a match "
-    "lies within one line, so a pattern holds no \\n; escape ( ) [ ] { } . | * + ? \\ to match them as text"
+    "lies within one line, so a pattern holds no \\n; escape ( ) [ ] { } . | * + ? ^ $ \\ to match them as text"
 )
 # Its line for a path given it that is not there (ENOENT), the model's own guess of a path (item 1283).
 _MISSING_PATH: re.Pattern[str] = re.compile(
