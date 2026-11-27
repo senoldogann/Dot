@@ -430,7 +430,9 @@ does. A run of a `dotx` command's own process cannot hand out orders (its runs e
 The **Work orders** part of the Agents page lists them read only, under the active objectives: a badge with where the
 order stands, its title, its agent, tries, age, due time, the last note and a link to its newest task. `GET
 /api/work-orders` gives them (the open ones first, each with its agent's name and the title of its objective) and `GET
-/api/objectives` the objectives.
+/api/objectives` the objectives. An active objective with no line of progress yet says its next step; the objectives done
+or let go stand last, under "Finished objectives", each with its state (item 2009, so that the web and the phone's
+bot profile list the same).
 
 ## Campaigns
 

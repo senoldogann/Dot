@@ -1,5 +1,5 @@
 // The work orders of the Agents page (items 907 and 908): what Dot handed to the agents and where each piece stands,
-// under the objectives it keeps. Read only: the lead (Dot) hands work out and judges it, in its chats. An order is a
+// under the objectives it keeps (the finished ones, done or let go, below the orders). Read only: the lead (Dot) hands work out and judges it, in its chats. An order is a
 // line with its state, its agent and the task of its newest try; the objectives that are active stand above them,
 // each with why it matters, how progress is judged and its newest line of progress.
 
@@ -7,7 +7,7 @@ import { api } from "./api.js";
 import { ago, clip, el, plural } from "./dom.js";
 import { errorPanel, loadingPanel } from "./panels.js";
 import { attempt } from "./ui.js";
-import { attemptWords, dueWords, stateOf } from "./workwords.js";
+import { attemptWords, dueWords, objectiveState, stateOf } from "./workwords.js";
 
 const TITLE_CHARS = 140;
 const NOTE_CHARS = 200;
@@ -18,24 +18,33 @@ const OUTSIDE = "Written after Dot read content from outside";
  * @typedef {import("./workwords.js").WorkOrder} WorkOrder
  * @typedef {{ order: WorkOrder, agent_name: string, objective_title: string | null }} OrderView
  * @typedef {{ at: number, text: string, tainted: boolean }} ObjectiveNote
- * @typedef {{ id: string, title: string, why: string, measure: string, status: string, notes: ObjectiveNote[], tainted: boolean }} Objective
+ * @typedef {{ id: string, title: string, why: string, measure: string, status: string, notes: ObjectiveNote[], tainted: boolean, workflow: { next_step: string } }} Objective
  */
 
 /** @param {Objective} objective */
 function objectiveRow(objective) {
   const newest = objective.notes.at(-1);
+  const state = objectiveState(objective.status);
+  // An active objective with no line of progress yet says the step that comes next, as the phone's row does.
+  const next = newest === undefined && objective.status === "active" ? objective.workflow.next_step : "";
   return el(
     "div",
     { class: "list-row work-row", dataset: { objective: objective.id } },
     el(
       "div",
       { class: "row-main" },
-      el("div", { class: "row-title" }, clip(objective.title, TITLE_CHARS)),
+      el(
+        "div",
+        { class: "row work-heads" },
+        objective.status === "active" ? null : el("span", { class: `badge ${state.tone}` }, state.label),
+        el("span", { class: "row-title" }, clip(objective.title, TITLE_CHARS)),
+      ),
       el("div", { class: "row-text muted" }, clip(objective.why, NOTE_CHARS)),
       el("div", { class: "row-text muted" }, `Judged by: ${clip(objective.measure, NOTE_CHARS)}`),
       newest === undefined
         ? null
         : el("div", { class: "row-text" }, `${new Date(newest.at * 1000).toLocaleDateString()}: ${clip(newest.text, NOTE_CHARS)}`),
+      next === "" ? null : el("div", { class: "row-text" }, `Next: ${clip(next, NOTE_CHARS)}`),
       objective.tainted || objective.notes.some((note) => note.tainted) ? el("div", { class: "row-meta" }, el("span", null, OUTSIDE)) : null,
     ),
   );
@@ -88,9 +97,10 @@ export function workOrdersPart() {
         return;
       }
       const active = objectives.filter((objective) => objective.status === "active");
+      const finished = objectives.filter((objective) => objective.status !== "active");
       const open = orders.filter((view) => view.order.status !== "accepted" && view.order.status !== "cancelled");
       count.textContent = open.length === 0 ? "" : String(open.length);
-      if (active.length === 0 && orders.length === 0) {
+      if (objectives.length === 0 && orders.length === 0) {
         holder.replaceChildren(
           el("div", { class: "card empty-teams" }, el("p", { class: "muted" }, "Nothing handed out yet. When Dot gives your agents work as orders, they show here with where each stands.")),
         );
@@ -104,6 +114,8 @@ export function workOrdersPart() {
           ...active.map(objectiveRow),
           orders.length === 0 ? null : el("h3", { class: "work-sub" }, "Orders"),
           ...orders.map(orderRow),
+          finished.length === 0 ? null : el("h3", { class: "work-sub" }, "Finished objectives"),
+          ...finished.map(objectiveRow),
         ),
       );
     } catch (error) {
