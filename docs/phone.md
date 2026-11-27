@@ -360,7 +360,7 @@ Over the composer there is one row and nothing stacked (item 1383, which ended t
 on the subagents, the queue, the loops and the commands at work, five panes one upon the other at different widths): a
 capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
-never a layer over it. Its segments are the run's status with its Stop (**Working · 36 s**, **Waiting for you**,
+never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Reconnecting…**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
