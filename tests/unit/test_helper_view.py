@@ -13,6 +13,13 @@ def test_a_title_is_the_goals_first_sentence_with_no_record_ids_cut_at_a_word() 
     assert len(long) <= 80 and long.endswith("…") and not long.endswith(" …")
 
 
+def test_a_label_the_goal_opens_with_is_left_out_of_its_title() -> None:
+    goal: str = "Görev: hafıza notlarını birleştirmek.\n\nGirdi dosyası: `/Users/x/C8.md`"
+    assert helper_title(goal) == "Hafıza notlarını birleştirmek."
+    assert helper_title("Task: check the build") == "Check the build"
+    assert helper_title("Fix this: the build fails") == "Fix this: the build fails"
+
+
 def test_a_step_names_the_tool_a_short_target_and_the_plain_line() -> None:
     called: EventRecord = EventRecord(
         id=3,

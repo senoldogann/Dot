@@ -79,6 +79,8 @@ _PHONES: tuple[tuple[str, str], ...] = (
     ("webkit", "iPhone 17 Pro Max"),
     ("chromium", "Pixel 7"),
 )
+# A box just past the 340 px where the composer becomes one row (item 2015): an iPhone 13 mini's, 375 px wide.
+_ONE_ROW_PHONE: tuple[str, str] = ("webkit", "iPhone 13 Mini")
 _OWNERS_PHONE: str = "iPhone 17 Pro Max"
 # The safe areas of an iPhone with a home indicator, as an app added to its home screen has them.
 _SAFE_TOP_PX: int = 47
@@ -430,7 +432,7 @@ async def test_the_words_in_an_empty_composer_box_fit_its_line_on_every_phone(ow
         )
         await manager.wait(run.id)
         misfits: list[str] = []
-        for engine, device in _PHONES:
+        for engine, device in (*_PHONES, _ONE_ROW_PHONE):
             browser: Browser = await getattr(playwright, engine).launch(
                 **({"channel": "chrome"} if engine == "chromium" else {}), headless=True
             )

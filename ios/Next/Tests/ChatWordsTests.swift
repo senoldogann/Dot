@@ -174,4 +174,12 @@ final class ChatWordsTests: XCTestCase {
         }
         XCTAssertFalse(BackgroundKind.subagent.word.lowercased().contains("subagent"))
     }
+
+    /// Item 2025: a new chat's outbox key is never opened as a stream (the daemon would answer 404 and the chat read as
+    /// deleted before it is named); the thread the daemon names is.
+    func testANewChatsKeyOpensNoStream() {
+        let starting: [String: String] = ["key-1": "Say hello"]
+        XCTAssertFalse(chatHasStream("key-1", starting: starting))
+        XCTAssertTrue(chatHasStream("thr_named", starting: starting))
+    }
 }
