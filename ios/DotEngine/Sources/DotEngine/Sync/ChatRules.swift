@@ -32,6 +32,42 @@ public enum AskKind: Sendable, Equatable {
     case secret
 }
 
+/// How a card's field of secrets is typed (item 2040): in a box that shows no letter, in one that shows them (an id the
+/// owner copies), or as a key file picked on the phone. Every kind is held and masked the same on the Mac.
+public enum SecretFieldKind: String, Sendable, Equatable {
+    case secret
+    case text
+    case file
+}
+
+/// One field of a card of several secrets (item 2040), with the limits the daemon gives: the name the chat's commands
+/// read it as, its words, its kind, and how long its value may be.
+public struct SecretField: Sendable, Equatable, Identifiable {
+    public let name: String
+    public let label: String
+    public let kind: SecretFieldKind
+    public let least: Int
+    public let most: Int
+    public var id: String { name }
+
+    public init(name: String, label: String, kind: SecretFieldKind, least: Int, most: Int) {
+        self.name = name
+        self.label = label
+        self.kind = kind
+        self.least = least
+        self.most = most
+    }
+}
+
+/// Whether every field of a card holds a value the card may hold: at least its least and at most its most, without the
+/// spaces around it (item 2040). Pure.
+public func secretFieldsReady(_ fields: [SecretField], values: [String: String]) -> Bool {
+    fields.allSatisfy { field in
+        let typed: Int = (values[field.name] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
+        return typed >= field.least && typed <= field.most
+    }
+}
+
 /// An option of a question (item 192).
 public struct AskOption: Sendable, Equatable, Hashable {
     public let label: String
@@ -62,6 +98,8 @@ public struct Ask: Sendable, Equatable, Identifiable {
     /// A helper's ask (its run is not one of the chat's own).
     public let fromHelper: Bool
     public let createdAt: Double
+    /// The fields of a card of several secrets (item 2040); empty for a card of one value, as cards were before.
+    public var secretFields: [SecretField] = []
 }
 
 /// Where an ask stands for the owner (plan §13 B1).
@@ -127,12 +165,26 @@ public func ask(of record: ApprovalRecord, chatRuns: Set<String>) -> Ask {
         case .secret: args["label"]?.string ?? record.summary
         case .approval, .handoff: record.summary
         }
-    return Ask(
+    var made: Ask = Ask(
         id: record.id, runId: record.runId, kind: kind, tool: record.tool, text: text,
         why: kind == .secret ? (args["why"]?.string ?? "") : "",
         target: [args["target"]?.string, args["body"]?.string].compactMap { $0 }.filter { !$0.isEmpty && !text.contains($0) }.joined(separator: "\n\n"),
         options: options, topic: args["header"]?.string ?? "", multiple: args["multiple"]?.bool == true, rememberable: rememberable, kept: kept,
         fromHelper: !chatRuns.contains(record.runId), createdAt: record.createdAt)
+    if kind == .secret { made.secretFields = secretFields(of: args) }
+    return made
+}
+
+/// The fields of a card of several secrets from its record's args (item 2040), with the daemon's limits; none for a
+/// card of one value (it keeps its one box and its short-code path). Pure.
+public func secretFields(of args: [String: JSONValue]) -> [SecretField] {
+    let fields: [SecretField] = (args["fields"]?.array ?? []).compactMap { field in
+        guard let name: String = field["name"]?.string, let label: String = field["label"]?.string else { return nil }
+        return SecretField(
+            name: name, label: label, kind: SecretFieldKind(rawValue: field["kind"]?.string ?? "") ?? .secret,
+            least: field["min_chars"]?.int ?? secretLeastCharacters, most: field["max_chars"]?.int ?? 8192)
+    }
+    return fields.count > 1 ? fields : []
 }
 
 /// The dock's entries (plan §13 B1): the asks waiting, oldest first (a stable order: a new ask never moves the one the

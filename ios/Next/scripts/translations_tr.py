@@ -1730,3 +1730,15 @@ TR.update(
         "Shows the whole message": "Mesajın tamamını gösterir",
     }
 )
+
+# A card of several secrets (item 2040).
+TR.update(
+    {
+        "Choose a file": "Dosya seç",
+        "No file chosen": "Dosya seçilmedi",
+        "%@ could not be read": "%@ okunamadı",
+        "%@ is too large for a card: a key file is a few KB at most.": "%@ bir kart için çok büyük: bir anahtar dosyası en fazla birkaç KB olur.",
+        "%@ is not a text file: pick the key file itself (.p8, .pem, .json).": "%@ bir metin dosyası değil: anahtar dosyasının kendisini seç (.p8, .pem, .json).",
+        "%@ · %lld bytes": "%1$@ · %2$lld bayt",
+    }
+)

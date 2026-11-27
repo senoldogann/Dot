@@ -79,4 +79,9 @@ public struct Engine: Sendable {
     public func giveSecret(approval: String, value: String) async throws(DaemonRequestError) -> ApprovalRecord {
         try await api.giveSecret(approval: approval, value: value)
     }
+
+    /// Gives every field of a card of several secrets (item 2040), as `giveSecret`: at once, never to the outbox's file.
+    public func giveSecrets(approval: String, answers: [(name: String, value: String)]) async throws(DaemonRequestError) -> ApprovalRecord {
+        try await api.giveSecrets(approval: approval, answers: answers)
+    }
 }

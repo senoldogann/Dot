@@ -10,11 +10,13 @@ import { capital, flagWords, kindWords } from "./flagwords.js";
 import { icon } from "./icons.js";
 import { t } from "./i18n.js";
 import { viaOutbox } from "./outbox.js";
+import { secretFields, secretFieldsReady } from "./secretfields.js";
 import { toastError } from "./ui.js";
 
 const STATUS_BADGE = { approved: "b-ok", denied: "b-bad", expired: "b-muted" };
 // The shortest secret a card takes: one shorter would stand bare where a command prints it (held_secrets.py, item 857).
 const SECRET_LEAST_CHARS = 8;
+
 const STATUS_LABEL = { approved: t("approvals.approved"), denied: t("approvals.denied"), expired: t("approvals.expired"), pending: t("approvals.waitingForYou") };
 // The note the daemon gives a step nobody answered in time (agent/approvals.py): the settled line says it in its words.
 const EXPIRED_NOTES = new Set(["no decision before the deadline", "kept past its time"]);
@@ -488,6 +490,11 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
    * securely, which sends the value to the daemon's own route for it (held for this chat's commands, written nowhere
    * else), and Decline. The box is emptied once it is sent. */
   function renderSecret() {
+    const fields = secretFields(approval.args);
+    if (fields.length > 0) {
+      renderSecretFields(fields);
+      return;
+    }
     node.className = "approval secret";
     const label = typeof approval.args.label === "string" ? approval.args.label : approval.summary;
     const why = typeof approval.args.why === "string" ? approval.args.why : "";
@@ -573,6 +580,110 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         why === "" ? null : el("div", { class: "secret-why" }, why),
         el("div", { class: "secret-entry" }, value, save),
         short,
+        el(
+          "div",
+          { class: "secret-foot" },
+          icon("shield"),
+          el("span", { class: "grow" }, t("approvals.keptOutOfTheChat")),
+          decline,
+        ),
+      ),
+    );
+  }
+
+  /** A card of several secrets (item 2040): each field's words and the name its commands read it as, a box that shows no
+   * letter (a secret), one that shows them (an id), or a file picked here (a key file, read as text); Save securely once
+   * every field has a value the card holds, which sends them together to the daemon's route, and Decline. */
+  function renderSecretFields(fields) {
+    node.className = "approval secret secret-fields";
+    const label = typeof approval.args.label === "string" ? approval.args.label : approval.summary;
+    const why = typeof approval.args.why === "string" ? approval.args.why : "";
+    const values = new Map();
+    const save = el("button", { class: "btn primary", type: "button", disabled: true }, t("approvals.saveSecurely"));
+    const decline = el("button", { class: "btn ghost", type: "button", onclick: () => decide(false, "") }, t("approvals.decline"));
+    function paint() {
+      save.disabled = busy || !secretFieldsReady(fields, values);
+    }
+    repaint = paint;
+    const rows = fields.map((field) => {
+      const head = el("div", { class: "secret-field-head" }, el("span", null, field.label), el("code", { class: "secret-field-name" }, `$${field.name}`));
+      if (field.kind === "file") {
+        const said = el("span", { class: "small muted secret-file-said", role: "status" }, t("approvals.noFileChosen"));
+        const input = el("input", { type: "file", class: "secret-file", accept: ".p8,.pem,.key,.json,.txt", "aria-label": field.label });
+        input.addEventListener("change", async () => {
+          const file = input.files?.[0];
+          values.set(field.name, "");
+          if (file === undefined) {
+            said.textContent = t("approvals.noFileChosen");
+          } else if (file.size > field.most) {
+            said.textContent = t("approvals.fileTooLarge", { name: file.name });
+          } else {
+            const text = await file.text();
+            if (text.includes("\u0000") || text.includes("�")) {
+              said.textContent = t("approvals.fileNotText", { name: file.name });
+            } else {
+              values.set(field.name, text);
+              said.textContent = t("approvals.fileChosen", { name: file.name, size: String(file.size) });
+            }
+          }
+          paint();
+        });
+        return el("label", { class: "secret-field" }, head, input, said);
+      }
+      const input = el("input", {
+        class: `input${field.kind === "secret" ? " mono" : ""}`,
+        type: field.kind === "secret" ? "password" : "text",
+        autocomplete: "off",
+        autocapitalize: "off",
+        spellcheck: "false",
+        maxlength: String(field.most),
+        "aria-label": field.label,
+      });
+      input.addEventListener("input", () => {
+        values.set(field.name, input.value);
+        paint();
+      });
+      return el("label", { class: "secret-field" }, head, input);
+    });
+    async function give() {
+      if (busy || !secretFieldsReady(fields, values)) {
+        return;
+      }
+      busy = true;
+      node.querySelectorAll("button, input").forEach((control) => {
+        control.disabled = true;
+      });
+      let decided;
+      try {
+        const answers = fields.map((field) => ({ name: field.name, value: values.get(field.name) }));
+        decided = await api.post(`/approvals/${approval.id}/secret`, { answers });
+      } catch (error) {
+        busy = false;
+        node.querySelectorAll("button, input").forEach((control) => {
+          control.disabled = false;
+        });
+        paint();
+        toastError(error);
+        if (error.status === 409) {
+          onSettled(null);
+        }
+        return;
+      }
+      // Nothing of them stays on the page: the map and the boxes are emptied once they are sent.
+      values.clear();
+      node.querySelectorAll("input").forEach((input) => {
+        input.value = "";
+      });
+      onSettled(decided);
+    }
+    save.addEventListener("click", () => give());
+    node.replaceChildren(
+      ...present(
+        el("div", { class: "approval-head" }, icon("key"), el("span", null, titleOf("secret")), el("span", { class: "spacer" }), heading),
+        el("div", { class: "approval-text secret-label" }, label),
+        why === "" ? null : el("div", { class: "secret-why" }, why),
+        el("div", { class: "secret-field-list" }, rows),
+        el("div", { class: "secret-actions" }, save),
         el(
           "div",
           { class: "secret-foot" },

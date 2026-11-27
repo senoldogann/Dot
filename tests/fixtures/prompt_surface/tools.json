@@ -68,11 +68,46 @@
     }
   },
   {
-    "description": "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's commands read it as $name for 24 hours. Never ask for a secret in a message or with ask_user. A short code may come back in words.",
+    "description": "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's commands read it as $name for 24 hours. Several that go together (an id, a key, a key file) go on one card with fields. Never ask for a secret in a message or with ask_user. A short code may come back in words.",
     "name": "ask_secret",
     "parameters": {
       "additionalProperties": false,
       "properties": {
+        "fields": {
+          "description": "Several on one card, instead of name: e.g. an Issuer ID, a Key ID and the .p8 key file.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "default": "secret",
+                "description": "secret (a box that shows no letter), text (an id the user copies, shown as typed), file (a key file the user picks; $name holds its text).",
+                "enum": [
+                  "secret",
+                  "text",
+                  "file"
+                ],
+                "type": "string"
+              },
+              "label": {
+                "description": "What it is, as the card says it: Issuer ID.",
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "name": {
+                "description": "The environment variable your commands read it as: APP_STORE_ISSUER_ID.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "label"
+            ],
+            "type": "object"
+          },
+          "maxItems": 4,
+          "type": "array"
+        },
         "label": {
           "description": "The card's title: what it is and its least access.",
           "maxLength": 120,
@@ -80,7 +115,8 @@
           "type": "string"
         },
         "name": {
-          "description": "The environment variable your commands read it as: CLOUDFLARE_API_TOKEN.",
+          "default": "",
+          "description": "One secret: the environment variable your commands read it as: CLOUDFLARE_API_TOKEN.",
           "type": "string"
         },
         "replace": {
@@ -96,7 +132,6 @@
         }
       },
       "required": [
-        "name",
         "label",
         "why"
       ],

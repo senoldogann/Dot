@@ -258,6 +258,11 @@ private struct DecisionBody: Encodable {
     let remember: Bool
 }
 private struct SecretBody: Encodable { let value: String }
+private struct SecretAnswer: Encodable {
+    let name: String
+    let value: String
+}
+private struct SecretAnswersBody: Encodable { let answers: [SecretAnswer] }
 private struct ReactionBody: Encodable { let reaction: String }
 private struct AsideBody: Encodable { let text: String }
 private struct LoopBody: Encodable {
@@ -424,6 +429,13 @@ extension DaemonAPI {
     }
 
     /// Gives the secret a card asks for (item 857); the value is sent once and kept nowhere on the phone.
+    /// Gives every field of a card of several secrets at once (item 2040), in the card's order.
+    public func giveSecrets(approval: String, answers: [(name: String, value: String)]) async throws(DaemonRequestError) -> ApprovalRecord {
+        try await send(
+            "POST", "/api/approvals/\(approval)/secret",
+            body: Self.json(SecretAnswersBody(answers: answers.map { SecretAnswer(name: $0.name, value: $0.value) })))
+    }
+
     public func giveSecret(approval: String, value: String) async throws(DaemonRequestError) -> ApprovalRecord {
         try await send("POST", "/api/approvals/\(approval)/secret", body: Self.json(SecretBody(value: value)))
     }

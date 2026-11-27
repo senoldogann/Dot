@@ -60,6 +60,46 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 )
 
 
+# Item 2040: an App Store Connect key on one card: the issuer's id (shown as typed), the key's id and its .p8 file.
+_ISSUER: str = "69a6de70-made-up-issuer-item-2040"
+_KEY_ID: str = "MADEUPKEY2040"
+_P8: str = (
+    "-----BEGIN PRIVATE KEY-----\n"
+    "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgmadeUpKeyItem2040\n"
+    "-----END PRIVATE KEY-----"
+)
+_ASK_FIELDS: ScriptedTurn = ScriptedTurn(
+    text="",
+    calls=(
+        ScriptedCall(
+            tool="ask_secret",
+            arguments={
+                "label": "App Store Connect API key",
+                "why": "To upload the build. Users and Access, then Integrations, then App Store Connect API.",
+                "fields": [
+                    {"name": "ASC_ISSUER_ID", "label": "Issuer ID", "kind": "text"},
+                    {"name": "ASC_KEY_ID", "label": "Key ID", "kind": "secret"},
+                    {"name": "ASC_KEY", "label": "Key file (.p8)", "kind": "file"},
+                ],
+            },
+        ),
+    ),
+)
+_USE_FIELDS: ScriptedTurn = ScriptedTurn(
+    text="",
+    calls=(
+        ScriptedCall(
+            tool="shell",
+            arguments={
+                "command": 'printf %s "$ASC_ISSUER_ID" | wc -c; printf %s "$ASC_KEY_ID" | wc -c; '
+                'printf %s "$ASC_KEY" | wc -l; echo "$ASC_KEY"; printf %s "$ASC_KEY" | sed -n 1p; '
+                'printf %s "$ASC_KEY" | sed -n 2p'
+            },
+        ),
+    ),
+)
+
+
 def _reads_of_the_folder(home: Path) -> list[ScriptedTurn]:
     """Runs of another chat that try to read the chats' secrets from their folder: one, a command then a file tool;
     the next, in yolo, a command."""
@@ -91,8 +131,11 @@ async def served(
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     # A test that reads the folder takes its run's turns from its parameter; the others, the second run's card.
-    second: list[ScriptedTurn] = _reads_of_the_folder(home) if getattr(request, "param", "") == "reads" else [_ASK]
-    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_ASK, _USE, _FINISH, *second, _FINISH]))
+    param: str = getattr(request, "param", "")
+    second: list[ScriptedTurn] = _reads_of_the_folder(home) if param == "reads" else [_ASK]
+    # The card of several fields (item 2040) is the first run's, in its own test.
+    first: list[ScriptedTurn] = [_ASK_FIELDS, _USE_FIELDS, _FINISH] if param == "fields" else [_ASK, _USE, _FINISH]
+    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [*first, *second, _FINISH]))
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", 0)
@@ -147,6 +190,15 @@ async def test_the_secret_reaches_the_chats_command_and_nothing_else(
         "name": "DEMO_TOKEN",
         "label": "Demo API token (read)",
         "why": "To read the visits. Make one at demo.example: Profile, then Tokens, then Create, read only.",
+        "fields": [
+            {
+                "name": "DEMO_TOKEN",
+                "label": "Demo API token (read)",
+                "kind": "secret",
+                "min_chars": 8,
+                "max_chars": 8192,
+            }
+        ],
     }
     # A yes with no value is refused: it would tell the run a secret was given.
     plain = await client.post(f"/api/approvals/{card['id']}/decision", json={"approve": True, "note": VALUE})
@@ -185,6 +237,56 @@ def _files_holding(folders: list[Path], value: str) -> list[Path]:
         for file in sorted(folder.rglob("*"))
         if file.is_file() and value.encode() in file.read_bytes()
     ]
+
+
+@pytest.mark.parametrize("served", ["fields"], indirect=True)
+async def test_a_card_of_several_fields_holds_them_all_and_a_key_files_text_is_masked(
+    served: tuple[RunManager, httpx.AsyncClient], tmp_path: Path
+) -> None:
+    manager, client = served
+    started = await client.post("/api/runs", json={"goal": "Upload the build to TestFlight", "approvals": "ask"})
+    assert started.status_code == 201, started.text
+    run_id: str = started.json()["id"]
+    card: dict[str, object] = await _card(client)
+    args = card["args"]
+    assert isinstance(args, dict) and "name" not in args, "an older client cannot answer part of a card of several"
+    assert [(field["name"], field["kind"]) for field in args["fields"]] == [
+        ("ASC_ISSUER_ID", "text"),
+        ("ASC_KEY_ID", "secret"),
+        ("ASC_KEY", "file"),
+    ]
+    # An older phone's one value is refused with a word to update; a field left out is refused; nothing is held.
+    old = await client.post(f"/api/approvals/{card['id']}/secret", json={"value": _KEY_ID})
+    assert old.status_code == 422 and "update the app" in old.text, old.text
+    part = await client.post(
+        f"/api/approvals/{card['id']}/secret", json={"answers": [{"name": "ASC_KEY_ID", "value": _KEY_ID}]}
+    )
+    assert part.status_code == 422, part.text
+    answers = [
+        {"name": "ASC_ISSUER_ID", "value": _ISSUER},
+        {"name": "ASC_KEY_ID", "value": _KEY_ID},
+        {"name": "ASC_KEY", "value": _P8},
+    ]
+    given = await client.post(f"/api/approvals/{card['id']}/secret", json={"answers": answers})
+    assert given.status_code == 200, given.text
+    async with asyncio.timeout(_WAIT_S):
+        assert (await manager.wait(run_id)).status == "done"
+    events: list[EventRecord] = await manager._runtime.store.list_events(run_id, 0, 500)
+    results: dict[str, str] = {
+        str(event.data.get("tool")): str(event.data.get("text", "")) for event in events if event.kind == "tool_result"
+    }
+    asked, used = results["ask_secret"], results["shell"]
+    assert "$ASC_ISSUER_ID" in asked and "$ASC_KEY (the file's text)" in asked, asked
+    # The command read every one (the key's three lines). The key printed whole is masked whole, and a line of it
+    # printed alone is masked too (Dot's own mask of a private key's block takes its first line with it).
+    assert str(len(_ISSUER)) in used and str(len(_KEY_ID)) in used, used
+    assert "MADEUPKEY2040" not in used and "madeUpKeyItem2040" not in used, used
+    assert used.count("***") >= 2, used
+    for value in (_ISSUER, _KEY_ID, "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgmadeUpKeyItem2040"):
+        for event in events:
+            assert value not in json.dumps(event.data), event.kind
+        holding: list[Path] = await asyncio.to_thread(_files_holding, [tmp_path / "home", tmp_path / "logs"], value)
+        assert [file.name for file in holding] == [f"{started.json()['thread_id']}.json"], holding
 
 
 async def test_a_declined_card_tells_the_run_so(served: tuple[RunManager, httpx.AsyncClient]) -> None:
@@ -328,5 +430,57 @@ async def test_the_card_takes_the_secret_in_a_box_that_shows_no_letter_and_says_
                 assert (await manager.wait(run_id)).status == "done"
             # The page never shows the value, the command's output masked included.
             assert VALUE not in await page.content()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize("served", ["fields"], indirect=True)
+@pytest.mark.parametrize("viewport", [(1440, 900), (390, 844)], ids=["desktop", "phone"])
+async def test_a_card_of_several_fields_takes_each_in_its_own_box_and_a_key_file_picked_here(
+    served: tuple[RunManager, httpx.AsyncClient], tmp_path: Path, viewport: tuple[int, int]
+) -> None:
+    """Item 2040 on the web: each field's words and the name its commands read it as; the Key ID in a box that shows no
+    letter, the Issuer ID in one that shows them, the key file picked here; Save securely once every field holds one."""
+    manager, client = served
+    started = await client.post("/api/runs", json={"goal": "Upload the build to TestFlight", "approvals": "ask"})
+    run_id: str = started.json()["id"]
+    await _card(client)
+    port: int | None = client.base_url.port
+    assert port is not None
+    key_file: Path = tmp_path / "AuthKey_MADEUPKEY2040.p8"
+    await asyncio.to_thread(key_file.write_text, _P8, "utf-8")
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            width, height = viewport
+            page = await browser.new_page(viewport={"width": width, "height": height}, reduced_motion="reduce")
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"http://127.0.0.1:{port}/#/runs/{run_id}")
+            card = page.locator(".approval.secret-fields")
+            await expect(card).to_be_visible()
+            await expect(card.locator(".secret-field-name")).to_have_text(["$ASC_ISSUER_ID", "$ASC_KEY_ID", "$ASC_KEY"])
+            issuer = card.get_by_role("textbox", name="Issuer ID")
+            await expect(issuer).to_have_attribute("type", "text")
+            await expect(card.get_by_label("Key ID")).to_have_attribute("type", "password")
+            save = card.get_by_role("button", name="Save securely")
+            await expect(save).to_be_disabled()
+            await issuer.fill(_ISSUER)
+            await card.get_by_label("Key ID").fill(_KEY_ID)
+            # The key file is still to pick.
+            await expect(save).to_be_disabled()
+            await card.get_by_label("Key file (.p8)").set_input_files(str(key_file))
+            await expect(card.locator(".secret-file-said")).to_contain_text("AuthKey_MADEUPKEY2040.p8")
+            await expect(save).to_be_enabled()
+            box = await card.bounding_box()
+            assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+            await page.screenshot(path=str(tmp_path / f"secret-fields-{width}.png"))
+            await save.click()
+            await expect(page.locator(".approval.secret-fields")).to_have_count(0)
+            async with asyncio.timeout(_WAIT_S):
+                assert (await manager.wait(run_id)).status == "done"
+            content: str = await page.content()
+            assert _ISSUER not in content and _KEY_ID not in content and "madeUpKeyItem2040" not in content
         finally:
             await browser.close()

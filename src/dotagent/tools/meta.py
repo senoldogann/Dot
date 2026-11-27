@@ -9,7 +9,14 @@ from pydantic import AfterValidator, Field, StringConstraints, model_validator
 
 from dotagent.agent.account import ResultFact, StepProof, opened_after, proof_words, result_fact, step_proof, with_proof
 from dotagent.agent.approvals import ApprovalOutcome
-from dotagent.agent.held_secrets import SECRET_SEVERITY, checked_name, held_secrets
+from dotagent.agent.held_secrets import (
+    MOST_FILE_CHARS,
+    MOST_VALUE_CHARS,
+    SECRET_SEVERITY,
+    SecretKind,
+    checked_name,
+    held_secrets,
+)
 from dotagent.agent.plan import (
     EMPTY_PLAN,
     EVIDENCE_MAX_CHARS,
@@ -29,6 +36,7 @@ from dotagent.agent.plan import (
 from dotagent.agent.questions import Option, QuestionOption, answered
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
+from dotagent.core.text import KNOWN_SECRET_MIN_CHARS
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.policy.types import ActionInfo
 from dotagent.server import UI_SOURCE
@@ -627,18 +635,58 @@ def _use_tools_tool() -> RegisteredTool:
     )
 
 
+class SecretField(FrozenModel):
+    name: str = Field(description="The environment variable your commands read it as: APP_STORE_ISSUER_ID.")
+    label: str = Field(min_length=1, max_length=80, description="What it is, as the card says it: Issuer ID.")
+    kind: SecretKind = Field(
+        default="secret",
+        description="secret (a box that shows no letter), text (an id the user copies, shown as typed), file (a key "
+        "file the user picks; $name holds its text).",
+    )
+
+
 class AskSecretArgs(ToolArgs):
-    name: str = Field(description="The environment variable your commands read it as: CLOUDFLARE_API_TOKEN.")
+    name: str = Field(
+        default="", description="One secret: the environment variable your commands read it as: CLOUDFLARE_API_TOKEN."
+    )
     label: str = Field(min_length=1, max_length=120, description="The card's title: what it is and its least access.")
     why: str = Field(min_length=1, max_length=1500, description="Why you need it, and how to make it, step by step.")
+    fields: list[SecretField] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Several on one card, instead of name: e.g. an Issuer ID, a Key ID and the .p8 key file.",
+    )
     replace: bool = Field(default=False, description="True to ask again for one this chat holds that is wrong.")
 
+    @model_validator(mode="after")
+    def _one_shape(self) -> Self:
+        if (self.name == "") == (not self.fields):
+            raise ValueError("give either name (one secret) or fields (several), not both")
+        return self
 
-def _held_line(name: str) -> str:
+
+def _card_fields(args: AskSecretArgs) -> list[SecretField]:
+    """The fields of the card: the one of ``name`` (its title as its label) or ``fields``. Pure."""
+    return list(args.fields) if args.fields else [SecretField(name=args.name, label=args.label, kind="secret")]
+
+
+def _field_details(field: SecretField) -> JsonObject:
+    """A field as the card's clients draw it, with its limits (item 2040): the phone and the page read them here."""
+    most: int = MOST_FILE_CHARS if field.kind == "file" else MOST_VALUE_CHARS
+    return {
+        "name": field.name,
+        "label": field.label,
+        "kind": field.kind,
+        "min_chars": KNOWN_SECRET_MIN_CHARS,
+        "max_chars": most,
+    }
+
+
+def _held_line(fields: list[SecretField]) -> str:
+    said: str = ", ".join(f"${field.name}" + (" (the file's text)" if field.kind == "file" else "") for field in fields)
     return (
-        f"The user saved it securely: your commands in this chat read it as ${name} for 24 hours. Its value is never "
-        "shown to you: use the variable, and never print, echo, save or send the value itself anywhere it does not "
-        "need to go."
+        f"The user saved it securely: your commands in this chat read {said} for 24 hours. Its value is never shown to "
+        "you: use the variable, and never print, echo, save or send the value itself anywhere it does not need to go."
     )
 
 
@@ -647,15 +695,29 @@ def _ask_secret_tool() -> RegisteredTool:
         return _meta_action(ASK_SECRET_TOOL, f"Ask the user for a secret: {args.label}")
 
     async def run(args: AskSecretArgs, ctx: ToolContext) -> ToolResult:
+        fields: list[SecretField] = _card_fields(args)
         try:
-            name: str = checked_name(args.name)
+            names: list[str] = [checked_name(field.name) for field in fields]
         except InvalidValueError as error:
             return fail(error.message)
-        # One the chat holds already is not asked for again, unless the run says it must be replaced.
-        if not args.replace and name in {held.name for held in await asyncio.to_thread(held_secrets, ctx.thread_id)}:
-            return ok(_held_line(name))
-        details: JsonObject = {"name": name, "label": args.label, "why": args.why}
-        # Nobody watches the run (item 857): the card stays for the user, and the secret, once given, holds for this
+        if len(set(names)) != len(names):
+            return fail("name each field once")
+        # What the chat holds already is not asked for again, unless the run says it must be replaced (item 2040: a
+        # card asks only for the fields the chat does not hold).
+        held: set[str] = {one.name for one in await asyncio.to_thread(held_secrets, ctx.thread_id)}
+        asked: list[SecretField] = fields if args.replace else [field for field in fields if field.name not in held]
+        if not asked:
+            return ok(_held_line(fields))
+        details: JsonObject = {
+            "label": args.label,
+            "why": args.why,
+            "fields": [_field_details(field) for field in asked],
+        }
+        # A card of one field keeps its name where an older phone or page reads it; one of several has none there, and
+        # such a client is told to update rather than answer part of it.
+        if len(asked) == 1:
+            details["name"] = asked[0].name
+        # Nobody watches the run (item 857): the card stays for the user, and the secrets, once given, hold for this
         # chat's later runs.
         if ctx.questions == "leave":
             await ctx.runtime.approvals.leave(ctx.run_id, ASK_SECRET_TOOL, args.label, SECRET_SEVERITY, details)
@@ -663,20 +725,22 @@ def _ask_secret_tool() -> RegisteredTool:
                 await ctx.runtime.notify("Dot asks for a secret", args.label)
             except Exception as error:  # noqa: BLE001 - a notification that fails must not fail the question
                 _log.warning("secret_notify_failed", run_id=ctx.run_id, error=str(error))
+            said: str = ", ".join(f"${field.name}" for field in asked)
             return ok(
                 f"The card asking for {args.label} is left for the user, who does not answer during this run. Once "
-                f"they save it, this chat's commands read it as ${name}. Go on with what does not need it."
+                f"they save it, this chat's commands read {said}. Go on with what does not need it."
             )
         outcome: ApprovalOutcome = await ctx.runtime.approvals.request(
             ctx.run_id, ASK_SECRET_TOOL, args.label, SECRET_SEVERITY, details
         )
-        held_now = await asyncio.to_thread(held_secrets, ctx.thread_id)
-        if outcome.status == "approved" and name in {held.name for held in held_now}:
-            return ok(_held_line(name))
+        held_now: set[str] = {one.name for one in await asyncio.to_thread(held_secrets, ctx.thread_id)}
+        if outcome.status == "approved" and all(name in held_now for name in names):
+            return ok(_held_line(fields))
         # A value too short for a card to hold (a code sent by SMS, a PIN: under 8 characters, which no mask reaches)
-        # the user may send as a message instead (item 1073): it comes as the card's note, in their words, from the page
-        # alone (a command that cannot ask declines with a note of its own, which is no word of the user's).
-        if outcome.status == "denied" and outcome.decided_by == UI_SOURCE and outcome.note.strip():
+        # the user may send as a message instead (item 1073), on a card of one field: it comes as the card's note, in
+        # their words, from the page alone (a command that cannot ask declines with a note of its own, which is no word
+        # of the user's).
+        if len(asked) == 1 and outcome.status == "denied" and outcome.decided_by == UI_SOURCE and outcome.note.strip():
             # The user's own words, as an answer to a question of the run is (item 1289): a code they typed here may go
             # into the page's one-time-code field, which outside yolo takes only text the user gave in this run.
             ctx.gate.add_instruction(outcome.note.strip())
@@ -694,8 +758,9 @@ def _ask_secret_tool() -> RegisteredTool:
         name=ASK_SECRET_TOOL,
         description=(
             "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's "
-            "commands read it as $name for 24 hours. Never ask for a secret in a message or with ask_user. A short "
-            "code may come back in words."
+            "commands read it as $name for 24 hours. Several that go together (an id, a key, a key file) go on one "
+            "card with fields. Never ask for a secret in a message or with ask_user. A short code may come back in "
+            "words."
         ),
         args_model=AskSecretArgs,
         modes=ALL_MODES,

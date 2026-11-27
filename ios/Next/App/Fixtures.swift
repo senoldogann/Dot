@@ -14,6 +14,8 @@
         case question = "n2-question"
         /// A secret ask.
         case secret = "n2-secret"
+        /// A card of several secrets (item 2040): an App Store Connect key's issuer id, key id and .p8 file.
+        case secrets = "n2-secrets"
         /// A hand-off.
         case handoff = "n2-handoff"
         /// The queue sheet over a working chat.
@@ -115,6 +117,14 @@
                 [{"id":"apr_3","run_id":"run_b","created_at":1,"status":"pending","tool":"ask_secret","severity":"secret","summary":"s",
                   "args":{"name":"CLOUDFLARE_API_TOKEN","label":"Cloudflare API token (DNS edit only)",
                     "why":"To add the TXT record that proves the domain is yours. Make one at dash.cloudflare.com › My Profile › API Tokens."}}]
+                """#
+            case .secrets:
+                #"""
+                [{"id":"apr_5","run_id":"run_b","created_at":1,"status":"pending","tool":"ask_secret","severity":"secret","summary":"s",
+                  "args":{"label":"App Store Connect API key","why":"To upload the build. Users and Access › Integrations › App Store Connect API.",
+                    "fields":[{"name":"ASC_ISSUER_ID","label":"Issuer ID","kind":"text","min_chars":8,"max_chars":8192},
+                              {"name":"ASC_KEY_ID","label":"Key ID","kind":"secret","min_chars":8,"max_chars":8192},
+                              {"name":"ASC_KEY","label":"Key file (.p8)","kind":"file","min_chars":8,"max_chars":16384}]}}]
                 """#
             case .handoff:
                 #"""

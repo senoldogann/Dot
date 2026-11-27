@@ -492,6 +492,7 @@ struct ChatScreen: View {
                     actions: AskDockActions(
                         decide: { ask, approve, note, remember in model.decide(ask, approve: approve, note: note, remember: remember, thread: thread) },
                         giveSecret: { ask, value in model.giveSecret(ask, value: value) },
+                        giveSecrets: { ask, answers in model.giveSecrets(ask, answers: answers) },
                         dismiss: { id in dismissedAsks.insert(id) },
                         stop: activeRun == nil ? nil : { stop() }),
                     folded: $dockFolded)

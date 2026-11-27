@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2040](2040.md) | done | 2026-11-27 | Several secrets on one card, on the phone and on the web |
 | [2024](2024.md) | done | 2026-11-27 | The chat header keeps the bot's face and name; only a lasting link problem shows, in the capsule |
 | [2023](2023.md) | done | 2026-11-27 | Chat settings as native inset groups, and a capsule that says "Waiting on N helpers" only while the run waits, with no spinner |
 | [2022](2022.md) | in progress | 2026-11-27 | Empty states in the app's own type, and the profile's Activity is the real page |

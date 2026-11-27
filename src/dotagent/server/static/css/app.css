@@ -6775,6 +6775,39 @@ html[data-chat-details="on"] .chat-internal {
   flex: none;
 }
 
+/* A card of several secrets (item 2040): each field its words, the name its commands read it as, and its box or file
+   picker, one under the other; Save under them all. */
+.secret-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.secret-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.secret-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-weight: var(--weight-label);
+}
+
+.secret-field-name {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.secret-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .secret-foot {
   display: flex;
   align-items: center;

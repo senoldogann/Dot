@@ -36,6 +36,7 @@ from dotagent.config_edit import ReactionsSetting
 from dotagent.connections.catalogue import ConnectionKind
 from dotagent.connections.directory import PluginView, ServiceMark
 from dotagent.connections.states import ConnectionState, ConnectionStep
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.desktop.snapshot_models import SnapshotTaken
@@ -712,11 +713,30 @@ class RecapRequest(FrozenModel):
     force: bool = False
 
 
-class SecretRequest(FrozenModel):
-    """The secret the owner gives a run's card (item 857): the value alone, which the daemon holds for the chat's
-    commands and writes nowhere else."""
+class SecretValue(FrozenModel):
+    """One field of a card as the owner answered it: its name and its value (a file's field, the file's text)."""
 
-    value: str = Field(min_length=1, max_length=8192)
+    name: str = Field(min_length=1, max_length=64)
+    value: str = Field(min_length=1, max_length=16384)
+
+
+class SecretRequest(FrozenModel):
+    """The secrets the owner gives a run's card (items 857 and 2040): ``value`` for a card of one field, as before;
+    ``answers`` for a card of several, every field once. The daemon holds them for the chat's commands and writes them
+    nowhere else."""
+
+    value: str | None = Field(default=None, min_length=1, max_length=8192)
+    answers: list[SecretValue] | None = Field(default=None, min_length=1, max_length=4)
+
+    def answers_by_name(self) -> dict[str, str] | None:
+        """``answers`` by field name, or None for a card of one field answered with ``value``; a name given twice is
+        refused."""
+        if self.answers is None:
+            return None
+        names: list[str] = [answer.name for answer in self.answers]
+        if len(set(names)) != len(names):
+            raise InvalidValueError("each field is answered once", {"names": ", ".join(names)})
+        return {answer.name: answer.value for answer in self.answers}
 
 
 class DecisionRequest(FrozenModel):
