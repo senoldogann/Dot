@@ -138,6 +138,8 @@ class PushMessage(FrozenModel):
     body: str
     route: str
     state: PushState
+    title_tr: str | None = None
+    body_tr: str | None = None
 
 
 class PushTotals(FrozenModel):
@@ -188,6 +190,31 @@ def finished_message(status: str, result: str, run_id: str) -> PushMessage:
     )
 
 
+# These fixed task notices have the same words across APNs, Web Push and desktop notifications. The detailed
+# answer or approval stays in its chat. The English strings are also DotNext's APNs localization keys.
+_TASK_NOTICE_TR: dict[str, str] = {
+    "Dot has a question": "Dot'un bir sorusu var",
+    "Dot needs your help": "Dot'un yardımınıza ihtiyacı var",
+    "Dot asks for approval": "Dot onay istiyor",
+    "A task is done": "Bir görev bitti",
+    "A task failed": "Bir görev başarısız oldu",
+    "A task is blocked": "Bir görev ilerleyemedi",
+}
+_TASK_NOTICE_BODY: str = "Open Dot to see it."
+_TASK_NOTICE_BODY_TR: str = "Görmek için Dot'u açın."
+
+
+def task_notice(title: str, run_id: str, state: PushState) -> PushMessage:
+    return PushMessage(
+        title=title,
+        body=_TASK_NOTICE_BODY,
+        route=f"#/runs/{run_id}",
+        state=state,
+        title_tr=_TASK_NOTICE_TR[title],
+        body_tr=_TASK_NOTICE_BODY_TR,
+    )
+
+
 def _told_by_its_schedule(run: RunRecord) -> bool:
     """Whether the end of ``run`` is its schedule's to tell (item 461): a run a schedule started, at its time or by
     hand, and not a campaign's session, which carries the same source."""
@@ -197,16 +224,12 @@ def _told_by_its_schedule(run: RunRecord) -> bool:
 def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
     """The message an event of a run is worth, or ``None``: an approval or a question asked or left; a draft written
     for the owner to send (item 314); the end of a run of its own (the sub-runs of a run stay quiet, as in the web UI),
-    with the first line of its result, but for a schedule's run, which its schedule tells at its level (item 461); the
+    but for a schedule's run, which its schedule tells at its level (item 461); the
     end of a campaign by itself."""
     if event.kind in _ASKED_KINDS:
         severity: object = event.data.get("severity")
-        args: object = event.data.get("args")
-        question: object = args.get("question") if isinstance(args, dict) else None
-        summary: object = event.data.get("summary")
-        text: str = question if severity == "question" and isinstance(question, str) else str(summary or "")
         title: str = _ASKING_TITLE.get(str(severity), "Dot asks for approval")
-        return PushMessage(title=title, body=_shorten(text), route=f"#/runs/{run.id}", state="waiting")
+        return task_notice(title, run.id, "waiting")
     if event.kind == DRAFT_CREATED_EVENT:
         draft: DraftRecord = DraftRecord.model_validate(event.data)
         about: str = draft.subject if draft.channel == "mail" else draft.body
@@ -217,8 +240,14 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
             state="waiting",
         )
     if event.kind == "run_finished" and run.parent_run_id is None and not _told_by_its_schedule(run):
-        result: object = event.data.get("result")
-        return finished_message(str(event.data.get("status", "")), result if isinstance(result, str) else "", run.id)
+        status: object = event.data.get("status")
+        if event.data.get("goal_blocked") is True or status == "blocked":
+            return task_notice("A task is blocked", run.id, "waiting")
+        if status == "done":
+            return task_notice(_FINISHED_TITLE["done"], run.id, "done")
+        if status == "failed":
+            return task_notice(_FINISHED_TITLE["failed"], run.id, "failed")
+        return None
     if event.kind == CAMPAIGN_ENDED_EVENT:
         ended: CampaignEnded = CampaignEnded.model_validate(event.data)
         achieved: bool = ended.status == "achieved"
@@ -290,7 +319,7 @@ def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) 
                 "endpoint": subscription.endpoint,
                 "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
             },
-            data=json.dumps(message.model_dump()),
+            data=json.dumps(message.model_dump(exclude_none=True)),
             vapid_private_key=_signer(keys),
             vapid_claims={"sub": SUBJECT},
             ttl=_TTL_S,
