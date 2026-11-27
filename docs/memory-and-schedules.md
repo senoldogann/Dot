@@ -122,7 +122,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   notes went to every helper, code reviews among them), and its notes put rules and workflows first. Your chats, a
   `dotx` command, a watcher's or a reply's run start with the same notes as before kinds. A note whose kind is not
   told yet comes after every kind and stands as before; the Task tab's "memories" event says the plan and how many
-  had no kind. A note keeps its kind when its words change.
+  had no kind. A note keeps its kind and who told it when its words change, by a run's rewrite too. The emergency stop
+  stops the fast model's pass, as it stops the reflection.
 - A lesson saved while its run had read content third parties can author (most of them: 544 of 569 on the owner's
   Mac on 2026-11-15) is never among the notes a run starts with nor in the note of a site it reaches, which the
   conversation keeps for later runs. A run of Dot's own loop that is tainted at that moment is handed such lessons

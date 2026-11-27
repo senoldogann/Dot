@@ -443,8 +443,15 @@ class Scheduler:
 
     async def _tell_kinds(self, now: float) -> None:
         """Start the fast model's pass over the notes the rules gave no kind (item 1975,
-        :func:`dotagent.memory.kinds.classify_untold`) in a task, at most once an hour and one at a time."""
+        :func:`dotagent.memory.kinds.classify_untold`) in a task, at most once an hour and one at a time. While the
+        emergency stop is engaged none starts, and one under way is cancelled: it asks the fast model, and what it
+        recorded before stays."""
         running: asyncio.Task[None] | None = self._telling_kinds
+        if await _emergency_stop_engaged():
+            if running is not None and not running.done():
+                running.cancel()
+                log.info("memory_kinds_stopped_by_emergency_stop")
+            return
         if (running is not None and not running.done()) or now - self._kinds_from < _KINDS_EVERY_S:
             return
         self._kinds_from = now

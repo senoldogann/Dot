@@ -252,7 +252,8 @@ def _save_tool(max_chars: int) -> RegisteredTool:
                     f"Not proposed again: the owner {held.state} these words already in this task "
                     f"[{ctx.run_id} #{held.index}]. Go on with the task."
                 )
-            return ok(f"{_HELD} [{ctx.run_id} #{held.index}] {held.content}")
+            kind_word: str = "" if args.kind is None else " Its kind is told once the owner saves it."
+            return ok(f"{_HELD}{kind_word} [{ctx.run_id} #{held.index}] {held.content}")
         # Read at any time in the run, not as it stands: the owner's "go on" clears the run's taint, not the page's
         # words it may quote (the review of 2026-11-01, as skill_save does).
         saved: Replacing = await save_replacing(
@@ -264,9 +265,12 @@ def _save_tool(max_chars: int) -> RegisteredTool:
             ctx.ever_tainted(),
             args.subject,
         )
-        if args.kind is not None and saved.saved.created:
+        if args.kind is None:
+            return ok(render_saved(saved))
+        if not saved.saved.created:
             # A note saved before keeps the kind it has: the owner's, or another run's.
-            await ctx.runtime.memory.store.set_memory_kind(saved.saved.record.id, args.kind, "run")
+            return ok(f"{render_saved(saved)}\nThe kind you named was not taken: the note keeps the kind it had.")
+        await ctx.runtime.memory.store.set_memory_kind(saved.saved.record.id, args.kind, "run")
         return ok(render_saved(saved))
 
     return make_tool(

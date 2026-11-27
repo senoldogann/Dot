@@ -1427,7 +1427,8 @@ event and approval.
   cancelled, as at the daemon's stop, and the harness's probe ends with the commands it started, item 683); nor does the
   nightly look for plugins (one under way ends at its next plugin and stores nothing, and Look now answers 409, items
   711 and 712), nor the repair night (one under way is cancelled with its session of Claude Code and what it started,
-  and its problem is left as it was; [Self-repair](repair.md), item 921)
+  and its problem is left as it was; [Self-repair](repair.md), item 921), nor the fast model's hourly pass over the
+  notes without a kind (one under way is cancelled, and what it recorded stays; item 1975)
 - while the `STOP` file exists, no watcher looks (a stop engaged while one looks keeps the next from looking and the
   one at work from starting a run, item 683), and **a message on a channel** (iMessage, [Channels](channels.md),
   item 611) starts no run and is not queued either: a message queued starts its run when the one at work ends, stop or
