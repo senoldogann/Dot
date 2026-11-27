@@ -186,6 +186,9 @@ final class AppModel {
     var askPhases: [String: AskPhase] = [:]
     /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
     var startingChats: [String: String] = [:]
+    /// Where the messages this phone sent to a chat with several tasks went (item 2013), for that chat's screen to say;
+    /// each is taken once said (`routedSaid`).
+    var routedSends: [RoutedSend] = []
 
     /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
     /// is read (item 1849).
@@ -260,6 +263,14 @@ final class AppModel {
                 // At most 15 pictures a second: the store's stream keeps only the newest, so the words that came
                 // meanwhile are drawn together, never dropped (item 1848); the answer's reveal paces them on screen.
                 try? await Task.sleep(for: .milliseconds(66))
+            }
+        }
+        Task { [weak self] in
+            for await outcome in await engine.outbox.outcomes() {
+                guard let self else { return }
+                if case .delivered(let item, let queue) = outcome, let thread = item.thread, let routed = queue.routed {
+                    await self.heard(routed, from: thread)
+                }
             }
         }
         Task { await engine.supervisor.start() }

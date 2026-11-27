@@ -45,6 +45,8 @@
         case helpersWait = "n2-helpers"
         /// The first run a schedule fired (owner 2026-11-27): its message is the routine's compact row, not a bubble.
         case routine = "n2-routine"
+        /// A chat with several tasks (item 2013): the capsule's "N tasks" and the tasks sheet.
+        case tasks = "n2-tasks"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -55,6 +57,7 @@
             case .agents: .agents
             case .inspector: .inspector
             case .model: .model
+            case .tasks: .tasks
             default: nil
             }
         }
@@ -143,6 +146,10 @@
                 self == .routine
                 ? #"[{"schedule":{"record":{"id":"sch_1","name":"Site build check","goal":"Find out why the site's build fails on CI and fix it"}},"loop":false}]"#
                 : "[]"
+            let tasks: String =
+                self == .tasks
+                ? #"{"chat_id":"thr_fixture","chat_title":"Dentist and the website","cap":5,"tasks":[{"thread_id":"thr_fixture","title":"Dentist and the website","run_id":"run_b","status":"running","state":"working","own":true},{"thread_id":"thr_lane1","title":"Improve my x.com account","run_id":"run_l1","status":"running","state":"working","own":false},{"thread_id":"thr_lane2","title":"Fill in the Gistsmith form","run_id":"run_l2","status":"done","state":"waits","own":false},{"thread_id":"thr_lane3","title":"Book the garage","run_id":"run_l3","status":"cancelled","state":"ended","own":false}]}"#
+                : #"{"chat_id":"thr_fixture","chat_title":"Dentist and the website","cap":5,"tasks":[]}"#
             return """
                 {"revision":7,
                  "thread":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"agent_id":null},
@@ -161,7 +168,8 @@
                  "background":[],
                  "reactions":[{"run_id":"run_a","message":"answer","reaction":"good"}],
                  "drafts":[],
-                 "schedules":\(schedules)}
+                 "schedules":\(schedules),
+                 "tasks":\(tasks)}
                 """
         }
 

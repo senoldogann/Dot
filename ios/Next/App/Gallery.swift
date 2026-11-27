@@ -255,14 +255,14 @@ private struct ChromeGallery: View {
                 ComposerView(text: $long, attachments: .constant([]), quote: .constant(nil), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !long.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
                 Text(String(localized: "Floating control", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .working, activity: nil, since: Date(timeIntervalSinceNow: -192), queued: 2, helpersDone: 1, helpersTotal: 3, plan: PlanProgress(done: 1, total: 5), canStop: true, link: nil),
-                    showsScrollToBottom: true, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
+                    summary: WorkingSummary(status: .working, activity: nil, since: Date(timeIntervalSinceNow: -192), queued: 2, helpersDone: 1, helpersTotal: 3, plan: PlanProgress(done: 1, total: 5), canStop: true, link: nil, tasks: 0),
+                    showsScrollToBottom: true, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, openTasks: {}, scrollToBottom: {})
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: nil, queued: 0, helpersDone: 0, helpersTotal: 0, plan: nil, canStop: false, link: nil),
-                    showsScrollToBottom: false, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
+                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: nil, queued: 0, helpersDone: 0, helpersTotal: 0, plan: nil, canStop: false, link: nil, tasks: 0),
+                    showsScrollToBottom: false, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, openTasks: {}, scrollToBottom: {})
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: nil, activity: nil, since: nil, queued: 0, helpersDone: 0, helpersTotal: 0, plan: nil, canStop: false, link: nil),
-                    showsScrollToBottom: true, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
+                    summary: WorkingSummary(status: nil, activity: nil, since: nil, queued: 0, helpersDone: 0, helpersTotal: 0, plan: nil, canStop: false, link: nil, tasks: 0),
+                    showsScrollToBottom: true, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, openTasks: {}, scrollToBottom: {})
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, Space.groupedGutter)
@@ -344,7 +344,7 @@ struct SampleChatScreen: View {
             switch panel {
             case .agents: AgentsSheet(runs: Samples.helperRuns(now: .now), close: { self.panel = nil })
             case .background: BackgroundWorkSheet(items: Samples.backgroundWork, close: { self.panel = nil })
-            case .files, .queue, .inspector, .model, .plan:
+            case .files, .queue, .inspector, .model, .plan, .tasks:
                 EmptyState(
                     title: String(localized: "No changes yet", comment: "Changes panel empty state"), systemImage: "folder",
                     detail: String(localized: "Files the run changes show here.", comment: "Changes panel empty state detail"),
@@ -368,9 +368,9 @@ struct SampleChatScreen: View {
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .trailing, spacing: Space.xs) {
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: Date(timeIntervalSinceNow: -180), queued: 2, helpersDone: 0, helpersTotal: 2, plan: nil, canStop: true, link: nil),
+                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: Date(timeIntervalSinceNow: -180), queued: 2, helpersDone: 0, helpersTotal: 2, plan: nil, canStop: true, link: nil, tasks: 0),
                     showsScrollToBottom: true, openStatus: { panel = .background }, stop: {}, openPlan: {}, openQueue: {}, openHelpers: { panel = .agents },
-                    scrollToBottom: {})
+                    openTasks: {}, scrollToBottom: {})
                     .frame(maxWidth: .infinity, alignment: .center)
                 ComposerView(text: $draft, attachments: .constant([]), quote: .constant(nil), placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), buttons: composerButtons(hasContent: !draft.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
             }

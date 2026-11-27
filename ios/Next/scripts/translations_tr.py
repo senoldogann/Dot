@@ -1194,12 +1194,29 @@ TR: dict[str, str] = {
     "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
     "Syncing messages…": "Mesajlar eşitleniyor…",
     "your Mac": "Mac",
+    # A chat's tasks (item 2013): the capsule's segment, the sheet, a task's own line, the toast of a routed message.
+    "%lld tasks": "%lld görev",
+    "Tasks": "Görevler",
+    "Waits for you": "Seni bekliyor",
+    "task.stopped": "Durdu",
+    "task.open": "Aç",
+    "A task of %@": "%@ sohbetinin görevi",
+    "Back to the chat": "Sohbete dön",
+    "Started a new task: %@": "Yeni görev başladı: %@",
+    "Sent to %@": "%@ görevine gönderildi",
+    "Stopped every task": "Tüm görevler durduruldu",
+    "Stopped %@": "%@ durduruldu",
+    "Move": "Taşı",
+    "Move to": "Şuraya taşı",
+    "New task": "Yeni görev",
+    "Not moved: %@": "Taşınamadı: %@",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
 EN_PLURALS: dict[str, tuple[str, str]] = {
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
+    "%lld tasks": ("%lld task", "%lld tasks"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),
     "Back, %lld bots unread": ("Back, %lld bot unread", "Back, %lld bots unread"),
     "Waiting on %lld helpers": ("Waiting on %lld helper", "Waiting on %lld helpers"),

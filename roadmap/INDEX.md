@@ -14,6 +14,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2016](2016.md) | built | 2026-11-27 | Unattended runs keep the sandbox: a run nobody started seals Dot's own files in yolo and free mode too |
 | [2015](2015.md) | done | 2026-11-27 | The web composer works as DotNext's on every width: one capsule, the model as its mark, its settings in one sheet |
 | [2014](2014.md) | done | 2026-11-27 | The small window's compaction fixture takes the cards tool, and the tool's schema is shorter |
+| [2013](2013.md) | built | 2026-11-27 | Several tasks in one chat, slice 3: the tasks on the pages and the phone |
 | [2012](2012.md) | built | 2026-11-27 | Several tasks in one chat, slice 2: where a message goes |
 | [2011](2011.md) | done | 2026-11-27 | The web says "helper" ("yardımcı") where it said "subagent" ("alt ajan"), as the iPhone app does |
 | [2010](2010.md) | done | 2026-11-27 | A chat's row says when its run waits on its helpers, and what works for it while it rests, as DotNext's rows do |

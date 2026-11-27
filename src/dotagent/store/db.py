@@ -1994,6 +1994,9 @@ _OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATU
 _RUN_WORKS_SQL: str = f"EXISTS (SELECT 1 FROM runs WHERE runs.id = ? AND runs.status IN ({_WORKING_SQL}))"
 
 
+# A thread's family (item 2013), as a join of ``me`` (the thread) to ``t``: the chat it is or is a lane of, and every
+# lane of that chat.
+_FAMILY_SQL: str = "(t.id = COALESCE(me.lane_of, me.id) OR t.lane_of = COALESCE(me.lane_of, me.id))"
 # How long a lane with no run yet counts as a task at work (item 2012): its first run starts within moments of it, and a
 # lane a crash left without one stops taking a place of its chat's after this.
 LANE_START_GRACE_S: float = 60.0
@@ -2113,9 +2116,14 @@ class Store:
     # ----- the chats' revisions (item 1686) -------------------------------------------------
 
     async def thread_revision(self, thread_id: str) -> int:
-        """The chat's revision (:mod:`dotagent.store.revisions`); ``NotFoundError`` for no chat."""
-        row: aiosqlite.Row | None = await self._one("SELECT revision FROM threads WHERE id = ?", (thread_id,))
-        if row is None:
+        """The chat's revision (:mod:`dotagent.store.revisions`), the newest of its family's (item 2013): of the chat a
+        thread is or is a lane of, and of that chat's lanes, since a chat's view and a lane's both show the chat's
+        tasks; ``NotFoundError`` for no chat."""
+        row: aiosqlite.Row | None = await self._one(
+            f"SELECT MAX(t.revision) AS revision FROM threads AS me JOIN threads AS t ON {_FAMILY_SQL} WHERE me.id = ?",
+            (thread_id,),
+        )
+        if row is None or row["revision"] is None:
             raise NotFoundError("thread not found", {"thread_id": thread_id})
         return int(row["revision"])
 
@@ -2129,9 +2137,14 @@ class Store:
         One statement reads both, so that a write of another process between two reads cannot skip a chat."""
         rows: list[aiosqlite.Row] = await self._all(
             "SELECT id AS name, revision AS revision, 0 AS deleted FROM threads WHERE revision > ? "
+            # A thread's change is its family's too (item 2013): its chat's and every other lane's of that chat,
+            # whose views show the chat's tasks.
+            "UNION ALL SELECT me.id AS name, t.revision AS revision, 0 AS deleted FROM threads AS t "
+            "JOIN threads AS me ON me.id = COALESCE(t.lane_of, t.id) OR me.lane_of = COALESCE(t.lane_of, t.id) "
+            "WHERE t.revision > ? AND me.id != t.id "
             "UNION ALL SELECT key AS name, CAST(value AS INTEGER) AS revision, 1 AS deleted FROM kv "
             "WHERE key >= ? AND key < ? AND CAST(value AS INTEGER) > ? ORDER BY revision",
-            (after, DELETED_PREFIX, DELETED_END, after),
+            (after, after, DELETED_PREFIX, DELETED_END, after),
         )
         return [
             ThreadRevision(
@@ -2143,14 +2156,18 @@ class Store:
         ]
 
     async def thread_revisions(self, thread_ids: Sequence[str]) -> dict[str, int]:
-        """The revisions of the chats ``thread_ids`` that exist, by id."""
+        """The revisions of the chats ``thread_ids`` that exist, by id, each the newest of its own and its lanes'
+        (:meth:`thread_revision`)."""
         named: tuple[str, ...] = tuple(thread_ids)
         if not named:
             return {}
+        marks: str = ", ".join("?" for _ in named)
         rows: list[aiosqlite.Row] = await self._all(
-            f"SELECT id, revision FROM threads WHERE id IN ({', '.join('?' for _ in named)})", named
+            f"SELECT me.id AS chat, MAX(t.revision) AS revision FROM threads AS me JOIN threads AS t ON {_FAMILY_SQL}"
+            f" WHERE me.id IN ({marks}) GROUP BY me.id",
+            named,
         )
-        return {str(row["id"]): int(row["revision"]) for row in rows}
+        return {str(row["chat"]): int(row["revision"]) for row in rows}
 
     async def thread_summary(self, thread_id: str, same_chat: bool) -> ThreadSummary | None:
         """The chat as :meth:`list_thread_summaries` lists it, ``None`` for a thread that is no chat (one that holds a

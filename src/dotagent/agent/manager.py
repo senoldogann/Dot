@@ -2979,6 +2979,14 @@ class RunManager:
             chat_id, chosen, text, files, mode, model, effort, speed, approvals, goal_mode, source
         )
 
+    async def tasks_of_chat(self, thread_id: str) -> list[ChatTask]:
+        """The tasks of the chat of ``thread_id`` (itself, or the chat it is a lane of), as the pages show them (item
+        2013); none while the chat has no lane."""
+        chat_id: str = await self._chat_of(thread_id)
+        if not await self._runtime.store.lanes_of(chat_id):
+            return []
+        return await self._chat_tasks_of(chat_id)
+
     async def _chat_tasks_of(self, chat_id: str) -> list[ChatTask]:
         """The tasks of the chat ``chat_id`` (item 2012): the chat's own and each lane's, each with its newest run of
         the owner's, whether it works, the question it waits on (a card left unanswered, or a reply ending with a
@@ -3004,6 +3012,7 @@ class RunManager:
                 ChatTask(
                     thread_id=thread_id,
                     newest_run_id=newest.id,
+                    status=newest.status,
                     goal="" if owners is None else owners.goal,
                     at_work=at_work,
                     asked=asked,

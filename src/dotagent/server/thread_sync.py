@@ -56,7 +56,15 @@ from dotagent.server.stream import (
     next_event,
     stored_events,
 )
-from dotagent.server.views import QueueView, RunDetail, TerminalView, ThreadAutomation
+from dotagent.server.views import (
+    ChatTaskView,
+    QueueView,
+    RunDetail,
+    TaskState,
+    TasksView,
+    TerminalView,
+    ThreadAutomation,
+)
 from dotagent.store.db import Store
 from dotagent.store.models import (
     WORKING_STATUSES,
@@ -191,6 +199,8 @@ class ThreadView(FrozenModel):
     reactions: list[ReactionRecord]
     drafts: list[DraftRecord]
     terminals: list[TerminalView]
+    # The tasks of the chat (item 2013): of the chat this thread is, or is a lane of; none while it has no lane.
+    tasks: TasksView
 
 
 class ThreadRow(FrozenModel):
@@ -324,7 +334,31 @@ async def thread_view(ctx: ServerContext, thread_id: str, tail: int, before: str
         reactions=await store.thread_reactions(thread_id),
         drafts=await store.thread_drafts(thread_id),
         terminals=terminals_of(ctx, thread_id),
+        tasks=await tasks_view(ctx, thread_id),
     )
+
+
+async def tasks_view(ctx: ServerContext, thread_id: str) -> TasksView:
+    """The tasks of the chat of ``thread_id`` (item 2013): the chat's own and its lanes', each working, waiting for
+    the owner or ended; none while the chat has no lane. ``NotFoundError`` for no thread."""
+    store: Store = ctx.runtime.store
+    thread: ThreadRecord = await store.get_thread(thread_id)
+    chat: ThreadRecord = thread if thread.lane_of is None else await store.get_thread(thread.lane_of)
+    tasks: list[ChatTaskView] = []
+    for task in await ctx.manager.tasks_of_chat(chat.id):
+        lane: ThreadRecord = chat if task.thread_id == chat.id else await store.get_thread(task.thread_id)
+        state: TaskState = "working" if task.at_work else "waits" if task.asked is not None else "ended"
+        tasks.append(
+            ChatTaskView(
+                thread_id=task.thread_id,
+                title=lane.title,
+                run_id=task.newest_run_id,
+                status=task.status,
+                state=state,
+                own=task.thread_id == chat.id,
+            )
+        )
+    return TasksView(chat_id=chat.id, chat_title=chat.title, cap=ctx.runtime.config.agent.chat_tasks, tasks=tasks)
 
 
 def _background(

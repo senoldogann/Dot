@@ -548,3 +548,52 @@ async def test_a_move_that_fails_loses_nothing(login_env: dict[str, str], monkey
         refused: httpx.Response = await client.post(f"/api/runs/{x_run.id}/move", json={"to_thread_id": None})
         assert refused.status_code == 422, refused.text
         assert (await runtime.store.get_run(x_run.id)).status == "running"
+
+
+async def test_a_chats_view_lists_its_tasks_and_moves_with_them(login_env: dict[str, str]) -> None:
+    """Item 2013: the chat's tasks for the pages and the phone, and a lane's change moves the chat's revision."""
+    gates: dict[str, asyncio.Event] = {"REPORT": asyncio.Event(), "XCOM": asyncio.Event()}
+    model: _Model = _Model(gates, {})
+    async with _served(login_env, model, 5) as (runtime, manager, client):
+        chat: RunRecord = await manager.start(
+            "Write the REPORT.",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            UI_SOURCE,
+            None,
+            None,
+            "standard",
+            None,
+            "yolo",
+            False,
+            (),
+        )
+        alone: httpx.Response = await client.get(f"/api/threads/{chat.thread_id}/tasks")
+        assert alone.status_code == 200 and alone.json()["tasks"] == [] and alone.json()["cap"] == 5
+        before: int = await runtime.store.thread_revision(chat.thread_id)
+        x_thread: str = str(_routed(await _send(client, chat.thread_id, f"/new {X_GOAL}"))["thread_id"])
+        tasks: JsonObject = (await client.get(f"/api/threads/{x_thread}/tasks")).json()
+        assert tasks["chat_id"] == chat.thread_id
+        rows: object = tasks["tasks"]
+        assert isinstance(rows, list)
+        assert [(row["thread_id"], row["own"], row["state"]) for row in rows] == [
+            (chat.thread_id, True, "working"),
+            (x_thread, False, "working"),
+        ]
+        # The lane's view says its chat's tasks too, and the chat's revision moved with the lane's.
+        view: JsonObject = (await client.get(f"/api/threads/{x_thread}/view")).json()
+        assert view["tasks"]["chat_id"] == chat.thread_id
+        after_start: int = await runtime.store.thread_revision(chat.thread_id)
+        assert after_start > before
+        changed = await runtime.store.thread_revisions_after(after_start)
+        assert changed == []
+        gates["XCOM"].set()
+        await _ended(runtime, (await _newest(runtime, x_thread)).id)
+        moved = await runtime.store.thread_revisions_after(after_start)
+        assert chat.thread_id in {change.thread_id for change in moved}
+        # The lane's view shows its chat's tasks, so its revision is its family's, as the chat's is.
+        assert await runtime.store.thread_revision(x_thread) == await runtime.store.thread_revision(chat.thread_id)
+        assert await runtime.store.thread_revision(chat.thread_id) > after_start
+        ended: JsonObject = (await client.get(f"/api/threads/{chat.thread_id}/tasks")).json()
+        assert [row["state"] for row in ended["tasks"]] == ["working", "ended"]
