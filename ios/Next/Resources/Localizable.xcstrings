@@ -265,6 +265,17 @@
         }
       }
     },
+    "%lld / %lld": {
+      "comment": "Ask dock: which ask is shown, \"1 / 3\"; the arguments are its place and the count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld"
+          }
+        }
+      }
+    },
     "%lld actions": {
       "comment": "Agents: a number of tools",
       "localizations": {
@@ -590,7 +601,7 @@
       }
     },
     "%lld of %lld": {
-      "comment": "Ask dock: which ask is shown; the arguments are its place and the count\nFind in chat: which find is shown of how many",
+      "comment": "Find in chat: which find is shown of how many",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2460,17 +2471,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kampanyalar"
-          }
-        }
-      }
-    },
-    "Can't reach %@": {
-      "comment": "Chat capsule: the link to the Mac broke a while ago and has not come back; the argument is the Mac's name",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ cihazına ulaşılamıyor"
           }
         }
       }
@@ -4757,17 +4757,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un ayarı"
-          }
-        }
-      }
-    },
-    "Dot's setting (%@)": {
-      "comment": "Chat settings: the approval mode configured on the Mac; the argument is its name",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un ayarı (%@)"
           }
         }
       }
@@ -7100,13 +7089,13 @@
         }
       }
     },
-    "Looking at %@": {
-      "comment": "Chat message of Dot's: a page it looks at; the argument is its site",
+    "Looking into it…": {
+      "comment": "Chat message of Dot's, said the moment a task starts, before it has done anything",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ inceleniyor"
+            "value": "Bakıyorum…"
           }
         }
       }
@@ -7203,6 +7192,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac uygulaması"
+          }
+        }
+      }
+    },
+    "Mac asleep or unreachable": {
+      "comment": "Connection status when the last contact time is unknown",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac uykuda veya ulaşılamıyor"
+          }
+        }
+      }
+    },
+    "Mac asleep or unreachable since %@": {
+      "comment": "Connection status with the time of the last successful contact",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac uykuda veya ulaşılamıyor · son bağlantı %@"
           }
         }
       }
@@ -12381,6 +12392,17 @@
         }
       }
     },
+    "Starting the chat…": {
+      "comment": "Placeholder of the composer while a new chat waits for the Mac to name it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet başlatılıyor…"
+          }
+        }
+      }
+    },
     "Starts a task": {
       "comment": "Watcher: it starts a task of the owner's goal for what came in",
       "localizations": {
@@ -12645,17 +12667,6 @@
         }
       }
     },
-    "Submit %lld answers": {
-      "comment": "Ask dock: sends the answers of several questions; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld yanıtı gönder"
-          }
-        }
-      }
-    },
     "Submit answer": {
       "comment": "Ask dock: sends the answer of the question",
       "localizations": {
@@ -12663,6 +12674,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtı gönder"
+          }
+        }
+      }
+    },
+    "Submit answers": {
+      "comment": "Ask dock: sends the answers of every question at once",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtları gönder"
           }
         }
       }
@@ -14692,6 +14714,17 @@
         }
       }
     },
+    "User input needed": {
+      "comment": "Ask dock header: Dot waits for the owner's answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senden bir cevap bekleniyor"
+          }
+        }
+      }
+    },
     "Using the page from the phone is off on your Mac: Settings › Browser › Use the page from the screen while I hold the task.": {
       "comment": "Takeover refused: [browser] remote_input is off on the Mac",
       "localizations": {
@@ -16052,17 +16085,6 @@
         }
       }
     },
-    "Your answer is needed": {
-      "comment": "Ask dock header",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yanıtın gerekiyor"
-          }
-        }
-      }
-    },
     "Your assistant": {
       "comment": "Dot's built-in role, under its name on its profile",
       "localizations": {
@@ -16957,17 +16979,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "· sormadan"
-          }
-        }
-      }
-    },
-    "your Mac": {
-      "comment": "The Mac when its name is not known",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mac"
           }
         }
       }

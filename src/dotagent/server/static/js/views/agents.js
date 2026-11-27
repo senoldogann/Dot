@@ -9,6 +9,7 @@
 // agent under the list's "…". A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
+import { agentHandoffs, agentObjectives, agentOrders, orderOpen } from "../botwork.js";
 import { emptyBoxWords } from "../composershape.js";
 import { sendToWork } from "../sendwork.js";
 import { AGENTS_CHANGED_EVENT, api } from "../api.js";
@@ -1407,6 +1408,46 @@ export function homeSection(key, title, rows, folds, toggle) {
   );
 }
 
+/** The agent's work (item 2035), three rows as the phone's bot profile has them: its open work orders, its active
+ * objectives and today's hand-offs, each counted, each a link to its own page. */
+function workCounts(agentId, orders, objectives, team) {
+  const { received, sent } = agentHandoffs(agentId, team.messages);
+  return {
+    error: null,
+    orders: agentOrders(agentId, orders).filter(orderOpen).length,
+    objectives: agentObjectives(agentId, orders, objectives).filter((objective) => objective.status === "active").length,
+    handoffs: received.length + sent.length,
+  };
+}
+
+/** The Work section; `counts.error` (the lists could not be read) is said in it, with `retry`. */
+function workSection(agentId, counts, retry) {
+  if (counts.error !== null) {
+    return el("div", { class: "home-today-section", "data-section": "work" }, el("h2", { class: "section-label" }, t("views.agentwork.work")), errorPanel(counts.error, retry));
+  }
+  const row = (kind, mark, title, count, words) =>
+    el(
+      "a",
+      { class: "list-row agent-work-row", href: `#/agents/${agentId}/${kind}`, dataset: { work: kind } },
+      icon(mark),
+      el("span", { class: "row-title" }, title),
+      el("span", { class: "row-meta" }, count > 0 ? words : t("views.agentwork.none")),
+      icon("chevron"),
+    );
+  return el(
+    "div",
+    { class: "home-today-section", "data-section": "work" },
+    el("h2", { class: "section-label" }, t("views.agentwork.work")),
+    el(
+      "div",
+      { class: "home-today-list card" },
+      row("orders", "list", t("workorders.workOrders"), counts.orders, t("views.agentwork.openCount", { count: counts.orders })),
+      row("objectives", "target", t("views.agentwork.objectives"), counts.objectives, t("views.agentwork.activeCount", { count: counts.objectives })),
+      row("handoffs", "branch", t("views.team.handoffs"), counts.handoffs, t("views.agentwork.todayCount", { count: counts.handoffs })),
+    ),
+  );
+}
+
 function mountPage(root, ctx, agentId) {
   // The agent's bar is glass from the page's first frame, while the agent is read (item 1123).
   setStageGlass();
@@ -1599,7 +1640,7 @@ function mountPage(root, ctx, agentId) {
   async function load() {
     const mine = ++ticket;
     try {
-      const [detail, schedules, templates] = await Promise.all([
+      const [detail, schedules, templates, work] = await Promise.all([
         api.get(`/agents/${agentId}`),
         api.get("/schedules"),
         // The template of its name, for the schedule it suggests (item 722); a list that cannot be read offers none.
@@ -1607,12 +1648,19 @@ function mountPage(root, ctx, agentId) {
           console.warn("the templates could not be listed", error);
           return [];
         }),
+        // What the agent is handed and passes on (item 2035), counted on its page as the phone's profile counts it; a
+        // list that cannot be read says so in the Work section alone, and the page stands.
+        Promise.all([api.get("/work-orders"), api.get("/objectives"), api.get("/team")]).then(
+          (lists) => ({ lists, error: null }),
+          (error) => ({ lists: null, error }),
+        ),
       ]);
       const own = schedules.filter((view) => view.record.options.agent_id === agentId);
       const name = detail.record.name.trim().toLowerCase();
       const template = templates.find((each) => each.name.toLowerCase() === name && each.cron !== "") ?? null;
       const suggested = template !== null && !own.some((view) => view.record.goal === template.task) ? template : null;
-      return disposed || mine !== ticket ? null : { ...detail, schedules: own, suggested };
+      const counts = work.lists === null ? { error: work.error } : workCounts(agentId, ...work.lists);
+      return disposed || mine !== ticket ? null : { ...detail, schedules: own, suggested, work: counts };
     } catch (error) {
       if (!disposed && mine === ticket) {
         page.replaceChildren(errorPanel(error, () => attempt(reload)));
@@ -1643,6 +1691,7 @@ function mountPage(root, ctx, agentId) {
       },
     });
     const parts = [
+      workSection(detail.record.id, detail.work, () => attempt(reload)),
       homeSection(
         "schedules",
         t("views.agents.schedules"),

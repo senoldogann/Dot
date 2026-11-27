@@ -60,17 +60,15 @@ func callPhrase(_ step: HelperStep) -> String {
             : String(localized: "Writing \(short(lastPart(about)))", comment: "Work line: a file written; the argument is its name")
     case .screen: return String(localized: "Working on the Mac", comment: "Work line: a step on the Mac's screen")
     case .web: return String(localized: "Reading a page", comment: "Work line: a web page read")
-    default: return about.isEmpty ? (dotToolWords(tool) ?? toolName(tool)) : "\(dotToolWords(tool) ?? toolName(tool)): \(short(about))"
+    // A tool with no phrase of its own is "Working": a tool's name is no plain word (owner 2026-11-27).
+    default: return String(localized: "Working", comment: "Status word: a run is at work")
     }
 }
 
-/// A call the run told as one of Dot's short messages (a `narration`, item 1976): a page or a site by its name ("Looking at
-/// gistsmith.com"), any other call as the live line says it.
-func narrationWords(_ step: HelperStep) -> String {
-    let about: String = step.target.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard about.contains("://"), let host = URL(string: about)?.host() else { return callPhrase(step) }
-    let site: String = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-    return String(localized: "Looking at \(middleCut(site, detailCharacters))", comment: "Chat message of Dot's: a page it looks at; the argument is its site")
+/// Dot's first words in a chat (a `first_words` event, item 2018): the fast model's line, or the words said at once when it
+/// has none.
+func firstWordsText(_ text: String) -> String {
+    text.isEmpty ? String(localized: "Looking into it…", comment: "Chat message of Dot's, said the moment a task starts, before it has done anything") : text
 }
 
 /// How long a run has worked, as the live line says it beside its words ("12 s", "3 min").

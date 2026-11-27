@@ -29,6 +29,9 @@ final class AppModel {
     private(set) var outbox: [OutboxItem] = []
     private(set) var accepted: [String: AcceptedMessage] = [:]
     private(set) var transport: Transport = .connecting
+    private(set) var visibleLink: LinkLine?
+    @ObservationIgnored private var linkDelay: Task<Void, Never>?
+    @ObservationIgnored private var currentLink: LinkLine?
     private(set) var online: Bool = true
     private(set) var savedAt: [String: Double] = [:]
     private(set) var workingAt: [String: Double] = [:]
@@ -98,6 +101,7 @@ final class AppModel {
         if next.outbox != outbox { outbox = next.outbox }
         if next.accepted != accepted { accepted = next.accepted }
         if next.transport != transport { transport = next.transport }
+        showLink(linkLine(transport: next.transport, lastContact: next.lastContact))
         if next.online != online { online = next.online }
         if next.savedAt != savedAt { savedAt = next.savedAt }
         if next.workingAt != workingAt { workingAt = next.workingAt }
@@ -106,6 +110,24 @@ final class AppModel {
         if next.reset != reset { reset = next.reset }
         if next.heard != heard { heard = next.heard }
         if let fresh: DaemonReset = next.reset, !fresh.taken, UserDefaults.standard.double(forKey: Self.rescuedKey) != fresh.at { rescue(fresh) }
+    }
+
+    private func showLink(_ line: LinkLine?) {
+        guard currentLink != line else { return }
+        currentLink = line
+        if line == nil {
+            linkDelay?.cancel()
+            linkDelay = nil
+            visibleLink = nil
+        } else if visibleLink != nil {
+            visibleLink = line
+        } else if linkDelay == nil {
+            linkDelay = Task { [weak self] in
+                do { try await Task.sleep(for: linkLineDelay) } catch { return }
+                self?.visibleLink = self?.currentLink
+                self?.linkDelay = nil
+            }
+        }
     }
 
     /// The draft of the new chat's composer, kept like a chat's (a chat's id is the daemon's `thr_…`, never this).
@@ -147,7 +169,10 @@ final class AppModel {
         parts.outbox = outbox
         parts.accepted = accepted
         parts.online = online
-        return parts.pending(in: thread)
+        // A chat this phone started and the daemon has not named yet is shown by its outbox key (item 2025): its first
+        // message is the new chat's own item of the outbox.
+        let starting: [PendingMessage] = startingChats[thread] == nil ? [] : parts.pendingChats.filter { $0.key == thread }
+        return starting + parts.pending(in: thread)
     }
 
     /// New chats not yet in the list, from the outbox and the link.
@@ -184,7 +209,8 @@ final class AppModel {
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
-    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
+    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849). Only these show
+    /// as a starting chat (item 2025); a key left in the outbox from an earlier launch is not one of them.
     var startingChats: [String: String] = [:]
     /// Where the messages this phone sent to a chat with several tasks went (item 2013), for that chat's screen to say;
     /// each is taken once said (`routedSaid`).
@@ -198,6 +224,20 @@ final class AppModel {
     /// "Show steps" of a chat where its This chat sheet set it, over Settings › Chat's (item 1915), kept on the phone.
     var stepsOverrides: [String: Bool] = (UserDefaults.standard.dictionary(forKey: "stepsOverrides") as? [String: Bool]) ?? [:] {
         didSet { UserDefaults.standard.set(stepsOverrides, forKey: "stepsOverrides") }
+    }
+    /// The chat that started each helper's chat this phone has seen listed, by the helper's chat: a helper's chat shows
+    /// its steps as its parent does unless it chose itself (`showsSteps(of:everywhere:)`). Kept in memory: a helper's chat
+    /// is opened from its parent's, which lists it first.
+    private(set) var helperParents: [String: String] = [:]
+
+    /// Notes that `helpers` work for `parent`; a helper already known is not written again (no redraw for nothing).
+    func noteHelpers(_ helpers: [String], of parent: String) {
+        for helper in helpers where helper != parent && helperParents[helper] != parent { helperParents[helper] = parent }
+    }
+
+    /// Whether `thread` shows its steps: its own choice, else its parent chat's, else Settings › Chat's (item 1915).
+    func showsSteps(of thread: String, everywhere: Bool) -> Bool {
+        DotEngine.showsSteps(of: thread, overrides: stepsOverrides, parents: helperParents, everywhere: everywhere)
     }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {

@@ -66,20 +66,25 @@ pressed. Approvals, questions, notes and the messages stay in sight either way; 
 steps, with **What it is doing** (item 830), and an agent's message is folded until you open it, in either choice
 (item 859). The choice is kept by the browser. A third choice, **Messages only** (item 1976, after Grok Bot's chats),
 tells the run as a conversation: the steps and thoughts fold out as with *What it is doing*; what the run says on the way
-to its calls is drawn as one of its messages and stays where it was said; and a call that turns the run to other work
-which its own words did not tell is one of Dot's short messages too, in the words the line uses for it ("Searching the
-web for “GistSmith contact”", "Looking at gistsmith.com", "Running a command"). The line under them says what the run
-does now and for how long ("Reading README.md… · 2 min"). Those lines come from the daemon's `narration` events
-(`agent/narration.py`), one beside a call's `tool_call` in every harness (Dot's own loop, Claude Code, OpenCode, whose own tools are told as the Dot tool that does the same): no model
-is asked for them and the model never reads them, so they cost no token. A stretch of one kind of work is one line: a
-call of a kind one of the run's four newest lines told is not told again, but for a search of other words or a page on
-another site; a line names a page by its site, a file by its name and a search by its words, never a command's text. Over
-the owner's 279 runs of two weeks that made a median of one line a run on Claude Code (at most 17) and six on OpenCode
-(at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
-the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
-may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
+to its calls is drawn as one of its messages and stays where it was said; a call is never a message of its own (the
+owner's word of 2026-11-27: stacked "Code run" and "Running a command" lines read as noise): the one line under the
+conversation says what the run does now, in plain words and never by a tool's name ("Running a command… · 2 min",
+"Reading README.md… · 2 min"; a tool with no phrase of its own is "Working"). The daemon still records a `narration` event
+beside a call's `tool_call` (`agent/narration.py`), in every harness; no model is asked for it, and neither the web
+nor the iPhone draws it as a line. A task you start in a chat says its first words
+the moment it starts (item 2018, `agent/first_words.py`, `[agent] first_words`): *Looking into it…* at once, then in its
+place a line of the fast model (`[models] fast`) of what Dot looks at first, written from your message alone while the
+task gets ready and takes its first step ("Looking at your calendar first."). The line is told only while the task has
+said nothing yet (no words of its own, no call, no question): once it speaks the call is dropped, so the line is never a
+second voice beside the task's own words, and a fast model that fails or takes more than 12 s leaves the first words as
+they were. Neither is a message the task's model reads; the line costs one short call of the fast model and nothing of
+the task's steps. A schedule's, a helper's or a review's task has none.
+On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
 the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
-behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A run
+behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A helper's chat
+shows its steps as the chat that started it does, unless its own This chat sheet chose, and opens as the bottom sheet
+from the chat's helpers row as from its Agents sheet; a helper is listed by its goal's first sentence, a label it opens
+with ("Task:") left out, and what it does names a file by its name, never its path. A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
@@ -982,14 +987,17 @@ sessions whose program runs (3; 0 removes the tools); one whose program ended do
 exit status with it, until a read or `terminal_close` closes it (item 1990). Each is closed after `terminal_idle_s`
 without use (30 minutes) and all of them when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
-**A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
-answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the
-checks are pending, and it runs no `gh pr checks` loop, no `sleep` and no `wait_until` on them. Over a week on the
-owner's Mac, 382 shell calls of that kind took 9.3 of the 29 hours of the helpers' shell time, in 37 of 76 helper
-runs, and each poll of a Claude Code helper read its whole context again. The parent, which has a chat, starts
-`gh pr checks <number> --watch` with `terminal_open` and `background` (the shell's and the delegate tool's descriptions
-say so) and ends its run or goes on; the chat is told when the command ends, and a run reads the checks then, as for
-any command in the background. This asks the owner nothing and changes no policy: it is words in two prompts.
+**A helper can hand off its pull request checks (items 1953 and 2046).** Once the PR is pushed and open, the helper
+calls `terminal_open` with `background: true` and a single `gh pr checks <number or GitHub PR URL> --watch` command.
+Add `--fail-fast` to report the first failing check. The watch starts in the helper's working directory and sandbox
+and appears in the top-level chat that delegated the work, where it can be stopped. The helper can finish as soon as it has
+the session ID. It reports the PR URL and whether it started a watch. If it could not start one, the parent can
+register the watch in its chat.
+
+The daemon waits in the background terminal, with zero model turns while it polls. The chat receives the terminal
+session ID and exit status once the command ends, including an error contacting GitHub. The check output is available
+through `terminal_read`. The daemon's usual rules for background commands apply, including stop behavior and delivery
+to a run already at work in the chat. This handoff is available to delegated runs in the daemon, outside campaigns.
 
 `wait_until` (item 887, after OpenMausBot's waits) waits for something to happen, checked in code, with no model turn
 spent on the wait. It names one condition:
@@ -1051,9 +1059,11 @@ messages and their order stay as they were. Right above the
 composer, the chat's page shows each of its commands at work, with the time it has run and a Stop; the dot of a command
 in the background pulses, as its end will wake Dot. A command stopped there, closed by the run or ended by the daemon's
 stop tells nothing, and neither does one whose end a run has read itself with `terminal_read` before it was told (item
-427): a run that waited for its command and saw it end is not told the same again. A delegated run or a campaign's
-session opens none, having no chat of its own to tell: it is not offered `background`, nor the sentence of `shell` that
-sends a long command there (item 1760), and a call that sets it anyway is refused. Neither does a `dotx` command, which
+427): a run that waited for its command and saw it end is not told the same again. A campaign's session opens none,
+having no chat of its own to tell: it is not offered `background`, nor the sentence of `shell` that sends a long
+command there (item 1760), and a call that sets it anyway is refused. A delegated run is offered `background` for
+one command only, a single `gh pr checks <number or URL> --watch [--fail-fast]` handed to its parent chat (item 2046,
+above); any other command it sets there is refused. Neither does a `dotx` command, which
 ends with its run: a command in the background lives as long as the daemon. The end of a helper that a run stopped waiting for tells the chat
 the same way ([Delegation](#delegation), item 1351).
 

@@ -1193,7 +1193,6 @@ TR: dict[str, str] = {
     # D2: the link in the chat's pill (item 1931).
     "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
     "Syncing messages…": "Mesajlar eşitleniyor…",
-    "your Mac": "Mac",
     # A chat's tasks (item 2013): the capsule's segment, the sheet, a task's own line, the toast of a routed message.
     "%lld tasks": "%lld görev",
     "Tasks": "Görevler",
@@ -1238,10 +1237,12 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "User input needed": "Senden bir cevap bekleniyor",
+        "%lld / %lld": "%lld / %lld",
+        "Submit answers": "Yanıtları gönder",
         "Default (%@)": "Varsayılan (%@)",
         "Favourite": "Favori",
-        "Can't reach %@": "%@ cihazına ulaşılamıyor",
-        "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
+            "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
         "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
         "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
         "Deleted for good %@.": "Kalıcı olarak silinecek: %@.",
@@ -1640,7 +1641,7 @@ TR.update(
     {
         "%lld min": "%lld dk",
         "%lld s": "%lld sn",
-        "Looking at %@": "%@ inceleniyor",
+        "Looking into it…": "Bakıyorum…",
     }
 )
 
@@ -1747,3 +1748,14 @@ TR.update(
         "Shows the whole message": "Mesajın tamamını gösterir",
     }
 )
+
+# MS1: the last confirmed contact with the Mac.
+TR.update(
+    {
+        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
+        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
+    }
+)
+
+# A new chat's first send opens the one chat screen (item 2025).
+TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})

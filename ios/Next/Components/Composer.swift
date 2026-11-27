@@ -592,20 +592,16 @@ struct DocumentScanner: UIViewControllerRepresentable {
     }
 }
 
-/// A lasting problem with the link to the Mac, said quietly in the capsule's status place (item 1931; the owner's report
-/// of 2026-11-27: a blip, a reconnection that mends or a chat being brought up to date shows nowhere, and the header
-/// always keeps the bot's face and name).
-enum LinkLine: Equatable, Sendable {
-    /// The link broke and has not come back, to the paired Mac by its name.
-    case unreachable(mac: String)
-    /// The phone has no link.
-    case offline
+/// A lasting break in contact with the Mac. A newly paired client may have no previous contact to show.
+struct LinkLine: Equatable, Sendable {
+    let lastContact: Double?
 
     var words: String {
-        switch self {
-        case .unreachable(let mac): String(localized: "Can't reach \(mac)", comment: "Chat capsule: the link to the Mac broke a while ago and has not come back; the argument is the Mac's name")
-        case .offline: String(localized: "Offline", comment: "Chat subtitle: the phone has no link")
+        guard let lastContact else {
+            return String(localized: "Mac asleep or unreachable", comment: "Connection status when the last contact time is unknown")
         }
+        let time: String = clockWords(Date(timeIntervalSince1970: lastContact), format: .twentyFour, locale: .current)
+        return String(localized: "Mac asleep or unreachable since \(time)", comment: "Connection status with the time of the last successful contact")
     }
 }
 
@@ -696,15 +692,9 @@ struct FloatingWorkingControl: View {
         let layout: AnyLayout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
             if let link = summary.link {
-                // The link's state in the status's place while it is not live (item 1931): its words while it comes
-                // back, a quiet glyph before them while there is none.
                 segment(action: openStatus, label: link.words, inset: inset) {
-                    HStack(spacing: Space.xxs + 1) {
-                        if link == .offline {
-                            Image(systemName: "wifi.slash").textRole(.label).foregroundStyle(Tone.tertiary)
-                        }
-                        Text(link.words).textRole(.label).fontWeight(.medium).foregroundStyle(Tone.secondary).lineLimit(1)
-                    }
+                    Text(link.words).textRole(.label).fontWeight(.medium).foregroundStyle(Tone.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .accessibilityIdentifier("capsule.link")
             } else if let status = summary.status {

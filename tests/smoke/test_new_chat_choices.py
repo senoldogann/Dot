@@ -141,7 +141,7 @@ def _pill(page: Page, name: str) -> Locator:
 def _menu(page: Page, label: str) -> Locator:
     """The choices a menu named `label` held: the agent's still in its menu, the others in the chat's settings (item
     2015)."""
-    if label == "Agent":
+    if label == "Bot":
         return page.locator(f".composer .composer-popover[aria-label='{label}']")
     return menu(page, label)
 
@@ -233,7 +233,7 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             # again too.
             await page.locator(GOAL).type("/research")
             await page.locator(GOAL).press("Tab")
-            await _pick(page, "agent", "Agent", "Scout")
+            await _pick(page, "agent", "Bot", "Scout")
             await _pick(page, "reasoning", "Reasoning", "Ultrathink")
             await page.locator(GOAL).fill(WORDS)
             await _away_and_back(page, served)

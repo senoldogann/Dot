@@ -4,7 +4,7 @@
 
 /**
  * Whether this page is a phone's touch screen (no pointer that hovers). What the page does on a bad link (the copies of the
- * chats, the reads that try again, the outbox, the line under the bar: items 1520 to 1524) is the phone's alone. A Mac's
+ * chats, the reads that try again, the outbox and the device-offline line: items 1520 to 1524) is the phone's alone. A Mac's
  * page talks to a Dot on the same Mac, which a network that is down does not take away: `navigator.onLine` is false there
  * while the daemon answers, and a page that took it for a lost link would hold what the owner sends.
  */
