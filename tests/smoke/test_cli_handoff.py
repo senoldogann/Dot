@@ -25,7 +25,7 @@ from dotagent.cli_commands import RunCommand
 from dotagent.cli_handoff import daemon_of_this_home
 from dotagent.cli_run import cmd_run
 from dotagent.config import ServerConfig, load_default_config
-from dotagent.core.errors import ServiceError
+from dotagent.core.errors import NotFoundError, ServiceError
 from dotagent.core.paths import ensure_layout, token_path
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config
 from dotagent.evals.scripted import ScriptedProvider
@@ -159,6 +159,22 @@ async def test_a_review_is_handed_with_its_own_source(own_home: Path) -> None:
         (run,) = await runtime.store.list_runs(10, None)
         assert run.source == "review"
         assert (await runtime.store.get_thread(run.thread_id)).source == "review"
+
+
+async def test_a_review_whose_chat_was_deleted_starts_in_a_new_chat(
+    own_home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The pre-push hook continues a branch's review chat (``--thread``); one the owner deleted since starts the review
+    in a new chat rather than refusing it (item 1986), and a run that is not a review is still refused."""
+    async with _daemon(own_home, [_FINISH]) as (runtime, _manager):
+        with pytest.raises(NotFoundError):
+            await cmd_run(_command("ask", False).model_copy(update={"thread": "thr_deleted_000000"}))
+        assert await cmd_run(_command("ask", True).model_copy(update={"thread": "thr_deleted_000000"})) == 0
+        (run,) = await runtime.store.list_runs(10, None)
+    assert run.source == "review" and run.status == "done" and run.thread_id != "thr_deleted_000000"
+    printed: str = capsys.readouterr().err
+    assert "the chat thr_deleted_000000 is gone; the review starts in a new chat" in printed
+    assert f"thread {run.thread_id}" in printed
 
 
 async def test_a_question_of_a_handed_run_is_answered_no_by_a_terminal_without_input(

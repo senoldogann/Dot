@@ -91,12 +91,17 @@ def _run_hook_on(
         encoding="utf-8",
     )
     stand_in.chmod(0o755)
-    # `uv run python scripts/prompt_surface.py --check` (item 1971): records that it ran, and when `uv_exit` is there
-    # fails with that exit status and what `uv_says` holds.
+    # `uv run python scripts/prompt_surface.py --check` (item 1971) and `uv run pytest` of the first step's budget
+    # (item 1997): records that it ran and its DOT_HOME; when `uv_exit` is there fails with that exit status and what
+    # `uv_says` holds, and the budget's run alone fails so when `pytest_exit` is there.
     uv: Path = bin_dir / "uv"
     uv.write_text(
         "#!/bin/sh\n"
         f'echo "$@" >> "{tmp_path / "uv_called"}"\n'
+        f'echo "$DOT_HOME" >> "{tmp_path / "uv_homes"}"\n'
+        f'if [ "$2" = pytest ] && [ -f "{tmp_path / "pytest_exit"}" ]; then\n'
+        f'  cat "{tmp_path / "uv_says"}"; exit "$(cat "{tmp_path / "pytest_exit"}")"\n'
+        "fi\n"
         f'if [ -f "{tmp_path / "uv_exit"}" ]; then\n'
         f'  cat "{tmp_path / "uv_says"}" >&2; exit "$(cat "{tmp_path / "uv_exit"}")"\n'
         "fi\n"
@@ -107,6 +112,7 @@ def _run_hook_on(
     env = {key: value for key, value in os.environ.items() if key != "ANTHROPIC_API_KEY"}
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env.pop("DOTX", None)
+    env.pop("DOT_HOME", None)
     done = subprocess.run(
         ["bash", str(_HOOK)],
         cwd=repo,
@@ -493,3 +499,76 @@ def test_a_branch_that_is_not_checked_out_is_not_checked_and_says_so(repo: Path,
     assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
     assert "is not checked out, so its prompt surface is not checked here" in done.stderr
     assert not (tmp_path / "uv_called").exists()
+
+
+_BUDGET_TEST: str = "tests/smoke/test_context_budget.py::test_a_fresh_homes_first_step_stays_within_its_budget"
+
+
+def test_a_change_of_the_prompt_surface_runs_the_first_steps_budget_in_a_throwaway_home(
+    repo: Path, tmp_path: Path
+) -> None:
+    """Item 1997: the budget's test is a macOS smoke test a pull request never runs, and main went red on it four times
+    in a day; a pushed change of the surface is measured against it here, in a home of its own."""
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    (repo / "tests" / "fixtures" / "prompt_surface").mkdir(parents=True)
+    (repo / "src" / "dotagent" / "tools.py").write_text("a longer tool\n", encoding="utf-8")
+    (repo / "tests" / "fixtures" / "prompt_surface" / "tools.json").write_text("{}\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "a tool's description and its surface")
+    tip: str = _git(repo, "rev-parse", "HEAD")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    called: list[str] = (tmp_path / "uv_called").read_text().splitlines()
+    assert called[0] == "run python scripts/prompt_surface.py --check"
+    assert called[1].startswith("run pytest ") and called[1].endswith(_BUDGET_TEST)
+    home: str = (tmp_path / "uv_homes").read_text().splitlines()[1]
+    assert home != "" and not Path(home).exists()
+
+
+def test_a_first_step_over_its_budget_stops_the_push_with_the_measured_numbers_and_no_model_is_asked(
+    repo: Path, tmp_path: Path
+) -> None:
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "tests" / "fixtures" / "prompt_surface").mkdir(parents=True)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    (repo / "src" / "dotagent" / "tools.py").write_text("a longer tool\n", encoding="utf-8")
+    (repo / "tests" / "fixtures" / "prompt_surface" / "tools.json").write_text("{}\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "a tool's description and its surface")
+    tip: str = _git(repo, "rev-parse", "HEAD")
+    (tmp_path / "uv_says").write_text(
+        "F\nE       AssertionError: in all 33732, system 9235 (...); raise the budget\nE       assert 33732 <= 33700\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pytest_exit").write_text("1\n", encoding="utf-8")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "the first step is over its budget" in done.stderr
+    assert "in all 33732, system 9235" in done.stderr and "assert 33732 <= 33700" in done.stderr
+
+
+def test_a_change_under_src_dotagent_that_leaves_the_surface_as_it_was_does_not_run_the_budget(
+    repo: Path, tmp_path: Path
+) -> None:
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/store.py", "a query\n", "a query")
+    (tmp_path / "pytest_exit").write_text("1\n", encoding="utf-8")
+    (tmp_path / "uv_says").write_text("over\n", encoding="utf-8")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    assert (tmp_path / "uv_called").read_text().splitlines() == ["run python scripts/prompt_surface.py --check"]
+
+
+def test_a_push_of_the_budget_alone_runs_it(repo: Path, tmp_path: Path) -> None:
+    """The review of item 1997: the check sat under the condition of a change under src/dotagent, so a push that raised
+    the budget, or wrote the surface again alone, ran nothing."""
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "tests" / "smoke").mkdir(parents=True)
+    tip: str = _commit(repo, "tests/smoke/test_context_budget.py", "BUDGET_TOKENS = 1\n", "a budget")
+    (tmp_path / "pytest_exit").write_text("1\n", encoding="utf-8")
+    (tmp_path / "uv_says").write_text("E       assert 33732 <= 1\n", encoding="utf-8")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "assert 33732 <= 1" in done.stderr

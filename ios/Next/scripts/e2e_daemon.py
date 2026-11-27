@@ -33,7 +33,10 @@ holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for
 ``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
 failed), the decisions made for the owner in them, drafts that wait (one whose send failed), a thing a run put on Dot's
 own list, and two versions of Dot's habits proposed by its learning (one written from a page others can write);
-``e2e_activity.sh`` marks "while you were away" read from before them. With
+``e2e_activity.sh`` marks "while you were away" read from before them. With ``--seed-work`` it holds an agent,
+Scribe, with what a bot's profile lists (items 87, 907, 908): an objective, two work orders (one handed out and
+due in three hours, one accepted) and two messages between Dot and Scribe, one of them answered
+(``e2e_bots.sh``). With
 ``--model <ref>`` (``claude_code:haiku``) the runs go to that real model instead of the script, for a real-model run of
 the phone's flows; the throwaway home has no key of its own, so only a provider that brings its own sign-in (the Claude
 plan's ``claude`` command) answers.
@@ -41,7 +44,7 @@ plan's ``claude`` command) answers.
 Usage (the three folders are throwaway, ``mktemp -d``)::
 
     DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome \\
-        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed] [--seed-activity]
+        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed] [--seed-activity] [--seed-work]
 
 It prints ``READY <port> <token>`` once it serves; a pairing code is made with
 ``curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/phone/pairing``.
@@ -81,6 +84,7 @@ from dotagent.store.db import Store
 from dotagent.store.models import (
     ApprovalRecord,
     DraftRecord,
+    ObjectiveWorkflow,
     RunRecord,
     RunStatus,
     ScheduleRecord,
@@ -481,6 +485,113 @@ async def seed(runtime: Runtime) -> None:
     )
 
 
+async def seed_work(runtime: Runtime) -> None:
+    """An agent, Scribe, with an objective, two work orders (one handed out and due in three hours, one accepted)
+    and two messages between Dot and Scribe, one answered and one still at work: what a bot's profile lists."""
+    store: Store = runtime.store
+    scribe = await store.create_agent(
+        "Scribe", "Writes the weekly note", "Write the weekly note, short.", "", None, None, (), None, None
+    )
+    objective = await store.add_objective(
+        "Keep the weekly note short",
+        "The owner reads it on the phone.",
+        "Under 200 words, every Friday.",
+        ObjectiveWorkflow(next_step="Draft this Friday's note"),
+        False,
+    )
+    chat: ThreadRecord = await store.create_thread("Weekly note", "ui")
+    lead: RunRecord = await store.create_run(
+        chat.id,
+        "Hand out the weekly note",
+        "task",
+        MODEL,
+        None,
+        "ui",
+        "medium",
+        "standard",
+        None,
+        "supervised",
+        False,
+        None,
+        None,
+        None,
+    )
+    await store.finish_run(lead.id, "done", "Handed out.")
+    await store.add_work_order(
+        scribe.id,
+        "Draft the weekly note",
+        "Collect the week's highlights and write the note.",
+        "A note under 200 words, ready to send.",
+        objective.id,
+        time.time() + 3 * 3600,
+        lead.id,
+        chat.id,
+        False,
+    )
+    done = await store.add_work_order(
+        scribe.id,
+        "Pick the note's topics",
+        "Choose three topics.",
+        "Three topics, one line each.",
+        None,
+        None,
+        lead.id,
+        chat.id,
+        False,
+    )
+    await store.move_work_order(done.id, "in_review", ("assigned",), note="The topics are chosen.")
+    await store.move_work_order(done.id, "accepted", ("in_review",), note="Good.")
+    asked: RunRecord = await store.create_run(
+        chat.id,
+        "Which topics fit this week?",
+        "task",
+        MODEL,
+        lead.id,
+        "team",
+        "medium",
+        "standard",
+        None,
+        "supervised",
+        False,
+        None,
+        scribe.id,
+        None,
+    )
+    await store.finish_run(asked.id, "done", "Launch, the offsite and the new price list.")
+    scribe_run: RunRecord = await store.create_run(
+        chat.id,
+        "Scribe's own run",
+        "task",
+        MODEL,
+        None,
+        "ui",
+        "medium",
+        "standard",
+        None,
+        "supervised",
+        False,
+        None,
+        scribe.id,
+        None,
+    )
+    await store.create_run(
+        chat.id,
+        "Is the offsite date final?",
+        "task",
+        MODEL,
+        scribe_run.id,
+        "team",
+        "medium",
+        "standard",
+        None,
+        "supervised",
+        False,
+        None,
+        None,
+        None,
+    )
+
+
 async def _schedule_run(store: Store, name: str, goal: str, status: RunStatus, answer: str) -> RunRecord:
     """A run of a schedule of ``name`` that ended ``status`` with ``answer``, in the schedule's own chat."""
     schedule: ScheduleRecord = await store.add_schedule(
@@ -583,7 +694,7 @@ class HoldAccepts:
         await self.app(scope, replay, send)
 
 
-async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None:
+async def serve(port: int, seeded: bool, activity: bool, work: bool, scripted: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     play_page: str = serve_play_page()
@@ -594,6 +705,8 @@ async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None
         await seed(runtime)
     if activity:
         await seed_activity(runtime)
+    if work:
+        await seed_work(runtime)
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", port)
@@ -635,4 +748,12 @@ def model_argument(args: list[str]) -> str:
 if __name__ == "__main__":
     chosen: str = model_argument(sys.argv[2:])
     prepare_home(chosen)
-    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:], "--seed-activity" in sys.argv[2:], chosen == MODEL))
+    asyncio.run(
+        serve(
+            int(sys.argv[1]),
+            "--seed" in sys.argv[2:],
+            "--seed-activity" in sys.argv[2:],
+            "--seed-work" in sys.argv[2:],
+            chosen == MODEL,
+        )
+    )

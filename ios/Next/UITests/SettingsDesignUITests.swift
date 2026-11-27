@@ -4,7 +4,7 @@ import XCTest
 /// fixture daemon: every row is a full tap target (44 pt at least), sits with equal insets left and right, and rows of
 /// the same kind in a page have one height. A difference over 1 pt fails. The measurements are printed for the report.
 final class SettingsDesignUITests: XCTestCase {
-    private let scenes: [String] = ["settings-models", "settings-schedules", "settings-rules", "settings-memory", "settings-agents"]
+    private let scenes: [String] = ["settings-models", "settings-schedules", "settings-rules", "settings-memory", "settings-memory-trash", "settings-agents"]
 
     func testRowsAreFullTargetsWithEqualInsetsAndOneHeightPerKind() throws {
         for scene in scenes {

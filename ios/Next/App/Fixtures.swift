@@ -37,6 +37,8 @@
         /// A working chat whose command rows return long output (a test run of 600 lines, a file of 400): the jank check of
         /// opening and closing a row (`UITests/WorkLogJankUITests.swift`).
         case jank = "n2-jank"
+        /// A run that wrote its answer and finished with it in slightly other words (item 1996): the answer stands once.
+        case restated = "n2-restated"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -120,7 +122,7 @@
         private var runB: String {
             switch self {
             case .failed: "failed"
-            case .deleted: "done"
+            case .deleted, .restated: "done"
             default: "running"
             }
         }
@@ -184,6 +186,14 @@
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"failed","result":"","error":{"kind":"model","message":"The model answered HTTP 529: overloaded. Try again in a minute."}}}"#)
             case .deleted:
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"done","result":"Booked Tuesday 14:00."}}"#)
+            case .restated:
+                events.append(contentsOf: [
+                    #"{"id":30,"run_id":"run_b","ts":\#(b + 50),"kind":"assistant","data":{"text":"Booked: Tuesday at 14:00 with Dr. Lind. ","step":5,"tool_calls":[]}}"#,
+                    #"{"id":31,"run_id":"run_b","ts":\#(b + 52),"kind":"assistant","data":{"text":"","step":6,"tool_calls":["finish"]}}"#,
+                    #"{"id":32,"run_id":"run_b","ts":\#(b + 52),"kind":"tool_call","data":{"call_id":"f1","tool":"finish","args":{"answer":"Booked: Tuesday at 14:00 with Dr. Lind."}}}"#,
+                    #"{"id":33,"run_id":"run_b","ts":\#(b + 53),"kind":"tool_result","data":{"call_id":"f1","ok":true,"text":"done"}}"#,
+                    #"{"id":34,"run_id":"run_b","ts":\#(b + 53),"kind":"run_finished","data":{"status":"done","result":"Booked: Tuesday at 14:00 with Dr. Lind.","restated":[5]}}"#,
+                ])
             default:
                 break
             }

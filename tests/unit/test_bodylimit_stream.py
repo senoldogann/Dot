@@ -23,7 +23,7 @@ async def _run(method: str, path: str) -> list[Message]:
     async def send(message: Message) -> None:
         sent.append(message)
 
-    layer: BodyLimit = BodyLimit(app, MOST, PUBLIC_MOST, lambda _path: True)
+    layer: BodyLimit = BodyLimit(app, MOST, PUBLIC_MOST, lambda _path: True, lambda _path: False, PUBLIC_MOST)
     scope: Scope = {
         "type": "http",
         "method": method,

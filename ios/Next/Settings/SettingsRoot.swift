@@ -191,6 +191,7 @@ struct SettingsDestination: View {
         case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, scope: .all)
         case .rules: RulesPage()
         case .memory: MemoryPage()
+        case .memoryTrash: MemoryTrashPage()
         case .agents: AgentsHome()
         case .system: SystemPage()
         case .usage: UsagePage()
@@ -276,8 +277,8 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "rules", String(localized: "Permissions", comment: "Settings row: the approval mode and the rules"), agents, "rules permissions approvals policy ask safety allow deny",
             String(localized: "permissions approvals policy ask safety", comment: "Settings search synonyms of Rules (space separated)"), .rules),
         entry(
-            "memory", String(localized: "Memory", comment: "Settings row"), agents, "notes remember lessons search proposals",
-            String(localized: "notes remember lessons proposals", comment: "Settings search synonyms of Memory (space separated)"), .memory),
+            "memory", String(localized: "Memory", comment: "Settings row"), agents, "notes remember lessons search proposals pin trash restore forget",
+            String(localized: "notes remember lessons proposals pin trash restore forget", comment: "Settings search synonyms of Memory (space separated)"), .memory),
         entry(
             "agents", String(localized: "Agents", comment: "Title of the agents list"), agents, "agent agents helpers chat",
             String(localized: "agent agents helpers chat", comment: "Settings search synonyms of Agents (space separated)"), .agents),

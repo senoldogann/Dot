@@ -643,8 +643,10 @@ its request holds in characters, the system prompt by the heading of each sectio
 each). `dotx stats` ends with the medians of the newest 200 runs of its window: in all, the system prompt and its five
 largest sections, the tools and their five largest groups, and the conversation before the first step. A fresh
 scheduled run of the owner's sent 50,000 to 61,000 tokens before any work on 2026-10-27, a fresh home's about 20,000;
-`tests/smoke/test_context_budget.py` holds a fresh home's task run under a budget (21,300 in all, the system prompt
-7,000, the tools 14,400), and a change that needs more raises it there, saying why.
+`tests/smoke/test_context_budget.py` holds a fresh home's task run under a budget (33,800 in all, the system prompt
+9,250, the tools 24,400), and a change that needs more raises it there, saying why. It is a macOS smoke test, which a
+pull request does not run, so the pre-push hook runs it when the pushed change touches the prompt surface or the budget
+(item 1997) and stops the push with the measured numbers when the first step is over.
 
 **The prompt surface is checked in** (item 1858): `tests/fixtures/prompt_surface/` holds the system prompt of five kinds
 of run (a task asking approvals, a yolo task, a lean task, a chat, a research run) and the schema of every built-in

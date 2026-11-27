@@ -28,6 +28,7 @@ export const TABS = [
   { id: "keys", label: t("settingstabs.aiServices"), icon: "key", words: t("settingstabs.keysApiProvidersOpenaiAnthropic") },
   { id: "phone", label: t("settingstabs.phone"), icon: "smartphone", words: t("settingstabs.tailscalePairDevicesIphone") },
   { id: "channels", label: t("settingstabs.channels"), icon: "message", words: t("settingstabs.imessageTelegramWhatsappMessaging") },
+  { id: "hooks", label: t("settingstabs.hooks"), icon: "bolt", words: t("settingstabs.webhooksSignedCallsHttpTrigger") },
   { id: "system", label: t("settingstabs.system"), icon: "monitor", words: t("settingstabs.daemonHealthEmergencyStopVersion") },
   { id: "repair", label: t("settingstabs.selfRepair"), icon: "wrench", words: t("settingstabs.problemsFixesClaudeCodeSessions") },
   { id: "diagnostics", label: t("settingstabs.diagnostics"), icon: "terminal", words: t("settingstabs.processesLogsDiskUsage") },
@@ -71,6 +72,7 @@ export const SETTINGS_GROUPS = [
       { tab: "keys", line: t("settingstabs.theKeysOfTheAi") },
       { tab: "phone", line: t("settingstabs.dotOnYourPhones"), value: "phone" },
       { tab: "channels", line: t("settingstabs.imessageAndTheOtherWays") },
+      { tab: "hooks", line: t("settingstabs.signedCallsFromServicesThat") },
     ],
   },
   {

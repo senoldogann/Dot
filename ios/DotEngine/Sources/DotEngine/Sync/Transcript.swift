@@ -130,19 +130,22 @@ public struct WorkTally: Sendable, Equatable, Hashable {
     }
 }
 
-/// A finished stretch of work folded to one line (plan §4.1): "Worked for 2m 14s · read 3 files, ran 2 commands". A
-/// fold with a failed step is drawn open.
+/// A finished stretch of work folded to one line (plan §4.1): "Worked for 2m 14s · read 3 files, ran 2 commands".
+/// `startsOpen`: whether it is drawn open, as one with a failed step is beside the steps; with "Show steps" off it is
+/// always drawn folded, the owner's choice of only the messages (item 1996).
 public struct WorkFold: Sendable, Equatable {
     public let id: String
     public let seconds: Int
     public let tally: WorkTally
     public let items: [TranscriptItem]
+    public let startsOpen: Bool
 
-    public init(id: String, seconds: Int, tally: WorkTally, items: [TranscriptItem]) {
+    public init(id: String, seconds: Int, tally: WorkTally, items: [TranscriptItem], startsOpen: Bool) {
         self.id = id
         self.seconds = seconds
         self.tally = tally
         self.items = items
+        self.startsOpen = startsOpen
     }
 
     public var hasFailure: Bool { tally.failed > 0 }
@@ -274,8 +277,9 @@ private func builtRuns(of chat: ChatProjection, streaming: Bool, context: Transc
 /// The transcript of "Show steps" off (items 1915 and 1976): the chat told as a conversation, as Grok Bot tells its work.
 /// The owner's words, Dot's words (those on the way to its calls too, which stay where they were said), the lines of the
 /// calls its words did not tell (`narration`), the asks, the helpers and how runs ended; a run at work's steps and
-/// thoughts are left out but a failed call, its live line saying what it does. A finished run's steps, thoughts and plan
-/// are one fold, "Worked for 2m", before its answer: a tap there shows them, so nothing is lost. Pure.
+/// thoughts are left out, a failed call too, its live line saying what it does. A finished run's steps, thoughts and
+/// plan are one fold, "Worked for 2m", before its answer, drawn folded even with a failed step in it: a tap there shows
+/// them, so nothing is lost. Pure.
 public func conversation(of chat: ChatProjection, pending: [PendingMessage], streaming: Bool, context: TranscriptContext) -> [TranscriptItem] {
     builtRuns(of: chat, streaming: streaming, context: context).flatMap { conversed($0.rows, finished: $0.finished) }
         + pending.map { .owner(id: "p:\($0.key)", text: $0.text, delivery: $0.delivery) }
@@ -283,11 +287,12 @@ public func conversation(of chat: ChatProjection, pending: [PendingMessage], str
 
 /// The rows of one run in the conversation (`conversation`). Pure.
 func conversed(_ built: [Built], finished: Bool) -> [TranscriptItem] {
+    // While the run works its steps are left out, a failed one too (item 1996): the live line says the work, a failure
+    // that ends the run is its end card, and a finished run's fold keeps every step.
     guard finished else {
         return built.filter { row in
             switch row.category {
-            case .thought: false
-            case .tool(let state): state == .failed
+            case .thought, .tool: false
             default: true
             }
         }.map(\.item)
@@ -305,7 +310,10 @@ func conversed(_ built: [Built], finished: Bool) -> [TranscriptItem] {
     let start: Double = steps.map(\.start).min() ?? first.start
     let end: Double = steps.map(\.end).max() ?? start
     let fold: Built = Built(
-        item: .work(WorkFold(id: "f:\(first.item.id)", seconds: max(0, Int((end - start).rounded())), tally: .of(tools), items: steps.map(\.item))),
+        item: .work(
+            WorkFold(
+                id: "f:\(first.item.id)", seconds: max(0, Int((end - start).rounded())), tally: .of(tools), items: steps.map(\.item),
+                startsOpen: false)),
         category: .tool(.done), start: start, end: end)
     out.insert(fold, at: out.firstIndex { $0.category == .answer(final: true) } ?? out.count)
     return out.map(\.item)
@@ -368,6 +376,8 @@ private func runItems(
     var planAt: Int?
     // Whether the newest step wrote words, which tell its calls: no line of a call stands beside them (item 1976).
     var said: Bool = false
+    // The step each of Dot's words came from, by its row's id: the run's end names the steps its answer restates.
+    var stepOf: [String: Int] = [:]
     let events: [EventRecord] = timeline?.events ?? []
     for event in events {
         switch event.kind {
@@ -385,6 +395,7 @@ private func runItems(
             let text: String = event.data["text"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             said = !text.isEmpty
             guard !text.isEmpty else { continue }
+            if let step: Int = event.data["step"]?.int { stepOf["a:\(event.id)"] = step }
             items.append(Built(item: .answer(id: "a:\(event.id)", text: text, writing: false, endedAt: nil), category: .answer(final: false), start: event.ts, end: event.ts))
         case "tool_call":
             guard let step: HelperStep = helperStep(of: event) else { continue }
@@ -456,13 +467,13 @@ private func runItems(
         case "run_finished":
             let result: String = (event.data["result"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let status: String = event.data["status"]?.string ?? "done"
-            // The replies that said the answer's words are the answer: it is shown once, at the end (as the old app does).
-            let restated: Set<String> = Set(
-                (event.data["restated"]?.array ?? []).compactMap { $0.string?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            ).union(result.isEmpty ? [] : [result])
+            // The replies that said the answer's words are the answer: it is shown once, at the end (as the web does). The
+            // daemon names them by their steps (`restated`, item 620): the phone read them as words, so a reply that said
+            // the answer in slightly other words stood above it whole (the owner's shot of 2026-11-27, item 1996).
+            let restated: Set<Int> = Set((event.data["restated"]?.array ?? []).compactMap(\.int))
             items = items.filter { built in
-                if case .answer(_, let text, _, _) = built.item { return !restated.contains(text) }
-                return true
+                guard case .answer(let id, let text, _, _) = built.item else { return true }
+                return text != result && !(stepOf[id].map(restated.contains) ?? false)
             }
             appendHelpers(&items, run: run, helpers: helpers, at: event.ts)
             let error: [String: JSONValue]? = event.data["error"]?.object
@@ -497,6 +508,12 @@ private func runItems(
     }
     if !hasEnded(timeline), run.isActive || !events.isEmpty {
         appendHelpers(&items, run: run, helpers: helpers, at: events.last?.ts ?? run.createdAt)
+    }
+    // The finish is the answer, which stands on its own: its row shows only when it was refused, as on the web (item
+    // 1996: "Finish" stood between the step's words and the answer).
+    items = items.filter { built in
+        guard case .tool(let entry) = built.item, entry.tool == finishTool else { return true }
+        return entry.state == .failed
     }
     if let thinking, !thinking.text.isEmpty, run.isActive, !hasEnded(timeline) {
         let at: Double = events.last?.ts ?? run.createdAt
@@ -585,6 +602,9 @@ private func foldable(_ category: Category) -> Bool {
     }
 }
 
+/// The tool that ends a run with its answer.
+let finishTool: String = "finish"
+
 /// The tools whose calls the transcript shows as their own rows instead (an ask's anchor, the plan's card).
 let silentTools: Set<String> = ["ask_user", "ask_secret", "update_plan", "mark_plan_step"]
 
@@ -600,7 +620,12 @@ func shaped(_ built: [Built], finished: Bool, mode: ToolCallMode) -> [Transcript
         let tools: [ToolEntry] = stretch.compactMap { if case .tool(let entry) = $0.item { entry } else { nil } }
         let start: Double = stretch.map(\.start).min() ?? 0
         let end: Double = stretch.map(\.end).max() ?? start
-        out.append(.work(WorkFold(id: "f:\(stretch[0].item.id)", seconds: max(0, Int((end - start).rounded())), tally: .of(tools), items: stretch.map(\.item))))
+        let tally: WorkTally = .of(tools)
+        out.append(
+            .work(
+                WorkFold(
+                    id: "f:\(stretch[0].item.id)", seconds: max(0, Int((end - start).rounded())), tally: tally, items: stretch.map(\.item),
+                    startsOpen: tally.failed > 0)))
         stretch = []
     }
     for row in kept {

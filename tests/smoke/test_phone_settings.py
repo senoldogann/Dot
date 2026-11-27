@@ -65,6 +65,7 @@ _TABS: dict[str, str] = {
     "keys": "AI services",
     "phone": "Phone",
     "channels": "Channels",
+    "hooks": "Hooks",
     "system": "System",
     "repair": "Self-repair",
     "diagnostics": "Diagnostics",

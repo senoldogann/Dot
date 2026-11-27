@@ -78,7 +78,8 @@ the owner's 279 runs of two weeks that made a median of one line a run on Claude
 (at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
 the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
 may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
-the line wears the bot's face, and a finished run's steps fold behind one *Worked for* line before its answer. A run
+the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
+behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
@@ -417,6 +418,19 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   message's level or one with picks, it waits as below. `[agent] busy_parallel = false` queues every message. This is
   the router of DeepSeek Harness's Super-agent design (2026-11-01): with one session that does the work itself, a new
   request waits; in its measure, a model left to decide whether to hand work out did so in none of five runs.
+- Several tasks in one chat (item 1984, slice 1 of [item 1982](../roadmap/1982.md)'s design): with `[agent]
+  chat_tasks` above 1 (1 by default, since the pages do not show lanes yet), a request of its own sent while the chat
+  works starts in a **lane** of the chat rather than a chat of its own: a thread of its own (`threads.lane_of` names
+  the chat) that the chat list does not show, whose first run is given what the chat said so far (the owner's words
+  and Dot's reply of the chat's newest runs and its lanes', not their steps), in front of the owner's words, which
+  stay its goal. A lane keeps everything a chat keeps per thread: one run at a time, its own queue, history, browser
+  tabs, resume and taint. At most `chat_tasks` tasks of a chat work at once, the chat's own run included, counted in
+  one write of the store so that two requests at once cannot both pass; a request past that waits in the chat's queue
+  as before. The answer to a question card a run left goes to that task: when another run works on its thread then,
+  it waits in the thread's queue (it cannot be steered into the run at work) and starts the asker's continuation once
+  that run has ended. `POST /api/threads/{id}/stop` stops every task of the chat (a lane names its chat), each as its
+  own Stop would, so each holds its queue, and a request the fast model was still being asked about starts nothing.
+  Deleting a chat deletes its lanes. With `chat_tasks = 1` all of this is as before.
 - A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
@@ -705,7 +719,9 @@ a model on the owner's Mac sent them 17 times in two days, each call refused), `
 `file_text` too (item 1902: Claude models sent that name, the one Anthropic's text editor tool gives it), `search_files` reads its `pattern` as
 `query` too (item 1176: a run on the Claude plan sent that name four times), `search_files` and `find_files` of a
 path that is not there fail with "path does not exist", as `list_dir` and `read_file` do, not as a failure of
-ripgrep's own (item 1283), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
+ripgrep's own (item 1283), `search_files` reads its pattern in ripgrep's own regex syntax, which its description
+names (no look-around, no backreferences, a match within one line), and fails a pattern ripgrep cannot read as the
+call's error with ripgrep's reason, not as a failure of ripgrep's own (item 1988), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
 comes, ending the search at that and saying so, so that a word a tree holds everywhere no longer costs the daemon
 the 1.8 GB that 397 MB of matches did (item 1956), and a wait or a count asked past its
 bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
@@ -904,8 +920,9 @@ a `shell` command is, a line typed in parts as a whole. Typing never holds Dot: 
 for it, up to 64 KB, and past that `terminal_send` fails with an error that says so until the program reads. A key a line editor acts upon (Tab, an arrow, a Ctrl- shortcut
 other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; once a line has run, the program may be
 in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
-sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
-when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
+sessions whose program runs (3; 0 removes the tools); one whose program ended does not count, and stays to be read, its
+exit status with it, until a read or `terminal_close` closes it (item 1990). Each is closed after `terminal_idle_s`
+without use (30 minutes) and all of them when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
 **A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
 answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the
