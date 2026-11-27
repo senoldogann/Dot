@@ -20,15 +20,18 @@ from dotagent.policy.sandbox import (
     CLIPBOARD_SERVICES,
     HANDING_PROGRAMS,
     HANDING_SERVICES,
+    NO_SEAL,
     SANDBOX_EXEC,
     UNSANDBOXED,
     Sandbox,
+    Seal,
     SwitchedSandbox,
     build_sandbox,
     hard_linked,
     sandbox_profile,
+    sealed_step,
 )
-from dotagent.policy.types import ApprovalMode
+from dotagent.policy.types import ActionInfo, ActionKind, ApprovalMode
 from dotagent.runtime import _dot_paths, _own_code
 
 
@@ -209,7 +212,7 @@ async def test_the_switch_starts_processes_without_the_sandbox_while_off_and_wit
     built: Sandbox = build_sandbox(
         (tmp_path / "token",), (tmp_path / "token",), (tmp_path / "skills",), tmp_path / "LaunchAgents"
     )
-    switched: SwitchedSandbox = SwitchedSandbox(built, False, True)
+    switched: SwitchedSandbox = SwitchedSandbox(built, NO_SEAL, False, True)
     assert (switched.on, switched.current()) == (False, UNSANDBOXED)
     await switched.switch(True)
     assert (switched.on, switched.current()) == (True, built)
@@ -225,7 +228,7 @@ def test_a_run_nobody_started_keeps_the_sandbox_in_every_mode_while_its_setting_
         (tmp_path / "token",), (tmp_path / "token",), (tmp_path / "skills",), tmp_path / "LaunchAgents"
     )
     for on in (True, False):
-        kept: SwitchedSandbox = SwitchedSandbox(built, on, True)
+        kept: SwitchedSandbox = SwitchedSandbox(built, NO_SEAL, on, True)
         for approvals in get_args(ApprovalMode):
             assert kept.for_run(approvals, True) == built, (on, approvals)
             assert kept.for_run(approvals, False) == (UNSANDBOXED if approvals == "yolo" or not on else built), (
@@ -233,7 +236,7 @@ def test_a_run_nobody_started_keeps_the_sandbox_in_every_mode_while_its_setting_
                 approvals,
             )
         assert kept.unattended() == built
-        followed: SwitchedSandbox = SwitchedSandbox(built, on, False)
+        followed: SwitchedSandbox = SwitchedSandbox(built, NO_SEAL, on, False)
         for approvals in get_args(ApprovalMode):
             assert followed.for_run(approvals, True) == followed.for_run(approvals, False), (on, approvals)
         assert followed.unattended() == followed.current()
@@ -242,7 +245,7 @@ def test_a_run_nobody_started_keeps_the_sandbox_in_every_mode_while_its_setting_
 async def test_a_sandbox_whose_program_does_not_start_is_never_switched_on(tmp_path: Path) -> None:
     missing: str = str(tmp_path / "no-sandbox-exec")
     broken: Sandbox = Sandbox(commands=(missing, "-p", "(version 1)"), search=(missing, "-p", "(version 1)"))
-    switched: SwitchedSandbox = SwitchedSandbox(broken, False, False)
+    switched: SwitchedSandbox = SwitchedSandbox(broken, NO_SEAL, False, False)
     with pytest.raises(ConfigError, match="cannot start") as refused:
         await switched.switch(True)
     assert refused.value.context["program"] == missing
@@ -536,3 +539,46 @@ def test_a_hard_link_made_outside_the_sandbox_is_the_one_name_of_a_sealed_file_t
     assert symbolic.returncode != 0 and "secret" not in symbolic.stdout
     read: subprocess.CompletedProcess[str] = run(f"cat {home}/workspace/hard")
     assert (read.returncode, read.stdout) == (0, "secret")
+
+
+def test_a_run_nobody_started_is_refused_by_dots_own_tools_what_its_sandbox_seals(tmp_path: Path) -> None:
+    """Item 2026: the seal Dot's own tools keep is the sandbox's: a sealed file is neither read nor written, what Dot
+    runs is read and not written, Dot's home is written only in the workspace; a file a step reads besides its target
+    counts; only a run nobody started has a seal, and only while [shell] sandbox_unattended holds."""
+    home: Path = tmp_path / "home"
+    seal: Seal = Seal(
+        sealed=(home / "token",),
+        unwritable=(home / "skills",),
+        closed=(home,),
+        open_folders=(home / "workspace",),
+    )
+
+    def step(kind: ActionKind, target: str, reads: tuple[str, ...]) -> ActionInfo:
+        return ActionInfo(tool="t", kind=kind, risk="low", summary="s", target=target, flags=(), reads=reads)
+
+    refused: list[ActionInfo] = [
+        step("read", str(home / "token"), ()),
+        step("read", str(home / "TOKEN"), ()),
+        step("write", str(home / "token"), ()),
+        step("write", str(home / "skills" / "x.md"), ()),
+        step("write", str(home / "config.toml"), ()),
+        step("browser_input", "https://example.invalid/", (str(home / "token"),)),
+        step("network", "notes.md", (str(home / "token"),)),
+    ]
+    allowed: list[ActionInfo] = [
+        step("read", str(home / "skills" / "x.md"), ()),
+        step("read", str(home / "config.toml"), ()),
+        step("write", str(home / "workspace" / "note.txt"), ()),
+        step("write", str(tmp_path / "elsewhere.txt"), ()),
+        step("network", str(home / "token"), ()),
+        step("browser_input", "https://example.invalid/", (str(home / "workspace" / "a.pdf"),)),
+    ]
+    for info in refused:
+        assert sealed_step(seal, info) is not None, info
+    for info in allowed:
+        assert sealed_step(seal, info) is None, info
+    built: Sandbox = build_sandbox((home / "token",), (home / "token",), (home / "skills",), tmp_path / "LaunchAgents")
+    for on in (True, False):
+        assert SwitchedSandbox(built, seal, on, True).seal_for(True) == seal
+        assert SwitchedSandbox(built, seal, on, True).seal_for(False) is None
+        assert SwitchedSandbox(built, seal, on, False).seal_for(True) is None

@@ -5055,6 +5055,8 @@ class RunManager:
                 owners_chat=owners_chat,
                 owner_there=owner_there,
                 unattended=unattended,
+                # A run nobody started keeps from Dot's own tools what its sandbox seals (item 2026).
+                seal=runtime.sandbox.seal_for(unattended),
                 # The chat whose "don't ask again" answers its questions (item 866): a delegated run's parent's.
                 chat_id=(parent.gate.chat_id if parent is not None else None) if marked_by is None else marked_by[0],
             )
