@@ -22,13 +22,23 @@ from dotagent.agent.reflection import last_reflection, record_reflection_failure
 from dotagent.agent.reflection_record import REFLECTION_OFF, Reflection, summary_line
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT
 from dotagent.config import SchedulerConfig
-from dotagent.core.errors import DotError, NotFoundError, PrecheckError, ProviderError, RunConflict, StoreError
+from dotagent.core.errors import (
+    DotError,
+    MissingSecretError,
+    NotFoundError,
+    PrecheckError,
+    ProviderError,
+    RunConflict,
+    StoreError,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path, workspace_dir
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.schedule import schedule_of
 from dotagent.harness.weekly import night as harness_night
+from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import Effort, Speed
+from dotagent.memory.kinds import classify_untold
 from dotagent.memory.service import backfill
 from dotagent.notify.owner import tell_owner
 from dotagent.plugins import scout_service
@@ -108,6 +118,8 @@ from dotagent.store.models import (
 )
 
 log = get_logger(__name__)
+# How often the fast model's pass over the notes without a kind may run (item 1975).
+_KINDS_EVERY_S: float = 3600.0
 
 _UNFINISHED: frozenset[str] = frozenset({"starting", "running"})
 # How many ticks in a row may fail before the scheduler's loop ends, and the daemon with it (``server/daemon.py``):
@@ -257,6 +269,9 @@ class Scheduler:
         self._settling: asyncio.Task[None] | None = None
         # Notes that have no vector, embedded off the request path. One pass at a time.
         self._backfilling: asyncio.Task[None] | None = None
+        # The fast model's pass over the notes the rules gave no kind (item 1975), at most once an hour, one at a time.
+        self._kinds_from: float = 0.0
+        self._telling_kinds: asyncio.Task[None] | None = None
         # Dot's own initiative (item 715): its runs while the Mac is idle, started from the tick.
         self._initiative: Initiative = Initiative(runtime, manager)
 
@@ -320,6 +335,9 @@ class Scheduler:
         backfilling: asyncio.Task[None] | None = self._backfilling
         if backfilling is not None:
             backfilling.cancel()
+        telling: asyncio.Task[None] | None = self._telling_kinds
+        if telling is not None:
+            telling.cancel()
         settling: asyncio.Task[None] | None = self._settling
         if settling is not None:
             settling.cancel()
@@ -347,6 +365,8 @@ class Scheduler:
             await asyncio.wait({self._repairing})
         if self._backfilling is not None:
             await asyncio.wait({self._backfilling})
+        if self._telling_kinds is not None:
+            await asyncio.wait({self._telling_kinds})
         if self._settling is not None:
             await asyncio.wait({self._settling})
 
@@ -382,6 +402,7 @@ class Scheduler:
             self._tell_restart_waits,
             self._initiative.tick,
             self._manager.desk.follow_up,
+            self._tell_kinds,
         ):
             try:
                 await part(now)
@@ -420,6 +441,48 @@ class Scheduler:
         if not await self._runtime.store.memories_without_vectors(1):
             return
         self._backfilling = asyncio.create_task(self._embed_missing(), name="memory-backfill")
+
+    async def _tell_kinds(self, now: float) -> None:
+        """Start the fast model's pass over the notes the rules gave no kind (item 1975,
+        :func:`dotagent.memory.kinds.classify_untold`) in a task, at most once an hour and one at a time. While the
+        emergency stop is engaged none starts, and one under way is cancelled: it asks the fast model, and what it
+        recorded before stays."""
+        running: asyncio.Task[None] | None = self._telling_kinds
+        if await _emergency_stop_engaged():
+            if running is not None and not running.done():
+                running.cancel()
+                log.info("memory_kinds_stopped_by_emergency_stop")
+            return
+        if (running is not None and not running.done()) or now - self._kinds_from < _KINDS_EVERY_S:
+            return
+        self._kinds_from = now
+        if not await self._runtime.store.memories_without_kind(1):
+            return
+        self._telling_kinds = asyncio.create_task(self._classify_untold(), name="memory-kinds")
+
+    async def _classify_untold(self) -> None:
+        """One pass of the fast model over the notes without a kind. A provider's error or an answer that is no kind
+        is logged, and the next pass, an hour on, asks again; a fault that is not the model's is logged here, so the
+        task's error is not lost."""
+        ref: ModelRef = parse_model_ref(self._runtime.roles.fast())
+        try:
+            told: int = await classify_untold(
+                self._runtime.store, self._runtime.router, ref, self._runtime.config.agent.model_call_timeout_s
+            )
+        except (ProviderError, MissingSecretError) as error:
+            log.warning(
+                "memory_kinds_failed",
+                model=ref.label,
+                error_type=type(error).__name__,
+                error=error.message,
+                context=error.context,
+                note="the notes keep no kind until the next pass, an hour on",
+            )
+        except Exception:
+            log.exception("memory_kinds_crashed", model=ref.label)
+        else:
+            if told:
+                log.info("memory_kinds_told", notes=told, model=ref.label)
 
     async def _embed_missing(self) -> None:
         """One background pass of :func:`dotagent.memory.service.backfill`. A service that fails is logged; the next
@@ -901,11 +964,12 @@ class Scheduler:
         return configured if record.options.same_chat is None else record.options.same_chat
 
     async def _check(self, name: str) -> CheckVerdict:
-        """Run the check ``name`` (item 1855) as a run's commands start: in the sandbox while it is on, from the
-        workspace, with the environment of a run's commands."""
+        """Run the check ``name`` (item 1855) as the commands of a run nobody started start (item 2016): in the
+        sandbox while [shell] sandbox_unattended holds (else while [shell] sandbox is on), from the workspace, with the
+        environment of a run's commands."""
         return await run_check(
             name,
-            self._runtime.sandbox.current().commands,
+            self._runtime.sandbox.unattended().commands,
             workspace_dir(),
             self._runtime.shell_env,
             CHECK_TIMEOUT_S,

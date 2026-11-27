@@ -6,6 +6,7 @@
 // composer.js draws the menu and listens to the keys.
 
 import { toolWords } from "./tools.js";
+import { t } from "./i18n.js";
 
 /** The word the caret is in when it opens the menu: `{ start, word, trigger }`, `trigger` "/" or "@" and `word` what
  * follows it (may be empty), or null. Such a word starts the text or follows white space, so a slash inside a path or
@@ -26,14 +27,14 @@ export function paletteGroups(commands, palette) {
   const groups = [];
   if (commands.length > 0) {
     groups.push({
-      title: "Commands",
+      title: t("slash.commands"),
       kind: "command",
       items: commands.map((command) => ({ ...command, id: `command-${command.label.slice(1)}`, kind: "command" })),
     });
   }
   if (palette !== null && palette.skills.length > 0) {
     groups.push({
-      title: "Skills",
+      title: t("slash.skills"),
       kind: "skill",
       items: palette.skills.map((skill) => ({
         id: `skill-${skill.name}`,
@@ -50,7 +51,7 @@ export function paletteGroups(commands, palette) {
   if (palette !== null) {
     for (const server of palette.servers) {
       groups.push({
-        title: `Connected app · ${server.name}`,
+        title: t("slash.connectedAppName", { name: server.name }),
         section: "Actions of connected apps",
         kind: "plugin",
         items: server.tools.map((tool) => ({
@@ -82,7 +83,7 @@ export function pickGroups(palette) {
   const groups = [];
   if (palette.servers.length > 0) {
     groups.push({
-      title: "Connected apps",
+      title: t("slash.connectedApps"),
       kind: "plugin",
       items: palette.servers.map((server) => ({
         id: `server-${server.name}`,
@@ -96,7 +97,7 @@ export function pickGroups(palette) {
   }
   if (palette.accounts.length > 0) {
     groups.push({
-      title: "Accounts",
+      title: t("slash.accounts"),
       kind: "account",
       items: palette.accounts.map((account) => ({
         id: `account-${account.address}`,

@@ -6,6 +6,7 @@ import { api } from "../api.js";
 import { el } from "../dom.js";
 import { errorPanel, loadingPanel, pageHead } from "../panels.js";
 import { attempt } from "../ui.js";
+import { t } from "../i18n.js";
 
 function card(title, side, body) {
   return el("section", { class: "card" }, el("div", { class: "card-head" }, el("span", { class: "grow" }, title), side), body);
@@ -53,7 +54,7 @@ function toolRow(tool) {
       { class: "row-main" },
       el("div", { class: "row-title" }, tool.name),
       el("div", { class: "row-text small" }, tool.does),
-      el("div", { class: tool.where === "" ? "row-text small muted" : "row-text mono small muted folder-path" }, tool.where === "" ? "Not on this Mac" : tool.where),
+      el("div", { class: tool.where === "" ? "row-text small muted" : "row-text mono small muted folder-path" }, tool.where === "" ? t("views.licences.notOnThisMac") : tool.where),
     ),
     el("span", { class: "tool-licence small" }, outLink(tool.url, tool.licence)),
   );
@@ -65,25 +66,25 @@ export function mount(root) {
 
   function paint(view) {
     const rows = view.packages.map(packageRow);
-    const count = el("span", { class: "small muted" }, `${view.packages.length} packages`);
+    const count = el("span", { class: "small muted" }, t("views.licences.lengthPackages", { length: view.packages.length }));
     const filter = el("input", {
       class: "input",
       type: "search",
-      placeholder: "Find a package",
-      "aria-label": "Find a package",
+      placeholder: t("views.licences.findAPackage"),
+      "aria-label": t("views.licences.findAPackage"),
       oninput: () => {
         const words = filter.value.trim().toLowerCase();
         const shown = rows.filter((row) => {
           row.hidden = words !== "" && !row.dataset.package.includes(words);
           return !row.hidden;
         });
-        count.textContent = words === "" ? `${view.packages.length} packages` : `${shown.length} of ${view.packages.length} packages`;
+        count.textContent = words === "" ? t("views.licences.lengthPackages", { length: view.packages.length }) : t("views.licences.lengthOfLength2Packages", { length: shown.length, length2: view.packages.length });
       },
     });
     holder.replaceChildren(
-      card("With Dot's pages", null, el("div", { class: "card-pad stack" }, el("p", { class: "hint" }, "The fonts, the icons and the code Dot took from other projects come with their notices, whose copyright Dot keeps."), view.bundled.map(noticeRow))),
-      card("Python packages", count, el("div", null, el("div", { class: "card-pad" }, filter), table(["Package", "Version", "Licence"], rows))),
-      card("Programs Dot uses", null, el("div", { class: "list" }, view.tools.map(toolRow))),
+      card(t("views.licences.withDotSPages"), null, el("div", { class: "card-pad stack" }, el("p", { class: "hint" }, t("views.licences.theFontsTheIconsAnd")), view.bundled.map(noticeRow))),
+      card(t("views.licences.pythonPackages"), count, el("div", null, el("div", { class: "card-pad" }, filter), table([t("views.licences.package"), t("views.licences.version"), t("views.licences.licence")], rows))),
+      card(t("views.licences.programsDotUses"), null, el("div", { class: "list" }, view.tools.map(toolRow))),
     );
   }
 
@@ -101,7 +102,7 @@ export function mount(root) {
   }
 
   root.append(
-    pageHead("Open source licences", "The notices of the open source software, fonts and pictures Dot is built from, as they are on this Mac.", null),
+    pageHead(t("views.licences.openSourceLicences"), t("views.licences.theNoticesOfTheOpen"), null),
     holder,
   );
   attempt(load);

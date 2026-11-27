@@ -341,7 +341,8 @@ async def test_an_update_streams_under_the_line_and_a_message_steps_it_aside(own
 # A run that works without a word on the way (item 1976): it lists a folder, runs a command of a few seconds, answers.
 _SILENT_TURNS: tuple[ScriptedTurn, ...] = (
     ScriptedTurn(text="", calls=(ScriptedCall(tool="list_dir", arguments={"path": "."}),)),
-    ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 6"}),)),
+    # Long enough for the page to open on a loaded Mac while the run still works (a run of 6 s ended first, 2026-11-27).
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 20"}),)),
     ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
 )
 
@@ -369,7 +370,7 @@ async def test_messages_only_tells_the_calls_as_dots_messages_and_the_line_says_
                 await expect(other.locator(".work-status")).to_have_attribute("data-state", "working")
                 await expect(other.locator(".say-narration").first).to_be_hidden()
                 await expect(other.locator(".work-status-time")).to_be_hidden()
-                async with asyncio.timeout(30):
+                async with asyncio.timeout(60):
                     assert (await manager.wait(run.id)).status == "done"
                 # Over, the lines stay as the conversation, and the steps are one press away.
                 await expect(page.locator(".answer .prose")).to_have_text("Done.")
@@ -435,7 +436,41 @@ async def test_messages_only_shows_no_step_a_failed_one_neither(own_home: Path, 
                 await expect(page.locator(".answer .prose")).to_have_text("Done.")
                 assert await page.locator("details.steps").count() >= 1, "the run has its steps"
                 await expect(page.locator("details.steps")).to_be_hidden()
-                await expect(page.get_by_text("no-such-file-1996.txt")).to_be_hidden()
+                # No step's row in sight, the failed read's neither; the line Dot told of it ("Reading
+                # no-such-file-1996.txt", item 1976) is a message and stays.
+                await expect(page.locator(".tool-sum").locator("visible=true")).to_have_count(0)
+                await expect(page.locator(".say-narration").filter(has_text="no-such-file-1996.txt")).to_be_visible()
                 await page.close()
+            finally:
+                await browser.close()
+
+
+async def test_a_routines_message_is_one_compact_row_that_unfolds_its_words(own_home: Path, tmp_path: Path) -> None:
+    """Owner 2026-11-27: the message a schedule, a watcher or a hook sent into a chat is one compact row, "Routine" and
+    its title, never the owner's bubble; a press unfolds the whole message. On a desktop's and a phone's width."""
+    goal: str = "A new mail from the bank came. Read it and tell me if it needs an answer today."
+    async with _served(own_home, _SILENT_TURNS) as (manager, address, port):
+        run: RunRecord = await manager.start(
+            goal, "task", SCRIPTED_MODEL, None, "watcher", None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(30):
+            assert (await manager.wait(run.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+            try:
+                for width in (1440, 390):
+                    page: Page = await _open(browser, port, address, run.id, "messages", width)
+                    row: Locator = page.locator(".routine")
+                    await expect(row.locator(".routine-label")).to_have_text("Routine")
+                    await expect(row.locator(".routine-title")).to_have_text("A new mail from the bank came")
+                    await expect(page.locator(".bubble.user")).to_have_count(0)
+                    head: Locator = row.locator(".routine-head")
+                    box = await head.bounding_box()
+                    assert box is not None and box["height"] >= 44, box
+                    await expect(row.locator(".routine-prompt")).to_be_hidden()
+                    await head.click()
+                    await expect(row.locator(".routine-prompt")).to_have_text(goal)
+                    await page.screenshot(path=str(tmp_path / f"routine-{width}.png"))
+                    await page.close()
             finally:
                 await browser.close()

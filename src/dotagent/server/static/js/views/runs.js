@@ -34,6 +34,8 @@ import { attempt, toast } from "../ui.js";
 import { WORKING_STATES } from "../runstates.js";
 import { attemptWithFallback } from "../modelrefused.js";
 import { sendToWork } from "../sendwork.js";
+import { emptyBoxWords } from "../composershape.js";
+import { t } from "../i18n.js";
 
 const MAX_GOAL_PX = 320;
 
@@ -105,7 +107,7 @@ const HOME_KEPT = {
 /** The words in the home's empty box, with the name the owner calls Dot by (item 420), as a messaging app's few
  * (item 833); what the at sign and the slash open is the box's tooltip. */
 function placeholderFor(name) {
-  return `Message ${name}`;
+  return emptyBoxWords(name, false);
 }
 
 /**
@@ -130,8 +132,8 @@ function whereTo(summaries, actorId) {
 function buildComposer(ctx, listener) {
   const start = readHomeChoices();
   const frame = composerFrame({
-    label: "Chat",
-    boxLabel: "Goal",
+    label: t("views.runs.chat"),
+    boxLabel: t("views.runs.goal"),
     placeholder: placeholderFor(dotName()),
     maxPx: MAX_GOAL_PX,
     commands: [
@@ -144,7 +146,7 @@ function buildComposer(ctx, listener) {
       LOOP_COMMAND,
     ],
     send: submit,
-    sendLabel: "Start",
+    sendLabel: t("views.runs.start"),
     draftKey: NEW_CHAT_DRAFT,
     listener,
   });
@@ -160,7 +162,7 @@ function buildComposer(ctx, listener) {
     frame,
     modes: MESSAGE_MODES,
     kept: { ...HOME_KEPT, mode: start.mode, model: start.model, once: start.once },
-    optionsTitle: "Approvals",
+    optionsTitle: t("views.runs.approvals"),
     more: () => [],
     onMode: modePicked,
     // HOME_KEPT keeps what it keeps as it is chosen; the new chat's own choices are kept here.
@@ -182,8 +184,8 @@ function buildComposer(ctx, listener) {
   // The agent the run is for (item 86): Dot, or one the owner made, with its still face and name on the pill and the
   // agents with their roles in its menu (item 115); the pill only shows once an agent exists. A campaign is Dot's own
   // work, so Keep going hides while an agent is picked.
-  const agentPill = composerPill({ id: "agent", caption: "Agent", value: "Dot", icon: actorFace(DOT_ID, "idle", null) });
-  agentPill.element.title = "The agent this task is for";
+  const agentPill = composerPill({ id: "agent", caption: t("views.runs.agent"), value: "Dot", icon: actorFace(DOT_ID, "idle", null) });
+  agentPill.element.title = t("views.runs.theAgentThisTaskIs");
   agentPill.element.hidden = true;
   let agents = [];
   let agentId = "";
@@ -224,11 +226,11 @@ function buildComposer(ctx, listener) {
   const agentMenu = anchoredPopover({
     anchor: agentPill.element,
     frame: frame.element,
-    label: "Agent",
+    label: t("views.runs.agent"),
     build: () => [
       el(
         "div",
-        { role: "listbox", "aria-label": "Agent" },
+        { role: "listbox", "aria-label": t("views.runs.agent") },
         optionRow({ lead: actorFace(DOT_ID, "idle", null), label: "Dot", hint: "", selected: agentId === "", onPick: () => pickAgent("") }),
         ...agents.map((record) =>
           optionRow({ lead: actorFace(record.id, "idle", record.look), label: record.name, hint: record.role, selected: agentId === record.id, onPick: () => pickAgent(record.id) }),
@@ -250,7 +252,7 @@ function buildComposer(ctx, listener) {
     if (home !== null) {
       conversation.setAttribute("href", `#/runs/${home.latest_run_id}`);
       conversation.title = home.title;
-      conversationLabel.textContent = `Open your chat with ${summary.record.id === DOT_ID ? called : summary.record.name}`;
+      conversationLabel.textContent = t("views.runs.openYourChatWithValue", { value: summary.record.id === DOT_ID ? called : summary.record.name });
     }
   }
   function readAgents() {
@@ -421,15 +423,15 @@ function mainProblem(providers, main) {
   const provider = providers.find((candidate) => candidate.provider === providerOf(main));
   const label = providerLabel(provider.provider);
   if (provider.problem === "no_key") {
-    return `No ${label} key is set.`;
+    return t("views.runs.noLabelKeyIsSet", { label });
   }
   if (provider.problem === "key_refused") {
-    return `${label} refused the key.`;
+    return t("views.runs.labelRefusedTheKey", { label });
   }
   if (provider.error !== null) {
     return provider.error;
   }
-  return provider.models.some((model) => model.ref === main) ? null : `${label} does not offer it.`;
+  return provider.models.some((model) => model.ref === main) ? null : t("views.runs.labelDoesNotOfferIt", { label });
 }
 
 /**
@@ -446,7 +448,7 @@ function buildSetup() {
   const element = el(
     "section",
     { class: "card home-setup", hidden: true, "aria-labelledby": "home-setup-title" },
-    el("div", { class: "card-head" }, icon("alert"), el("span", { id: "home-setup-title", class: "grow" }, "Set up a model")),
+    el("div", { class: "card-head" }, icon("alert"), el("span", { id: "home-setup-title", class: "grow" }, t("views.runs.setUpAModel"))),
     el(
       "div",
       { class: "card-pad home-setup-body" },
@@ -455,15 +457,15 @@ function buildSetup() {
       el(
         "div",
         { class: "row home-setup-ways" },
-        el("a", { class: "btn primary", href: "#/settings/models" }, "Choose a model"),
-        el("a", { class: "btn", href: "#/settings/keys" }, "Add a key"),
+        el("a", { class: "btn primary", href: "#/settings/models" }, t("views.runs.chooseAModel")),
+        el("a", { class: "btn", href: "#/settings/keys" }, t("views.runs.addAKey")),
       ),
       el(
         "details",
         { class: "error-details" },
-        el("summary", null, "Details"),
+        el("summary", null, t("views.runs.details")),
         recorded,
-        el("p", { class: "small muted" }, "Another way: in Terminal, run ", el("code", null, "dotx setup"), ". It checks this Mac, saves a key and chooses the model."),
+        el("p", { class: "small muted" }, t("views.runs.anotherWayInTerminalRun"), el("code", null, "dotx setup"), t("views.runs.itChecksThisMacSaves")),
       ),
     ),
   );
@@ -478,7 +480,7 @@ function buildSetup() {
     element.dataset.state = problem === null ? "ready" : "needed";
     element.hidden = problem === null;
     if (problem !== null) {
-      what.textContent = `New chats start on ${modelName(main)} from ${providerLabel(providerOf(main))}, which cannot answer now.`;
+      what.textContent = t("views.runs.newChatsStartOnModelname", { modelName: modelName(main), providerLabel: providerLabel(providerOf(main)) });
       const said = serviceWords(problem);
       why.textContent = said.text;
       recorded.textContent = said.details;
@@ -534,7 +536,7 @@ export function mount(root, ctx) {
   const home = el(
     "div",
     { class: "home" },
-    el("h1", { class: "visually-hidden" }, "Chat"),
+    el("h1", { class: "visually-hidden" }, t("views.runs.chat")),
     start,
     away?.element ?? null,
     day ? presence.strip : null,

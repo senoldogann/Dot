@@ -13,6 +13,7 @@ import { icon } from "./icons.js";
 import { nestRows } from "./nesting.js";
 import { readFolds, readPref, writePref } from "./prefs.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, readFailed } from "./state.js";
+import { t, tCount } from "./i18n.js";
 
 const OWNER_KEY = "dot.owner";
 // The first name of the owner's account on this Mac, as the daemon said it (assistant.js): the greeting's name until the
@@ -25,16 +26,16 @@ const ROWS_SHOWN = 2;
 // Which sections of the strip the owner folded, kept between visits.
 const FOLDS_KEY = "dot.homeFolds";
 const SECTIONS = [
-  { key: "waiting", title: "Waits for you" },
-  { key: "working", title: "Working" },
-  { key: "due", title: "Due today" },
-  { key: "learned_today", title: "Learned today" },
-  { key: "recent", title: "Ended today" },
+  { key: "waiting", title: t("presence.waitsForYou") },
+  { key: "working", title: t("presence.working") },
+  { key: "due", title: t("presence.dueToday") },
+  { key: "learned_today", title: t("presence.learnedToday") },
+  { key: "recent", title: t("presence.endedToday") },
 ];
 const VERB_OF_STATE = {
-  idle: "What should I work on?",
-  working: "I'm on it. Anything else?",
-  waiting: "Something waits for you.",
+  idle: t("presence.whatShouldIWorkOn"),
+  working: t("presence.iMOnItAnything"),
+  waiting: t("presence.somethingWaitsForYou"),
 };
 
 /** Your name, as the greeting says it; empty when you have not given one. */
@@ -57,7 +58,7 @@ export function setOwnerName(name) {
 
 /** The greeting for `hour` (0 to 23), with `owner` when there is one, and the verb of the face's `state`. */
 export function greeting(hour, owner, state) {
-  const time = hour < 5 ? "Hello" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const time = hour < 5 ? t("presence.hello") : hour < 12 ? t("presence.goodMorning") : hour < 18 ? t("presence.goodAfternoon") : t("presence.goodEvening");
   const salute = owner === "" ? `${time}.` : `${time}, ${owner}.`;
   return `${salute} ${VERB_OF_STATE[state] ?? VERB_OF_STATE.idle}`;
 }
@@ -72,25 +73,25 @@ function nowLine(activity) {
   // Every row of the working section is a run at work (item 608).
   const runs = activity.working.length;
   if (runs > 0) {
-    parts.push(`Working on ${count(runs, "task", "tasks")}`);
+    parts.push(t("presence.workingOnTasks", { tasks: tCount(runs, "presence.countTask", "presence.countTasks") }));
   }
   if (activity.waiting.length > 0) {
-    parts.push(activity.waiting.length === 1 ? "1 waits for you" : `${activity.waiting.length} wait for you`);
+    parts.push(activity.waiting.length === 1 ? t("presence.1WaitsForYou") : t("presence.lengthWaitForYou", { length: activity.waiting.length }));
   }
   if (activity.recent.length > 0) {
-    parts.push(`${activity.recent.length} ended today`);
+    parts.push(t("presence.lengthEndedToday", { length: activity.recent.length }));
   }
   const lessons = activity.learned_today.filter((row) => row.kind === "lesson").length;
   if (lessons > 0) {
     parts.push(count(lessons, "lesson", "lessons"));
   }
   if (activity.learned_today.some((row) => row.kind === "journal")) {
-    parts.push("the day's journal");
+    parts.push(t("presence.theDaySJournal"));
   }
   if (activity.due.length > 0) {
-    parts.push(`${count(activity.due.length, "thing", "things")} due today`);
+    parts.push(t("presence.thingsDueToday", { things: tCount(activity.due.length, "presence.countThing", "presence.countThings") }));
   }
-  return parts.length === 0 ? "A quiet day so far: nothing works, nothing waits, nothing ended." : parts.join(" · ");
+  return parts.length === 0 ? t("presence.aQuietDaySoFar") : parts.join(" · ");
 }
 
 /** The sections of the Today strip that have rows: `{ key, title, count, rows, rest }`. `rows` are the section's first
@@ -127,9 +128,9 @@ export function buildPresence({ day = true } = {}) {
   const face = live.element;
   const name = el("div", { class: "home-name" }, dotName());
   const hello = el("p", { class: "home-greeting" });
-  const now = el("p", { class: "home-now", "aria-live": "polite" }, "Looking around…");
+  const now = el("p", { class: "home-now", "aria-live": "polite" }, t("presence.lookingAround"));
   const element = el("div", { class: "home-who" }, face, name, hello, day ? now : null);
-  const strip = el("section", { class: "home-today", "aria-label": "Today", hidden: true });
+  const strip = el("section", { class: "home-today", "aria-label": t("presence.today"), hidden: true });
   let activity = null;
   let disposed = false;
   let moodTimer = 0;
@@ -201,7 +202,7 @@ export function buildPresence({ day = true } = {}) {
                 ...(opened.has(key) ? [...rows, ...rest] : rows).map((row) => activityRow(row, false)),
                 rest.length === 0 || opened.has(key)
                   ? null
-                  : el("button", { class: "activity-row home-today-more", type: "button", onclick: () => openSection(key) }, `Show ${rest.length} more`),
+                  : el("button", { class: "activity-row home-today-more", type: "button", onclick: () => openSection(key) }, t("presence.showLengthMore", { length: rest.length })),
               ),
         );
       }),
@@ -222,7 +223,7 @@ export function buildPresence({ day = true } = {}) {
       }
       if (activity === null) {
         console.warn("the activity of the home could not be loaded", error);
-        now.textContent = "I could not read what is going on.";
+        now.textContent = t("presence.iCouldNotReadWhat");
       } else {
         readFailed("readFailed.presence", error);
       }

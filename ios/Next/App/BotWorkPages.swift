@@ -114,7 +114,7 @@ private func dayText(_ seconds: Double, locale: Locale) -> String {
 
 /// Words Dot wrote after it read content third parties can author: not the owner's, whatever they look like.
 private var outsideWords: String {
-    String(localized: "Written after Dot read content from outside.", comment: "Work order and objective: written by a run that read pages or mail others can write")
+    String(localized: "Written after Dot read content from outside", comment: "Work order and objective: written by a run that read pages or mail others can write")
 }
 
 /// A block of words in a card, as the profile shows a bot's instructions.
@@ -174,6 +174,7 @@ struct WorkOrdersPage: View {
         var meta: [String] = []
         if botId == dotAgentId { meta.append(view.agentName.isEmpty ? String(localized: "A bot that is gone", comment: "Work order: its bot was deleted") : view.agentName) }
         if order.attempts > 0 { meta.append(String(localized: "\(order.attempts) tries", comment: "Work order: how many attempts it has had")) }
+        meta.append(String(localized: "handed out \(agoText(order.createdAt, locale: locale))", comment: "Work order: when it was handed out; the argument is a span such as 2 hours ago"))
         if let due = order.due(now: Date.now.timeIntervalSince1970) { meta.append(dueText(due)) }
         var lines: [String] = [meta.joined(separator: " · "), order.note.isEmpty ? "" : flatClip(order.note, 200)].filter { !$0.isEmpty }
         if let objective = view.objectiveTitle { lines.append(String(localized: "For: \(flatClip(objective, 120))", comment: "Work order: the objective it serves")) }
@@ -278,6 +279,7 @@ struct ObjectivesPage: View {
 
     private func row(_ objective: ObjectiveRecord) -> some View {
         var lines: [String] = [flatClip(objective.why, 200)].filter { !$0.isEmpty }
+        if !objective.measure.isEmpty { lines.append(String(localized: "Judged by: \(flatClip(objective.measure, 200))", comment: "Objective: how progress is judged; the argument is the measure")) }
         if let newest = objective.notes.last {
             lines.append("\(dayText(newest.at, locale: locale)): \(flatClip(newest.text, 200))")
         } else if !objective.workflow.nextStep.isEmpty && objective.isActive {
@@ -333,6 +335,55 @@ struct ObjectivePage: View {
 
 // MARK: Hand-offs
 
+/// What stands where a reply would: that the bot asked is at work on it, as the web's Handoffs page says, or that it ended with none.
+private func noReplyWords(_ message: TeamMessage) -> String {
+    message.isAtWork
+        ? String(localized: "\(message.toName) is working on it", comment: "Hand-off: the bot asked has not answered yet; the argument is its name")
+        : String(localized: "No reply", comment: "Hand-off: it ended without a reply")
+}
+
+/// A hand-off in a list, as the web's Handoffs page draws it: the two faces, "From → To", the time on the title's baseline
+/// (under it at the accessibility sizes), the message and its reply, and the chevron centred on the row.
+private struct HandoffRow: View {
+    let from: (id: String, look: AgentLook?)
+    let to: (id: String, look: AgentLook?)
+    let title: String
+    let time: String
+    let lines: [String]
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+
+    var body: some View {
+        HStack(spacing: Space.s) {
+            HStack(spacing: -Space.xs) {
+                BotFace(id: from.id, look: from.look, size: 28)
+                BotFace(id: to.id, look: to.look, size: 28)
+            }
+            .frame(minWidth: Metric.iconSlot)
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                if dynamicTypeSize.isAccessibilitySize {
+                    Text(title).textRole(.body).foregroundStyle(Tone.text).multilineTextAlignment(.leading)
+                    Text(time).textRole(.footnote).foregroundStyle(Tone.secondary)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                        Text(title).textRole(.body).foregroundStyle(Tone.text).multilineTextAlignment(.leading)
+                        Spacer(minLength: Space.s)
+                        Text(time).textRole(.footnote).foregroundStyle(Tone.secondary)
+                    }
+                }
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.tertiary)
+        }
+        .padding(.horizontal, Space.groupedGutter).padding(.vertical, Space.s)
+        .frame(minHeight: Metric.rowWithDescription, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
 /// Today's messages between the bot and the others: those it received, then those it sent; one opens to the message and its reply.
 struct HandoffsPage: View {
     let botId: String
@@ -351,12 +402,12 @@ struct HandoffsPage: View {
                 } else {
                     if !handoffs.received.isEmpty {
                         GroupedSection(header: String(localized: "Received", comment: "Hand-offs: messages sent to the bot"), footer: handoffs.sent.isEmpty ? footer : nil) {
-                            ForEach(handoffs.received) { message in row(message, other: message.fromName) }
+                            ForEach(handoffs.received) { message in row(message) }
                         }
                     }
                     if !handoffs.sent.isEmpty {
                         GroupedSection(header: String(localized: "Sent to others", comment: "Hand-offs: messages the bot sent to other bots"), footer: footer) {
-                            ForEach(handoffs.sent) { message in row(message, other: message.toName) }
+                            ForEach(handoffs.sent) { message in row(message) }
                         }
                     }
                 }
@@ -370,17 +421,21 @@ struct HandoffsPage: View {
         String(localized: "Today's messages between bots, newest first.", comment: "Hand-offs: what the list holds")
     }
 
-    private func row(_ message: TeamMessage, other: String) -> some View {
+    private func look(_ id: String) -> AgentLook? { model.bots.first { $0.id == id }?.record.look }
+
+    private func row(_ message: TeamMessage) -> some View {
         var lines: [String] = [flatClip(message.message, 200)]
         if let reply = message.reply, !reply.isEmpty {
             lines.append(String(localized: "Reply: \(flatClip(reply, 200))", comment: "Hand-off: the answer of the bot that was asked"))
-        } else if message.isAtWork {
-            lines.append(String(localized: "Waiting for a reply", comment: "Hand-off: the bot asked has not answered yet"))
+        } else {
+            lines.append(noReplyWords(message))
         }
         return NavigationLink {
             HandoffPage(message: message)
         } label: {
-            StateRow(title: other, state: timeText(message.ts, locale: locale), lines: lines)
+            HandoffRow(
+                from: (message.fromId, look(message.fromId)), to: (message.toId, look(message.toId)),
+                title: "\(message.fromName) → \(message.toName)", time: timeText(message.ts, locale: locale), lines: lines)
         }
         .buttonStyle(RowPressStyle())
         .accessibilityIdentifier("work.handoff")
@@ -408,7 +463,7 @@ struct HandoffPage: View {
                 if let reply = message.reply, !reply.isEmpty {
                     WorkTextCard(text: reply)
                 } else {
-                    WorkTextCard(text: message.isAtWork ? String(localized: "Waiting for a reply", comment: "Hand-off: the bot asked has not answered yet") : String(localized: "No reply", comment: "Hand-off: it ended without a reply"))
+                    WorkTextCard(text: noReplyWords(message))
                 }
             }
         }

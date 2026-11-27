@@ -111,7 +111,7 @@ async def test_the_line_says_how_the_link_stands_and_covers_nothing(login_env: d
                     tag: str = f"{width}x{height}-{scheme}"
                     context: BrowserContext = await phone(chromium, playwright, width, height, scheme)
                     page: Page = await open_chat(context, working.address, working.token, working.run.id)
-                    await expect(page.locator(".capsule")).to_contain_text("Working", timeout=20_000)
+                    await expect(page.locator(".capsule")).to_contain_text("Waiting on 2 helpers", timeout=20_000)
                     await until_kept(page, chats=1, lists=2)
                     # With the link well the line is not there.
                     assert await page.locator(".link-line:not([hidden])").count() == 0
@@ -232,7 +232,7 @@ async def test_a_daemon_that_cannot_be_reached_on_a_link_that_is_there_is_reconn
             resting.stop_serving()
             for (width, height, scheme, context, page), was in zip(pages, before, strict=True):
                 line = page.locator(".link-line:not([hidden])")
-                await expect(line).to_have_text("Reconnecting…", timeout=30_000)
+                await expect(line).to_have_text("Can't reach Dot", timeout=30_000)
                 await asyncio.sleep(0.4)
                 seen: dict[str, Any] = await page.evaluate(_MEASURE)
                 _fits(seen, f"reconnecting {width}x{height} {scheme}", 2 if width <= 320 else 1, floating=True)

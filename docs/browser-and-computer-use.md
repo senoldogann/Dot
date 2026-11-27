@@ -764,7 +764,7 @@ A bundle that is not on the sealed system volume (`/System`, and not the data vo
 made, which runs outside Dot's sandbox: it asks first, as a step outside the sandbox (item 418), whether it is named by
 its path or by a name or a bundle id Launch Services resolves to one. The bundle is resolved again as the call starts and
 one that leads elsewhere by then is refused, as a path a file tool names is (item 181), so a link moved while the call
-waited for its approval opens nothing. Outside yolo a run's command opens nothing (`open` is refused in the sandbox), so
+waited for its approval opens nothing. Outside yolo, and in every mode for a run nobody started (item 2016), a run's command opens nothing (`open` is refused in the sandbox), so
 this tool is how a run's command starts an application; an AppleScript can still start one itself (see
 [Safety](safety.md#safety)).
 A name that fits several running copies of one application, "Google Chrome" while your Chrome and Dot's own both run
@@ -787,7 +787,8 @@ every mode but `yolo` (item 433).
   ref to read one of them with `ref` (Mail's window: 692 characters instead of 10,115). `desktop_read` reads one
   element's full text. `desktop_clipboard_read` reads the text on the clipboard, which can hold a password you just copied from your password manager, so it asks in every
   preset, as `pbpaste` and an AppleScript that names the clipboard do (item 534); and outside a yolo run the sandbox, where
-  it is on, closes the clipboard to a run's commands as well; a yolo run asks nothing (item 443).
+  it is on, closes the clipboard to a run's commands as well, and in every mode for a run nobody started (item 2016); a
+  yolo run asks nothing (item 443).
 - `desktop_act` runs up to `max_batch_steps` steps in one call (25 by default; a longer batch is cut the same way):
   `click`, `double_click`, `right_click`, `hover`, `press`,
   `focus`, `set_value`, `type`, `paste`, `key`, `scroll`, `drag`, `menu`, `wait` and `activate`. A step names an element
@@ -932,6 +933,25 @@ every mode but `yolo` (item 433).
   (`run_max_minutes`): a run whose wait goes past it is told to finish, and its reply after that ends it, so a task run
   (120 minutes by default) never waits the full 4 hours. A Mac whose idle time cannot be read counts as one the owner
   is at.
+- A background driver, a trial, off by default (item 2007): with `desktop.background_driver = "cua"` the clicks,
+  double and right clicks with no key held, typing, pastes, keys and scrolls of `desktop_act` go to the application's
+  own window through [cua-driver](https://github.com/trycua/cua), whether that window is in front or covered, with the
+  Mac's pointer, keyboard and front window left alone: they go while you are at the Mac. Dot starts the driver as its
+  own child (`cua-driver serve --embedded --no-overlay` on a private socket, spoken to through `cua-driver mcp
+  --embedded`), so macOS answers its permission checks with Dot's own grants and it asks for none; it gets Dot's
+  environment without its secrets, and its telemetry is off. A step is judged and recorded exactly as before, and its text goes in pieces of 100 characters with the emergency stop checked before each, so a stop ends it within one piece; and goes only to the batch's application: typing and keys
+  without a ref are judged against that application's focused field, not the one in front; a step at a point the
+  review found in another application's window is not sent; a ref is clicked in its window even when another covers
+  it. Such a step posts nothing to the Mac's own input, so your touch while it runs is seen as your return. A point
+  is placed in a fresh capture of the window, as the driver reads coordinates in its last capture. Hover,
+  drag, a click with a key held, `activate` and keys the driver does not name (forward delete, punctuation) still
+  use the Mac's own pointer and keyboard and wait for you to step away. Typing goes in through accessibility where the
+  field takes it (the driver's own key events where it does not) and a paste is typed the same way, leaving the
+  clipboard alone; a scroll is counted in wheel notches of about 20 px. Dot uses only cua-driver 0.28.2 signed by
+  Cua AI (`desktop.background_driver_path`), its signature checked before it is ever run, and never installs it: `dotx doctor` says whether it is there and the
+  one command that installs it. A driver that cannot start fails the batch that needs it, and a step it fails fails, each with why; nothing falls
+  back to your pointer. A call that gets no answer within a minute stops the driver, and what it did is not known; the
+  next batch starts a new one. The driver uses private macOS interfaces that an update can break.
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields outside `yolo`, where the step is the user's; in `yolo` the run types the field itself (item 443),
   and a step the review sees take a credential keeps that reason in its record (item 429, see

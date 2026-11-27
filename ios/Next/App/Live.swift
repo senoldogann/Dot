@@ -62,22 +62,20 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
     }
 }
 
-/// The pill's link line (item 1931): a real state of the transport only, never "Reconnecting" over a healthy stream
-/// (R-f §3): no link is Offline, a broken one Reconnecting to the Mac, an up one whose chat is not live yet Syncing;
-/// `nil` while the chat is live, and for a refused key or an old Dot, which the subtitle says. Pure.
-func linkLine(transport: Transport, freshness: Freshness?, mac: String) -> LinkLine? {
+/// The capsule's link line (item 1931): a real state of the transport only (R-f §3): no link is Offline, a broken one
+/// Can't reach the Mac; `nil` for a link that is up or opening (bringing a chat up to date is no problem to tell, the
+/// owner's report of 2026-11-27), and for a refused key or an old Dot, which the chat's notice says. The screen shows it
+/// only once it lasted `linkLineDelay`. Pure.
+func linkLine(transport: Transport, mac: String) -> LinkLine? {
     switch transport {
-    case .offline: return .offline
-    case .reconnecting: return .reconnecting(mac: mac)
-    case .keyRefused, .daemonTooOld: return nil
-    case .connecting, .up:
-        guard let freshness else { return .syncing }
-        switch freshness {
-        case .live, .deleted: return nil
-        case .empty, .cached, .syncing: return .syncing
-        }
+    case .offline: .offline
+    case .reconnecting: .unreachable(mac: mac)
+    case .keyRefused, .daemonTooOld, .connecting, .up: nil
     }
 }
+
+/// How long a link problem lasts before the capsule says it: a reconnection that mends within it shows nowhere.
+let linkLineDelay: Duration = .seconds(5)
 
 /// Where an owner's message stands, in words (plan §13 B3).
 func deliveryWords(_ delivery: Delivery) -> String {
@@ -313,7 +311,7 @@ struct ChatListView: View {
         .pageGround()
         .overlay {
             if rows.isEmpty && !query.isEmpty {
-                ContentUnavailableView.search(text: query)
+                SearchEmptyState(query: query)
             } else if rows.isEmpty, model.list.freshness == .live {
                 EmptyState(
                     title: String(localized: "No chats yet", comment: "Chat list empty state title"), systemImage: "bubble.left.and.bubble.right",
@@ -619,10 +617,11 @@ struct BotNewChat: View {
             .padding(.bottom, Space.xs)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("botNewChat")
         .background(Tone.ground)
         .navigationTitle(botChat == nil ? bot?.record.name ?? "" : "")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { if let botChat { BotHeader(chat: botChat, subtitle: nil, alive: false, find: nil, library: nil) } }
+        .toolbar { if let botChat { BotHeader(chat: botChat, alive: false, find: nil, library: nil) } }
         .task { await model.loadModels() }
         // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
         .onAppear { text = model.draft(of: AppModel.newChatDraft(agent: agent)) }
@@ -834,7 +833,7 @@ enum LatencyProbe {
             for (text, sent) in model.probeSent {
                 // The run's own first event: its goal drawn from the stream (not the outbox's overlay, keyed "p:").
                 let shown: Bool = items.contains { item in
-                    if case .owner(let id, let words, nil) = item { return id.hasPrefix("u:") && words == text }
+                    if case .owner(let id, let words, nil, _) = item { return id.hasPrefix("u:") && words == text }
                     return false
                 }
                 guard shown else { continue }

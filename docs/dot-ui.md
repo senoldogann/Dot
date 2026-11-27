@@ -34,19 +34,19 @@ the tokens of `themes.css` and `app.css`, never a literal (`tests/unit/test_css_
   agents whose name or role holds every word, and the files attached to the chats or written by their runs
   (`GET /api/threads/search/files`);
   All shows three of each with **See all**, a chip every find of its kind, and Agents and Files hide the list. A message
-  opens its chat on the run it is of, scrolled to it, with a ring that fades (`chatfind.js`); a file opens its chat, an
-  agent its conversation.
+  opens its chat on the run it is of, scrolled to it, with a ring that fades (`chatfind.js`), and one of a chat with no
+  run (nothing to open) is left out; a file opens its chat, an agent its conversation.
 - **The stage bar** (`shell.js`, `stage.js`, `shell.css`): 52 px, sticky, a hairline under it only once the page has scrolled
   under it (`layout.js`, `data-scrolled`). At the left the sidebar's button (a phone's Back or menu: the edge swipe and the
   rules of Back are those of items 338, 1079 and 1321), then the breadcrumb: the agent's badge, its name, a slash and the
   chat's title. At the right the toggles of the panels. A page that is no chat's names itself alone. The face a page puts
   before an agent's name stays in the badge, out of sight, and its state tints the badge.
-- **The composer** (`composer.js`, `choices.js`, `app.css`): one rounded box on the token's radius with a hairline edge; the
-  words on top and, under them, one bar: the "+" at the left; at the right the model's pill (the provider's mark, the name and
-  the reasoning as bars), the microphone and the round send. The mode (when named) and the context meter are quiet
-  pills of the same bar; on a Mac the approvals stand under the box at its right, and on a phone the model's sheet holds
-  them (YOLO's lock stays in the bar). The choices are always in sight: there is no resting state and no button that hides
-  them. The queue's sheet over the box is on the box's own ground, a row of it with an up and a down arrow (32 px, 44 on a phone;
+- **The composer** (`composer.js`, `composershape.js`, `choices.js`, `run.css`): the iPhone app's capsule on every width
+  (item 2015), one rounded box with a hairline edge: one row while the words are short and the box is at least 340 px wide (the "+", the words, the model's mark and chevron, the microphone and the round send), the words on top once they are long, a line break or a file, with
+  the model named and its level in grey on the line under them. The model's pill opens the Chat settings sheet (models,
+  Reasoning, Mode, Approvals, How Dot works); YOLO's lock alone stays in the bar. There is no resting state and no button
+  that hides the choices.
+  The queue's sheet over the box is on the box's own ground, a row of it with an up and a down arrow (32 px, 44 on a phone;
   no drag, item 1348); the line over it that says the work's state is a quiet pill.
 
 Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows.py`, `test_activity.py`,
@@ -81,6 +81,7 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | Snapshots | `snapshots.js` | Both Command keys together capture the window in front (a double tap, once on). |
 | System | `system.js` | Daemon health, the emergency stop, health checks and provider models. |
 | Diagnostics | `diagnostics.js` | The daemon's process and the children it started. |
+| Speed | `speed.js` | Where the seconds of the runs went, stage by stage, with p50, p95, p99 and the count over 3 s. |
 | Open source licences | `licences.js` | The licences of what Dot uses. |
 | Controls | `controls.js` | Every control on one page, for checking a look in light and dark. |
 | Theme editor | `themeEditor.js` | A theme of one's own: a name and a palette for each scheme. |
@@ -146,25 +147,27 @@ and made again, after 0.5, 1, 2, 4, 8 and 15 s, from the last event, with `Last-
 kept by `js/outbox.js` (the rules are `js/outboxrules.js`) and shown under the chat by `js/outboxrows.js`: a message as
 *Waiting to send* with Retry now and Edit, sent once with its key when the link is back (item 1523). The line under the
 bar (`js/connectionline.js`, in the bar's own header, a row of its own for *Offline* and a refused key, floating over the room
-under the bar for *Reconnecting…* so that nothing read moves; the words are `js/linewords.js`) says *Offline: showing saved chats,
-last updated 3 min ago*, *Offline: 2 waiting to send*, *Reconnecting…* or *This phone's key was refused* (item 1524), and a
+under the bar for *Can't reach Dot* so that nothing read moves; the words are `js/linewords.js`) says *Offline: showing saved chats,
+last updated 3 min ago*, *Offline: 2 waiting to send*, *Can't reach Dot* or *This phone's key was refused* (item 1524), and a
 failed request shows no toast over the chat while it does. See [On a bad link: the web app](phone.md).
 
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)
 
 The run page is drawn as a developer tool draws a thread, plain and professional, the same language on a Mac and on a
-phone: what you wrote is a raised, rounded box; what Dot says is plain text with no bubble; the steps of a turn are one
+phone: what you wrote is a raised, rounded box, and a routine's message (item 2021) a compact "Routine" row on that
+surface that unfolds its words; what Dot says is plain text with no bubble; the steps of a turn are one
 quiet line each. The modules of the conversation and the panel, and what each holds:
 
 | Module | What it draws |
 |---|---|
-| `timeline.js` | The turn by turn flow; a group of subagents is one card (`buildFlock`): faces, "2 subagents", "2 working" in blue, the time, and a row each (`childScope`): the job, what it does now (`callPhrase` of `workstatus.js`), its state in a word beside the time. |
-| `capsule.js` | The bar over the composer, and above it the line "Waiting on 2 subagents" with Details and Stop; once the run was released from its wait (a message of yours, item 1351) the line says "2 subagents keep working in the background" (`waitcounts.js` counts which). A pane in the dock on the bar's own ground (item 1347). A window wider than a phone's (721 px up) draws it; a phone's chat draws `dockbar.js` instead. |
+| `timeline.js` | The turn by turn flow; a group of helpers is one card (`buildFlock`): faces, "2 helpers", "2 working" in blue, the time, and a row each (`childScope`): the job, what it does now (`callPhrase` of `workstatus.js`), its state in a word beside the time. |
+| `capsule.js` | The bar over the composer, whose status says "Waiting on 2 helpers" only while the run has stopped for them (`waitsOnHelpers` in `waitcounts.js`) and no spinner, and above it the line of what the first helper does now with Details and Stop; once the run was released from its wait (a message of yours, item 1351) the line says "2 helpers keep working in the background" (`waitcounts.js` counts which). A pane in the dock on the bar's own ground (item 1347). A window wider than a phone's (721 px up) draws it; a phone's chat draws `dockbar.js` instead. |
 | `dockbar.js`, `dockwords.js` | A phone's one row over the composer (item 1383): a capsule of glass whose segments are the run's status with its Stop, the plan, helpers, loops, the queue and the commands at work, each there only while it has something to say, with the round way down beside it. `dockwords.js` says which segments there are and their words from what the page knows (pure, `tests/js/dockwords.test.js`); `dockbar.js` draws them and says fewer words, step by step, until the row fits (never a scroll). |
 | `docksheet.js` | The one sheet of a phone's chat: a segment of the capsule opens its detail from the foot of the screen, one at a time, closed by a tap outside, Escape, its handle or a swipe down. The queue, the loops and the commands at work stand in it as the very panes (`queue.js`, `loops.js`, `background.js`) that stay over the composer on a computer; the helpers and the plan are drawn from their words. |
 | `inspector.js` | The side panel, closed by default: one rounded card in two parts, a head that stays (the tabs as a segmented switch, and on a phone the grabber and Close) and a body that scrolls (`.inspector-body`), whose sections each have a small sticky head (`.panel-section-head`: title, count, buttons on one line) over tight rows on the 8 px scale. A sheet from the foot on a phone. |
 | `prose.js`, `linkpill.js` | A link in a message (a markdown link or an autolink, in what you wrote and in what Dot says) is plain words: no frame, no fill and no icon, in the text's ink tilted toward the accent (`.msg-link`; a shade brighter in dark, more saturated in light, above 4.5:1 on every ground), underlined only under the pointer and with the focus, which keeps the page's ring. It opens in a new window, and its label is the link's words, `#1001` for a GitHub pull request or issue, or the site's name for a bare address (`data-words` keeps the words as written for a copy). Dot asks no site for an icon. |
-| `agentlist.js` | The **Lineage** ("Lineage · 2 running": the task that leads and its subagents) and the fold of the previous agents; the Task tab has it compact, the Agents tab in full. |
+| `agentlist.js` | The **Lineage** ("Lineage · 2 running": the task that leads and its helpers) and the fold of the previous agents; the Task tab has it compact, the Agents tab in full. |
+| `routinewords.js`, `messages.js` (`routineMessage`) | The row of a message a routine sent (a run of source `schedule` or `watcher`, item 2021): `.routine`, a `details` whose head says "Routine" and the title (the chat's schedule's name from `GET /api/threads/{id}/automations`, else the words' first sentence, `routineTitle`) and whose body is the whole message. |
 | `automations.js`, `automationwords.js` | The **Automations** of the chat in the Task tab: its schedules and loops, each with a pencil (`#/settings/schedules/<id>`, the schedule's editor page), a play and a switch, from `GET /api/threads/{id}/automations`. |
 
 Colours and radii of these are tokens (`var(--accent-strong)` for the colour of work, `--ok`, `--bad`, `--border`,

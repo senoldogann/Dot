@@ -11,6 +11,7 @@ import { awayLine, decidedBy } from "./awaywords.js";
 import { readPref, removePref } from "./prefs.js";
 import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt } from "./ui.js";
+import { t } from "./i18n.js";
 
 // The moment this browser marked the card read before Dot kept it (item 1356), in seconds since the epoch: the first
 // mark Dot makes starts from it, and the browser forgets it.
@@ -57,12 +58,12 @@ function decisionRow(run) {
 
 /** A "Show N more" that opens the rest of the list `list` in place, or null when it has no more. */
 function moreButton(list, rest, onOpen) {
-  return rest === 0 ? null : el("button", { class: "btn ghost sm", type: "button", dataset: { awayMore: list }, onclick: onOpen }, `Show ${rest} more`);
+  return rest === 0 ? null : el("button", { class: "btn ghost sm", type: "button", dataset: { awayMore: list }, onclick: onOpen }, t("away.showRestMore", { rest }));
 }
 
 /** Build the card: `element` (hidden while there is nothing to tell) and `dispose()`. */
 export function buildAway() {
-  const element = el("section", { class: "home-away", "aria-label": "While you were away", hidden: true });
+  const element = el("section", { class: "home-away", "aria-label": t("away.whileYouWereAway"), hidden: true });
   let disposed = false;
   let view = null;
   // Grows with every load, so a slow answer never overwrites a newer one (nor gives Mark as read an older moment).
@@ -113,7 +114,7 @@ export function buildAway() {
     const runs = opened.has("runs") ? view.runs : view.runs.slice(0, ROWS_SHOWN);
     const decided = opened.has("decisions") ? view.decision_runs : view.decision_runs.slice(0, ROWS_SHOWN);
     element.replaceChildren(
-      el("h2", { class: "section-label" }, "While you were away"),
+      el("h2", { class: "section-label" }, t("away.whileYouWereAway")),
       el(
         "div",
         { class: "card card-pad stack" },
@@ -125,11 +126,11 @@ export function buildAway() {
           : el(
               "div",
               { class: "stack tight away-decisions" },
-              el("div", { class: "hint" }, "Most decisions made for you"),
+              el("div", { class: "hint" }, t("away.mostDecisionsMadeForYou")),
               el("ul", { class: "firings-list" }, ...decided.map(decisionRow)),
               moreButton("decisions", view.decision_runs.length - decided.length, () => open("decisions")),
             ),
-        el("div", { class: "row" }, el("span", { class: "spacer" }), el("button", { class: "btn sm", type: "button", onclick: () => attempt(markRead) }, "Mark as read")),
+        el("div", { class: "row" }, el("span", { class: "spacer" }), el("button", { class: "btn sm", type: "button", onclick: () => attempt(markRead) }, t("away.markAsRead"))),
       ),
     );
   }

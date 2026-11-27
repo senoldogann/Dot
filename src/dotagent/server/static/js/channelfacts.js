@@ -2,6 +2,8 @@
 // Finder writes them, moments as the page reads clock times, the rows of facts in the order the tab shows them, and the
 // line a press of Check now says. Pure, so that it runs under Node without a page.
 
+import { t } from "./i18n.js";
+
 /**
  * @typedef {{ size: number, changed_at: number }} SeenFile
  * @typedef {{ rowid: number, dated: number | null, seen_at: number }} SeenRow
@@ -66,33 +68,33 @@ export function seenFacts(seen, now = Date.now() / 1000, zone = undefined) {
   const looked = seen.looked_at !== null;
   const at = (/** @type {number} */ seconds) => moment(seconds, now, zone);
   /** @param {SeenFile | null} found @param {string} missing */
-  const file = (found, missing) => (!looked ? "not looked at yet" : found === null ? missing : `${byteSize(found.size)}, changed ${at(found.changed_at)}`);
-  let newest = "Dot has not looked yet.";
+  const file = (found, missing) => (!looked ? t("channelfacts.notLookedAtYet") : found === null ? missing : t("channelfacts.bytesizeChangedAt", { byteSize: byteSize(found.size), at: at(found.changed_at) }));
+  let newest = t("channelfacts.dotHasNotLookedYet");
   if (looked) {
-    newest = "none: the database holds no message.";
+    newest = t("channelfacts.noneTheDatabaseHoldsNo");
     if (seen.newest !== null) {
-      const dated = seen.newest.dated === null ? "with no date" : `dated ${at(seen.newest.dated)}`;
-      newest = `row ${seen.newest.rowid}, ${dated}, first seen ${at(seen.newest.seen_at)}`;
+      const dated = seen.newest.dated === null ? t("channelfacts.withNoDate") : t("channelfacts.datedAt", { at: at(seen.newest.dated) });
+      newest = t("channelfacts.rowRowidDatedFirstSeen", { rowid: seen.newest.rowid, dated, at: at(seen.newest.seen_at) });
     }
   }
   /** @type {[string, string][]} */
   const moved = seen.cursor_reset
     ? [
         [
-          "Moved down",
-          `from row ${seen.cursor_reset.from_row} to row ${seen.cursor_reset.to_row} at ${at(seen.cursor_reset.at)}: the newest message was below where Dot had read, so Messages' database was rebuilt or restored. What it holds was not run.`,
+          t("channelfacts.movedDown"),
+          t("channelfacts.fromRowFromRowTo", { from_row: seen.cursor_reset.from_row, to_row: seen.cursor_reset.to_row, at: at(seen.cursor_reset.at) }),
         ],
       ]
     : [];
   return [
-    ["Newest message", newest],
-    ["Read up to", seen.cursor === null ? "not set yet" : `row ${seen.cursor}`],
+    [t("channelfacts.newestMessage"), newest],
+    [t("channelfacts.readUpTo"), seen.cursor === null ? t("channelfacts.notSetYet") : t("channelfacts.rowCursor", { cursor: seen.cursor })],
     ...moved,
-    ["Last looked", looked ? at(seen.looked_at) : "never"],
-    ["chat.db", file(seen.chat_db, "not found")],
-    ["chat.db-wal", file(seen.chat_db_wal, "none: nothing waits in it")],
-    ["Last command", seen.command === null ? "none yet" : `row ${seen.command.rowid}, taken ${at(seen.command.at)}`],
-    ["Last error", seen.error === null ? "none" : `${seen.error.message} (${at(seen.error.at)})`],
+    [t("channelfacts.lastLooked"), looked ? at(seen.looked_at) : "never"],
+    ["chat.db", file(seen.chat_db, t("channelfacts.notFound"))],
+    ["chat.db-wal", file(seen.chat_db_wal, t("channelfacts.noneNothingWaitsInIt"))],
+    [t("channelfacts.lastCommand"), seen.command === null ? t("channelfacts.noneYet") : t("channelfacts.rowRowidTakenAt", { rowid: seen.command.rowid, at: at(seen.command.at) })],
+    [t("channelfacts.lastError"), seen.error === null ? "none" : `${seen.error.message} (${at(seen.error.at)})`],
   ];
 }
 
@@ -105,13 +107,13 @@ export function seenFacts(seen, now = Date.now() / 1000, zone = undefined) {
  */
 export function linkFact(links, off) {
   if (off) {
-    return ["Links in messages", "none: [channels] links is off, so a message says to open Dot on your Mac."];
+    return [t("channelfacts.linksInMessages"), t("channelfacts.noneChannelsLinksIsOff")];
   }
   return [
-    "Links in messages",
+    t("channelfacts.linksInMessages"),
     links === null
-      ? "none: this Mac's own address opens nothing on a phone, and [server] reach names no other, so Dot sends no link and says to open Dot on your Mac (Settings › Phone sets a name)."
-      : `open at ${links}`,
+      ? t("channelfacts.noneThisMacSOwn")
+      : t("channelfacts.openAtLinks", { links }),
   ];
 }
 
@@ -127,20 +129,20 @@ export function linkFact(links, off) {
 export function lookWords(view, before, now = Date.now() / 1000, zone = undefined) {
   const { seen } = view;
   if (seen.error !== null && seen.error.at === seen.looked_at) {
-    return ["error", `Dot could not look: ${seen.error.message}`];
+    return ["error", t("channelfacts.dotCouldNotLookMessage", { message: seen.error.message })];
   }
   if (seen.command !== null && seen.command.rowid !== before) {
-    return ["ok", `Dot took row ${seen.command.rowid} as a command.`];
+    return ["ok", t("channelfacts.dotTookRowRowidAs", { rowid: seen.command.rowid })];
   }
-  let ending = "Nothing new to run.";
+  let ending = t("channelfacts.nothingNewToRun");
   if (!view.on) {
-    ending = "iMessage is off, so no message is read.";
+    ending = t("channelfacts.imessageIsOffSoNo");
   } else if (view.handles.length === 0) {
-    ending = "No number is paired, so no message is read.";
+    ending = t("channelfacts.noNumberIsPairedSo");
   }
   if (seen.newest === null) {
-    return ["ok", `Dot looked: the database holds no message. ${ending}`];
+    return ["ok", t("channelfacts.dotLookedTheDatabaseHolds", { ending })];
   }
-  const dated = seen.newest.dated === null ? "" : `, dated ${moment(seen.newest.dated, now, zone)}`;
-  return ["ok", `Dot looked: the newest message is row ${seen.newest.rowid}${dated}. ${ending}`];
+  const dated = seen.newest.dated === null ? "" : t("channelfacts.datedMoment", { moment: moment(seen.newest.dated, now, zone) });
+  return ["ok", t("channelfacts.dotLookedTheNewestMessage", { rowid: seen.newest.rowid, dated, ending })];
 }

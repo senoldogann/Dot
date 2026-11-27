@@ -20,7 +20,7 @@
 
 import { api, query } from "../api.js";
 import { customizeHead } from "../customizehead.js";
-import { ago, clip, el, foldSearch, plural } from "../dom.js";
+import { ago, clip, el, foldSearch, } from "../dom.js";
 import { icon } from "../icons.js";
 import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark } from "../marks.js";
 import { emptyPanel, errorPanel, foldGroup, loadingPanel, segmented } from "../panels.js";
@@ -29,13 +29,14 @@ import { proposalCard } from "../skillproposals.js";
 import { WHOLE_RUN, providerOf } from "../providers.js";
 import { showVersions } from "../skillversions.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
+import { t, tCount } from "../i18n.js";
 
 /** Drop a learned skill after a confirmation; resolves to the list after it, or null when the owner kept it. */
 async function dropSkill(skill) {
   const confirmed = await confirmDialog({
-    title: `Drop ${skill.name}?`,
-    message: "The skill is removed; a later task of its kind may learn it again.",
-    confirmLabel: "Drop",
+    title: t("views.skills.dropName", { name: skill.name }),
+    message: t("views.skills.theSkillIsRemovedA"),
+    confirmLabel: t("views.skills.drop"),
     danger: true,
     focusCancel: true,
   });
@@ -43,37 +44,40 @@ async function dropSkill(skill) {
     return null;
   }
   const page = await api.del(`/skills/learned/${encodeURIComponent(skill.name)}`);
-  toast("ok", `Dropped ${skill.name}.`);
+  toast("ok", t("views.skills.droppedName", { name: skill.name }));
   return page.items;
 }
 
 /** Offer an agent's skill to every run, or to the agent's alone again; resolves to the list after it. */
 async function shareSkill(skill, shared) {
   const page = await api.put(`/skills/learned/${encodeURIComponent(skill.name)}`, { shared });
-  toast("ok", shared ? `${skill.name} is offered to every task.` : `${skill.name} is ${skill.agentName}'s alone again.`);
+  toast("ok", shared ? t("views.skills.nameIsOfferedToEvery", { name: skill.name }) : t("views.skills.nameIsAgentnameSAlone", { name: skill.name, agentName: skill.agentName }));
   return page.items;
 }
 
 /** Pin a learned skill so that it never rests (a resting one wakes), or take the pin off; resolves to the list after it. */
 async function pinSkill(skill, pinned) {
   const page = await api.put(`/skills/learned/${encodeURIComponent(skill.name)}/pin`, { pinned });
-  toast("ok", pinned ? `${skill.name} is pinned: it never rests.` : `${skill.name} is not pinned.`);
+  toast("ok", pinned ? t("views.skills.nameIsPinnedItNever", { name: skill.name }) : t("views.skills.nameIsNotPinned", { name: skill.name }));
   return page.items;
 }
 
 /** Wake a learned skill that rests, for disuse, by hand or for a merge; resolves to the list after it. */
 async function wakeSkill(skill) {
   const page = await api.post(`/skills/learned/${encodeURIComponent(skill.name)}/wake`, {});
-  toast("ok", `${skill.name} is awake: tasks are offered it again.`);
+  toast("ok", t("views.skills.nameIsAwakeTasksAre", { name: skill.name }));
   return page.items;
 }
 
 /** Why a skill rests, in words: no run read it for `restDays` days, the owner put it to rest, or a merge put it aside. */
+/** What a skill that was put away reads as, and the check for it. */
+const RETIRED = t("views.skills.retired");
+
 function restWords(skill, restDays) {
   if (skill.rest_reason === "merged") {
-    return `Merged into ${skill.merged_into}`;
+    return t("views.skills.mergedIntoMergedInto", { merged_into: skill.merged_into });
   }
-  return skill.rest_reason === "owner" ? "Put to rest by you" : `No task read it for ${plural(restDays, "day", "days")}`;
+  return skill.rest_reason === "owner" ? t("views.skills.putToRestByYou") : t("views.skills.noTaskReadItFor", { part: tCount(restDays, "views.skills.countDay", "views.skills.countDays") });
 }
 
 /**
@@ -81,25 +85,25 @@ function restWords(skill, restDays) {
  * and the record. `skill.agentName` names the agent when the skill is one's; `onChanged` gets the list after an action.
  */
 export function skillRow(skill, onChanged) {
-  const drop = el("button", { class: "btn ghost sm", type: "button" }, "Drop");
+  const drop = el("button", { class: "btn ghost sm", type: "button" }, t("views.skills.drop"));
   drop.addEventListener("click", () => attempt(async () => onChanged(await dropSkill(skill))));
   const share =
     skill.agent_id === null
       ? null
-      : el("button", { class: "btn ghost sm", type: "button" }, skill.shared ? "Keep to the agent" : "Share");
+      : el("button", { class: "btn ghost sm", type: "button" }, skill.shared ? t("views.skills.keepToTheAgent") : t("views.skills.share"));
   if (share !== null) {
     share.addEventListener("click", () => attempt(async () => onChanged(await shareSkill(skill, !skill.shared))));
   }
   const record =
     skill.uses + skill.failures === 0
-      ? "Not read by a task yet"
-      : `${plural(skill.uses, "task", "tasks")} done after reading it, ${skill.failures} failed`;
+      ? t("views.skills.notReadByATask")
+      : t("views.skills.partDoneAfterReadingIt", { part: tCount(skill.uses, "views.skills.countTask", "views.skills.countTasks"), failures: skill.failures });
   const whose =
     skill.agent_id === null
       ? null
-      : el("span", { class: "chip" }, skill.shared ? `${skill.agentName ?? "An agent"}, shared` : (skill.agentName ?? "An agent"));
+      : el("span", { class: "chip" }, skill.shared ? t("views.skills.valueShared", { value: skill.agentName ?? t("views.skills.anAgent") }) : (skill.agentName ?? t("views.skills.anAgent")));
   // A skill that rests is not offered to runs (item 585): the row says so and Wake offers it again.
-  const wake = skill.resting ? el("button", { class: "btn ghost sm", type: "button" }, "Wake") : null;
+  const wake = skill.resting ? el("button", { class: "btn ghost sm", type: "button" }, t("views.skills.wake")) : null;
   if (wake !== null) {
     wake.addEventListener("click", () => attempt(async () => onChanged(await wakeSkill(skill))));
   }
@@ -116,10 +120,10 @@ export function skillRow(skill, onChanged) {
         { class: "row-meta" },
         el("span", { class: "chip" }, skill.kind),
         whose,
-        skill.resting ? el("span", { class: "chip" }, "Resting") : null,
-        skill.pinned ? el("span", { class: "chip" }, "Pinned") : null,
+        skill.resting ? el("span", { class: "chip" }, t("views.skills.resting")) : null,
+        skill.pinned ? el("span", { class: "chip" }, t("views.skills.pinned")) : null,
         el("span", null, skill.host),
-        el("span", null, `Learned from ${plural(skill.runs.length, "task", "tasks")}, last ${ago(skill.updated_at)}`),
+        el("span", null, t("views.skills.learnedFromPartLastAgo", { part: tCount(skill.runs.length, "views.skills.countTask", "views.skills.countTasks"), ago: ago(skill.updated_at) })),
         el("span", null, record),
       ),
     ),
@@ -138,27 +142,27 @@ function foundDialog(kind, item, added) {
   if (kind === "skill") {
     return added
       ? {
-          title: `Add ${item.name} to Dot?`,
-          message: `Dot copies this skill of ${item.agent} into its own skills folder and offers it to every task. The copy stays as it is now: later changes in ${item.agent}'s folder are not copied.`,
-          confirmLabel: "Add",
+          title: t("views.skills.addNameToDot", { name: item.name }),
+          message: t("views.skills.dotCopiesThisSkillOf", { agent: item.agent, agent2: item.agent }),
+          confirmLabel: t("views.skills.add"),
         }
       : {
-          title: `Remove ${item.name} from Dot?`,
-          message: `Dot deletes its copy and no longer offers the skill. The skill stays where ${item.agent} keeps it.`,
-          confirmLabel: "Remove",
+          title: t("views.skills.removeNameFromDot", { name: item.name }),
+          message: t("views.skills.dotDeletesItsCopyAnd", { agent: item.agent }),
+          confirmLabel: t("views.skills.remove"),
           focusCancel: true,
         };
   }
   return added
     ? {
-        title: `Add the connected app ${item.name} to Dot?`,
-        message: `From its next start, Dot starts it as ${item.agent} does, with the command written there, and offers what it can do to tasks as their mode allows.`,
-        confirmLabel: "Add",
+        title: t("views.skills.addTheConnectedAppName", { name: item.name }),
+        message: t("views.skills.fromItsNextStartDot", { agent: item.agent }),
+        confirmLabel: t("views.skills.add"),
       }
     : {
-        title: `Remove the connected app ${item.name} from Dot?`,
-        message: `Dot no longer starts it, from its next start. It stays set up in ${item.agent}.`,
-        confirmLabel: "Remove",
+        title: t("views.skills.removeTheConnectedAppName", { name: item.name }),
+        message: t("views.skills.dotNoLongerStartsIt", { agent: item.agent }),
+        confirmLabel: t("views.skills.remove"),
         focusCancel: true,
       };
 }
@@ -167,15 +171,15 @@ function foundDialog(kind, item, added) {
 function goneDialog(item) {
   return item.kind === "skill"
     ? {
-        title: `Remove ${item.name} from Dot?`,
-        message: `${item.agent} no longer has this skill. Dot deletes its copy and no longer offers it.`,
-        confirmLabel: "Remove",
+        title: t("views.skills.removeNameFromDot", { name: item.name }),
+        message: t("views.skills.agentNoLongerHasThis", { agent: item.agent }),
+        confirmLabel: t("views.skills.remove"),
         focusCancel: true,
       }
     : {
-        title: `Remove the connected app ${item.name} from Dot?`,
-        message: `${item.agent} no longer has this connected app, and Dot leaves it out when it starts. Dot forgets it.`,
-        confirmLabel: "Remove",
+        title: t("views.skills.removeTheConnectedAppName", { name: item.name }),
+        message: t("views.skills.agentNoLongerHasThis2", { agent: item.agent }),
+        confirmLabel: t("views.skills.remove"),
         focusCancel: true,
       };
 }
@@ -198,7 +202,7 @@ async function askAndChange(dialog, body, done) {
  * found after it, or null when the owner said no.
  */
 function changeFound(kind, item, added) {
-  const done = !added ? `Removed ${item.name}.` : kind === "skill" ? `Added ${item.name}; tasks are offered it.` : `Added ${item.name}; Dot starts it the next time it starts.`;
+  const done = !added ? t("views.skills.removedName", { name: item.name }) : kind === "skill" ? t("views.skills.addedNameTasksAreOffered", { name: item.name }) : t("views.skills.addedNameDotStartsIt", { name: item.name });
   return askAndChange(foundDialog(kind, item, added), { kind, agent: item.agent, name: item.name, added }, done);
 }
 
@@ -209,7 +213,7 @@ function addable(item) {
 
 /** What a found MCP server starts or reaches, in a few words. */
 function reachOf(server) {
-  return server.transport === "stdio" ? `Starts ${server.reaches}` : `Connects to ${server.reaches}`;
+  return server.transport === "stdio" ? t("views.skills.startsReaches", { reaches: server.reaches }) : t("views.skills.connectsToReaches", { reaches: server.reaches });
 }
 
 /**
@@ -224,12 +228,12 @@ function importDialog(found) {
     const ticks = [];
     const dialog = el("dialog", { class: "modal import-dialog", "aria-labelledby": "import-title" });
     const go = el("button", { class: "btn primary", type: "button", onclick: () => dialog.close("ok") });
-    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel");
+    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, t("views.skills.cancel"));
     const all = el("input", { type: "checkbox" });
 
     function paint() {
       const chosen = ticks.filter((tick) => tick.box.checked).length;
-      go.textContent = chosen === 0 ? "Import" : `Import ${chosen}`;
+      go.textContent = chosen === 0 ? t("views.skills.import") : t("views.skills.importChosen", { chosen });
       go.disabled = chosen === 0;
       all.checked = chosen === ticks.length;
       all.indeterminate = chosen > 0 && chosen < ticks.length;
@@ -254,7 +258,7 @@ function importDialog(found) {
       el(
         "div",
         { class: "import-group" },
-        el("div", { class: "import-group-head" }, agent, el("span", { class: "hint" }, plural(list.length, "skill", "skills"))),
+        el("div", { class: "import-group-head" }, agent, el("span", { class: "hint" }, tCount(list.length, "views.skills.countSkill", "views.skills.countSkills"))),
         list.map((skill) => tick("skill", skill, true, clip(skill.description, 140))),
       ),
     );
@@ -263,7 +267,7 @@ function importDialog(found) {
         el(
           "div",
           { class: "import-group" },
-          el("div", { class: "import-group-head" }, "Connected apps", el("span", { class: "hint" }, "start with Dot's next start")),
+          el("div", { class: "import-group-head" }, t("views.skills.connectedApps"), el("span", { class: "hint" }, t("views.skills.startWithDotSNext"))),
           servers.map((server) => tick("server", server, false, `${server.agent} · ${reachOf(server)}`)),
         ),
       );
@@ -279,15 +283,15 @@ function importDialog(found) {
       el(
         "div",
         { class: "modal-body" },
-        el("h3", { id: "import-title" }, "Import from other apps"),
+        el("h3", { id: "import-title" }, t("views.skills.importFromOtherApps")),
         el(
           "p",
           { class: "muted" },
-          "What Claude Code, Codex and the Mac's other agents set up. A skill is copied into Dot and offered to tasks at once; a connected app starts with Dot's next start, as its app starts it.",
+          t("views.skills.whatClaudeCodeCodexAnd"),
         ),
-        el("label", { class: "import-all" }, all, el("span", null, "Choose all")),
+        el("label", { class: "import-all" }, all, el("span", null, t("views.skills.chooseAll"))),
         el("div", { class: "import-list" }, groups),
-        others === 0 ? null : el("p", { class: "hint" }, `${plural(others, "other item is", "other items are")} in Dot already or cannot be added; Found on this Mac says which.`),
+        others === 0 ? null : el("p", { class: "hint" }, t("views.skills.partInDotAlreadyOr", { part: tCount(others, "views.skills.countOtherItemIs", "views.skills.countOtherItemsAre") })),
       ),
       el("div", { class: "modal-actions" }, cancel, go),
     );
@@ -313,10 +317,10 @@ async function importFound(found) {
   }
   const done = await api.post("/skills/elsewhere/import", { items });
   if (done.added.length > 0) {
-    toast("ok", `Imported ${plural(done.added.length, "item", "items")}.`);
+    toast("ok", t("views.skills.importedPart", { part: tCount(done.added.length, "views.skills.countItem", "views.skills.countItems") }));
   }
   for (const refused of done.refused) {
-    toast("error", `${refused.item.name} was not imported: ${refused.reason}`);
+    toast("error", t("views.skills.nameWasNotImportedReason", { name: refused.item.name, reason: refused.reason }));
   }
   return done.found;
 }
@@ -333,25 +337,25 @@ function refusalLine(text) {
 function foundState(kind, item, hasIt, onFound) {
   const change = (added) => attempt(async () => onFound(await changeFound(kind, item, added)));
   if (item.added) {
-    const remove = el("button", { class: "btn ghost sm", type: "button" }, "Remove");
+    const remove = el("button", { class: "btn ghost sm", type: "button" }, t("views.skills.remove"));
     remove.addEventListener("click", () => change(false));
-    const refusal = item.refusal === null ? null : refusalLine(`Dot leaves it out when it starts: ${item.refusal}`);
-    return { chip: el("span", { class: "chip" }, "Added"), refusal, action: remove };
+    const refusal = item.refusal === null ? null : refusalLine(t("views.skills.dotLeavesItOutWhen", { refusal: item.refusal }));
+    return { chip: el("span", { class: "chip" }, t("views.skills.added")), refusal, action: remove };
   }
   if (item.used) {
     return { chip: el("span", { class: "chip" }, hasIt), refusal: null, action: null };
   }
   if (item.refusal !== null) {
-    return { chip: null, refusal: refusalLine(`Can't add: ${item.refusal}`), action: null };
+    return { chip: null, refusal: refusalLine(t("views.skills.canTAddRefusal", { refusal: item.refusal })), action: null };
   }
-  const add = el("button", { class: "btn sm", type: "button" }, "Add to Dot");
+  const add = el("button", { class: "btn sm", type: "button" }, t("views.skills.addToDot"));
   add.addEventListener("click", () => change(true));
   return { chip: null, refusal: null, action: add };
 }
 
 /** A skill another agent of this Mac set up: its name and description, whether Dot has it, and Add or Remove. */
 function foundSkillRow(skill, onFound) {
-  const { chip, refusal, action } = foundState("skill", skill, "Dot reads it", onFound);
+  const { chip, refusal, action } = foundState("skill", skill, t("views.skills.dotReadsIt"), onFound);
   return el(
     "div",
     { class: "list-row" },
@@ -370,7 +374,7 @@ function foundSkillRow(skill, onFound) {
 /** An MCP server another agent set up: its name, the agent, the program it starts or the host it reaches, and Add. */
 function foundServerRow(server, onFound) {
   const reach = reachOf(server);
-  const { chip, refusal, action } = foundState("server", server, "Dot has it", onFound);
+  const { chip, refusal, action } = foundState("server", server, t("views.skills.dotHasIt"), onFound);
   return el(
     "div",
     { class: "list-row" },
@@ -387,10 +391,10 @@ function foundServerRow(server, onFound) {
 
 /** Something the owner added that its agent no longer has: its name, the agent, what Dot does with it, and Remove. */
 function goneRow(item, onFound) {
-  const remove = el("button", { class: "btn ghost sm", type: "button" }, "Remove");
+  const remove = el("button", { class: "btn ghost sm", type: "button" }, t("views.skills.remove"));
   const body = { kind: item.kind, agent: item.agent, name: item.name, added: false };
-  remove.addEventListener("click", () => attempt(async () => onFound(await askAndChange(goneDialog(item), body, `Removed ${item.name}.`))));
-  const what = item.kind === "skill" ? "Skill: Dot keeps its copy" : "Connected app: Dot leaves it out when it starts";
+  remove.addEventListener("click", () => attempt(async () => onFound(await askAndChange(goneDialog(item), body, t("views.skills.removedName", { name: item.name })))));
+  const what = item.kind === "skill" ? t("views.skills.skillDotKeepsItsCopy") : t("views.skills.connectedAppDotLeavesIt");
   return el(
     "div",
     { class: "list-row" },
@@ -410,7 +414,7 @@ function foundGroup(id, title, count, extra, rows) {
 }
 
 function foundHead() {
-  return el("div", { class: "row section-head" }, el("div", { class: "section-label grow" }, "Found on this Mac"));
+  return el("div", { class: "row section-head" }, el("div", { class: "section-label grow" }, t("views.skills.foundOnThisMac")));
 }
 
 /**
@@ -425,31 +429,31 @@ function foundSection(found, onFound) {
   }
   const groups = [...agents].map(([agent, skills]) => {
     const read = skills.filter((skill) => skill.used).length;
-    const extra = read > 0 ? el("span", { class: "chip" }, `Dot reads ${read}`) : null;
+    const extra = read > 0 ? el("span", { class: "chip" }, t("views.skills.dotReadsRead", { read })) : null;
     // An element id holds no space ("Claude Code plugin x" becomes claude-code-plugin-x), or aria-controls breaks.
     const slug = agent.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    return foundGroup(`found-skills-${slug}`, agent, plural(skills.length, "skill", "skills"), extra, skills.map((skill) => foundSkillRow(skill, onFound)));
+    return foundGroup(`found-skills-${slug}`, agent, tCount(skills.length, "views.skills.countSkill", "views.skills.countSkills"), extra, skills.map((skill) => foundSkillRow(skill, onFound)));
   });
   if (found.servers.length > 0) {
-    groups.push(foundGroup("found-servers", "Connected apps", plural(found.servers.length, "connected app", "connected apps"), null, found.servers.map((server) => foundServerRow(server, onFound))));
+    groups.push(foundGroup("found-servers", t("views.skills.connectedApps"), tCount(found.servers.length, "views.skills.countConnectedApp", "views.skills.countConnectedApps"), null, found.servers.map((server) => foundServerRow(server, onFound))));
   }
   if (found.gone.length > 0) {
-    groups.push(foundGroup("found-gone", "Added, no longer set up", plural(found.gone.length, "item", "items"), null, found.gone.map((item) => goneRow(item, onFound))));
+    groups.push(foundGroup("found-gone", t("views.skills.addedNoLongerSetUp"), tCount(found.gone.length, "views.skills.countItem", "views.skills.countItems"), null, found.gone.map((item) => goneRow(item, onFound))));
   }
   if (found.problems.length > 0) {
     const rows = found.problems.map((problem) =>
       el("div", { class: "list-row" }, el("div", { class: "row-main" }, el("div", { class: "row-text" }, problem.path), el("div", { class: "row-meta" }, problem.reason))),
     );
-    groups.push(foundGroup("found-problems", "Left out", plural(found.problems.length, "file", "files"), null, rows));
+    groups.push(foundGroup("found-problems", t("views.skills.leftOut"), tCount(found.problems.length, "views.skills.countFile", "views.skills.countFiles"), null, rows));
   }
   const head = foundHead();
   if (groups.length === 0) {
-    return [head, emptyPanel("search", "Nothing found", "No other agent of this Mac (Claude Code, Claude Desktop, Cursor, VS Code, Codex) has skills or connected apps set up.")];
+    return [head, emptyPanel("search", t("views.skills.nothingFound"), t("views.skills.noOtherAgentOfThis"))];
   }
   const hint = el(
     "div",
     { class: "hint" },
-    "Skills and connected apps that other agents of this Mac set up. Dot uses one only once you add it: a skill is copied and offered to tasks at once, a connected app starts with Dot's next start.",
+    t("views.skills.skillsAndConnectedAppsThat"),
   );
   return [head, hint, el("div", { class: "card list-box" }, groups)];
 }
@@ -478,9 +482,9 @@ function leftOutSection(entries, tab) {
   if (entries.length === 0) {
     return [];
   }
-  const head = el("div", { class: "row section-head" }, el("div", { class: "section-label grow" }, "Left out"));
+  const head = el("div", { class: "row section-head" }, el("div", { class: "section-label grow" }, t("views.skills.leftOut")));
   const hint = el("div", { class: "hint", dataset: { leftOutHint: "" } }, leftOutSummary(entries));
-  const group = foundGroup(`left-out-${tab}`, "Skills Dot could not use", plural(entries.length, "skill", "skills"), null, entries.map(leftOutRow));
+  const group = foundGroup(`left-out-${tab}`, t("views.skills.skillsDotCouldNotUse"), tCount(entries.length, "views.skills.countSkill", "views.skills.countSkills"), null, entries.map(leftOutRow));
   return [head, hint, el("div", { class: "card list-box" }, group)];
 }
 
@@ -505,7 +509,7 @@ function skillCard({ name, description, mark, facts, actions, have, haveMark = "
         "div",
         { class: "skill-head" },
         el("div", { class: "skill-name" }, name),
-        el("span", { class: `skill-have${have === "Retired" ? " retired" : ""}${haveClass}` }, have === "Retired" ? null : icon(haveMark), have),
+        el("span", { class: `skill-have${have === RETIRED ? " retired" : ""}${haveClass}` }, have === RETIRED ? null : icon(haveMark), have),
       ),
       el("div", { class: "skill-does" }, description),
       facts,
@@ -530,34 +534,34 @@ function factsOf(chips, words) {
 /** The state a learned skill's card says: retired, resting (quiet), pinned or learned, with the icon beside it. */
 function learnedState(skill) {
   if (skill.retired) {
-    return { have: "Retired", haveMark: "check", haveClass: "" };
+    return { have: RETIRED, haveMark: "check", haveClass: "" };
   }
   if (skill.resting) {
-    return { have: "Resting", haveMark: "clock", haveClass: " resting" };
+    return { have: t("views.skills.resting"), haveMark: "clock", haveClass: " resting" };
   }
-  return skill.pinned ? { have: "Pinned", haveMark: "pin", haveClass: "" } : { have: "Learned", haveMark: "check", haveClass: "" };
+  return skill.pinned ? { have: t("views.skills.pinned"), haveMark: "pin", haveClass: "" } : { have: t("views.skills.learned"), haveMark: "check", haveClass: "" };
 }
 
 /** A learned skill as a card: the kind of work, the place, the agent whose it is, the runs, the record and when a run last
  * read it, with Versions once it was rewritten, Wake while it rests, Pin, Share for an agent's and Drop. `onChanged` gets
  * the list after an action; `restDays` is the days after which a skill no run read rests. */
 function learnedCard(skill, onChanged, restDays) {
-  const drop = el("button", { class: "btn ghost sm", type: "button" }, "Drop");
+  const drop = el("button", { class: "btn ghost sm", type: "button" }, t("views.skills.drop"));
   drop.addEventListener("click", () => attempt(async () => onChanged(await dropSkill(skill))));
-  const share = skill.agent_id === null ? null : el("button", { class: "btn ghost sm", type: "button" }, skill.shared ? "Keep to the agent" : "Share");
+  const share = skill.agent_id === null ? null : el("button", { class: "btn ghost sm", type: "button" }, skill.shared ? t("views.skills.keepToTheAgent") : t("views.skills.share"));
   if (share !== null) {
     share.addEventListener("click", () => attempt(async () => onChanged(await shareSkill(skill, !skill.shared))));
   }
   const versions =
     skill.version > 1
-      ? el("button", { class: "btn ghost sm", type: "button", title: "The versions this skill had, and what each changed" }, icon("clock"), `Versions (${skill.version})`)
+      ? el("button", { class: "btn ghost sm", type: "button", title: t("views.skills.theVersionsThisSkillHad") }, icon("clock"), t("views.skills.versionsVersion", { version: skill.version }))
       : null;
   if (versions !== null) {
     versions.addEventListener("click", () => attempt(() => showVersions(skill, onChanged)));
   }
   const wake =
     skill.resting && !skill.retired
-      ? el("button", { class: "btn ghost sm", type: "button", title: "Offer this skill to tasks again" }, "Wake")
+      ? el("button", { class: "btn ghost sm", type: "button", title: t("views.skills.offerThisSkillToTasks") }, t("views.skills.wake"))
       : null;
   if (wake !== null) {
     wake.addEventListener("click", () => attempt(async () => onChanged(await wakeSkill(skill))));
@@ -570,25 +574,25 @@ function learnedCard(skill, onChanged, restDays) {
           class: "btn ghost sm",
           type: "button",
           "aria-pressed": String(skill.pinned),
-          title: skill.pinned ? "Take the pin off: this skill may rest again" : "Pin this skill: it never rests",
+          title: skill.pinned ? t("views.skills.takeThePinOffThis") : t("views.skills.pinThisSkillItNever"),
         },
         icon("pin"),
-        skill.pinned ? "Unpin" : "Pin",
+        skill.pinned ? t("views.skills.unpin") : t("views.skills.pin"),
       );
   if (pin !== null) {
     pin.addEventListener("click", () => attempt(async () => onChanged(await pinSkill(skill, !skill.pinned))));
   }
-  const record = skill.uses + skill.failures === 0 ? "Not read by a task yet" : `${plural(skill.uses, "task", "tasks")} done after reading it, ${skill.failures} failed`;
+  const record = skill.uses + skill.failures === 0 ? t("views.skills.notReadByATask") : t("views.skills.partDoneAfterReadingIt", { part: tCount(skill.uses, "views.skills.countTask", "views.skills.countTasks"), failures: skill.failures });
   const chips = [
     el("span", { class: "chip" }, skill.kind),
-    skill.agent_id === null ? null : el("span", { class: "chip" }, skill.shared ? `${skill.agentName ?? "An agent"}, shared` : (skill.agentName ?? "An agent")),
+    skill.agent_id === null ? null : el("span", { class: "chip" }, skill.shared ? t("views.skills.valueShared", { value: skill.agentName ?? t("views.skills.anAgent") }) : (skill.agentName ?? t("views.skills.anAgent"))),
   ].filter((chip) => chip !== null);
   const facts = factsOf(chips, [
     skill.host,
-    `Learned from ${plural(skill.runs.length, "task", "tasks")}, last ${ago(skill.updated_at)}`,
+    t("views.skills.learnedFromPartLastAgo2", { part: tCount(skill.runs.length, "views.skills.countTask", "views.skills.countTasks"), ago: ago(skill.updated_at) }),
     record,
-    skill.last_read_at === null ? null : `Last read ${ago(skill.last_read_at)}`,
-    skill.version > 1 ? `Version ${skill.version}` : null,
+    skill.last_read_at === null ? null : t("views.skills.lastReadAgo", { ago: ago(skill.last_read_at) }),
+    skill.version > 1 ? t("views.skills.versionVersion", { version: skill.version }) : null,
     skill.resting && !skill.retired ? restWords(skill, restDays) : null,
   ].filter((fact) => fact !== null));
   return skillCard({
@@ -624,8 +628,8 @@ function chatDialog(loading, save) {
     let saved = null;
     const dialog = el("dialog", { class: "modal chat-skill-dialog", "aria-labelledby": "chat-skill-title" });
     const problem = el("p", { class: "hint chat-skill-problem", role: "alert", hidden: true });
-    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel");
-    const list = el("div", { class: "chat-skill-list" }, el("p", { class: "hint" }, "Reading your chats…"));
+    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, t("views.skills.cancel"));
+    const list = el("div", { class: "chat-skill-list" }, el("p", { class: "hint" }, t("views.skills.readingYourChats")));
     let rows = [];
     const rowsOf = (runs) => runs.map((run) => {
       const when = el("span", { class: "hint" }, ago(run.finished_at ?? run.created_at));
@@ -636,7 +640,7 @@ function chatDialog(loading, save) {
         }
         cancel.disabled = true;
         problem.hidden = true;
-        when.textContent = "Saving…";
+        when.textContent = t("views.skills.saving");
         try {
           saved = await save(run);
           dialog.close("ok");
@@ -655,11 +659,11 @@ function chatDialog(loading, save) {
     loading.then(
       (runs) => {
         rows = rowsOf(runs);
-        list.replaceChildren(...(rows.length === 0 ? [el("p", { class: "hint" }, "No chat has ended done yet.")] : rows));
+        list.replaceChildren(...(rows.length === 0 ? [el("p", { class: "hint" }, t("views.skills.noChatHasEndedDone"))] : rows));
       },
       (error) => {
         list.replaceChildren();
-        problem.textContent = `Your chats could not be read: ${error.message}`;
+        problem.textContent = t("views.skills.yourChatsCouldNotBe", { message: error.message });
         problem.hidden = false;
       },
     );
@@ -667,8 +671,8 @@ function chatDialog(loading, save) {
       el(
         "div",
         { class: "modal-body" },
-        el("h3", { id: "chat-skill-title" }, "Save a skill from a chat"),
-        el("p", { class: "muted" }, "Dot's reviewer writes how the chat's work was done as a skill, offered to the tasks of its kind after it."),
+        el("h3", { id: "chat-skill-title" }, t("views.skills.saveASkillFromA")),
+        el("p", { class: "muted" }, t("views.skills.dotSReviewerWritesHow")),
         list,
         problem,
       ),
@@ -707,19 +711,19 @@ export function mount(root) {
   // The sections opened past their first cards.
   const opened = new Set();
   const holder = el("div", { class: "stack" }, loadingPanel());
-  const importButton = el("button", { class: "btn sm", type: "button", disabled: true }, icon("download"), "Import from other apps");
+  const importButton = el("button", { class: "btn sm", type: "button", disabled: true }, icon("download"), t("views.skills.importFromOtherApps"));
   importButton.addEventListener("click", () => attempt(async () => foundChanged(await importFound(found))));
-  const saveButton = el("button", { class: "btn sm", type: "button" }, icon("plus"), "Save from a chat");
+  const saveButton = el("button", { class: "btn sm", type: "button" }, icon("plus"), t("views.skills.saveFromAChat"));
   saveButton.addEventListener("click", () => attempt(saveFromChat));
-  const search = el("input", { class: "input customize-search", type: "search", placeholder: "Search skills", "aria-label": "Search skills", autocomplete: "off", spellcheck: "false" });
+  const search = el("input", { class: "input customize-search", type: "search", placeholder: t("views.skills.searchSkills"), "aria-label": t("views.skills.searchSkills"), autocomplete: "off", spellcheck: "false" });
   search.addEventListener("input", () => {
     words = foldSearch(search.value);
     paint();
   });
   const tabs = segmented(
     [
-      { id: "personal", label: "Personal", hint: "Your skills, those you imported and those Dot learned" },
-      { id: "system", label: "System", hint: "The skills that come with Dot and with its plugins" },
+      { id: "personal", label: t("views.skills.personal"), hint: t("views.skills.yourSkillsThoseYouImported") },
+      { id: "system", label: t("views.skills.system"), hint: t("views.skills.theSkillsThatComeWith") },
     ],
     shown,
     (id) => {
@@ -728,10 +732,10 @@ export function mount(root) {
     },
   );
   tabs.element.classList.add("plugin-tabs");
-  tabs.element.setAttribute("aria-label", "Skills to show");
+  tabs.element.setAttribute("aria-label", t("views.skills.skillsToShow"));
   // Out of what paints again, so that the search keeps the focus while the cards are drawn anew.
   const head = customizeHead({
-    line: "What Dot knows how to do: the skills it learned from your chats, those you wrote or imported, and those of its plugins. A task reads the ones it needs.",
+    line: t("views.skills.whatDotKnowsHowTo"),
     search,
     controls: [tabs.element, saveButton, importButton],
   });
@@ -743,11 +747,11 @@ export function mount(root) {
     importButton.title =
       found === null
         ? foundError === null
-          ? "Looking for what other apps set up…"
-          : "What other apps set up could not be read"
+          ? t("views.skills.lookingForWhatOtherApps")
+          : t("views.skills.whatOtherAppsSetUp")
         : count === 0
-          ? "Nothing found that Dot can add"
-          : `${plural(count, "item", "items")} found that Dot can add`;
+          ? t("views.skills.nothingFoundThatDotCan")
+          : t("views.skills.partFoundThatDotCan", { part: tCount(count, "views.skills.countItem", "views.skills.countItems") });
   }
 
   function foundPart() {
@@ -787,7 +791,7 @@ export function mount(root) {
                 paint();
               },
             },
-            `See ${cards.length - SHOWN_CARDS} more`,
+            t("views.skills.seeValueMore", { value: cards.length - SHOWN_CARDS }),
           );
     return el(
       "section",
@@ -817,22 +821,22 @@ export function mount(root) {
     if (!skill.gone) {
       return changeFound("skill", skill, false);
     }
-    return askAndChange(goneDialog(skill), { kind: "skill", agent: skill.agent, name: skill.name, added: false }, `Removed ${skill.name}.`);
+    return askAndChange(goneDialog(skill), { kind: "skill", agent: skill.agent, name: skill.name, added: false }, t("views.skills.removedName", { name: skill.name }));
   }
 
   function personal() {
     const copies = imported();
     const own = palette.skills.filter((skill) => OWN_SOURCES.has(skill.source) && !copies.has(skill.name) && matches(skill.name, skill.description));
     const ownCards = own.map((skill) =>
-      skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([], [skill.source === "home" ? "In Dot's skills folder" : "In a folder in Dot's settings"]), actions: [], have: "Installed" }),
+      skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([], [skill.source === "home" ? t("views.skills.inDotSSkillsFolder") : t("views.skills.inAFolderInDot")]), actions: [], have: t("views.skills.installed") }),
     );
     const importedCards = [...copies.values()]
       .filter((skill) => matches(skill.name, skill.description))
       .map((skill) => {
-        const remove = el("button", { class: "btn ghost sm", type: "button" }, "Remove");
+        const remove = el("button", { class: "btn ghost sm", type: "button" }, t("views.skills.remove"));
         remove.addEventListener("click", () => attempt(async () => foundChanged(await removeImported(skill))));
-        const from = skill.gone ? `Imported from ${skill.agent}, which no longer has it` : `Imported from ${skill.agent}`;
-        return skillCard({ name: skill.name, description: skill.description, mark: IMPORTED_SKILL_MARK, facts: factsOf([], [from]), actions: [remove], have: "Installed" });
+        const from = skill.gone ? t("views.skills.importedFromAgentWhichNo", { agent: skill.agent }) : t("views.skills.importedFromAgent", { agent: skill.agent });
+        return skillCard({ name: skill.name, description: skill.description, mark: IMPORTED_SKILL_MARK, facts: factsOf([], [from]), actions: [remove], have: t("views.skills.installed") });
       });
     // Awake first, then those that rest, then the retired ones; each in the order the list gave.
     const rank = (skill) => (skill.retired ? 2 : skill.resting ? 1 : 0);
@@ -855,16 +859,16 @@ export function mount(root) {
         }),
       );
     const parts = [
-      section("proposals", "Waiting for your yes", waiting),
-      section("own", "Yours", ownCards),
-      section("imported", "Imported", importedCards),
-      section("learned", "Learned", learnedCards),
+      section("proposals", t("views.skills.waitingForYourYes"), waiting),
+      section("own", t("views.skills.yours"), ownCards),
+      section("imported", t("views.skills.imported"), importedCards),
+      section("learned", t("views.skills.learned"), learnedCards),
     ];
     if (parts.every((part) => part === null)) {
       parts.push(
         words === ""
-          ? emptyPanel("sparkles", "No skills of yours yet", "After a task that went well, Dot writes how it did it as a skill for the next one of its kind; Save from a chat writes one at your word.")
-          : emptyPanel("search", "No skill matches the search", ""),
+          ? emptyPanel("sparkles", t("views.skills.noSkillsOfYoursYet"), t("views.skills.afterATaskThatWent"))
+          : emptyPanel("search", t("views.skills.noSkillMatchesTheSearch"), ""),
       );
     }
     return [...parts, ...leftOutPart("personal"), ...foundPart()];
@@ -883,22 +887,22 @@ export function mount(root) {
     const parts = [
       section(
         "builtin",
-        "Comes with Dot",
-        builtin.map((skill) => skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([], ["Comes with Dot"]), actions: [], have: "Installed" })),
+        t("views.skills.comesWithDot"),
+        builtin.map((skill) => skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([], [t("views.skills.comesWithDot")]), actions: [], have: t("views.skills.installed") })),
       ),
       section(
         "plugins",
-        "From plugins",
+        t("views.skills.fromPlugins"),
         fromPlugins.map((skill) =>
-          skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([el("span", { class: "chip" }, skill.source.slice(PLUGIN_SOURCE.length))], []), actions: [], have: "Installed" }),
+          skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([el("span", { class: "chip" }, skill.source.slice(PLUGIN_SOURCE.length))], []), actions: [], have: t("views.skills.installed") }),
         ),
       ),
     ];
     if (parts.every((part) => part === null)) {
       parts.push(
         words === ""
-          ? emptyPanel("sparkles", "Neither Dot nor a plugin brings a skill", "Dot's built-in skills are switched off in its settings file, and no plugin has one.")
-          : emptyPanel("search", "No skill matches the search", ""),
+          ? emptyPanel("sparkles", t("views.skills.neitherDotNorAPlugin"), t("views.skills.dotSBuiltInSkills"))
+          : emptyPanel("search", t("views.skills.noSkillMatchesTheSearch"), ""),
       );
     }
     return [...parts, ...leftOutPart("system")];
@@ -913,8 +917,8 @@ export function mount(root) {
     const copies = imported();
     const personalCount = palette.skills.filter((skill) => OWN_SOURCES.has(skill.source) && !copies.has(skill.name)).length + copies.size + items.length;
     const systemCount = palette.skills.filter((skill) => skill.source === BUILTIN_SOURCE || skill.source.startsWith(PLUGIN_SOURCE)).length;
-    personalButton.textContent = `Personal ${personalCount}`;
-    systemButton.textContent = `System ${systemCount}`;
+    personalButton.textContent = t("views.skills.personalPersonalcount", { personalCount });
+    systemButton.textContent = t("views.skills.systemSystemcount", { systemCount });
     const parts = shown === "personal" ? personal() : system();
     holder.replaceChildren(...parts.filter((part) => part !== null));
   }
@@ -950,7 +954,7 @@ export function mount(root) {
     if (saved === null) {
       return;
     }
-    toast("ok", saved.updated ? `Updated the skill ${saved.name}.` : `Saved the skill ${saved.name}.`);
+    toast("ok", saved.updated ? t("views.skills.updatedTheSkillName", { name: saved.name }) : t("views.skills.savedTheSkillName", { name: saved.name }));
     const page = await api.get("/skills/learned");
     changed(page.items);
   }

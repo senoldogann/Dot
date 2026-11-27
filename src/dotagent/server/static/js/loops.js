@@ -26,9 +26,9 @@ const FOLD_KEY = "dot.fold.chat-loops";
 // that is not a rhythm is said how to write it (LOOP_HOW).
 const LOOP_PATTERN = /^\/loop\s+(\d+\s*[mh])\s+([\s\S]+)$/i;
 export const LOOP_WORD = /^\/loop(?:\s|$)/i;
-export const LOOP_HOW = "Write /loop, how often and the message: /loop 30m check the build";
+export const LOOP_HOW = t("loops.writeLoopHowOftenAnd");
 /** "/loop" in the slash menu (composer.js `commands`) of the box of a run, and of a new chat's (item 400). */
-export const LOOP_COMMAND = { label: "/loop", hint: "Ask again every so often until it is done: /loop 30m <message>", insert: "/loop " };
+export const LOOP_COMMAND = { label: "/loop", hint: t("loops.askAgainEverySoOften"), insert: "/loop " };
 
 /** The rhythm (`every`, as the daemon reads it) and the message of `text` written as "/loop 30m <message>", or null. */
 export function loopOf(text) {

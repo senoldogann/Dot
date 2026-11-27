@@ -1203,6 +1203,18 @@ a.stage-name-link {
   white-space: nowrap;
 }
 
+/* A row whose run waits on its helpers (item 2010) says so in its last line, shimmering as the line of the work does;
+   one that rests while something works for it in the background says it quietly. */
+.side-chat-words.side-chat-live {
+  background: linear-gradient(90deg, var(--muted) 30%, var(--text) 50%, var(--muted) 70%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer var(--motion-shimmer) linear infinite;
+  animation-play-state: var(--endless);
+}
+
 /* A row that waits for you (item 836) says so in its last line, in the warning's ink. */
 .side-chat-last.side-chat-waits {
   color: var(--warn);

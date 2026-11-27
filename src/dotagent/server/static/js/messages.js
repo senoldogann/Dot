@@ -1,16 +1,18 @@
 // The messages of a conversation that more than one view draws: what the user wrote, and how a run ended with Dot's answer.
 
-import { dateTimeFull, duration, el, messageTime } from "./dom.js";
+import { dateTimeFull, duration, el, messageTime, setText } from "./dom.js";
 import { actorFace } from "./actors.js";
+import { api } from "./api.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { copyButton } from "./copybutton.js";
-import { serviceFailure } from "./errors.js";
+import { isCutOffResult, isStoppedResult, runFailure } from "./errors.js";
 import { faceStateAtEnd } from "./face.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { sentPicks } from "./picks.js";
 import { prose } from "./prose.js";
 import { quoteButton } from "./quotebutton.js";
+import { routineTitle, shortTitle } from "./routinewords.js";
 import { readAloudButton } from "./readaloud.js";
 import { loopRhythm, onceAt } from "./rhythm.js";
 
@@ -52,11 +54,11 @@ function outcomeAlert(status) {
   return null;
 }
 
-/** The words of a run its model service stopped (`serviceFailure`): what stopped, that what was done stays, what the
+/** The words of a run its model service stopped or the harness ended (`runFailure`): what stopped, that what was done stays, what the
  * owner can do, and the service's own words, a link of theirs among them, under a closed Details. */
 function serviceStopped(failure) {
   return [
-    el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, t("errors.serviceStopped"))),
+    el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, failure.title)),
     el("div", { class: "prose answer-service" }, el("p", null, failure.next), el("p", { class: "muted" }, t("errors.serviceKept"))),
     el("details", { class: "error-details answer-service-details" }, el("summary", null, t("errors.details")), prose(failure.details)),
   ];
@@ -121,6 +123,68 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
       editFromHere === null ? null : editFromHereButton(editFromHere),
     ),
   );
+}
+
+/**
+ * A message just sent that Dot has not taken yet (item 1999, DotNext's items 1919 and 1927): the bubble at once, as it
+ * will stand, a quiet "Pending" at its right edge, and under it the agent's typing dots and "Starting…", so the chat
+ * moves the moment the send is pressed rather than when the run's first event comes. The page Dot's answer opens draws
+ * the message itself; a send that fails takes this away and gives the words back to the box.
+ */
+export function pendingMessage(text) {
+  return el(
+    "div",
+    { class: "pending-send", dataset: { pending: "" } },
+    el(
+      "div",
+      { class: "user-message fresh" },
+      el("div", { class: "bubble user" }, prose(text)),
+      el("div", { class: "pending-note" }, t("messages.pending")),
+    ),
+    el(
+      "div",
+      { class: "starting-line", role: "status" },
+      el("span", { class: "typing-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
+      el("span", { class: "work-status-words" }, t("messages.starting")),
+    ),
+  );
+}
+
+// The automations of each chat, read once per page for the titles of its routines' messages.
+const chatSchedules = new Map();
+
+/** The message a routine sent into the chat `threadId` (owner 2026-11-27, after T3's "Automation" row): one compact row
+ * on your side, the calendar-clock mark, "Routine", the routine's title cut at its end and a chevron that unfolds the
+ * whole message. Never your bubble: you did not write it. The title is the words' first sentence until the chat's
+ * schedules are read, then the schedule's name. */
+export function routineMessage({ goal, threadId }) {
+  const title = el("span", { class: "routine-title" }, shortTitle(goal));
+  const node = el(
+    "details",
+    { class: "routine" },
+    el(
+      "summary",
+      { class: "routine-head" },
+      el("span", { class: "routine-mark", "aria-hidden": "true" }, icon("calendarClock")),
+      el("span", { class: "routine-label" }, t("messages.routine")),
+      title,
+      el("span", { class: "chev" }, icon("chevron")),
+    ),
+    el("div", { class: "routine-prompt" }, prose(goal)),
+  );
+  if (!chatSchedules.has(threadId)) {
+    chatSchedules.set(threadId, api.get(`/threads/${encodeURIComponent(threadId)}/automations`));
+  }
+  chatSchedules
+    .get(threadId)
+    .then((schedules) => setText(title, routineTitle(goal, schedules)))
+    .catch((error) => {
+      // The title stays the words' first sentence, the rule's own last choice; the failed read is logged, and the run
+      // page's Automations panel says it where there is one.
+      chatSchedules.delete(threadId);
+      console.error("the chat's schedules could not be read for a routine's title", { threadId, error });
+    });
+  return el("div", { class: "routine-message" }, node);
 }
 
 /** When a schedule a run made runs, in words: its rhythm from the cron ("on Mondays at 09:00"), a one-time one's time
@@ -231,18 +295,26 @@ export function showMessagePicks(message, picks) {
  * can speak), the button of the reactions with the chips of those that stand (item 586; where `reactions` is given and
  * `runId` is the run the answer is of), when it ended, the outcome and how long the run took. `startedAt` is null when
  * the start of the run is not known; `href` leads to the run itself (null when the reader is there). `readNow` says the
- * answer has just come in, to be read aloud as it appears when Settings › General says so.
+ * answer has just come in, to be read aloud as it appears when Settings › General says so. `stoppedWords` are the words a
+ * run the owner stopped had streamed and not finished: they stay as its answer, with a note that it was stopped.
+ * `errored` says the run's end carried an error of the daemon's, whose words then stand under Details (true), or did not (false);
+ * null, the default, when the page does not know (a run read again), and the shape of the words tells (`runFailure`).
  */
-export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null }) {
+export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null, stoppedWords = "", errored = null }) {
   const outcome = OUTCOMES[status] ?? null;
-  const written = text.trim() !== "";
+  // A run the owner stopped has the harness's own words for a result ("The run was stopped."): they say nothing the note
+  // under the words it had streamed does not, so those words stay and the note says it (item 23 of the 2026-11-26 review).
+  const stopped = status === "cancelled";
+  const bare = stopped && isStoppedResult(text);
+  const words = bare ? stoppedWords : text;
+  const written = words.trim() !== "";
   // A run its model service stopped says so in words of its own, not the service's line (item 1136 left its sentence,
   // a billing link and all, as the answer); the line itself stands under Details.
-  const failure = status === "failed" ? serviceFailure(text) : null;
+  const failure = status === "failed" ? runFailure(text, errored) : null;
   // A run that ended well needs no word for it, as a message that arrived needs none (item 832); a failure and a stop
   // say so.
   const label = outcome === null ? status : t(outcome.label);
-  const facts = [stamp(endedAt, dateTimeFull(endedAt)), status === "done" ? null : el("span", null, label)];
+  const facts = [stamp(endedAt, dateTimeFull(endedAt)), status === "done" || (stopped && written) ? null : el("span", null, label)];
   if (startedAt !== null) {
     facts.push(el("span", { class: "answer-took" }, duration(Math.max(0, endedAt - startedAt))));
   }
@@ -251,14 +323,18 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
     { class: `answer answer-${status}`, "aria-label": t("outcome.answer") },
     el("span", { class: "turn-face" }, actorFace(actorId, faceStateAtEnd(status === "waiting" ? "blocked" : status), null)),
     ...(failure === null
-      ? [outcomeAlert(status), written ? prose(text) : el("div", { class: "muted" }, outcome === null ? "" : t(outcome.empty))]
+      ? [
+          outcomeAlert(status),
+          written ? prose(words) : el("div", { class: "muted" }, bare && isCutOffResult(text) ? t("outcome.cutOffEmpty") : outcome === null ? "" : t(outcome.empty)),
+          stopped && written ? el("div", { class: "answer-stopped-note" }, t("outcome.stoppedNote")) : null,
+        ]
       : serviceStopped(failure)),
     el(
       "div",
       { class: "answer-foot" },
-      written ? copyButton(text, t("outcome.copy")) : null,
-      written ? quoteButton(text) : null,
-      written ? readAloudButton(text, readNow && status === "done") : null,
+      written ? copyButton(words, t("outcome.copy")) : null,
+      written ? quoteButton(words) : null,
+      written ? readAloudButton(words, readNow && status === "done") : null,
       written && reactions !== null && runId !== null ? reactions.controls(runId, "answer") : null,
       el("span", { class: "answer-facts meta-facts" }, ...facts),
       href === null ? null : el("a", { class: "small", href }, t("outcome.openTask")),

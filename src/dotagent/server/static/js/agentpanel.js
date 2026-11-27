@@ -6,12 +6,13 @@
 
 import { actorFace } from "./actors.js";
 import { api, query } from "./api.js";
-import { clip, el, modelName, plural, setText } from "./dom.js";
+import { clip, el, modelName, setText } from "./dom.js";
 import { dotName } from "./face.js";
 import { icon } from "./icons.js";
 import { APPROVAL_OPTIONS } from "./runmodes.js";
 import { getSnapshot } from "./state.js";
 import { attempt } from "./ui.js";
+import { t, tCount } from "./i18n.js";
 
 // How much of an agent's instructions the panel shows; the editor holds them whole.
 const INSTRUCTION_CHARS = 280;
@@ -26,11 +27,11 @@ function modelWords(chosen) {
   if (chosen !== "") {
     return modelName(chosen);
   }
-  return status === null ? "Default" : `Default (${modelName(status.models.main)})`;
+  return status === null ? t("agentpanel.default") : t("agentpanel.defaultModelname", { modelName: modelName(status.models.main) });
 }
 
 function approvalWords(approvals) {
-  return approvals === null ? "Default" : (APPROVAL_OPTIONS.find((option) => option.id === approvals)?.label ?? approvals);
+  return approvals === null ? t("agentpanel.default") : (APPROVAL_OPTIONS.find((option) => option.id === approvals)?.label ?? approvals);
 }
 
 /** The head of the tab: the agent's face, its name and its role. */
@@ -66,14 +67,14 @@ export function agentPanel({ agent }) {
   /** Dot: its settings, each where it is set. */
   function paintDot(notes) {
     element.replaceChildren(
-      who("dot", dotName(), "Your assistant", null),
+      who("dot", dotName(), t("agentpanel.yourAssistant"), null),
       el(
         "dl",
         { class: "kv kv-rows agent-panel-facts" },
-        fact("Model", settingsLink("models", modelWords(""))),
-        fact("Name and look", settingsLink("general", "General")),
-        fact("Rules", settingsLink("rules", "Rules")),
-        fact("Memory", settingsLink("memory", notes === null ? "Notes" : plural(notes, "note", "notes"))),
+        fact(t("agentpanel.model"), settingsLink("models", modelWords(""))),
+        fact(t("agentpanel.nameAndLook"), settingsLink("general", t("agentpanel.general"))),
+        fact(t("agentpanel.rules"), settingsLink("rules", t("agentpanel.rules"))),
+        fact(t("agentpanel.memory"), settingsLink("memory", notes === null ? t("agentpanel.notes") : tCount(notes, "agentpanel.countNote", "agentpanel.countNotes"))),
       ),
     );
   }
@@ -81,26 +82,26 @@ export function agentPanel({ agent }) {
   /** One of your agents: its settings, what it learned, Edit and its page. */
   function paintAgent(learned) {
     const instructions = record.instructions.trim();
-    const learnedWords = learned === null ? "" : [learned.lessons.length > 0 ? plural(learned.lessons.length, "lesson", "lessons") : null, learned.skills.length > 0 ? plural(learned.skills.length, "skill", "skills") : null].filter((part) => part !== null).join(", ");
-    const edit = el("button", { class: "btn sm", type: "button", onclick: () => attempt(openForm) }, icon("pencil"), "Edit");
+    const learnedWords = learned === null ? "" : [learned.lessons.length > 0 ? tCount(learned.lessons.length, "agentpanel.countLesson", "agentpanel.countLessons") : null, learned.skills.length > 0 ? tCount(learned.skills.length, "agentpanel.countSkill", "agentpanel.countSkills") : null].filter((part) => part !== null).join(", ");
+    const edit = el("button", { class: "btn sm", type: "button", onclick: () => attempt(openForm) }, icon("pencil"), t("agentpanel.edit"));
     element.replaceChildren(
       who(record.id, record.name, record.role, record.look),
       el(
         "dl",
         { class: "kv kv-rows agent-panel-facts" },
-        fact("Model", modelWords(record.model)),
-        fact("Approvals", approvalWords(record.approvals)),
-        fact("Actions", record.tools.length === 0 ? "All" : plural(record.tools.length, "action", "actions")),
-        record.paused_at === null ? null : fact("Schedules", "Paused"),
-        learnedWords === "" ? null : fact("Learned", learnedWords),
+        fact(t("agentpanel.model"), modelWords(record.model)),
+        fact(t("agentpanel.approvals"), approvalWords(record.approvals)),
+        fact(t("agentpanel.actions"), record.tools.length === 0 ? t("agentpanel.all") : tCount(record.tools.length, "agentpanel.countAction", "agentpanel.countActions")),
+        record.paused_at === null ? null : fact(t("agentpanel.schedules"), t("agentpanel.paused")),
+        learnedWords === "" ? null : fact(t("agentpanel.learned"), learnedWords),
       ),
       el(
         "section",
-        { class: "agent-panel-instructions", "aria-label": "Instructions" },
-        el("h4", { class: "agent-panel-label" }, "Instructions"),
-        el("p", { class: instructions === "" ? "muted" : null }, instructions === "" ? "None: it works as Dot does." : clip(instructions, INSTRUCTION_CHARS)),
+        { class: "agent-panel-instructions", "aria-label": t("agentpanel.instructions") },
+        el("h4", { class: "agent-panel-label" }, t("agentpanel.instructions")),
+        el("p", { class: instructions === "" ? "muted" : null }, instructions === "" ? t("agentpanel.noneItWorksAsDot") : clip(instructions, INSTRUCTION_CHARS)),
       ),
-      el("div", { class: "cluster agent-panel-actions" }, edit, el("a", { class: "btn ghost sm", href: `#/agents/${record.id}` }, "Open its page")),
+      el("div", { class: "cluster agent-panel-actions" }, edit, el("a", { class: "btn ghost sm", href: `#/agents/${record.id}` }, t("agentpanel.openItsPage"))),
     );
   }
 

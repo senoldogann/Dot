@@ -8,6 +8,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 from dotagent.agent.account import RunAccount
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
 from dotagent.agent.authorization import StepDecision
+from dotagent.agent.lanes import RoutedMessage
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import Disliked, RunLessons
 from dotagent.agent.proof import ProofSpec
@@ -628,6 +629,15 @@ class QueueView(FrozenModel):
     # chat; none when the message was queued.
     beside_run_id: str | None = None
     beside_thread_id: str | None = None
+    # Where a message sent to a chat with several tasks went (item 2012); none for any other message.
+    routed: RoutedMessage | None = None
+
+
+class MoveRequest(FrozenModel):
+    """Where **Move** sends a message or a run the router sent to the wrong task (item 2012): another task of the same
+    chat, by its thread, or a new task (``None``)."""
+
+    to_thread_id: str | None
 
 
 class ChatStopped(FrozenModel):

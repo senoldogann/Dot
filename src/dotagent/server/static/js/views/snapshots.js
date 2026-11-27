@@ -7,12 +7,13 @@ import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { choiceRowSetting, errorPanel, loadingPanel, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
 import { attempt, toast } from "../ui.js";
+import { t } from "../i18n.js";
 
 const SOUNDS = [
-  { id: "click", label: "Click", hint: "A short click" },
-  { id: "pop", label: "Pop", hint: "A soft pop" },
-  { id: "glass", label: "Glass", hint: "A glass note" },
-  { id: "off", label: "Off", hint: "No sound" },
+  { id: "click", label: t("views.snapshots.click"), hint: t("views.snapshots.aShortClick") },
+  { id: "pop", label: t("views.snapshots.pop"), hint: t("views.snapshots.aSoftPop") },
+  { id: "glass", label: t("views.snapshots.glass"), hint: t("views.snapshots.aGlassNote") },
+  { id: "off", label: t("views.snapshots.off"), hint: t("views.snapshots.noSound") },
 ];
 
 export function mount(root, ctx) {
@@ -28,32 +29,32 @@ export function mount(root, ctx) {
    * watch starts by itself once the permission is granted. */
   function listening() {
     if (!view.enabled) {
-      return setRow({ title: "The Command key", lead: "Off: the Command key is not watched." });
+      return setRow({ title: t("views.snapshots.theCommandKey"), lead: t("views.snapshots.offTheCommandKeyIs") });
     }
     if (view.problem !== null) {
       return setRow({
-        title: "The Command key",
+        title: t("views.snapshots.theCommandKey"),
         lead: el("span", { class: "snapshots-problem" }, icon("alert"), el("span", null, ` ${view.problem}`)),
         control: el(
           "button",
           { class: "btn sm", type: "button", onclick: () => attempt(() => api.post("/desktop/permissions/open", { pane: "accessibility" })) },
           icon("external"),
-          "Open System Settings",
+          t("views.snapshots.openSystemSettings"),
         ),
       });
     }
-    return setRow({ title: "The Command key", lead: view.listening ? `Listening for ${view.shortcut}.` : "Starting the watch of the key…" });
+    return setRow({ title: t("views.snapshots.theCommandKey"), lead: view.listening ? t("views.snapshots.listeningForShortcut", { shortcut: view.shortcut }) : t("views.snapshots.startingTheWatchOfThe") });
   }
 
   function paint() {
     const enabled = switchRowSetting({
-      label: "Snapshots",
-      hint: "Capture a window and attach it to your current draft.",
+      label: t("views.snapshots.snapshots"),
+      hint: t("views.snapshots.captureAWindowAndAttach"),
       read: () => view.enabled,
       // The words follow the change once it is made (item 559): a switch that failed says so alone.
       write: async (on) => {
         await change("enabled", on);
-        toast("ok", view.enabled ? "Snapshots are on." : "Snapshots are off.");
+        toast("ok", view.enabled ? t("views.snapshots.snapshotsAreOn") : t("views.snapshots.snapshotsAreOff"));
       },
       onToggled: () => {
         if (!disposed) {
@@ -63,8 +64,8 @@ export function mount(root, ctx) {
     });
     enabled.paint();
     const appText = switchRowSetting({
-      label: "Include app text",
-      hint: "Include the text and buttons of the window when the app makes them available: a text file beside the picture.",
+      label: t("views.snapshots.includeAppText"),
+      hint: t("views.snapshots.includeTheTextAndButtons"),
       read: () => view.app_text,
       write: (on) => change("app_text", on),
       onToggled: () => {
@@ -75,13 +76,13 @@ export function mount(root, ctx) {
     });
     appText.paint();
     const shortcut = setRow({
-      title: "Capture shortcut",
-      lead: "Capture the window you're using without switching apps: press the Command keys on both sides of the space bar together. Another key in between, as in ⌘C ⌘V, is not a capture. Dot's own window and a password manager's are never captured.",
+      title: t("views.snapshots.captureShortcut"),
+      lead: t("views.snapshots.captureTheWindowYouRe"),
       control: el("kbd", { class: "snapshots-keys" }, view.shortcut),
     });
     const doubleTap = switchRowSetting({
-      label: "Double tap of ⌘ too",
-      hint: "Also capture when one Command key is tapped twice. Off, a Command key pressed twice for shortcuts captures nothing.",
+      label: t("views.snapshots.doubleTapOfToo"),
+      hint: t("views.snapshots.alsoCaptureWhenOneCommand"),
       read: () => view.double_tap,
       write: (on) => change("double_tap", on),
       onToggled: () => {
@@ -92,15 +93,15 @@ export function mount(root, ctx) {
     });
     doubleTap.paint();
     const sound = choiceRowSetting({
-      label: "Capture sound",
-      hint: "Choose the sound played when capture starts.",
+      label: t("views.snapshots.captureSound"),
+      hint: t("views.snapshots.chooseTheSoundPlayedWhen"),
       options: SOUNDS,
       selected: view.sound,
       onSelect: (id) => attempt(() => change("sound", id)),
     });
     const animations = switchRowSetting({
-      label: "Capture animations",
-      hint: "Animate captured windows into your draft.",
+      label: t("views.snapshots.captureAnimations"),
+      hint: t("views.snapshots.animateCapturedWindowsIntoYour"),
       read: () => view.animations,
       write: (on) => change("animations", on),
       onToggled: () => {
@@ -111,8 +112,8 @@ export function mount(root, ctx) {
     });
     animations.paint();
     const flash = switchRowSetting({
-      label: "Capture flash",
-      hint: "A soft flash over the window as it is captured.",
+      label: t("views.snapshots.captureFlash"),
+      hint: t("views.snapshots.aSoftFlashOverThe"),
       read: () => view.flash,
       write: (on) => change("flash", on),
       onToggled: () => {
@@ -123,8 +124,8 @@ export function mount(root, ctx) {
     });
     flash.paint();
     const openDot = switchRowSetting({
-      label: "Open Dot after a capture",
-      hint: "Bring Dot's window, or its tab in your browser, to the front with the capture in the box. macOS asks once whether Dot may choose the browser's tab.",
+      label: t("views.snapshots.openDotAfterACapture"),
+      hint: t("views.snapshots.bringDotSWindowOr"),
       read: () => view.open_dot,
       write: (on) => change("open_dot", on),
       onToggled: () => {
@@ -137,9 +138,9 @@ export function mount(root, ctx) {
     holder.replaceChildren(
       el(
         "div",
-        { class: "set-sections", role: "region", "aria-label": "Snapshots" },
-        setSection({ title: "Capture", body: setCard(enabled.element, listening(), appText.element, shortcut, doubleTap.element) }),
-        setSection({ title: "When it captures", body: setCard(sound.element, animations.element, flash.element, openDot.element) }),
+        { class: "set-sections", role: "region", "aria-label": t("views.snapshots.snapshots") },
+        setSection({ title: t("views.snapshots.capture"), body: setCard(enabled.element, listening(), appText.element, shortcut, doubleTap.element) }),
+        setSection({ title: t("views.snapshots.whenItCaptures"), body: setCard(sound.element, animations.element, flash.element, openDot.element) }),
       ),
     );
   }
@@ -158,7 +159,7 @@ export function mount(root, ctx) {
     }
   }
 
-  ctx.head.setLead("Both Command keys pressed together, in any app, capture the window in front into the box of the open chat.");
+  ctx.head.setLead(t("views.snapshots.bothCommandKeysPressedTogether"));
   root.append(holder);
   attempt(load);
   return () => {

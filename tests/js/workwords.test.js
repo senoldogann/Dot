@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { attemptWords, dueWords, isOpen, span, stateOf } from "../../src/dotagent/server/static/js/workwords.js";
+import { attemptWords, dueWords, isOpen, objectiveState, span, stateOf } from "../../src/dotagent/server/static/js/workwords.js";
 
 const NOW = 1_000_000;
 
@@ -42,3 +42,11 @@ test("the tries are counted from the first", () => {
   assert.equal(attemptWords(1), "1 try");
   assert.equal(attemptWords(3), "3 tries");
 });
+
+test("an objective stands as active, done or let go, an unknown one as it is", () => {
+  assert.equal(objectiveState("active").label, "Active");
+  assert.equal(objectiveState("done").label, "Done");
+  assert.equal(objectiveState("dropped").label, "Let go");
+  assert.equal(objectiveState("later").label, "later");
+});
+

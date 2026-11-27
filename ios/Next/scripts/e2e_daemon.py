@@ -44,7 +44,7 @@ plan's ``claude`` command) answers.
 Usage (the three folders are throwaway, ``mktemp -d``)::
 
     DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome \\
-        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed] [--seed-activity] [--seed-work]
+        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed] [--seed-activity] [--seed-work] [--slow-deletes <s>]
 
 It prints ``READY <port> <token>`` once it serves; a pairing code is made with
 ``curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/phone/pairing``.
@@ -445,7 +445,8 @@ def prepare_home(model: str) -> None:
     ensure_layout()
     config.write_text(
         f'{CONFIG_MARK}\n[models]\nmain = "{model}"\n\n[browser]\nheadless = true\n\n'
-        '[policy]\napprovals = "supervised"\n',
+        # No floor of free space: a check of the phone is not refused (507) by how full the Mac it runs on is.
+        '[policy]\napprovals = "supervised"\n\n[store]\nmin_free_gb = 0\n',
         encoding="utf-8",
     )
 
@@ -499,6 +500,14 @@ async def seed_work(runtime: Runtime) -> None:
         ObjectiveWorkflow(next_step="Draft this Friday's note"),
         False,
     )
+    finished = await store.add_objective(
+        "Choose the note's topics well",
+        "Three topics keep the note short.",
+        "Three topics a week, one line each.",
+        ObjectiveWorkflow(next_step=""),
+        False,
+    )
+    await store.update_objective(finished.id, "done", None, None)
     chat: ThreadRecord = await store.create_thread("Weekly note", "ui")
     lead: RunRecord = await store.create_run(
         chat.id,
@@ -533,7 +542,7 @@ async def seed_work(runtime: Runtime) -> None:
         "Pick the note's topics",
         "Choose three topics.",
         "Three topics, one line each.",
-        None,
+        finished.id,
         None,
         lead.id,
         chat.id,
@@ -664,12 +673,21 @@ async def seed_activity(runtime: Runtime) -> None:
 
 class HoldAccepts:
     """Holds for 3 s the phone's sending of a message whose words start with "hold:" (item 1927), so that a test sees
-    it pending under the owner's bubble before the daemon takes it."""
+    it pending under the owner's bubble before the daemon takes it; with ``slow_deletes`` above 0, holds a delete of
+    chats that long (item 1985), as a Mac far away or busy answers."""
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, slow_deletes: float) -> None:
         self.app: ASGIApp = app
+        self.slow_deletes: float = slow_deletes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            scope["type"] == "http"
+            and scope.get("method") == "DELETE"
+            and scope.get("path") == "/api/threads"
+            and self.slow_deletes > 0
+        ):
+            await asyncio.sleep(self.slow_deletes)
         if scope["type"] != "http" or scope.get("method") != "POST":
             await self.app(scope, receive, send)
             return
@@ -694,7 +712,7 @@ class HoldAccepts:
         await self.app(scope, replay, send)
 
 
-async def serve(port: int, seeded: bool, activity: bool, work: bool, scripted: bool) -> None:
+async def serve(port: int, seeded: bool, activity: bool, work: bool, scripted: bool, slow_deletes: float) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     play_page: str = serve_play_page()
@@ -720,7 +738,7 @@ async def serve(port: int, seeded: bool, activity: bool, work: bool, scripted: b
         started_at=time.time(),
         stopping=stopping,
     )
-    server: DotServer = DotServer(serving_config(HoldAccepts(create_app(context))), stopping)
+    server: DotServer = DotServer(serving_config(HoldAccepts(create_app(context), slow_deletes)), stopping)
     serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
     watching: asyncio.Task[None] = asyncio.create_task(watch_revisions(runtime.store, runtime.bus))
     # As the smoke tests wait for it: the server says it started by a flag, not an event.
@@ -733,6 +751,16 @@ async def serve(port: int, seeded: bool, activity: bool, work: bool, scripted: b
         watching.cancel()
         await manager.shutdown()
         await close_runtime(runtime)
+
+
+def slow_deletes_argument(args: list[str]) -> float:
+    """The seconds ``--slow-deletes <s>`` holds a delete of chats, else none."""
+    if "--slow-deletes" not in args:
+        return 0.0
+    at: int = args.index("--slow-deletes")
+    if at + 1 >= len(args):
+        raise SystemExit("--slow-deletes needs a number of seconds")
+    return float(args[at + 1])
 
 
 def model_argument(args: list[str]) -> str:
@@ -755,5 +783,6 @@ if __name__ == "__main__":
             "--seed-activity" in sys.argv[2:],
             "--seed-work" in sys.argv[2:],
             chosen == MODEL,
+            slow_deletes_argument(sys.argv[2:]),
         )
     )

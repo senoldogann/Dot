@@ -25,7 +25,7 @@ final class ChatWordsTests: XCTestCase {
 
     func testFindInChatSearchesTheWordsOfTheChatNotTheToolOutput() {
         let items: [TranscriptItem] = [
-            .owner(id: "u:1", text: "Book the garage", delivery: nil),
+            .owner(id: "u:1", text: "Book the garage", delivery: nil, files: []),
             .tool(ToolEntry(id: "t:1", tool: "shell", kind: .command, target: "garage", args: "", output: "garage", state: .done, images: [], startedAt: 0, endedAt: 1)),
             .answer(id: "a:1", text: "The GARAGE is booked", writing: false, endedAt: 2),
         ]
@@ -133,17 +133,16 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(engineLine(helper("a", "done", 0, 1), models: options), "Claude Code · opus · " + effortTitle("high"), "the model's id when the list does not hold it")
     }
 
-    /// Item 1931: the pill's link line comes from the transport alone: a healthy stream never says Reconnecting.
-    func testThePillsLinkLineIsTheTransportsRealState() {
-        XCTAssertEqual(linkLine(transport: .offline, freshness: .cached, mac: "MacBook Air"), .offline)
-        XCTAssertEqual(linkLine(transport: .reconnecting(attempt: 2), freshness: .cached, mac: "MacBook Air"), .reconnecting(mac: "MacBook Air"))
-        XCTAssertEqual(linkLine(transport: .up, freshness: .syncing, mac: "MacBook Air"), .syncing)
-        XCTAssertNil(linkLine(transport: .up, freshness: .live, mac: "MacBook Air"), "a live chat on a healthy stream says nothing")
-        XCTAssertNil(linkLine(transport: .keyRefused, freshness: .cached, mac: "MacBook Air"), "a refused key is the subtitle's")
-        XCTAssertEqual(linkLine(transport: .up, freshness: nil, mac: "MacBook Air"), .syncing, "a chat not loaded yet is brought up to date")
-        XCTAssertNil(linkLine(transport: .up, freshness: .deleted, mac: "MacBook Air"), "a deleted chat says so itself")
-        XCTAssertEqual(linkLine(transport: .connecting, freshness: .cached, mac: "MacBook Air"), .syncing, "the first connection brings it up to date")
-        XCTAssertTrue(LinkLine.reconnecting(mac: "MacBook Air").words.contains("MacBook Air"), "the paired Mac by its name, in the phone's language")
+    /// Item 1931 and the owner's report of 2026-11-27: only a lasting problem is told, never a reconnection that mends or
+    /// a chat being brought up to date.
+    func testTheCapsulesLinkLineIsALastingProblemOnly() {
+        XCTAssertEqual(linkLine(transport: .offline, mac: "MacBook Air"), .offline)
+        XCTAssertEqual(linkLine(transport: .reconnecting(attempt: 2), mac: "MacBook Air"), .unreachable(mac: "MacBook Air"))
+        XCTAssertNil(linkLine(transport: .up, mac: "MacBook Air"), "a healthy stream says nothing, whatever the chat's sync")
+        XCTAssertNil(linkLine(transport: .connecting, mac: "MacBook Air"), "the first connection says nothing")
+        XCTAssertNil(linkLine(transport: .keyRefused, mac: "MacBook Air"), "a refused key is the chat's notice")
+        XCTAssertTrue(LinkLine.unreachable(mac: "MacBook Air").words.contains("MacBook Air"), "the paired Mac by its name, in the phone's language")
+        XCTAssertEqual(linkLineDelay, .seconds(5), "a problem shows once it lasted a few seconds")
     }
 
     /// Item 1996: the live picture's caption says a call with the work log's mark and words.

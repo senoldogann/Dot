@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The empty state of a list or screen: the system's own view, in the palette's ink.
+/// The empty state of a list or screen: a still glyph, the title and one line, in the palette's ink.
 struct EmptyState: View {
     let title: String
     let systemImage: String
@@ -8,16 +8,42 @@ struct EmptyState: View {
     let actionTitle: String?
     let action: () -> Void
 
+    @ScaledMetric(relativeTo: .title3) private var glyph: CGFloat = 28
+
+    /// The app's own type roles, not the system's larger empty-state styles (owner 2026-11-27): the words follow Settings ›
+    /// Appearance's text size and Dynamic Type as every other line does; the glyph is still, sized with the title.
     var body: some View {
-        ContentUnavailableView {
-            Label(title, systemImage: systemImage).foregroundStyle(Tone.text)
-        } description: {
-            Text(detail).foregroundStyle(Tone.secondary)
-        } actions: {
+        VStack(spacing: Space.s) {
+            Image(systemName: systemImage)
+                .font(.system(size: glyph, weight: .regular))
+                .foregroundStyle(Tone.tertiary)
+                .accessibilityHidden(true)
+                .padding(.bottom, Space.xxs)
+            Text(title).textRole(.headline).foregroundStyle(Tone.text)
+            Text(detail).textRole(.footnote).foregroundStyle(Tone.secondary)
             if let actionTitle {
-                Button(actionTitle, action: action).buttonStyle(PrimaryButtonStyle())
+                Button(actionTitle, action: action).buttonStyle(PrimaryButtonStyle()).padding(.top, Space.xs)
             }
         }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, Space.xl)
+        .padding(.vertical, Space.xxl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// A search that found nothing, in the empty state's look (the system's `ContentUnavailableView.search` has its own
+/// larger type, which Settings › Appearance's text size does not reach).
+struct SearchEmptyState: View {
+    let query: String
+
+    var body: some View {
+        EmptyState(
+            title: String(localized: "No results for “\(query)”", comment: "Search: nothing matches the words; the argument is what was searched"),
+            systemImage: "magnifyingglass",
+            detail: String(localized: "Check the spelling or try a new search.", comment: "Search: what to do when nothing matches"),
+            actionTitle: nil, action: {})
     }
 }
 

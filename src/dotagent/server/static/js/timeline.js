@@ -20,6 +20,7 @@ import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, besideLine, chatNoteLine, needsAside, outcomeOf, scheduleLine, userMessage } from "./messages.js";
+import { chatCardRenderer, POST_DRAFT_SETTLED } from "./chatcards.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { readsPages } from "./sourcelist.js";
@@ -413,7 +414,8 @@ function buildFlock() {
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order,
  * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it,
  * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row),
- * `helperStatuses()` the statuses of the delegated runs, `helperReleased()` those of them the run stopped waiting for, and `draft(record)` paints a draft's card as the draft now
+ * `helperStatuses()` the statuses of the delegated runs, `helperReleased()` those of them the run stopped waiting for,
+ * `rootOpenCalls()` the run's own calls that have no result yet (`{ tool, args }`), and `draft(record)` paints a draft's card as the draft now
  * stands (item 314: one answered after the run's stream ended). `revealing()` says whether an answer that arrives now
  * ends a run under the reader's eyes, to be read aloud when Settings › General says so, rather than one read again; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
@@ -465,6 +467,8 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
   const liveChildren = new Set();
   // The delegated runs the run stopped waiting for (item 1351): they work on in the background.
   const released = new Set();
+  // The calls of the run's own that have no result yet, by call id (`rootOpenCalls`): whether it only waits on helpers.
+  const rootOpen = new Map();
   let browserSeen = false;
   const totals = { calls: 0, failed: 0 };
   // The cards of the drafts the runs wrote, by draft id, in the order they came (item 314): a decision repaints its card
@@ -1111,6 +1115,7 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
     return entry;
   }
 
+  const richCards = chatCardRenderer();
   const handlers = {
     run_started(scope, record) {
       if (scope.runId === rootRunId) {
@@ -1123,11 +1128,26 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
 
     run_finished(scope, record) {
       const { status, result } = record.data;
+      if (scope.runId === rootRunId) {
+        rootOpen.clear();
+      }
       // What the run said, as it ended, it needs from the user (older runs have none).
       const needs = typeof record.data.needs === "string" ? record.data.needs.trim() : "";
       const isRoot = scope.runId === rootRunId;
       settleGroups(scope, record.ts);
+      // The words a stopped run had streamed and not finished stay as its answer, with a note that it was stopped
+      // (item 23 of the 2026-11-26 review): the bubble that held them goes for the answer, which says them again.
+      const stoppedWords = isRoot && status === "cancelled" && scope.live !== null ? scope.live.text.trim() : "";
       closeLive(scope);
+      if (stoppedWords !== "") {
+        scope.replies = scope.replies.filter((reply) => {
+          if (reply.text.trim() !== stoppedWords) {
+            return true;
+          }
+          reply.node.remove();
+          return false;
+        });
+      }
       // A reply that streamed the same words was read as they came: the bubble that held them goes for the answer.
       dropRepeatedReply(scope, result, record.data.restated ?? []);
       const answer = answerMessage({
@@ -1144,6 +1164,8 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         // The reactions on the page's own run (item 586); a delegated run's answer is read in the row that holds it.
         reactions: isRoot ? reactions : null,
         runId: scope.runId,
+        stoppedWords,
+        errored: typeof record.data.error === "object" && record.data.error !== null,
       });
       showSources(answer, scope.reads);
       place(scope, answer, record.ts);
@@ -1293,6 +1315,9 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       if (readsPages(data.tool)) {
         scope.reads.push(record);
       }
+      if (scope.runId === rootRunId) {
+        rootOpen.set(data.call_id, { tool: data.tool, args: data.args ?? {} });
+      }
       if (QUIET_TOOLS.has(data.tool)) {
         scope.finishing.set(data.call_id, data.args);
         return;
@@ -1329,6 +1354,9 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       const data = record.data;
       if (readsPages(data.tool)) {
         scope.reads.push(record);
+      }
+      if (scope.runId === rootRunId) {
+        rootOpen.delete(data.call_id);
       }
       const finishArgs = scope.finishing.get(data.call_id);
       if (finishArgs !== undefined) {
@@ -1562,6 +1590,17 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       place(scope, sentPicks(record.data), record.ts);
     },
 
+    [POST_DRAFT_SETTLED](_scope, record) {
+      richCards.settle(record);
+    },
+
+    cards_shown(scope, record) {
+      const node = richCards.show(record);
+      if (node !== null) {
+        place(scope, node, record.ts);
+      }
+    },
+
     // A page the run showed (`show_page`, item 193), in its frame.
     page_shown(scope, record) {
       place(scope, pageCard(record.data.page_id, record.data.title), record.ts);
@@ -1608,7 +1647,7 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       const data = record.data;
       // A program Dot ended itself after it failed has no exit of its own: what it said, else that Dot ended it.
       const noExit = data.said || t("timeline.programEndedByDot");
-      const how = data.signal ? `${data.signal} (${data.returncode})` : data.returncode === null ? noExit : `code ${data.returncode}`;
+      const how = data.signal ? `${data.signal} (${data.returncode})` : data.returncode === null ? noExit : t("timeline.codeReturncode", { returncode: data.returncode });
       const details = t("timeline.programCut", { how, steps: data.steps, silent: data.silent_s });
       const words = data.fresh_session ? "timeline.programContinuedFresh" : "timeline.programContinued";
       note(scope, record.ts, "bolt", t(words, { at: data.cut_at }), "warn", details);
@@ -2054,6 +2093,7 @@ const helperNow = () =>
     helperStatuses,
     helperReleased,
     helperNow,
+    rootOpenCalls: () => [...rootOpen.values()],
     draft: (record) => drafts.get(record.id)?.update(record),
   };
 }

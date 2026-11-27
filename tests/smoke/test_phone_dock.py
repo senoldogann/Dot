@@ -110,10 +110,10 @@ async def test_a_phones_dock_is_one_capsule_of_segments_over_the_composer_and_ea
                 await expect(bar).to_be_visible()
                 # The segments the run has something to say of, named for a screen reader whatever the room.
                 await expect(_segment(page, "status")).to_contain_text(re.compile(r"\d"))
-                await expect(_segment(page, "status")).to_have_attribute("aria-label", re.compile(r"^Working · \d"))
+                await expect(_segment(page, "status")).to_have_attribute("aria-label", "Waiting on 2 helpers")
                 await expect(_segment(page, "stop")).to_have_attribute("aria-label", "Stop the task")
                 await expect(_segment(page, "helpers")).to_have_attribute(
-                    "aria-label", "2 helpers. Waiting on 2 subagents"
+                    "aria-label", "2 helpers. Waiting on 2 helpers"
                 )
                 await expect(_segment(page, "loops")).to_have_attribute("aria-label", "Loop, every 10 min")
                 await expect(_segment(page, "queue")).to_have_attribute("aria-label", "1 queued")
@@ -386,7 +386,7 @@ async def test_the_helpers_sheet_says_what_the_task_waits_on_and_has_the_details
             page: Page = await _page(browser, sc, 390, 844, "dark")
             await _segment(page, "helpers").tap()
             sheet: Locator = _open_sheet(page)
-            await expect(sheet.locator(".dock-helpers-lead")).to_have_text("Waiting on 2 subagents")
+            await expect(sheet.locator(".dock-helpers-lead")).to_have_text("Waiting on 2 helpers")
             await expect(sheet.locator(".dock-helper")).to_have_count(2)
             assert sorted(await sheet.locator(".dock-helper-title").all_text_contents()) == sorted(JOBS)
             await expect(sheet.locator(".dock-helper-now")).to_have_text(["Running sleep 300"] * 2)
@@ -461,10 +461,10 @@ async def test_a_chat_at_rest_has_no_capsule_and_a_lost_stream_is_said_in_it(log
         browser = await playwright.webkit.launch(headless=True)
         try:
             page = await _page(browser, sc, 390, 844, "light")
-            await expect(_segment(page, "status")).to_contain_text("Working")
+            await expect(_segment(page, "status")).to_contain_text("Waiting on 2 helpers")
             # The daemon goes away: the page lost its stream and says so once, in the capsule.
             sc.stop_serving()
-            await expect(_segment(page, "status")).to_have_text("Reconnecting…", use_inner_text=True, timeout=30000)
+            await expect(_segment(page, "status")).to_have_text("Can't reach Dot", use_inner_text=True, timeout=30000)
             await expect(_segment(page, "status")).to_have_attribute("data-tone", "warn")
             # The note under the top bar is not drawn on a phone, and the Stop stays.
             await expect(page.locator(".connection-slot .note")).to_be_hidden()

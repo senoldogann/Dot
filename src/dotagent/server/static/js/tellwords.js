@@ -2,16 +2,16 @@
 // rows `{ kind, subject, counts }` (notify/tells.py): how many tells went out and how many were acted on, opened,
 // dismissed, ignored, still waiting for their half hour or have no chat to open, and the share that was opened or acted on.
 
-import { plural } from "./dom.js";
+import { t, tCount } from "./i18n.js";
 
 const KIND_LABELS = {
-  brief: "Morning brief",
-  checkin: "Evening check-in",
-  watcher: "Watchers",
-  initiative: "On its own",
-  run_end: "Ends of your tasks",
-  schedule_end: "Ends of scheduled tasks",
-  system: "Other news from Dot",
+  brief: t("tellwords.morningBrief"),
+  checkin: t("tellwords.eveningCheckIn"),
+  watcher: t("tellwords.watchers"),
+  initiative: t("tellwords.onItsOwn"),
+  run_end: t("tellwords.endsOfYourTasks"),
+  schedule_end: t("tellwords.endsOfScheduledTasks"),
+  system: t("tellwords.otherNewsFromDot"),
 };
 
 /** The counts of `rows` added together. */
@@ -41,16 +41,16 @@ export function rowsOf(rows, kind, subject) {
  */
 export function countsLine(counts) {
   if (counts.sent === 0) {
-    return "Nothing told yet";
+    return t("tellwords.nothingToldYet");
   }
-  const parts = [`${counts.sent} told`];
+  const parts = [t("tellwords.sentTold", { sent: counts.sent })];
   const read = counts.acted + counts.opened;
   const wanted = [
-    [read, `${read} opened or acted on`],
-    [counts.dismissed, `${counts.dismissed} dismissed`],
-    [counts.ignored, `${counts.ignored} ignored`],
-    [counts.pending, `${counts.pending} waiting`],
-    [counts.unmeasured, `${counts.unmeasured} with no chat to open`],
+    [read, t("tellwords.readOpenedOrActedOn", { read })],
+    [counts.dismissed, t("tellwords.dismissedDismissed", { dismissed: counts.dismissed })],
+    [counts.ignored, t("tellwords.ignoredIgnored", { ignored: counts.ignored })],
+    [counts.pending, t("tellwords.pendingWaiting", { pending: counts.pending })],
+    [counts.unmeasured, t("tellwords.unmeasuredWithNoChatTo", { unmeasured: counts.unmeasured })],
   ];
   for (const [number, words] of wanted) {
     if (number > 0) {
@@ -58,7 +58,7 @@ export function countsLine(counts) {
     }
   }
   if (counts.precision !== null) {
-    parts.push(`${Math.round(counts.precision * 100)}% read`);
+    parts.push(t("tellwords.roundRead", { round: Math.round(counts.precision * 100) }));
   }
   return parts.join(" · ");
 }
@@ -74,5 +74,5 @@ export function tellLines(report) {
 
 /** The heading of the panel: the days it counts. */
 export function windowWords(days) {
-  return `In the last ${plural(days, "day", "days")}`;
+  return t("tellwords.inTheLastPart", { part: tCount(days, "tellwords.countDay", "tellwords.countDays") });
 }

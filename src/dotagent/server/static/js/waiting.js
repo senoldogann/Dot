@@ -10,6 +10,7 @@ import { el, showAfter } from "./dom.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
 import { RETURN_GRACE_MS } from "./state.js";
+import { t } from "./i18n.js";
 
 // What a chat's page showed last in its bar and its composer: `{ runId, name, title, sub, placeholder }`.
 const LOOK_KEY = "dot.chatLook";
@@ -84,7 +85,7 @@ function chatPage(look, frame, note) {
  * lifted.
  */
 export function openingCurtain(runId) {
-  const note = el("div", { class: "waiting-note", hidden: true }, el("div", { class: "spinner" }), el("span", null, "Connecting to Dot…"));
+  const note = el("div", { class: "waiting-note", hidden: true }, el("div", { class: "spinner" }), el("span", null, t("waiting.connectingToDot")));
   const showNote = showAfter(note, RETURN_GRACE_MS);
   showNote(true);
   const look = runId === null ? null : chatLook(runId);
@@ -92,13 +93,13 @@ export function openingCurtain(runId) {
     look === null
       ? null
       : composerFrame({
-          label: "Message",
-          boxLabel: "Message",
+          label: t("waiting.message"),
+          boxLabel: t("waiting.message"),
           placeholder: look.placeholder,
           maxPx: CHAT_BOX_PX,
           commands: [],
           send: () => undefined,
-          sendLabel: "Send",
+          sendLabel: t("waiting.send"),
           draftKey: runId,
           listener: null,
         });

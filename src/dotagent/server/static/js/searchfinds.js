@@ -162,7 +162,7 @@ export function buildSearchFinds({ chatTitle, homeHref, onScope, onFound, onNavi
     searching = false;
     found = {
       // A find of a chat with no run has no page to open: it is left out.
-      messages: messages.status === "fulfilled" ? messages.value.filter((hit) => hit.run_id !== null) : [],
+      messages: messages.status === "fulfilled" ? messages.value.filter((hit) => typeof hit.run_id === "string") : [],
       files: files.status === "fulfilled" ? files.value : [],
       bots: agents.status === "fulfilled" ? botsMatching(agents.value, asked) : [],
     };

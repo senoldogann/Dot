@@ -84,6 +84,7 @@ _BY_NAME: dict[str, LiveNow] = {
     "edit_file": LiveNow(kind="writing", line="Writing files"),
     "write_notes": LiveNow(kind="writing", line="Writing notes"),
     "show_page": LiveNow(kind="writing", line="Making a page"),
+    "show_cards": LiveNow(kind="writing", line="Making cards"),
     "draft_message": LiveNow(kind="writing", line="Writing a draft"),
     "apple_script": LiveNow(kind="mac", line="Using your Mac"),
     "mail_read": LiveNow(kind="mail", line="Reading mail"),

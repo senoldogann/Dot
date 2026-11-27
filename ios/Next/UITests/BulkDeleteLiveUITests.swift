@@ -58,5 +58,17 @@ final class BulkDeleteLiveUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         expectation(for: empty, evaluatedWith: profileChats)
         waitForExpectations(timeout: 10)
+
+        // Item 1985: the Mac is still deleting (it takes 8 s here); back on Dot's own chat, its new-chat page shows at
+        // once, never a "Syncing…" of the chat it held, which is being deleted.
+        // The first look after the tap (XCUITest waits for the app to settle, which is its own time, as the 2 s the
+        // list took to "empty" though it empties in the same frame): the page is there already, nothing syncs.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["botNewChat"].firstMatch.exists, "Dot's new-chat page at the first look")
+        XCTAssertFalse(app.staticTexts["Syncing…"].exists, "no chat being deleted is synced")
+        XCTAssertTrue(app.descendants(matching: .any)["botNewChat"].firstMatch.exists, "and it stays")
+        // The app stays up while the Mac answers (8 s here), so the script finds every chat deleted on the Mac.
+        _ = XCTWaiter.wait(for: [XCTestExpectation(description: "the Mac answers the delete")], timeout: 12)
+        XCTAssertFalse(app.staticTexts["Syncing…"].exists, "nothing synced once the Mac answered either")
     }
 }
