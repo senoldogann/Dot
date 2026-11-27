@@ -345,8 +345,8 @@ answer of a run that ended done is shown so; it stays in sight when the chat sho
 folded there too until you open it (item 859: item 830 had it open, and each return to the chat opened it again); one
 you opened stays open in that tab when the chat is drawn again.
 The run that answers a message names the bot in its `run_queued` event (`agent_name`), which the page reads; a
-helper a bot's own run delegated to carries the bot's id (item 553) but no name, and is a helper. **Handoffs** (under the "…" of the Bots page, `#/team`) lists today's messages: who to whom, the
-message and the reply (their words, with no markdown marks: item 778), the time and the two runs; `GET /api/agents/{id}`
+helper a bot's own run delegated to carries the bot's id (item 553) but no name, and is a helper. **Handoffs** (under the "…" of the Bots page, `#/team`) lists today's messages, newest first (item 2035, as the phone lists them): who to whom, the
+message and the reply (their words, with no markdown marks: item 778) or that the bot asked is working on it, with no badge, the time and the two runs; `GET /api/agents/{id}`
 gives the messages a bot sent or received (item 1266: its page's fold of them is gone). `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
 which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the
@@ -432,7 +432,7 @@ order stands, its title, its bot, tries, age, due time, the last note and a link
 /api/work-orders` gives them (the open ones first, each with its bot's name and the title of its objective) and `GET
 /api/objectives` the objectives. An active objective with no line of progress yet says its next step; the objectives done
 or let go stand last, under "Finished objectives", each with its state (item 2009, so that the web and the phone's
-bot profile list the same).
+bot profile list the same). A bot's page has a **Work** section, as the phone's bot profile does (item 2035): its work orders (how many are open), its objectives (how many are active, those its orders serve) and today's hand-offs (how many), each a link to a page of the bot's own (`#/agents/{id}/orders`, `/objectives`, `/handoffs`): the orders open, then finished; the objectives active, then finished; the hand-offs received, then sent to others, each newest first. Dot's pages hold every order and objective, as it hands and keeps them all.
 
 ## Campaigns
 
