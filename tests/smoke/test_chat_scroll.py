@@ -54,9 +54,9 @@ class _ByGoal:
         return _PROVIDER
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
-        # The run's own goal is its newest user message: a run in a chat reads the chat's earlier words first.
-        goal: str = [message.content for message in request.messages if message.role == "user"][-1]
-        if _ASK_GOAL in goal:
+        # A run in a chat reads the chat's earlier words too, so its own goal is looked for in every user message.
+        words: str = "\n".join(message.content for message in request.messages if message.role == "user")
+        if _ASK_GOAL in words:
             ask: ScriptedTurn = ScriptedTurn(
                 text="",
                 calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Which colour?", "wait": True}),),
