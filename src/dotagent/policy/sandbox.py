@@ -66,7 +66,8 @@ from pathlib import Path
 from dotagent.core.errors import ConfigError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
-from dotagent.policy.types import ApprovalMode
+from dotagent.policy.paths import within
+from dotagent.policy.types import ActionInfo, ApprovalMode
 
 SANDBOX_EXEC: str = "/usr/bin/sandbox-exec"
 _CHECKED_PROGRAM: str = "/usr/bin/true"
@@ -166,6 +167,53 @@ def sandbox_profile(
     return "\n".join(rules)
 
 
+class Seal(FrozenModel):
+    """What the sandbox of a run's processes seals, as paths (item 2026), so that Dot's own tools, which read and
+    write in the daemon's process, keep the same seal for a run nobody started: ``sealed`` is neither read nor
+    written (Dot's own files, ``[policy] sealed_paths``), ``unwritable`` not written (what Dot loads and runs), and
+    nothing in ``closed`` is written but in ``open_folders`` (Dot's home and its logs, but the workspace). The paths
+    are resolved, as :func:`build_sandbox` takes them."""
+
+    sealed: tuple[Path, ...]
+    unwritable: tuple[Path, ...]
+    closed: tuple[Path, ...]
+    open_folders: tuple[Path, ...]
+
+
+# A seal that refuses nothing: the sandbox of a stand-in runtime that seals no path.
+NO_SEAL: Seal = Seal(sealed=(), unwritable=(), closed=(), open_folders=())
+
+
+def seal_refusal(seal: Seal, path: Path, writes: bool) -> str | None:
+    """Why ``seal`` refuses a read of the resolved ``path``, or a write of it when ``writes``; ``None`` when it does
+    not: as the sandbox of the run's processes would (:func:`sandbox_profile`), letter case aside."""
+    if any(within(path, sealed) for sealed in seal.sealed):
+        return "it is one of Dot's own files or a sealed store, which a run nobody started neither reads nor writes"
+    if not writes:
+        return None
+    if any(within(path, location) for location in seal.unwritable):
+        return "it is part of what Dot loads and runs, which a run nobody started does not change"
+    if any(within(path, location) for location in seal.closed) and not any(
+        within(path, location) for location in seal.open_folders
+    ):
+        return "it is in Dot's home or its logs outside the workspace, where a run nobody started writes nothing"
+    return None
+
+
+def sealed_step(seal: Seal, info: ActionInfo) -> str | None:
+    """Why ``seal`` refuses the step ``info`` in Dot's own process (item 2026), ``None`` when it does not: its
+    target when the step is a read or a write of a file (an absolute path, as the file tools resolve it), and every
+    file it reads besides (``info.reads``). The reason names the path."""
+    named: list[tuple[str, bool]] = [(read, False) for read in info.reads]
+    if info.kind in ("read", "write") and Path(info.target).is_absolute():
+        named.insert(0, (info.target, info.kind == "write"))
+    for path, writes in named:
+        found: str | None = seal_refusal(seal, Path(path), writes)
+        if found is not None:
+            return f"{path}: {found}"
+    return None
+
+
 def build_sandbox(
     sealed: tuple[Path, ...],
     protected: tuple[Path, ...],
@@ -254,8 +302,9 @@ class SwitchedSandbox:
     (``unattended``). The sandbox is built at start whatever the settings, and checked to start each time it is
     switched on, so that a Mac without ``sandbox-exec`` refuses the switch rather than every process of a run."""
 
-    def __init__(self, built: Sandbox, on: bool, unattended: bool) -> None:
+    def __init__(self, built: Sandbox, seal: Seal, on: bool, unattended: bool) -> None:
         self._built: Sandbox = built
+        self._seal: Seal = seal
         self._on: bool = on
         self._unattended: bool = unattended
 
@@ -273,6 +322,11 @@ class SwitchedSandbox:
         (:func:`dotagent.scheduler.precheck.run_check`, :func:`dotagent.proactive.looks.look_check`). The built one
         while ``[shell] sandbox_unattended`` holds, whatever the owner's switch says; else as :meth:`current`."""
         return self._built if self._unattended else self.current()
+
+    def seal_for(self, unattended: bool) -> Seal | None:
+        """What Dot's own tools keep from a run (item 2026): a run nobody started (``unattended``) the paths its
+        sandbox seals, in every mode while ``[shell] sandbox_unattended`` holds; any other run nothing (``None``)."""
+        return self._seal if unattended and self._unattended else None
 
     def for_run(self, approvals: ApprovalMode, unattended: bool) -> Sandbox:
         """The sandbox a process of a run in the approval mode ``approvals`` starts in: one nobody started
