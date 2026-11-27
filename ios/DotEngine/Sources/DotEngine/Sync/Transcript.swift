@@ -190,8 +190,9 @@ public struct AskAnchor: Sendable, Equatable, Hashable {
 
 /// One row of a chat's transcript, built from its projection (plan §4.1).
 public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
-    /// The owner's words: a run's goal or a message sent into a run. `delivery` is set while it is not yet plain.
-    case owner(id: String, text: String, delivery: Delivery?)
+    /// The owner's words: a run's goal or a message sent into a run. `delivery` is set while it is not yet plain;
+    /// `files` are what came with them (item 1992: the photos, videos and files the message carried).
+    case owner(id: String, text: String, delivery: Delivery?, files: [AttachedFile])
     /// A note of Dot's from another run (a helper's report among them), drawn as Dot's row.
     case note(id: String, text: String)
     /// Dot's words; `writing` while they are still being written (the stream's live words). `endedAt` (epoch seconds)
@@ -216,7 +217,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
 
     public var id: String {
         switch self {
-        case .owner(let id, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
+        case .owner(let id, _, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
             .limit(let id, _), .narration(let id, _):
             id
         case .tool(let entry): entry.id
@@ -241,7 +242,7 @@ public func transcript(
     of chat: ChatProjection, pending: [PendingMessage], mode: ToolCallMode, streaming: Bool, context: TranscriptContext
 ) -> [TranscriptItem] {
     builtRuns(of: chat, streaming: streaming, context: context).flatMap { shaped($0.rows, finished: $0.finished, mode: mode) }
-        + pending.map { .owner(id: "p:\($0.key)", text: $0.text, delivery: $0.delivery) }
+        + pending.map { .owner(id: "p:\($0.key)", text: $0.text, delivery: $0.delivery, files: []) }
 }
 
 /// A run's rows and whether it is over, for the transcript's filter and fold.
@@ -282,7 +283,7 @@ private func builtRuns(of chat: ChatProjection, streaming: Bool, context: Transc
 /// them, so nothing is lost. Pure.
 public func conversation(of chat: ChatProjection, pending: [PendingMessage], streaming: Bool, context: TranscriptContext) -> [TranscriptItem] {
     builtRuns(of: chat, streaming: streaming, context: context).flatMap { conversed($0.rows, finished: $0.finished) }
-        + pending.map { .owner(id: "p:\($0.key)", text: $0.text, delivery: $0.delivery) }
+        + pending.map { .owner(id: "p:\($0.key)", text: $0.text, delivery: $0.delivery, files: []) }
 }
 
 /// The rows of one run in the conversation (`conversation`). Pure.
@@ -356,6 +357,15 @@ struct Built: Equatable {
     var end: Double
 }
 
+/// The files a message carried, as the daemon's `attachments` and `steer` events tell them (`agent.attachments.attachment_summary`);
+/// one that cannot be read is left out.
+func attachedFiles(_ value: JSONValue?) -> [AttachedFile] {
+    (value?.array ?? []).compactMap { file in
+        guard let id: String = file["id"]?.string, let name: String = file["name"]?.string else { return nil }
+        return AttachedFile(id: id, name: name, kind: file["kind"]?.string ?? "", size: file["size"]?.int ?? 0)
+    }
+}
+
 private func hasEnded(_ timeline: RunTimeline?) -> Bool {
     timeline?.events.contains { $0.kind == "run_finished" } ?? false
 }
@@ -364,7 +374,7 @@ private func runItems(
     _ run: RunRecord, timeline: RunTimeline?, writing: String?, thinking: LiveThought?, helpers: [HelperView], context: TranscriptContext) -> [Built] {
     // A run a helper's report started (item 1351) begins with Dot's note, not the owner's words.
     let opening: TranscriptItem =
-        run.source == "helper_report" ? .note(id: "u:\(run.id)", text: run.goal) : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil)
+        run.source == "helper_report" ? .note(id: "u:\(run.id)", text: run.goal) : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil, files: [])
     // A run that follows the owner's reaction (item 844) draws no message of the owner's: the reaction stands on its message.
     // Nor does an agent's first meeting (item 993, source `welcome`): its goal is Dot's words to the agent, and the agent
     // speaks first (item 1881).
@@ -456,13 +466,21 @@ private func runItems(
                 AskAnchor(
                     id: anchor.id, approvalId: approval, severity: anchor.severity, summary: anchor.summary, status: status, decider: decider,
                     note: event.data["note"]?.string ?? ""))
+        case "attachments":
+            // What the run's first message carried (item 1992): the owner's row shows it above the words.
+            if let first: Int = items.firstIndex(where: { $0.category == .owner }), case .owner(let id, let text, let delivery, _) = items[first].item, id.hasPrefix("u:") {
+                items[first].item = .owner(id: id, text: text, delivery: delivery, files: attachedFiles(event.data["files"]))
+            }
         case "steer":
             guard let text: String = event.data["text"]?.string, !text.isEmpty else { continue }
             if event.data["of_dot"]?.bool == true || event.data["vouches"]?.bool == false {
                 items.append(Built(item: .note(id: "n:\(event.id)", text: text), category: .note, start: event.ts, end: event.ts))
             } else if let timeline {
                 let delivery: Delivery? = readsAfterStep(steer: event, in: timeline) ? .readsAfterStep : nil
-                items.append(Built(item: .owner(id: "s:\(event.id)", text: text, delivery: delivery), category: .owner, start: event.ts, end: event.ts))
+                items.append(
+                    Built(
+                        item: .owner(id: "s:\(event.id)", text: text, delivery: delivery, files: attachedFiles(event.data["files"])), category: .owner,
+                        start: event.ts, end: event.ts))
             }
         case "run_finished":
             let result: String = (event.data["result"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

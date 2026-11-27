@@ -101,7 +101,9 @@ _HARBOUR_PNG: str = (
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\ngoal_mode = false',
+        # No floor of free space: an upload is not refused by how full this Mac's disk is (item 1938 has its own test).
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n'
+        "[agent]\ngoal_mode = false\n\n[store]\nmin_free_gb = 0",
         encoding="utf-8",
     )
     (home / "skills" / "scan-catalogue").mkdir(parents=True)
@@ -698,10 +700,9 @@ async def test_video_from_the_plus_menu_and_drag_and_drop_reaches_the_run(
             )
             await page.goto(ui_url(client.base_url.host, port, TOKEN))
             composer: Locator = page.locator(".composer")
-            await composer.locator(".plus-button").click()
-            async with page.expect_file_chooser() as choosing:
-                await page.get_by_role("menuitem", name="Add files").click()
-            await (await choosing.value).set_files(_VIDEO_SAMPLE)
+            # The picker's own input: whether the "+" is a menu or the picker itself depends on the mode an earlier
+            # test of this module left the daemon in, and this test is about what a video does, not the "+".
+            await composer.locator("input[type=file]").set_input_files(_VIDEO_SAMPLE)
             await expect(composer.locator(".attach-chip.ready")).to_have_count(1)
             transfer = await page.evaluate_handle(
                 """bytes => {
@@ -728,6 +729,62 @@ async def test_video_from_the_plus_menu_and_drag_and_drop_reaches_the_run(
                 ("attachment-sample.mp4", "video"),
                 ("drop.mp4", "video"),
             ]
+        finally:
+            await browser.close()
+
+
+@pytest.mark.parametrize(("width", "height"), [(1440, 900), (390, 844)], ids=["desktop", "phone"])
+async def test_a_video_is_a_tile_with_its_length_in_the_box_and_over_the_sent_message_and_plays_full_screen(
+    runtime: Runtime, client: httpx.AsyncClient, width: int, height: int
+) -> None:
+    """Item 1992, on the web as on DotNext: a video added stands as a tile (its first frame, a play glyph, its length, a
+    ×), the same tile stands over the message once sent, and a click plays it full screen until Escape."""
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": width, "height": height})
+            await page.goto(ui_url(client.base_url.host, port, TOKEN))
+            composer: Locator = page.locator(".composer")
+            # The picker's own input: the "+" is a menu on a desktop and the picker itself on a phone.
+            await composer.locator("input[type=file]").set_input_files(_VIDEO_SAMPLE)
+            tile: Locator = composer.locator(".attach-chip.picture.ready")
+            await expect(tile).to_have_count(1)
+            await expect(tile.locator(".media-length")).to_have_text("0:01")
+            await expect(tile.locator(".media-play")).to_be_visible()
+            await expect(tile.locator(".attach-thumb")).to_have_attribute("src", re.compile("^data:image/jpeg"))
+            await expect(tile.get_by_role("button", name="Remove attachment-sample.mp4")).to_be_visible()
+            await expect(tile.get_by_role("button", name="Play video attachment-sample.mp4")).to_be_visible()
+            await page.locator(GOAL).fill("What happens in this video")
+            async with page.expect_response(
+                lambda answer: answer.url.endswith("/api/runs") and answer.request.method == "POST"
+            ) as sent:
+                await page.locator(GOAL).press("Enter")
+            assert (await sent.value).status == 201
+            sent_tile: Locator = page.locator(".sent-video").first
+            await expect(sent_tile).to_be_visible()
+            await expect(sent_tile.locator(".media-length")).to_have_text("0:01")
+            await expect(sent_tile.locator(".sent-picture-image")).to_have_attribute(
+                "src", re.compile("^data:image/jpeg")
+            )
+            await expect(sent_tile.locator(".media-play")).to_be_visible()
+            assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), (
+                "no sideways scroll"
+            )
+            box = await sent_tile.bounding_box()
+            assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+            await sent_tile.click()
+            player: Locator = page.locator(".player-overlay")
+            await expect(player).to_be_visible()
+            await expect(player.locator("video")).to_have_attribute("src", re.compile("^blob:"))
+            # Polled here: wait_for_function fails under the page's CSP once it has to wait (see the memory notes).
+            deadline: float = time.monotonic() + 15
+            while not await page.evaluate("document.querySelector('.player-video').readyState >= 1"):
+                assert time.monotonic() < deadline, "the video never loaded its start"
+                await asyncio.sleep(0.2)
+            await page.keyboard.press("Escape")
+            await expect(player).to_have_count(0)
         finally:
             await browser.close()
 

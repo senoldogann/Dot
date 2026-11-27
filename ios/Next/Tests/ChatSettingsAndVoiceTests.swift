@@ -78,6 +78,16 @@ final class ChatSettingsAndVoiceTests: XCTestCase {
         XCTAssertEqual(picking(opus, in: fastHigh).speed, "fast")
     }
 
+    /// The owner's phone (2026-11-27): DeepSeek through OpenCode Go wore OpenCode's mark, a plain white block in the chip.
+    func testAModelOfAFamilyWithNoMarkOnAGatewayWearsANeutralSymbolNotTheGatewaysBlock() {
+        XCTAssertEqual(modelMark(ref: "opencode_go:deepseek-v4.1-flash", provider: "opencode_go"), .symbol("sparkles"))
+        XCTAssertEqual(modelMark(ref: "openrouter:deepseek/deepseek-v4.1-flash-1017", provider: "openrouter"), .symbol("sparkles"))
+        XCTAssertEqual(modelMark(ref: "ollama:qwen3:32b", provider: "ollama"), .symbol("sparkles"))
+        XCTAssertEqual(modelMark(ref: "anthropic:claude-opus-5-5", provider: "anthropic"), .asset("provider-anthropic"))
+        XCTAssertEqual(modelMark(ref: "openrouter:openai/gpt-5.5", provider: "openrouter"), .asset("provider-openrouter"))
+        XCTAssertEqual(modelMark(ref: "ollama:gemma4:cloud", provider: "ollama"), .asset("provider-ollama"))
+    }
+
     func testTheMarksToggle() {
         let none: ModelMarks = ModelMarks(favourites: [], hidden: [])
         XCTAssertEqual(none.togglingFavourite("a").favourites, ["a"])

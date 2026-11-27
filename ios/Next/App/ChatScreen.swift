@@ -375,8 +375,9 @@ struct ChatScreen: View {
 
     @ViewBuilder private func row(_ item: TranscriptItem) -> some View {
         switch item {
-        case .owner(let id, let text, let delivery):
+        case .owner(let id, let text, let delivery, let files):
             VStack(alignment: .trailing, spacing: Space.xxs) {
+                if !files.isEmpty { OwnerFilesView(files: files) }
                 OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, quote: quoteMessage, tell: { toast = $0 }))
                 // "Pending" (or why it was refused) until the Mac took the message; nothing once it did (item 1927).
                 if let delivery, delivery != .delivered { deliveryLine(id: id, delivery: delivery) }

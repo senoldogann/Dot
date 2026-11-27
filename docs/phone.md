@@ -638,6 +638,18 @@ goes as base64 in JSON (`POST /api/attachments`), up to 20 MiB. Only a video ove
 **Trim video** on its chip, to choose a shorter part. Files show their name, type and size. Up to 10 attachments go
 with a message.
 
+In the composer a photo or a video stands as a tile: the picture (a video's first frame), its length at the foot, a play
+glyph over a video and a × at the corner; while a video is re-encoded its tile is already there with a ring that fills
+(item 1992). In the chat the owner's message shows what it carried above its words: a photo as its picture, a video as a
+tile with its length that plays full screen on a tap, a sound or any other file as a chip with its name and size. The
+files come from the run's `attachments` event (the first message) and the `steer` event (a message sent into a run),
+and a video is played from `GET /api/attachments/{id}/media`, which serves it in ranges so that it starts at once and
+can be moved through. The chat of a run older than the newest the phone holds shows no tiles until it is opened. The
+web page shows the same tiles in its box and over a sent message ([Runs](runs.md#tools)). The model button in the
+composer wears the provider's mark; a DeepSeek, Kimi, GLM, Qwen or MiniMax model that a gateway
+(OpenCode Go, OpenRouter, Ollama) hosts wears a neutral symbol instead of the gateway's, which for OpenCode Go is a
+plain block.
+
 After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
 The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer
 or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
