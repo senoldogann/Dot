@@ -1624,6 +1624,7 @@ TR.update(
     {
         "%lld min": "%lld dk",
         "%lld s": "%lld sn",
+        "Looking into it…": "Bakıyorum…",
     }
 )
 

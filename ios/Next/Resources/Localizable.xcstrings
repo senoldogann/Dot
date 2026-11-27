@@ -7038,6 +7038,17 @@
         }
       }
     },
+    "Looking into it…": {
+      "comment": "Chat message of Dot's, said the moment a task starts, before it has done anything",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bakıyorum…"
+          }
+        }
+      }
+    },
     "Looks every %lld minutes": {
       "comment": "Watcher: how often it looks",
       "localizations": {

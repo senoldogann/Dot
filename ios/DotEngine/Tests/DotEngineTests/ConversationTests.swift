@@ -95,4 +95,25 @@ final class ConversationTests: XCTestCase {
         }
         XCTAssertEqual(conversation(of: chat(status: "done", said), pending: [], streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"])
     }
+
+    /// Dot's first words (item 2018): the words said at once, then the fast model's line in their place, one row before
+    /// the run's own words, in the conversation and in every tool mode, outside a finished run's fold.
+    func testTheFirstWordsAreOneRowFirstInEveryModeAndTheLineTakesThePlaceOfTheWordsSaidAtOnce() {
+        let said: [EventRecord] = [event(2, "first_words", ["text": .string(""), "model": .null])]
+        let atOnce: [TranscriptItem] = conversation(of: chat(status: "running", said + events), pending: [], streaming: true, context: .none)
+        XCTAssertEqual(atOnce.map(\.id), ["u:run_a", "fw:run_a", "a:10"])
+        guard case .firstWords(_, let empty) = atOnce[1] else { return XCTFail("the words said at once are a row") }
+        XCTAssertEqual(empty, "", "the app says them in its language")
+        let lined: [EventRecord] = said + [event(3, "first_words", ["text": .string(" Looking at the site first. "), "model": .string("fast")])] + events
+        let finished: [EventRecord] =
+            lined + [step(30, "", ["finish"]), event(31, "run_finished", ["status": .string("done"), "result": .string("Two fields.")])]
+        for mode in ToolCallMode.allCases {
+            for (status, timeline) in [("running", lined), ("done", finished)] {
+                let items: [TranscriptItem] = transcript(of: chat(status: status, timeline), pending: [], mode: mode, streaming: true, context: .none)
+                let rows: [String] = items.compactMap { if case .firstWords(_, let text) = $0 { text } else { nil } }
+                XCTAssertEqual(rows, ["Looking at the site first."], "\(mode) \(status)")
+                XCTAssertEqual(items[1].id, "fw:run_a", "\(mode) \(status): right under the owner's words")
+            }
+        }
+    }
 }

@@ -622,6 +622,20 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// Item 2018: Dot's first words stand under the owner's message as one of its short messages, with the steps shown and
+    /// with Show steps off.
+    func testTheFirstWordsStandUnderTheOwnersMessageWithAndWithoutTheSteps() {
+        for defaults in [["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", "{}"], ["-showSteps", "NO", "-stepsOverrides", "{}"]] {
+            let app: XCUIApplication = launch("n2-chat", defaults: defaults)
+            let words: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Looking at next week's calendar first.")).firstMatch
+            // The chat opens at its newest words; the first words stand near the run's start, above them.
+            for _ in 0..<6 where !words.waitForExistence(timeout: 2) { app.swipeDown() }
+            for _ in 0..<6 where !words.exists { app.swipeUp() }
+            XCTAssertTrue(words.waitForExistence(timeout: 15), "\(defaults): the first words")
+            app.terminate()
+        }
+    }
+
     /// Item 1932: the asks scene settles: once it stood still for a few seconds, the screen is not drawn again (its
     /// scroll followed the lazy stack's own height estimates in a loop, at 100 % CPU).
     func testTheAsksSceneSettles() {
