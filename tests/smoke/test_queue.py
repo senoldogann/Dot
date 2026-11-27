@@ -887,11 +887,8 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
                     send: Locator = page.locator(".dock .btn.send")
                     queue: Locator = page.locator(".dock .queue")
                     await expect(send).to_have_attribute("aria-label", "Stop")
-                    # A phone's line holds about thirty characters, so it has the short words (item 437).
-                    await expect(box).to_have_attribute(
-                        "placeholder",
-                        "Add to task (or /btw)" if width < 720 else "Add to this task, or /btw to ask on the side",
-                    )
+                    # The phone's words on every width (item 2015).
+                    await expect(box).to_have_attribute("placeholder", "Tell the running task")
 
                     # A message steers the run at work, sent with ⌘Enter.
                     await box.fill(NOW)
