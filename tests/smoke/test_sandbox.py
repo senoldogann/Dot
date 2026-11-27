@@ -306,6 +306,26 @@ async def test_a_search_of_a_path_that_is_not_there_says_so_as_list_dir_does(run
     assert str(gone.parent) in str(found.value), found.value
 
 
+@pytest.mark.parametrize(
+    ("pattern", "reason"),
+    [
+        ("^from (?!dotagent)[a-z_]+ import", "look-around"),
+        ("except DotError:\\n.*return fail", 'the literal "\\n" is not allowed'),
+        ('def .*delete|threads\\")|@router', "unopened group"),
+    ],
+)
+async def test_a_search_with_a_pattern_ripgrep_cannot_read_is_the_calls_own_error(
+    runtime: Runtime, pattern: str, reason: str
+) -> None:
+    # Item 1988: models write Python's or PCRE's regex; the call is told what is wrong and what syntax is read, not
+    # "ripgrep failed" with advice to pass a flag the tool does not take.
+    ctx: ToolContext = await _context(runtime, "ask")
+    with pytest.raises(ToolInputError, match="regex syntax error") as found:
+        await _run(ctx, "search_files", {"pattern": pattern, "path": str(workspace_dir())})
+    assert reason in found.value.message and "Rust regex syntax" in found.value.message, found.value.message
+    assert "--pcre2" not in found.value.message and "--multiline" not in found.value.message, found.value.message
+
+
 async def test_a_command_of_a_run_cannot_read_the_sealed_stores_however_its_line_names_them(runtime: Runtime) -> None:
     """Item 531: the data of the browsers, Mail and Messages (``[policy] sealed_paths``) are closed to a command by the
     sandbox, as Dot's own files are: named whole, built from pieces by a substitution, walked by a recursive search of
