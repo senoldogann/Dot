@@ -77,7 +77,8 @@ async def _index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Memor
 
 
 def _starting(index: MemoryIndex, source: str, goal: str) -> object:
-    runtime = SimpleNamespace(memory=index)
+    # start_notes reads the memory and, for how long it waits for the notes by meaning, [memory] start_recall_s.
+    runtime = SimpleNamespace(memory=index, config=SimpleNamespace(memory=index.config))
     run = SimpleNamespace(source=source, agent_id=None)
     return start_notes(runtime, run, goal, 4000)  # type: ignore[arg-type]  # start_notes reads these alone
 
