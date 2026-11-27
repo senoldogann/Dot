@@ -244,31 +244,31 @@ def location_text(answer: LocationAnswer, zone: dt.tzinfo) -> str:
     )
 
 
-class PhoneRefused(ToolExecutionError):
-    """The phone did not do the ask: ``result`` is what the run reads, its words from the phone fenced and marked as
-    content others may have written (a shared calendar's name in a list of them)."""
+class PhoneAskRefused(ToolExecutionError):
+    """The phone did not do the ask: ``result`` is what the run reads (:func:`refusal_result`); the error's own words
+    are Dot's, never the phone's."""
 
     def __init__(self, tool: str, answer: RefusedAnswer, result: ToolResult) -> None:
-        super().__init__(result.text, {"tool": tool, "reason": answer.reason})
+        super().__init__("the iPhone did not do it", {"tool": tool, "reason": answer.reason})
         self.result: ToolResult = result
 
 
 def refusal_result(tool: str, answer: RefusedAnswer, nonce: str) -> ToolResult:
-    """What a run reads of a refusal: Dot's own head line (and where the owner gives the permission back), then the
-    phone's words fenced, since a calendar's or a list's name in them may be someone else's."""
-    said: str = fence_account("the iPhone's answer", answer.message, nonce)
+    """What a run reads of a refusal. A permission refused or restricted is said in Dot's own words, with where the
+    owner gives it back. A failure carries the phone's words fenced, and taints the run: they may list the phone's
+    calendars, and a shared one is named by someone else."""
     if answer.reason == "failed":
+        said: str = fence_account("the iPhone's answer", answer.message, nonce)
         return mark_untrusted(fail(f"the iPhone could not do it; it said:\n{said}"))
     where: str = f"iOS Settings › Apps › Dot Next › {_SETTINGS[tool]}"
-    return mark_untrusted(
-        fail(f"the iPhone refused ({answer.reason}): only the owner can allow it, in {where}. It said:\n{said}")
-    )
+    why: str = "the owner has not allowed it" if answer.reason == "denied" else "the iPhone's restrictions forbid it"
+    return fail(f"the iPhone refused: {why}. Only the owner can change that, in {where}.")
 
 
 async def _asked(ctx: ToolContext, tool: str, ask: PhoneAsk) -> PhoneAnswer:
     answer: PhoneAnswer = await ctx.runtime.phone_link.ask(ask, _ANSWER_S)
     if isinstance(answer, RefusedAnswer):
-        raise PhoneRefused(tool, answer, refusal_result(tool, answer, secrets.token_hex(_NONCE_BYTES)))
+        raise PhoneAskRefused(tool, answer, refusal_result(tool, answer, secrets.token_hex(_NONCE_BYTES)))
     return answer
 
 
@@ -290,7 +290,7 @@ def refusals_read[A: ToolArgs](
     async def answered(args: A, ctx: ToolContext) -> ToolResult:
         try:
             return await run(args, ctx)
-        except PhoneRefused as refused:
+        except PhoneAskRefused as refused:
             return refused.result
 
     return answered

@@ -15,6 +15,7 @@ from dotagent.agent.verify import new_facts
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.paths import phones_path, workspace_dir
 from dotagent.core.types import JsonObject
+from dotagent.phone.asks import PhoneAnswerUnreadable
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime
 from dotagent.server.phones import any_paired
@@ -117,7 +118,7 @@ async def test_the_phone_answers_the_tools_while_dot_next_is_open(own_home: Path
         )
         assert (gate.shown[-1].kind, gate.shown[-1].target) == ("app_control", "iPhone")
 
-        # An answer whose times cannot be read is refused at the door, and the run goes on waiting.
+        # An answer whose times cannot be read is refused at the door, and the run is told at once (not after 75 s).
         polling = asyncio.ensure_future(client.get("/phone/asks/next", headers=phone))
         reading = asyncio.ensure_future(
             _call(runtime, gate, "phone_calendar_events", {"start": "2026-11-28", "end": "2026-11-29"})
@@ -140,11 +141,14 @@ async def test_the_phone_answers_the_tools_while_dot_next_is_open(own_home: Path
             headers=phone,
         )
         assert bad.status_code == 422, bad.text
-        good: httpx.Response = await client.post(
+        began = time.monotonic()
+        with pytest.raises(PhoneAnswerUnreadable, match="could not be read"):
+            await reading
+        assert time.monotonic() - began < 2.0
+        late: httpx.Response = await client.post(
             f"/phone/asks/{bad_id}", json={"answer": {"kind": "events", "events": [], "more": False}}, headers=phone
         )
-        assert good.status_code == 204, good.text
-        assert "no event" in (await reading).text
+        assert late.status_code == 404, "the run no longer waits"
 
         events: JsonObject = {
             "kind": "events",
@@ -175,10 +179,10 @@ async def test_the_phone_answers_the_tools_while_dot_next_is_open(own_home: Path
         refusal: JsonObject = {"kind": "refused", "reason": "denied", "message": "Reminders are not allowed."}
         phone_side = asyncio.ensure_future(_phone_answers(client, phone, refusal))
         refused: ToolResult = await _call(runtime, gate, "phone_reminder_add", {"title": "Call Ada"})
-        assert refused.is_error and refused.untrusted and "Dot Next › Reminders" in refused.text
+        assert refused.is_error and not refused.untrusted and "Dot Next › Reminders" in refused.text
         assert (await phone_side)["kind"] == "reminder_add"
 
-        # An answer of another kind is refused, and the run goes on waiting for the right one.
+        # An answer of another kind is refused, and ends the run's wait at once with Dot's own words.
         polling = asyncio.ensure_future(client.get("/phone/asks/next", headers=phone))
         asking = asyncio.ensure_future(_call(runtime, gate, "phone_location", {}))
         location_ask: JsonObject = (await polling).json()
@@ -186,6 +190,8 @@ async def test_the_phone_answers_the_tools_while_dot_next_is_open(own_home: Path
             f"/phone/asks/{location_ask['id']}", json={"answer": created}, headers=phone
         )
         assert wrong.status_code == 422, wrong.text
+        with pytest.raises(PhoneAnswerUnreadable, match="another kind"):
+            await asking
         here: JsonObject = {
             "kind": "location",
             "latitude": 41.0,
@@ -193,11 +199,10 @@ async def test_the_phone_answers_the_tools_while_dot_next_is_open(own_home: Path
             "accuracy_m": 12.0,
             "at": "2026-11-28T11:00:00Z",
         }
-        right: httpx.Response = await client.post(
-            f"/phone/asks/{location_ask['id']}", json={"answer": here}, headers=phone
-        )
-        assert right.status_code == 204, right.text
-        assert "41.00000,29.00000" in (await asking).text
+        phone_side = asyncio.ensure_future(_phone_answers(client, phone, here))
+        located: ToolResult = await _call(runtime, gate, "phone_location", {})
+        location_ask = await phone_side
+        assert "41.00000,29.00000" in located.text
         gone: httpx.Response = await client.post(
             f"/phone/asks/{location_ask['id']}", json={"answer": here}, headers=phone
         )

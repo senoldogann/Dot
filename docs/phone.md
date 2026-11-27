@@ -847,7 +847,7 @@ The daemon cannot open a connection to the phone, so the phone holds one open to
 screen it calls `GET /api/phone/asks/next`, which answers the next ask meant for that phone (200) or nothing after 20
 seconds (204), and calls again at once. The answer of an ask goes to `POST /api/phone/asks/{id}` as `{"answer": ...}`
 (204). Only a paired phone's own key reaches either (403 for the Mac's token); an ask is the phone's that took it (404
-for another phone's, or one whose run stopped waiting), and an answer of another kind than the ask is a 422. iOS lets the
+for another phone's, or one whose run stopped waiting), and an answer that cannot be read is a 422 (below). iOS lets the
 app's requests go only while it is in front: when it goes to the background the request ends, and a run that asks then
 is told at once that the iPhone cannot be reached and why (Dot Next answers only while it is open). An ask the phone
 does not take within 6 seconds, or does not answer within 75 (the first time, the owner answers iOS's permission
@@ -875,12 +875,13 @@ The answers, by `kind`:
 - `location`: `latitude`, `longitude`, `accuracy_m`, `at` (a moment).
 - `refused`: `reason` (`denied`: the owner said no, or took it back in iOS Settings › Apps › Dot Next; `restricted`:
   the phone's restrictions forbid it; `failed`: it tried and could not, such as no calendar of that name) and
-  `message`. The run reads where the owner gives the permission back in Dot's own words, and the phone's `message`
-  fenced, as it may list calendars' names.
+  `message`. A permission refused or restricted is said to the run in Dot's own words, with where the owner gives it
+  back; a failure's `message` reaches it fenced, and taints it, since it may list calendars' names.
 
 A time the run could not read (an all-day event whose `start` or `end` is not a day, a moment with no offset, an event
-that ends before it starts, a location's `at` that is not a moment) makes the answer a 422, and the run goes on waiting
-for one it can read.
+that ends before it starts, a location's `at` that is not a moment), or an answer of another kind than the ask, makes
+the answer a 422 and ends the run's wait at once: it reads, in Dot's own words, that the answer could not be read and
+that Dot Next and Dot may be of different versions.
 
 Each permission is asked by iOS the first time an ask needs it, never when the app starts: full access to the calendars
 (reading needs it, so an add asks for it too), full access to Reminders, and the location while the app is in use. The

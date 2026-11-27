@@ -190,6 +190,11 @@ _ANSWER_OF: dict[AskKind, str] = {
 }
 
 
+class PhoneAnswerUnreadable(ToolExecutionError):
+    """The phone answered with something the run cannot read: an answer of another kind than the ask, or times that
+    are not what the contract says (an app of another version)."""
+
+
 class PhoneUnreachable(ToolExecutionError):
     """No phone holds Dot Next open now, or the one that did left before it answered."""
 
@@ -271,18 +276,35 @@ class PhoneLink:
             phone.waiting -= 1
             phone.left_at = self._now()
 
-    def answer(self, phone_id: str, ask_id: str, answer: PhoneAnswer) -> None:
-        """Give the run that waits on ``ask_id`` its answer. Raises :class:`NotFoundError` for an ask that is not
-        ``phone_id``'s or no longer waits, and :class:`InvalidValueError` for an answer of another kind."""
+    def _waiting(self, phone_id: str, ask_id: str) -> _Pending:
         pending: _Pending | None = self._pending.get(ask_id)
         if pending is None or pending.phone != phone_id or pending.answered.done():
             raise NotFoundError("no such ask waits for this phone's answer", {"ask": ask_id})
+        return pending
+
+    def answer(self, phone_id: str, ask_id: str, answer: PhoneAnswer) -> None:
+        """Give the run that waits on ``ask_id`` its answer. Raises :class:`NotFoundError` for an ask that is not
+        ``phone_id``'s or no longer waits; an answer of another kind ends the run's wait with
+        :class:`PhoneAnswerUnreadable` and raises :class:`InvalidValueError` to the phone."""
+        pending: _Pending = self._waiting(phone_id, ask_id)
         if not fits(pending.ask, answer):
-            raise InvalidValueError(
-                "the answer is not of the ask's kind",
-                {"ask": ask_id, "ask_kind": pending.ask.kind, "answer_kind": answer.kind},
-            )
+            context: dict[str, str] = {"ask": ask_id, "ask_kind": pending.ask.kind, "answer_kind": answer.kind}
+            self.unreadable(phone_id, ask_id, "an answer of another kind than the ask")
+            raise InvalidValueError("the answer is not of the ask's kind", context)
         pending.answered.set_result(answer)
+
+    def unreadable(self, phone_id: str, ask_id: str, what: str) -> None:
+        """End the run's wait on ``ask_id`` at once: the phone answered with something it cannot read (``what``, Dot's
+        own words: never the phone's, which may hold a calendar's name). The phone is told 422 by the caller."""
+        pending: _Pending = self._waiting(phone_id, ask_id)
+        log.warning("phone_answer_unreadable", ask=ask_id, kind=pending.ask.kind, what=what)
+        pending.answered.set_exception(
+            PhoneAnswerUnreadable(
+                f"the iPhone's answer could not be read ({what}): Dot Next and Dot may be of different versions. "
+                "Update both, then try again.",
+                {"ask": ask_id, "ask_kind": pending.ask.kind},
+            )
+        )
 
     async def ask(self, ask: PhoneAsk, answer_s: float) -> PhoneAnswer:
         """Hand ``ask`` to the phone present now and wait up to ``answer_s`` for its answer (the first time, the owner

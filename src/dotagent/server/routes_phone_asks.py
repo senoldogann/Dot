@@ -3,7 +3,9 @@ the next ask meant for the phone that calls it, and ``POST /api/phone/asks/{id}`
 phone's own key reaches them (:func:`dotagent.server.routes_phone.asking_phone`): an ask is one phone's."""
 
 from fastapi import APIRouter, Request, Response
+from pydantic import ValidationError
 
+from dotagent.core.errors import InvalidValueError
 from dotagent.phone.asks import POLL_S, AnswerBody, PhoneAsk
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_phone import asking_phone
@@ -21,9 +23,18 @@ def phone_asks_router(ctx: ServerContext) -> APIRouter:
         return Response(status_code=204) if ask is None else ask
 
     @router.post("/phone/asks/{ask_id}", status_code=204)
-    async def answer_ask(ask_id: str, body: AnswerBody, http: Request) -> None:
+    async def answer_ask(ask_id: str, http: Request) -> None:
         """The phone's answer to one of its asks: 404 when the ask is not this phone's or no longer waits (its run gave
-        up), 422 when the answer is of another kind."""
-        ctx.runtime.phone_link.answer(asking_phone(http), ask_id, body.answer)
+        up); 422 when the answer cannot be read (of another kind, or times not as the contract says), which ends the
+        run's wait at once with words that say so, rather than leaving it to wait for an answer that will not come."""
+        phone_id: str = asking_phone(http)
+        try:
+            body: AnswerBody = AnswerBody.model_validate_json(await http.body())
+        except ValidationError as error:
+            ctx.runtime.phone_link.unreadable(phone_id, ask_id, "times or fields not as Dot asked")
+            raise InvalidValueError(
+                "the answer cannot be read", {"ask": ask_id, "errors": error.error_count()}
+            ) from error
+        ctx.runtime.phone_link.answer(phone_id, ask_id, body.answer)
 
     return router
