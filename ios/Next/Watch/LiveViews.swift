@@ -30,45 +30,12 @@ func feedLine(_ state: FeedState, connecting: String, fps: Double, quality: Watc
     }
 }
 
-/// The caption of what the run does now.
-func actionWords(_ action: LiveAction) -> String {
-    let detail: String = action.detail
-    // A ref ("e12", "a7") names nothing the owner can read.
-    let readable: String? = detail.isEmpty || detail.range(of: #"^[a-z]\d+$"#, options: .regularExpression) != nil ? nil : detail
-    let base: String
-    switch action.kind {
-    case .click:
-        base = readable.map { String(localized: "Clicking \($0)", comment: "Live caption: the run clicks; the argument is what") }
-            ?? String(localized: "Clicking", comment: "Live caption: the run clicks")
-    case .type:
-        base = readable.map { String(localized: "Typing “\($0)”", comment: "Live caption: the run types; the argument is the text") }
-            ?? String(localized: "Typing", comment: "Live caption: the run types")
-    case .key:
-        base = readable.map { String(localized: "Pressing \($0)", comment: "Live caption: the run presses a key; the argument is the key") }
-            ?? String(localized: "Pressing a key", comment: "Live caption: the run presses a key")
-    case .scroll: base = String(localized: "Scrolling", comment: "Live caption: the run scrolls the page")
-    case .open:
-        base = readable.map { String(localized: "Opening \($0)", comment: "Live caption: the run opens a page or app; the argument is which") }
-            ?? String(localized: "Opening a page", comment: "Live caption: the run opens a page")
-    case .look: base = String(localized: "Looking at the page", comment: "Live caption: the run reads the page or screen")
-    case .wait: base = String(localized: "Waiting for the page", comment: "Live caption: the run waits for text on the page")
-    case .other: base = String(localized: "Working on the page", comment: "Live caption: another browser or desktop step")
-    }
-    guard action.steps > 1 else { return base }
-    return String(localized: "\(base) · \(action.steps) steps", comment: "Live caption: a batch of steps; the arguments are the first step and the count")
-}
-
-func actionSymbol(_ kind: LiveAction.Kind) -> String {
-    switch kind {
-    case .click: "cursorarrow.click"
-    case .type: "keyboard"
-    case .key: "command"
-    case .scroll: "arrow.up.and.down"
-    case .open: "globe"
-    case .look: "eye"
-    case .wait: "hourglass"
-    case .other: "macwindow"
-    }
+/// A call the live picture's caption tells, as the chat's work log tells it (item 1996): the same mark and the same
+/// plain words, so a step reads alike in the chat and over the picture.
+func captionEntry(_ call: HelperStep) -> ToolEntry {
+    ToolEntry(
+        id: "", tool: call.tool, kind: ToolKind.of(call.tool), target: call.target, args: "", output: "", state: .running, images: [], startedAt: call.at,
+        endedAt: nil)
 }
 
 // MARK: Pieces
@@ -86,16 +53,17 @@ struct LiveDot: View {
     }
 }
 
-/// What the run does now, over the bottom of the picture: its glyph and words on dark glass.
+/// What the run does now, over the bottom of the picture: the call at work with the work log's mark and words, or
+/// the thinking between calls, on dark glass.
 struct ActionCaption: View {
-    let action: LiveAction?
+    let call: HelperStep?
     let fallback: String?
     let compact: Bool
 
     var body: some View {
-        if let words = action.map(actionWords) ?? fallback {
+        if let words = call.map({ toolLine(captionEntry($0)) }) ?? fallback {
             HStack(spacing: compact ? 5 : Space.xs) {
-                Image(systemName: action.map { actionSymbol($0.kind) } ?? "sparkle")
+                Image(systemName: call.map { toolSymbol(captionEntry($0).kind) } ?? "brain")
                     .font(compact ? .system(.caption2, weight: .semibold) : .system(.footnote, weight: .medium))
                     .symbolRenderingMode(.monochrome)
                     .contentTransition(.symbolEffect(.replace))
@@ -103,7 +71,7 @@ struct ActionCaption: View {
                     .textRole(compact ? .micro : .footnote)
                     .fontWeight(.medium)
                     .lineLimit(1)
-                    .truncationMode(.tail)
+                    .truncationMode(.middle)
                     .contentTransition(.opacity)
             }
             .foregroundStyle(.white)
@@ -113,6 +81,7 @@ struct ActionCaption: View {
             .animation(.easeOut(duration: MotionToken.adjust.seconds), value: words)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(words)
+            .accessibilityIdentifier("live.caption")
         }
     }
 }
