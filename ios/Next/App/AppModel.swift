@@ -147,7 +147,10 @@ final class AppModel {
         parts.outbox = outbox
         parts.accepted = accepted
         parts.online = online
-        return parts.pending(in: thread)
+        // A chat this phone started and the daemon has not named yet is shown by its outbox key (item 2025): its first
+        // message is the new chat's own item of the outbox.
+        let starting: [PendingMessage] = startingChats[thread] == nil ? [] : parts.pendingChats.filter { $0.key == thread }
+        return starting + parts.pending(in: thread)
     }
 
     /// New chats not yet in the list, from the outbox and the link.

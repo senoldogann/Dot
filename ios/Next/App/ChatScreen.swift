@@ -161,7 +161,7 @@ struct ChatScreen: View {
         let items: [TranscriptItem] = builtItems
         return content(items)
             .background(Tone.ground)
-            .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? "")
+            .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? model.startingChats[thread] ?? "")
             .navigationSubtitle(botChat == nil ? subtitle : "")
             .navigationBarTitleDisplayMode(.inline)
             .modifier(HelperChats(thread: thread, helpers: helpers.map(\.threadId), opened: $openedHelper))
@@ -498,13 +498,16 @@ struct ChatScreen: View {
                     text: edit == nil ? $draft : Binding(get: { edit?.text ?? "" }, set: { edit?.text = $0 }),
                     attachments: $attachments,
                     quote: $quoted,
-                    placeholder: activeRun == nil
+                    placeholder: activeRun == nil && startingSince == nil
                         ? botChat.map { askPlaceholder($0.record.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer")
                         : followUp == .queue
                             ? String(localized: "Queue a message", comment: "Placeholder of the composer while a run works and follow-ups queue")
                             : String(localized: "Tell the running task", comment: "Placeholder of the composer while a run works and follow-ups steer"),
                     buttons: composerButtons(
-                        hasContent: !(edit?.text ?? draft).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty,
+                        // A chat the daemon has not named yet takes no message (item 2025): the words wait in the field
+                        // for the second or two it takes, then go.
+                        hasContent: model.startingChats[thread] == nil
+                            && (!(edit?.text ?? draft).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty),
                         runActive: activeRun != nil && !stopping, followUp: followUp, editing: edit != nil),
                     perform: perform,
                     model: currentModel, openSettings: { panel = .model },
