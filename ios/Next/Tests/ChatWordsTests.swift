@@ -156,4 +156,23 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(toolSymbol(captionEntry(call).kind), toolSymbol(row.kind))
         XCTAssertEqual(toolSymbol(captionEntry(HelperStep(tool: "desktop_act", target: "", line: "", at: 0)).kind), "cursorarrow.click")
     }
+
+    /// Item 2002: work handed to a helper is said in plain words with the helper's title, in the phone's language;
+    /// never "delegate", "child" or "subagent".
+    func testHandedWorkIsSaidInPlainWords() {
+        let banned: [String] = ["delegat", "subagent", "child", "alt ajan", "devret"]
+        let goal: String = "Check the dentist's free slots. Then say which suit."
+        let line: String = callPhrase(HelperStep(tool: "delegate", target: goal, line: "", at: 0))
+        XCTAssertTrue(line.contains("Check the dentist's free slots"), line)
+        XCTAssertFalse(line.contains("Then say"), "the helper's short title, not its whole goal: \(line)")
+        let rows: [String] = [
+            toolLine(ToolEntry(id: "d", tool: "delegate", kind: .helper, target: goal, args: "", output: "", state: .running, images: [], startedAt: 0, endedAt: 1)),
+            toolLine(ToolEntry(id: "d", tool: "delegate", kind: .helper, target: goal, args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1)),
+            toolLine(ToolEntry(id: "d", tool: "delegate", kind: .helper, target: goal, args: "", output: "", state: .failed, images: [], startedAt: 0, endedAt: 1)),
+        ]
+        for words in [line, callPhrase(HelperStep(tool: "delegate", target: "", line: "", at: 0)), dotToolWords("delegate") ?? ""] + rows {
+            for word in banned { XCTAssertFalse(words.lowercased().contains(word), "\(word) in \(words)") }
+        }
+        XCTAssertFalse(BackgroundKind.subagent.word.lowercased().contains("subagent"))
+    }
 }

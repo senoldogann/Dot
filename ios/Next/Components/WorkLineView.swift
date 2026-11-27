@@ -16,7 +16,7 @@ func workLineWords(_ now: WorkNow) -> String? {
     case .tool(let step): callPhrase(step)
     case .handoff(let agent):
         agent.isEmpty
-            ? String(localized: "Handing a part to a subagent", comment: "Work line: work handed to a helper")
+            ? String(localized: "Handed to a helper", comment: "Work line: work handed to a helper (plain words: never 'subagent' or 'delegate')")
             : String(localized: "Waiting for \(agent)", comment: "Work line: work handed to an agent; the argument is its name")
     case .told(let words): middleCut(words, 90)
     case .writing: nil
@@ -39,6 +39,12 @@ func callPhrase(_ step: HelperStep) -> String {
         return about.isEmpty
             ? String(localized: "Reading a page", comment: "Work line: a web page read")
             : String(localized: "Reading \(short(URL(string: about)?.host() ?? about))", comment: "Work line: a file or page read; the argument is its name")
+    }
+    if tool == "delegate" || tool == "team" {
+        // The helper's work by its title, in plain words (item 2002): never "delegate", "child" or "subagent".
+        return about.isEmpty
+            ? String(localized: "Handed to a helper", comment: "Work line: work handed to a helper (plain words: never 'subagent' or 'delegate')")
+            : String(localized: "Handed to a helper: \(short(shortTitle(about)))", comment: "Tool row: work handed to a helper, at work; the argument is its title")
     }
     if tool.hasPrefix("browser_") { return String(localized: "Working in the browser", comment: "Work line: a browser step") }
     if tool.hasPrefix("desktop_") { return String(localized: "Working on the Mac", comment: "Work line: a step on the Mac's screen") }

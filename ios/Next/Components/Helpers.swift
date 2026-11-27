@@ -143,7 +143,7 @@ enum BackgroundKind: Equatable, Sendable {
 
     var word: String {
         switch self {
-        case .subagent: String(localized: "Subagent", comment: "Background work kind: a helper agent")
+        case .subagent: String(localized: "Helper", comment: "Background work kind: a helper agent")
         case .command: String(localized: "Command", comment: "Background work kind: a shell command still running")
         case .loop: String(localized: "Loop", comment: "Background work kind: a repeating task of the chat")
         }

@@ -539,7 +539,7 @@
       }
     },
     "%lld min": {
-      "comment": "Work line: how long the run has worked, in whole minutes",
+      "comment": "A short span of time: minutes\nWork line: how long the run has worked, in whole minutes",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -860,7 +860,7 @@
       }
     },
     "%lld tries": {
-      "comment": "Own initiative: how many times Dot tried a thing",
+      "comment": "Own initiative: how many times Dot tried a thing\nWork order: how many attempts it has had",
       "localizations": {
         "en": {
           "variations": {
@@ -1104,6 +1104,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unutulan bir not burada bir süre bekler ve geri getirilebilir."
+          }
+        }
+      }
+    },
+    "A helper failed: %@": {
+      "comment": "Tool row: work handed to a helper that failed; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir yardımcı başarısız oldu: %@"
+          }
+        }
+      }
+    },
+    "A helper finished: %@": {
+      "comment": "Tool row: work handed to a helper, ended; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir yardımcı bitirdi: %@"
           }
         }
       }
@@ -2788,7 +2810,7 @@
       }
     },
     "Close": {
-      "comment": "Sheet toolbar: closes an inspector sheet\nSheet toolbar: closes the sheet",
+      "comment": "Sheet toolbar: closes an inspector sheet\nSheet toolbar: closes the sheet\nVoiceOver: closes the full-screen video",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3587,50 +3609,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Varsayılan · orta"
-          }
-        }
-      }
-    },
-    "Delegate": {
-      "comment": "Tool row of Dot's own tool: a part handed to a helper",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Görev devret"
-          }
-        }
-      }
-    },
-    "Delegated task “%@” failed": {
-      "comment": "Tool row: a task handed to a helper that failed; the argument is its goal",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” görevi devredildi, başarısız oldu"
-          }
-        }
-      }
-    },
-    "Delegated task “%@” finished": {
-      "comment": "Tool row: a task handed to a helper, ended; the argument is its goal",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” görevi devredildi ve bitti"
-          }
-        }
-      }
-    },
-    "Delegating “%@”": {
-      "comment": "Tool row: a task handed to a helper, at work; the argument is its goal",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” devrediliyor"
           }
         }
       }
@@ -5971,13 +5949,24 @@
         }
       }
     },
-    "Handing a part to a subagent": {
-      "comment": "Work line: work handed to a helper",
+    "Handed to a helper": {
+      "comment": "Tool row of Dot's own tool: a part handed to a helper (never 'delegate')\nWork line: work handed to a helper (plain words: never 'subagent' or 'delegate')",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bir kısmı alt ajana veriyor"
+            "value": "Bir yardımcıya verildi"
+          }
+        }
+      }
+    },
+    "Handed to a helper: %@": {
+      "comment": "Tool row: work handed to a helper, at work; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir yardımcıya verildi: %@"
           }
         }
       }
@@ -6066,6 +6055,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bekletiliyor"
+          }
+        }
+      }
+    },
+    "Helper": {
+      "comment": "Background work kind: a helper agent\nBackground work kind: a helper let go to the background",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcı"
           }
         }
       }
@@ -6797,7 +6797,7 @@
       }
     },
     "Let go": {
-      "comment": "Own initiative: a thing taken off the list",
+      "comment": "Objective: the owner and Dot let it go\nOwn initiative: a thing taken off the list",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7245,7 +7245,7 @@
       }
     },
     "Message": {
-      "comment": "Draft: an iMessage",
+      "comment": "Draft: an iMessage\nHand-off: what was asked",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8026,7 +8026,7 @@
       }
     },
     "None": {
-      "comment": "Find in chat: no block holds the words\nMaintenance › Performance: no hang, no crash",
+      "comment": "Bot profile: nothing in a group of its work\nFind in chat: no block holds the words\nMaintenance › Performance: no hang, no crash",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8851,7 +8851,7 @@
       }
     },
     "Open": {
-      "comment": "VoiceOver: an open provider group",
+      "comment": "VoiceOver: an open provider group\nWork orders: the section of those not over",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9600,7 +9600,7 @@
       }
     },
     "Progress": {
-      "comment": "Campaign note: progress",
+      "comment": "Campaign note: progress\nObjective: its dated lines of progress",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11751,6 +11751,17 @@
         }
       }
     },
+    "Show cards": {
+      "comment": "Tool row of Dot's own tool: cards shown in the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kart göster"
+          }
+        }
+      }
+    },
     "Show full message": {
       "comment": "Under a long owner's message: unfolds it",
       "localizations": {
@@ -11780,17 +11791,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Daha fazla not göster"
-          }
-        }
-      }
-    },
-    "Show cards": {
-      "comment": "Tool row of Dot's own tool: cards shown in the chat",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kart göster"
           }
         }
       }
@@ -12297,17 +12297,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Strateji"
-          }
-        }
-      }
-    },
-    "Subagent": {
-      "comment": "Background work kind: a helper agent\nBackground work kind: a helper let go to the background",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alt ajan"
           }
         }
       }
@@ -13755,7 +13744,7 @@
       }
     },
     "To": {
-      "comment": "Draft card: the recipients",
+      "comment": "Draft card: the recipients\nHand-off: who it was sent to",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14063,7 +14052,7 @@
       }
     },
     "Typing": {
-      "comment": "Live caption: the run types\nWork line: the run waits for its model to answer",
+      "comment": "Work line: the run waits for its model to answer",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14546,6 +14535,35 @@
         }
       }
     },
+    "Waiting for %lld helpers": {
+      "comment": "Capsule: the run waits for its helpers; the argument is how many still work\nChat row: the run waits for its helpers; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Waiting for %lld helper"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Waiting for %lld helpers"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yardımcı bekleniyor"
+          }
+        }
+      }
+    },
     "Waiting for Dot's check": {
       "comment": "Work order: the attempt ended and the lead has not judged it",
       "localizations": {
@@ -14602,7 +14620,7 @@
       }
     },
     "Waiting for you": {
-      "comment": "Campaign section: questions that wait\nWork line: an approval or a question waits for the owner",
+      "comment": "Campaign section: questions that wait\nWork line: an approval or a question waits for the owner\nWork order: it waits for the owner's decision",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14619,35 +14637,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtını bekliyor"
-          }
-        }
-      }
-    },
-    "Waiting on %lld helpers": {
-      "comment": "Capsule: the run waits for its helpers; the argument is how many still work\nChat row: the run waits on helpers; the argument is how many",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Waiting on %lld helper"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Waiting on %lld helpers"
-                }
-              }
-            }
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld yardımcıyı bekliyor"
           }
         }
       }
@@ -15192,7 +15181,7 @@
       }
     },
     "Work orders": {
-      "comment": "Tool row of Dot's own tool: the agents' work orders",
+      "comment": "Bot profile: the work the lead handed to the bot\nTool row of Dot's own tool: the agents' work orders",
       "localizations": {
         "tr": {
           "stringUnit": {

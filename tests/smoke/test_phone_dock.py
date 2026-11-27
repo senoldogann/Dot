@@ -113,7 +113,7 @@ async def test_a_phones_dock_is_one_capsule_of_segments_over_the_composer_and_ea
                 await expect(_segment(page, "status")).to_have_attribute("aria-label", re.compile(r"^Working · \d"))
                 await expect(_segment(page, "stop")).to_have_attribute("aria-label", "Stop the task")
                 await expect(_segment(page, "helpers")).to_have_attribute(
-                    "aria-label", "2 helpers. Waiting on 2 helpers"
+                    "aria-label", "2 helpers. Waiting for 2 helpers"
                 )
                 await expect(_segment(page, "loops")).to_have_attribute("aria-label", "Loop, every 10 min")
                 await expect(_segment(page, "queue")).to_have_attribute("aria-label", "1 queued")
@@ -386,7 +386,7 @@ async def test_the_helpers_sheet_says_what_the_task_waits_on_and_has_the_details
             page: Page = await _page(browser, sc, 390, 844, "dark")
             await _segment(page, "helpers").tap()
             sheet: Locator = _open_sheet(page)
-            await expect(sheet.locator(".dock-helpers-lead")).to_have_text("Waiting on 2 helpers")
+            await expect(sheet.locator(".dock-helpers-lead")).to_have_text("Waiting for 2 helpers")
             await expect(sheet.locator(".dock-helper")).to_have_count(2)
             assert sorted(await sheet.locator(".dock-helper-title").all_text_contents()) == sorted(JOBS)
             await expect(sheet.locator(".dock-helper-now")).to_have_text(["Running sleep 300"] * 2)

@@ -14,6 +14,11 @@ test("a page or a site is named by its site, any other call as the live line say
   assert.equal(narrationPhrase("shell", {}), "Running a command");
 });
 
+test("work handed to a helper is said in plain words with its title, never delegate or subagent (item 2002)", () => {
+  assert.equal(narrationPhrase("delegate", { goal: "Check the dentist's free slots" }), "Handed to a helper: Check the dentist's free slots");
+  assert.equal(narrationPhrase("delegate", {}), "Handed to a helper");
+});
+
 test("the time is in seconds under a minute and in whole minutes after", () => {
   assert.equal(workedFor(0), "0 s");
   assert.equal(workedFor(59.9), "59 s");

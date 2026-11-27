@@ -774,7 +774,7 @@ struct ChatScreen: View {
         guard capsuleStatus == .working, let run = activeRun, let chat, case .tool(let step)? = activity(of: chat, run: run.id) else { return nil }
         let working: Int = newestRunHelpers.filter { helperState($0.status).isLive }.count
         guard working > 0, isHelperStep(step.tool) else { return nil }
-        return String(localized: "Waiting on \(working) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
+        return String(localized: "Waiting for \(working) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
     }
 
     /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none. Zen filters the

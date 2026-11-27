@@ -58,10 +58,12 @@ func toolLine(_ entry: ToolEntry) -> String {
             ? String(localized: "Waiting for a condition", comment: "Tool row: a wait_until step at work")
             : String(localized: "Waited for a condition", comment: "Tool row: a wait_until step")
     case .helper where !target.isEmpty:
+        let title: String = shortTitle(target)
         switch entry.state {
-        case .running: return String(localized: "Delegating “\(target)”", comment: "Tool row: a task handed to a helper, at work; the argument is its goal")
-        case .done: return String(localized: "Delegated task “\(target)” finished", comment: "Tool row: a task handed to a helper, ended; the argument is its goal")
-        case .failed: return String(localized: "Delegated task “\(target)” failed", comment: "Tool row: a task handed to a helper that failed; the argument is its goal")
+        // Plain words, the helper's work by its title: never "delegate", "child" or "subagent" (item 2002).
+        case .running: return String(localized: "Handed to a helper: \(title)", comment: "Tool row: work handed to a helper, at work; the argument is its title")
+        case .done: return String(localized: "A helper finished: \(title)", comment: "Tool row: work handed to a helper, ended; the argument is its title")
+        case .failed: return String(localized: "A helper failed: \(title)", comment: "Tool row: work handed to a helper that failed; the argument is its title")
         }
     default: return target.isEmpty ? toolName(entry.tool) : "\(toolName(entry.tool)) · \(target)"
     }

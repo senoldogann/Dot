@@ -8,6 +8,7 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    "Show cards": "Kart göster",
     "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",
     "Not sent: an attachment could not be read on this phone": "Gönderilmedi: eklerden biri bu telefonda okunamadı",
     "Upload cancelled": "Yükleme iptal edildi",
@@ -1690,3 +1691,15 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+# Delegation in plain words (item 2002): never "delegate", "child" or "subagent".
+TR.update(
+    {
+        "Handed to a helper": "Bir yardımcıya verildi",
+        "Handed to a helper: %@": "Bir yardımcıya verildi: %@",
+        "A helper finished: %@": "Bir yardımcı bitirdi: %@",
+        "A helper failed: %@": "Bir yardımcı başarısız oldu: %@",
+        "Helper": "Yardımcı",
+        "Waiting for %lld helpers": "%lld yardımcı bekleniyor",
+    }
+)
+EN_PLURALS.update({"Waiting for %lld helpers": ("Waiting for %lld helper", "Waiting for %lld helpers")})

@@ -303,9 +303,14 @@ def render_detached(outcome: DelegateOutcome, step: int | None, unplanned: str |
 def _delegate_tool() -> RegisteredTool:
     def classify(args: DelegateArgs, ctx: ToolContext) -> ActionInfo:
         shown: str = truncate_tail(" ".join(args.goal.split()), _SUMMARY_CHARS)
-        on: str = "" if args.model is None else f" to {args.model}"
+        on: str = "" if args.model is None else f" on {args.model}"
         return ActionInfo(
-            tool=DELEGATE_TOOL, kind="delegate", risk="safe", summary=f"Delegate{on}: {shown}", target="", flags=()
+            tool=DELEGATE_TOOL,
+            kind="delegate",
+            risk="safe",
+            summary=f"Hand to a helper{on}: {shown}",
+            target="",
+            flags=(),
         )
 
     async def run(args: DelegateArgs, ctx: ToolContext) -> ToolResult:
