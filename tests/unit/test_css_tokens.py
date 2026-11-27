@@ -615,3 +615,12 @@ def test_a_link_in_a_message_has_no_chip_and_reads_at_aa_on_every_ground_it_stan
     in_bubble: str = _mix_oklab(pairs["--accent-strong"][scheme], resolved("--on-msg-me"), int(mine.group(1)) / 100)
     ratio = contrast(in_bubble, resolved("--msg-me"))
     assert ratio >= 4.5, f"a link ({in_bubble}) in the owner's bubble: {ratio:.2f} < 4.5"
+
+
+def test_the_question_cards_header_is_not_set_in_capitals() -> None:
+    """A CSS uppercase turns an English "is" under ``lang="tr"`` into "İS" (item 1978, 2026-11-26 review): the header of
+    the card that asks is in sentence case, so a line of another language is never changed by the sheet."""
+    sheet: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    rule: re.Match[str] | None = re.search(r"\n\.asks-title \{([^}]*)\}", sheet)
+    assert rule is not None, "the sheet has no rule for the header of the card that asks"
+    assert "text-transform" not in rule.group(1)
