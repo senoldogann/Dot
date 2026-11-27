@@ -703,8 +703,9 @@ login_env_timeout_s = 20.0
 default_timeout_s = 120
 max_timeout_s = 1800
 # Terminal sessions (terminal_open): a program that asks questions, a REPL, a server that must stay up while a run goes
-# on. At most this many per chat at a time (0 offers no terminal tools); each is closed after terminal_idle_s seconds
-# without a read or a send, and all of them when the daemon stops. The end of a run closes none.
+# on. At most this many per chat whose program runs at a time (0 offers no terminal tools; one whose program ended does
+# not count); each is closed after terminal_idle_s seconds without a read or a send, and all of them when the daemon
+# stops. The end of a run closes none.
 terminal_sessions = 3
 terminal_idle_s = 1800.0
 # Outside yolo, the processes of a run (shell commands, terminal sessions, AppleScript, the search tools) start in a

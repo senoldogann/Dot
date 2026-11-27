@@ -718,7 +718,9 @@ a model on the owner's Mac sent them 17 times in two days, each call refused), `
 `file_text` too (item 1902: Claude models sent that name, the one Anthropic's text editor tool gives it), `search_files` reads its `pattern` as
 `query` too (item 1176: a run on the Claude plan sent that name four times), `search_files` and `find_files` of a
 path that is not there fail with "path does not exist", as `list_dir` and `read_file` do, not as a failure of
-ripgrep's own (item 1283), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
+ripgrep's own (item 1283), `search_files` reads its pattern in ripgrep's own regex syntax, which its description
+names (no look-around, no backreferences, a match within one line), and fails a pattern ripgrep cannot read as the
+call's error with ripgrep's reason, not as a failure of ripgrep's own (item 1988), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
 comes, ending the search at that and saying so, so that a word a tree holds everywhere no longer costs the daemon
 the 1.8 GB that 397 MB of matches did (item 1956), and a wait or a count asked past its
 bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
@@ -917,8 +919,9 @@ a `shell` command is, a line typed in parts as a whole. Typing never holds Dot: 
 for it, up to 64 KB, and past that `terminal_send` fails with an error that says so until the program reads. A key a line editor acts upon (Tab, an arrow, a Ctrl- shortcut
 other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; once a line has run, the program may be
 in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
-sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
-when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
+sessions whose program runs (3; 0 removes the tools); one whose program ended does not count, and stays to be read, its
+exit status with it, until a read or `terminal_close` closes it (item 1990). Each is closed after `terminal_idle_s`
+without use (30 minutes) and all of them when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
 **A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
 answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the

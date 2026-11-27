@@ -2774,7 +2774,7 @@
           "type": "string"
         },
         "pattern": {
-          "description": "Regular expression to search for in file contents.",
+          "description": "Regular expression to search for in file contents, in Rust regex syntax, as ripgrep reads it: no look-around ((?=, (?!, (?<=, (?<!) and no backreferences, and a match lies within one line, so a pattern holds no \\n; escape ( ) [ ] { } . | * + ? ^ $ \\ to match them as text.",
           "type": "string"
         }
       },
