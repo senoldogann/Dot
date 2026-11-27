@@ -15,7 +15,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
-from dotagent.agent.busy import SEPARATE_TOOL
+from dotagent.agent.busy import ROUTE_TOOL, SEPARATE_TOOL
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import NotFoundError
@@ -58,6 +58,10 @@ class _Model(ScriptedProvider):
                 text="", calls=(ScriptedCall(tool=SEPARATE_TOOL, arguments={"separate": True}),)
             )
             return await ScriptedProvider(_PROVIDER, [verdict]).complete(request, sink)
+        # With several tasks a chat's router (item 2012) asks instead: a new task, as the fast model said above.
+        if any(spec.name == ROUTE_TOOL for spec in request.tools):
+            routed: ScriptedTurn = ScriptedTurn(text="", calls=(ScriptedCall(tool=ROUTE_TOOL, arguments={"task": 0}),))
+            return await ScriptedProvider(_PROVIDER, [routed]).complete(request, sink)
         said: str = "\n".join(message.content for message in request.messages if message.role == "user")
         for word, gate in self.gates.items():
             if word in said:
