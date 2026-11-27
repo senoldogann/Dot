@@ -40,7 +40,7 @@ step that needs your answer is not folded out of sight. Its fold is kept in that
 kept from before item 836 is not read as it. At the right of a chat at work the age gives way to **Working** and how long
 since the run was asked for ("12s", "4m", "1h 5m", read again every second). What a chat delegated (item 507), the runs at
 work and those that ended, is one quiet count in its last line (the users mark and how many), and its name for a screen reader
-says how many there are. Nothing hangs under the row: a click on it opens the chat,
+says how many there are. A chat whose run waits on its helpers says **Waiting on 2 helpers…** in its last line, in place of its last words, shimmering as the work line does, and a chat at rest with something still working for it (a helper let go, a command in the background, its loop) says **Waiting · ** and the first of them, quiet (item 2010, as the iPhone app's rows do; read from `GET /api/threads/view` beside the list, so a phone with no link shows what the list alone tells). Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
 (which works in a thread of its own). A run another run delegated stands under the chat its work came from, never as a
 row of its own, also once the run that delegated it has ended (item 1074: a work order's try outlives the lead's turn

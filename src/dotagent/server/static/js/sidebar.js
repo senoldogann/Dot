@@ -28,6 +28,7 @@ import { badge, badgeCode } from "./badge.js";
 import { shownOwner } from "./presence.js";
 import { dotName } from "./face.js";
 import { requestCompose } from "./shortcuts.js";
+import { waitsOn } from "./rowwaits.js";
 import { PHONE } from "./layout.js";
 import { loopRhythm, nextFiring } from "./rhythm.js";
 import { closeMenu, closeMenuFrom, menuOpenedBy, openMenu, openOnHold } from "./menu.js";
@@ -42,6 +43,8 @@ import { attempt, confirmDialog, toast } from "./ui.js";
 const LIST_LIMIT = 200;
 const LIST_CAP = 500;
 // The moments a run changes status; a run that waits for an approval is "blocked" until it is answered.
+// The events that move what a row says it waits on and nothing else of the list (item 2010).
+const WAIT_KINDS = new Set(["helper_released", "terminals_changed"]);
 const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback", "chat_rewound"]);
 // The groups above the chats: what waits for you and what works now (`GET /activity`), each hidden while empty. They
 // are rows as a messaging app's (item 836), with no heading: a row says that it waits or works itself, and its group's
@@ -238,8 +241,11 @@ function chatText(chat, agent, children, waits = null, right = null, unread = fa
   // and all, stood here after item 1136); its own line stands in the chat. Any other chat ends on its last words.
   const stopped = chat.latest_status === "failed" ? serviceFailure(chat.last_message ?? "") : null;
   const words = stopped === null ? serviceWords(chat.last_message ?? "").text : stopped.short;
-  const last = words === "" || chat.last_role !== "user" || stopped !== null ? words : t("side.you", { words });
-  const helpers = helperChip(children);
+  const state = waitsOn(chat);
+  const said = words === "" || chat.last_role !== "user" || stopped !== null ? words : t("side.you", { words });
+  const last = state === null ? said : state.words;
+  // A row that says it waits on its helpers says how many: the count beside it would say it twice.
+  const helpers = state?.live === true ? null : helperChip(children);
   // A chat with a team (item 610) says which, ahead of its last words.
   const team = chat.team === null || chat.team === undefined ? null : el("span", { class: "side-chat-team", title: chat.team.name }, chat.team.name);
   const empty = last === "" && team === null && helpers === null && marks.every((mark) => mark === null) && dot === null;
@@ -251,7 +257,13 @@ function chatText(chat, agent, children, waits = null, right = null, unread = fa
         ...marks,
         team,
         helpers,
-        last === "" || helpers !== null ? null : el("span", { class: "side-chat-words", dataset: stopped === null ? {} : { stopped: "" } }, last),
+        last === "" || (helpers !== null && state === null)
+          ? null
+          : el(
+              "span",
+              { class: state?.live === true ? "side-chat-words side-chat-live" : "side-chat-words", dataset: stopped === null || state !== null ? {} : { stopped: "" } },
+              last,
+            ),
         dot,
       );
   return el("span", { class: "side-chat-text" }, top, title, under);
@@ -295,7 +307,9 @@ function chatLink(chat, onNavigate, agent, children, waits = null) {
   const word = [
     chat.team === null || chat.team === undefined ? undefined : t("side.withTeam", { name: chat.team.name }),
     waits === null ? STATUS_WORD[chat.latest_status] : `${WAITS_WORDS.toLowerCase()}: ${waits.map((row) => `${row.title}, ${row.detail}`).join("; ")}`,
-    helperWords(children),
+    // A row that says it waits on its helpers says how many once.
+    waits === null && waitsOn(chat)?.live === true ? undefined : helperWords(children),
+    waits === null ? waitsOn(chat)?.words : undefined,
     // While it waits its row shows no dot of an unread chat, so its name says none either (the pre-push review).
     chat.unread === true && waits === null ? t("side.unread") : undefined,
     loop === null ? undefined : loop.toLowerCase(),
@@ -474,6 +488,8 @@ function closesOnSwipe(element, onCollapse) {
 
 export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let chats = null;
+  /** @type {Map<string, { helpers: number, background: Array<{ title: string }> }>} */
+  let waitsByChat = new Map();
   let listLimit = LIST_LIMIT;
   let failure = null;
   let needle = "";
@@ -1175,7 +1191,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // A chat's entry: its row, wearing while its latest run works (`family`, that run's row and the runs it delegated;
   // null at rest) the faces of those runs (items 202 and 507).
   function chatEntry(chat, family) {
-    const link = chatLink(chat, onNavigate, agentOf(chat), family === null ? [] : family.children, waits.byChat.get(chat.id) ?? null);
+    const shown = { ...chat, ...(waitsByChat.get(chat.id) ?? {}) };
+    const link = chatLink(shown, onNavigate, agentOf(chat), family === null ? [] : family.children, waits.byChat.get(chat.id) ?? null);
     rowNodes.set(chat.id, link);
     return chatRow(chat, link);
   }
@@ -1497,8 +1514,30 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     paintLists();
   }
 
+  // What each chat waits on that is not the owner (item 2010): the helpers its run waits on and what works for it
+  // in the background, by chat, from `GET /threads/view`, which reads them only for a chat at work, one that let a helper
+  // go or one with a loop. It is read beside the list, which a phone keeps a copy of for when it has no link; with no
+  // link it cannot be read, and the rows say what the list alone tells.
+  let waitsTicket = 0;
+
+  async function loadWaits() {
+    const mine = ++waitsTicket;
+    try {
+      const view = await api.get(`/threads/view?limit=${listLimit}`);
+      if (disposed || mine !== waitsTicket) {
+        return;
+      }
+      waitsByChat = new Map(view.threads.map((row) => [row.summary.id, { helpers: row.helpers, background: row.background }]));
+    } catch (error) {
+      console.warn("what the chats wait on could not be read", error);
+      return;
+    }
+    paintLists();
+  }
+
   async function load() {
     loadActivity();
+    loadWaits();
     const mine = ++chatsTicket;
     try {
       const all = await api.get(`/threads?limit=${listLimit}`);
@@ -1537,9 +1576,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const reloadFacesSoon = debounce(() => {
     loadFaces();
   }, 250);
+  // What the rows say they wait on moves with a helper let go and with a command in the background (item 2010).
+  const reloadWaitsSoon = debounce(() => {
+    loadWaits();
+  }, 250);
   const stopLifecycle = onLifecycle((event) => {
     if (RELOAD_KINDS.has(event.kind)) {
       reloadSoon();
+    } else if (WAIT_KINDS.has(event.kind)) {
+      reloadWaitsSoon();
     }
     // A run that starts may begin an agent's conversation (item 1233), and one that ends moves its face.
     if (event.kind === "run_started" || event.kind === "run_finished") {
