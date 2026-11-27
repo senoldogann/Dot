@@ -1630,3 +1630,6 @@ TR.update(
         "Looking at %@": "%@ inceleniyor",
     }
 )
+
+# The expanded composer chip (item 1991)
+TR.update({"Fast": "Hızlı"})

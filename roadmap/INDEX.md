@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1991](1991.md) | done | 2026-11-27 | DotNext: the jump-to-end button comes whenever the owner has scrolled up, and the expanded composer names the model |
 | [1988](1988.md) | done | 2026-11-27 | A search pattern ripgrep cannot read is told as the call's own error, with the syntax it reads |
 | [1986](1986.md) | done | 2026-11-27 | A code review whose chat was deleted starts in a new chat instead of failing |
 | [1984](1984.md) | built | 2026-11-27 | Several tasks in one chat, slice 1: lanes, the answer's queue, Stop for the whole chat |

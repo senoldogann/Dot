@@ -72,6 +72,8 @@ struct ChatScreen: View {
     /// The owner's finger moves the transcript, or it glides on after it.
     @State private var ownerScrolls: Bool = false
     @State private var showsJump: Bool = false
+    /// Whether the transcript is at its end now, as the scroll last said.
+    @State private var atEnd: Bool = true
     @State private var reading: ReadingMark = ReadingMark()
     /// How many times the screen was drawn, for the debug render meter (item 1932).
     @State private var renders: RenderMeter = RenderMeter()
@@ -321,8 +323,13 @@ struct ChatScreen: View {
         // their scroll back to the end starts it again; words that grow the transcript never stop it.
         .onScrollGeometryChange(for: Bool.self) { geometry in
             isAtEnd(distanceFromEnd: Double(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.contentOffset.y - geometry.containerSize.height))
-        } action: { _, atEnd in
-            if atEnd { pinned = true } else if ownerScrolls { pinned = false }
+        } action: { _, now in
+            atEnd = now
+            pinned = followsAfterScroll(following: pinned, atEnd: now, ownerScrolls: ownerScrolls)
+        }
+        // The owner's own scroll, begun while the end is already away (it moved by itself first), stops the follow too.
+        .onChange(of: ownerScrolls) { _, now in
+            pinned = followsAfterScroll(following: pinned, atEnd: atEnd, ownerScrolls: now)
         }
         // New words are followed when the transcript's end changes, never when its height does (item 1932): a lazy
         // stack estimates the rows out of sight, so its height moves as rows come into sight, and following each move
@@ -688,7 +695,7 @@ struct ChatScreen: View {
     private var currentModel: ModelChoice? {
         let choices: ChatChoices = chatChoices
         guard let ref = effectiveModel(choices, defaultRef: model.chatDefaults?.model) else { return nil }
-        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: choices.effort)
+        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: choices.effort, fast: choices.speed == "fast")
     }
 
     /// The chat's choices as its next follow-up starts with them: those kept for it, else what its last run ran on.

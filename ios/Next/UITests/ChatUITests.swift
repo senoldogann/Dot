@@ -50,6 +50,29 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// The round "↓" beside the bottom capsule (item 1991): it is absent while the chat stands at its end, comes once the owner
+    /// scrolls up, and a tap on it scrolls to the end, follows again and hides it.
+    @MainActor
+    func testTheJumpButtonComesWhenTheOwnerScrollsUpAndLeavesWithATap() {
+        let app: XCUIApplication = launch("n2-failed", defaults: [])
+        let jump: XCUIElement = app.buttons["chat.scrollToBottom"]
+        let message: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 10))
+        XCTAssertFalse(jump.exists, "at the end there is no button")
+        let scroll: XCUIElement = app.scrollViews.firstMatch
+        for _ in 0..<3 { scroll.swipeDown(velocity: .fast) }
+        XCTAssertTrue(jump.waitForExistence(timeout: 5), "scrolled up, the button comes")
+        XCTAssertGreaterThanOrEqual(jump.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(jump.frame.height, 44)
+        let attachment: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "jump-button"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        jump.tap()
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: jump)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "at the end again, the button leaves")
+    }
+
     @MainActor
     func testThePlusMenuAttachesAVideoWithItsDurationAndCanRemoveIt() throws {
         let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))

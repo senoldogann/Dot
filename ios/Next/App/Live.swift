@@ -581,7 +581,7 @@ struct BotNewChat: View {
 
     private var chip: ModelChoice? {
         guard let ref = effectiveModel(settings.choices, defaultRef: model.chatDefaults?.model) else { return nil }
-        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: settings.choices.effort)
+        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: settings.choices.effort, fast: settings.choices.speed == "fast")
     }
 
     var body: some View {

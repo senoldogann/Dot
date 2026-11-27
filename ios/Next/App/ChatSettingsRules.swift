@@ -208,6 +208,35 @@ func providerOfModel(_ ref: String, in options: [ProviderModels]) -> String {
     return ref.contains(":") ? String(ref.split(separator: ":", maxSplits: 1)[0]) : ""
 }
 
+/// Whether the chat follows new words after the scroll changed (pure): at the end it always does; away from it, the owner's
+/// own scroll stops it, and without one it keeps what it was (a lazy stack's moving height is no scroll of theirs). The
+/// owner's scroll counts when it begins as well as when the end moves away: a chat whose end moved away first, by itself,
+/// would otherwise never be seen to be left, and the jump button would never come.
+func followsAfterScroll(following: Bool, atEnd: Bool, ownerScrolls: Bool) -> Bool {
+    if atEnd { return true }
+    return ownerScrolls ? false : following
+}
+
+/// A model's name without its provider's name in front ("Anthropic · Opus 5.5" and "Claude Code: Opus" give "Opus 5.5" and
+/// "Opus"): the provider's mark stands beside it. A label that does not start so, or is no more than the provider's name,
+/// is kept (pure).
+func modelNameWithoutProvider(_ label: String, provider: String) -> String {
+    let title: String = providerTitle(provider)
+    let separators: String = " ·:/-–—"
+    guard !title.isEmpty, let range = label.range(of: title, options: [.anchored, .caseInsensitive]) else { return label }
+    let tail: Substring = label[range.upperBound...]
+    guard let first = tail.first, separators.contains(first) else { return label }
+    let rest: Substring = tail.drop { separators.contains($0) }
+    return rest.isEmpty ? label : String(rest)
+}
+
+/// What the expanded composer's chip says in grey after the model's name: its level and "Fast" when fast mode is on
+/// ("Medium Fast"); `nil` when neither (pure).
+func chipDetail(effort: String?, fast: Bool) -> String? {
+    let parts: [String] = [effort.map(effortTitle), fast ? String(localized: "Fast", comment: "The composer's model chip: fast mode is on") : nil].compactMap { $0 }
+    return parts.isEmpty ? nil : parts.joined(separator: " ")
+}
+
 /// The asset of a provider's mark (`Resources/Assets.xcassets/provider-*`, the web's `static/icons/providers`): Zen's
 /// free models wear OpenCode Go's, the Claude plan Anthropic's, Antigravity Google's; the rest the generic one.
 func providerMarkAsset(_ provider: String) -> String {
