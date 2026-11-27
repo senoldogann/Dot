@@ -923,6 +923,16 @@ export const EN_APP = {
   "planbubble.evidence": "Evidence",
   "planbubble.plan": "Plan",
   "planbubble.openInTheSidePanel": "Open in the side panel",
+  // planwords.js
+  "planwords.count": "{done} of {total} done",
+  "planwords.done": "The run is done",
+  "planwords.failed": "The run failed",
+  "planwords.failedAt": "Failed at step {step}",
+  "planwords.stopped": "Stopped",
+  "planwords.stoppedAt": "Stopped at step {step}",
+  "planwords.finishing": "Finishing",
+  "planwords.workingOn": "Working on step {step}",
+  "planwords.stoppedStep": "Stopped",
   // presence.js
   "presence.waitsForYou": "Waits for you",
   "presence.working": "Working",

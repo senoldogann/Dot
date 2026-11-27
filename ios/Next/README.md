@@ -40,7 +40,9 @@ a service waits on the Mac. A photo goes at most 1,600 px on its long side and a
 diagnostics' counts, and the app's counters of each time it was open, `App/PerfCounters.swift`) goes to the paired Mac
 alone (`POST /api/phone/metrics`, sent when the app opens) and Settings › Maintenance shows its last seven days. A step's thinking is
 one folded line that a tap opens; the running work is one pill (plain words and clock | Stop | Plan 1/5 | queued |
-helpers done/total), whose plan and people segments open the plan's checklist and the Agents sheet; the stream keeps
+helpers done/total), whose plan and people segments open the plan's sheet (`Components/PlanSheet.swift`: "2 of 6 done", where the run
+stands, a bar, the steps on a line, sized to its content; a failed or stopped run's step says so, `planAtEnd`) and the
+Agents sheet; the stream keeps
 no plan card (item 1880), and a run's helpers are one group row whose tap opens a card of each (item 1957). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 

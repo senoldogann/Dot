@@ -1735,3 +1735,15 @@ TR.update(
         "Shows the whole message": "Mesajın tamamını gösterir",
     }
 )
+# The plan sheet (the owner's report of 2026-11-28).
+TR.update(
+    {
+        "%lld of %lld done": "%lld / %lld tamamlandı",
+        "The run is done": "Çalışma tamamlandı",
+        "Failed at step %lld": "%lld. adımda başarısız oldu",
+        "Stopped at step %lld": "%lld. adımda durduruldu",
+        "Finishing": "Bitiriliyor",
+        "Working on step %lld": "%lld. adım üzerinde çalışıyor",
+        "stopped": "durduruldu",
+    }
+)

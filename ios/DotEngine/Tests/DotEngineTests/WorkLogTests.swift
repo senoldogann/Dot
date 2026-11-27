@@ -319,4 +319,23 @@ final class WorkLogTests: XCTestCase {
         let ended: ChatProjection = chat([run("run_a", status: "done")], [step, delegate(11, "d1", wait: nil), event(12, "run_finished", [:])])
         XCTAssertFalse(waitsOnHelpers(of: ended, run: "run_a"))
     }
+
+    // MARK: The plan once its run ended (the owner's report of 2026-11-28)
+
+    func testAFailedOrStoppedRunsPlanShowsItsStepFailedOrStopped() {
+        let steps: [PlanStep] = [
+            PlanStep(text: "Read the CV", status: "done"), PlanStep(text: "Search LinkedIn", status: "in_progress"),
+            PlanStep(text: "Write the letters", status: "pending"),
+        ]
+        XCTAssertEqual(PlanEnd(runStatus: "failed"), .failed)
+        XCTAssertEqual(PlanEnd(runStatus: "cancelled"), .stopped)
+        XCTAssertEqual(PlanEnd(runStatus: "running"), .working)
+        XCTAssertEqual(PlanEnd(runStatus: nil), .working)
+        XCTAssertEqual(planAtEnd(steps, end: .failed).map(\.status), ["done", "failed", "pending"])
+        XCTAssertEqual(planAtEnd(steps, end: .stopped).map(\.status), ["done", "stopped", "pending"])
+        XCTAssertEqual(planAtEnd(steps, end: .working), steps, "at work the step stays in progress")
+        XCTAssertEqual(planCurrentStep(planAtEnd(steps, end: .failed)), 2)
+        XCTAssertEqual(planCurrentStep([PlanStep(text: "a", status: "done"), PlanStep(text: "b", status: "pending")]), 2)
+        XCTAssertNil(planCurrentStep([PlanStep(text: "a", status: "done"), PlanStep(text: "b", status: "skipped")]))
+    }
 }

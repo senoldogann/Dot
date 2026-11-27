@@ -814,8 +814,10 @@ for you or that it stops (once Stop was pressed, until it has),
 how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
-composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side
-panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
+composer: a head with **2 of 6 done**, where the run stands (**Working on step 3**, or **Failed at step 2** /
+**Stopped at step 2** once it failed or was stopped, its step then shown failed or stopped, never still in progress)
+and a thin bar, its targets, its steps on a line that joins their marks (done steps quiet, the step at work in ink with
+no pulse, later ones dimmed) as the Plan tab draws them, and **Open in the side panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
 part closes it. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at

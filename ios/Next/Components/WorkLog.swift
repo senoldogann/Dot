@@ -344,52 +344,6 @@ struct PlanProgress: Equatable, Sendable {
     }
 }
 
-/// The run's plan as a checklist: its header line and one row per step.
-struct PlanSteps: View {
-    let steps: [PlanStep]
-
-    var body: some View {
-        let done: Int = steps.filter { $0.status == "done" }.count
-        VStack(alignment: .leading, spacing: Space.xs) {
-            Text(String(localized: "Plan · \(done) of \(steps.count) done", comment: "Plan card header; the arguments are the steps done and all steps"))
-                .textRole(.label).fontWeight(.semibold).foregroundStyle(Tone.secondary).tabularNumbers()
-            ForEach(Array(steps.enumerated()), id: \.offset) { _, step in
-                HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
-                    Image(systemName: glyph(step.status)).font(.system(.footnote, weight: .medium))
-                        .foregroundStyle(step.status == "failed" ? Tone.failure : step.status == "done" ? Tone.text : Tone.tertiary)
-                        .accessibilityHidden(true)
-                    Text(step.text).textRole(.footnote)
-                        .foregroundStyle(step.status == "done" || step.status == "skipped" ? Tone.secondary : Tone.text)
-                        .strikethrough(step.status == "skipped")
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: "\(step.text), \(statusWords(step.status))"))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func glyph(_ status: String) -> String {
-        switch status {
-        case "done": "checkmark.circle.fill"
-        case "in_progress": "circle.dotted"
-        case "failed": "xmark.circle"
-        case "skipped": "minus.circle"
-        default: "circle"
-        }
-    }
-
-    private func statusWords(_ status: String) -> String {
-        switch status {
-        case "done": String(localized: "done", comment: "VoiceOver: a plan step's state")
-        case "in_progress": String(localized: "in progress", comment: "VoiceOver: a plan step's state")
-        case "failed": String(localized: "failed", comment: "VoiceOver: a plan step's state")
-        case "skipped": String(localized: "skipped", comment: "VoiceOver: a plan step's state")
-        default: String(localized: "to do", comment: "VoiceOver: a plan step's state")
-        }
-    }
-}
-
 /// An ask left where it was asked: a quiet line with what was decided and by whom (amber while it waits).
 struct AskAnchorRow: View {
     let anchor: AskAnchor

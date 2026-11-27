@@ -924,6 +924,16 @@ export const TR_APP = {
   "planbubble.evidence": "Kanıt",
   "planbubble.plan": "Plan",
   "planbubble.openInTheSidePanel": "Yan panelde aç",
+  // planwords.js
+  "planwords.count": "{done} / {total} tamamlandı",
+  "planwords.done": "Çalışma tamamlandı",
+  "planwords.failed": "Çalışma başarısız oldu",
+  "planwords.failedAt": "{step}. adımda başarısız oldu",
+  "planwords.stopped": "Durduruldu",
+  "planwords.stoppedAt": "{step}. adımda durduruldu",
+  "planwords.finishing": "Bitiriliyor",
+  "planwords.workingOn": "{step}. adım üzerinde çalışıyor",
+  "planwords.stoppedStep": "Durduruldu",
   // presence.js
   "presence.waitsForYou": "Sizi bekliyor",
   "presence.working": "Çalışıyor",

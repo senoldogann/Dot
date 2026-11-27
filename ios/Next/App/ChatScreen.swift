@@ -801,12 +801,10 @@ struct ChatScreen: View {
     @ViewBuilder private func sheet(_ panel: ChatPanel) -> some View {
         switch panel {
         case .plan:
-            ScrollView {
-                PlanSteps(steps: newestPlan(builtItems) ?? [])
-                    .padding(.horizontal, Space.gutter)
-                    .padding(.vertical, Space.m)
-            }
-            .inspectorSheet(title: String(localized: "Plan", comment: "Inspector section: the run's plan"), close: { self.panel = nil })
+            // The plan as its run left it: a step in progress when the run failed or was stopped says so.
+            let end: PlanEnd = PlanEnd(runStatus: ownRuns.last?.status)
+            PlanSheet(steps: planAtEnd(newestPlan(builtItems) ?? [], end: end), end: end)
+                .fittedInspectorSheet(title: String(localized: "Plan", comment: "Inspector section: the run's plan"), close: { self.panel = nil })
         case .agents:
             LiveAgentsSheet(thread: thread, close: { self.panel = nil })
         case .background:
