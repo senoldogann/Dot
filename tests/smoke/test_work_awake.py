@@ -5,6 +5,7 @@
 
 import asyncio
 import os
+import sqlite3
 import stat
 from pathlib import Path
 
@@ -32,7 +33,7 @@ def test_the_state_says_off_when_the_setting_is_off() -> None:
 
 
 @pytest.mark.asyncio
-async def test_caffeinate_i_is_held_while_dot_works_and_let_go_after_the_grace(
+async def test_caffeinate_i_recovers_from_a_failed_work_check_and_holds_through_the_grace(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     said: Path = tmp_path / "said.txt"
@@ -40,13 +41,17 @@ async def test_caffeinate_i_is_held_while_dot_works_and_let_go_after_the_grace(
     awake: KeepAwake = KeepAwake("-i")
     works: list[bool] = [False]
     stopping: asyncio.Event = asyncio.Event()
+    failed_check: asyncio.Event = asyncio.Event()
 
     async def working() -> bool:
+        if not failed_check.is_set():
+            failed_check.set()
+            raise sqlite3.OperationalError("database is locked")
         return works[0]
 
     keeping: asyncio.Task[None] = asyncio.create_task(keep_awake_while_working(awake, working, 0.5, 0.05, stopping))
     try:
-        await asyncio.sleep(0.2)
+        await asyncio.wait_for(failed_check.wait(), timeout=5)
         assert not awake.on
         works[0] = True
         async with asyncio.timeout(5):

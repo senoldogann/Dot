@@ -817,11 +817,13 @@ parts has something to say and goes when none has. The plan's part opens the pla
 composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side
 panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
 part closes it. It does not say what the run does now, which the conversation shows, nor count
-the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
+the commands at work in the chat, which stand right under it. An interrupted chat stream is reported in the capsule
+while Dot is reachable. During a daemon outage the shared line under the bar shows *Mac asleep or unreachable
+since HH:MM*. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
+**Waiting on 2 helpers** (only while the run has stopped for them), **Chat updates interrupted**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
 for the secondary segments, then the Stop without its word, then the time without "Working", and at the narrowest a

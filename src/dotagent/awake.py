@@ -98,18 +98,23 @@ def holds_awake(working: bool, last_work_at: float | None, now: float, after_s: 
 async def keep_awake_while_working(
     awake: KeepAwake, working: Callable[[], Awaitable[bool]], after_s: float, every_s: float, stopping: asyncio.Event
 ) -> None:
-    """Hold ``awake`` while ``working`` says work is active or due soon, and ``after_s`` seconds
-    after, looking every ``every_s`` seconds, until ``stopping`` is set (item 1671); it lets go on its way out. A
-    ``caffeinate`` that cannot be started is raised (the daemon logs the end of this task): the Mac then sleeps as it
-    would, and the log says why."""
+    """Hold ``awake`` while work is active or due soon and for ``after_s`` seconds afterward.
+
+    Check every ``every_s`` seconds until ``stopping`` is set. If a work check fails, keep the current assertion
+    and check again at the next tick. Release it on exit. Raise a failure to start ``caffeinate`` for the daemon to log.
+    """
     last_work_at: float | None = None
     try:
         while not stopping.is_set():
             now: float = time.monotonic()
-            busy: bool = await working()
-            if busy:
-                last_work_at = now
-            await awake.switch(holds_awake(busy, last_work_at, now, after_s))
+            try:
+                busy: bool = await working()
+            except Exception:
+                log.exception("keep_awake_work_check_failed")
+            else:
+                if busy:
+                    last_work_at = now
+                await awake.switch(holds_awake(busy, last_work_at, now, after_s))
             try:
                 async with asyncio.timeout(every_s):
                     await stopping.wait()
