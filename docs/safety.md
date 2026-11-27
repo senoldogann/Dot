@@ -721,7 +721,7 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
     key file you pick (`file`: a key in PEM alone, `.p8`, `.pem`, `.key`, at most 16 KB, its text in `$NAME`, no file
     written; a JSON or an `.env` is refused, as it holds its secret in a form a command decodes and no mask reaches).
     The kind changes the box alone: every value is held for 24 hours, at least 8 characters, and masked as any other
-    (a key's text whole and each of its base64 lines; a decoded form of a key, its hex or `openssl -text`, is not
+    (a key's text whole and each of its base64 lines of 8 characters or more; a decoded form of a key, its hex or `openssl -text`, is not
     found). Masking is a guard against a value printed by chance, not against a run that means to send it: a command of
     the chat reads the value, as it must to use it. **Save securely** sends every field at once and the daemon holds all or none in
     one write; a field left out, one the card did not ask for, or one value from an older phone or page (which is

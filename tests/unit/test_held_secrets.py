@@ -284,3 +284,15 @@ def test_a_key_file_is_read_line_by_line_so_a_long_odd_text_is_refused_at_once()
     assert refused == [False, False]
     assert time.monotonic() - started < 0.5
     assert is_pem_block("-----BEGIN PRIVATE KEY-----\nMIGTAgEA\nAwEHBG0w\n-----END PRIVATE KEY-----\n")
+
+
+def test_a_key_file_takes_base64_lines_alone_and_masks_its_short_last_line() -> None:
+    """Item 2040's security review: an .env between BEGIN and END lines is no key, and a key's 8-character last line is
+    masked on its own as its longer lines are."""
+    from dotagent.agent.held_secrets import is_pem_block, masked_parts
+
+    key = "-----BEGIN PRIVATE KEY-----\n" + "A" * 64 + "\n" + "ZZZZabcd\n-----END PRIVATE KEY-----"
+
+    assert not is_pem_block("-----BEGIN X-----\nAPITOKEN=abcd1234secret\n-----END X-----")
+    assert is_pem_block(key)
+    assert "ZZZZabcd" in masked_parts(key, "file")

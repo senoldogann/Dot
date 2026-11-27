@@ -37,10 +37,11 @@ MOST_FILE_CHARS: int = 16384
 SecretKind = Literal["secret", "text", "file"]
 # A line of a key file that is no secret: a PEM's first and last, which every key of the kind shares.
 _PEM_EDGE: re.Pattern[str] = re.compile(r"-----(?:BEGIN|END) [A-Z0-9 ]{1,60}-----")
-# A line of a PEM key's body: base64 alone.
-_PEM_BODY_LINE: re.Pattern[str] = re.compile(r"[A-Za-z0-9+/=]+")
-# The shortest line of a file's text masked on its own: a base64 line of a key, never a short word of a JSON.
-_FILE_LINE_MIN_CHARS: int = 16
+# A line of a PEM key's body: base64 alone, `=` only as the padding at its end (a `NAME=value` line is no key's).
+_PEM_BODY_LINE: re.Pattern[str] = re.compile(r"[A-Za-z0-9+/]+={0,2}")
+# The shortest line of a key's text masked on its own: the floor of every held value, so a key's short last line is
+# masked too (the security review of item 2040).
+_FILE_LINE_MIN_CHARS: int = 8
 _NAME: re.Pattern[str] = re.compile(r"[A-Z][A-Z0-9_]{1,63}")
 _THREAD: re.Pattern[str] = re.compile(r"[A-Za-z0-9_-]{1,80}")
 # The names the shell, the loader or a language reads to decide how a command runs: a secret given under one would
