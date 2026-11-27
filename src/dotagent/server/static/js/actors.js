@@ -211,8 +211,7 @@ export function liveFace(id, state, look, size) {
 const GLANCE_EVERY_MS = [3600, 4800];
 const GLANCE_MS = 1200;
 const GLANCE = { yaw: 30, pitch: 0, mix: 1, spin: 0, wander: 0.2 };
-// The bob's and the flip's periods (app.css `.avatar[data-living]`), in seconds.
-const BOB_EVERY_S = 1.8;
+// The living face's turn (app.css `--motion-face`: ten bobs and a flip), in seconds.
 const FLIP_EVERY_S = 16;
 const living = new WeakMap();
 const onScreen = new IntersectionObserver((entries) => {
@@ -227,7 +226,7 @@ const onScreen = new IntersectionObserver((entries) => {
 });
 
 /**
- * Set a living face's bob and flip where the page's clock has them, its flip moved by its id (`data-seed`, tenths of a
+ * Set a living face's turn (its bobs and its flip) where the page's clock has it, moved by its id (`data-seed`, tenths of a
  * second) so that two faces at work do not flip as one: a face the page moved to a new row (which starts its animations
  * again) goes on from where it was.
  * @param {HTMLElement | SVGElement} face
@@ -235,8 +234,7 @@ const onScreen = new IntersectionObserver((entries) => {
 export function keepPhase(face) {
   const now = performance.now() / 1000;
   const seed = Number(face.dataset.seed ?? "0") / 10;
-  face.style.setProperty("--bob-delay", `${(-(now % BOB_EVERY_S)).toFixed(3)}s`);
-  face.style.setProperty("--flip-delay", `${(-((now + seed) % FLIP_EVERY_S)).toFixed(3)}s`);
+  face.style.setProperty("--live-delay", `${(-((now + seed) % FLIP_EVERY_S)).toFixed(3)}s`);
 }
 
 /**

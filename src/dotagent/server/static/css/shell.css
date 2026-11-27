@@ -1092,7 +1092,7 @@ a.stage-name-link {
 .side-find {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-half);
   padding: var(--space-2);
   border-radius: var(--radius-control);
   color: var(--text);

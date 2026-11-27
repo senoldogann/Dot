@@ -209,6 +209,11 @@
   --motion-spin: 0.8s;
   --motion-moment: 3s;
   --motion-shimmer: 1.8s;
+  /* A living face (actors.js `liven`): ten bobs and a flip in one turn; a found message's ring, and the glow of a
+     living face under reduced motion. */
+  --motion-face: 16s;
+  --motion-find: 2.4s;
+  --motion-glow: 2.4s;
   /* A slow turn: the arrows of the loop mark beside a chat in the sidebar that runs on a loop (shell.css .side-loop). */
   --motion-turn: 6s;
   /* A chat that opens (item 643): how long it waits before it shows that it is opening, and the rhythm of the three
@@ -795,34 +800,102 @@ input[type="radio"] {
   animation-play-state: var(--endless);
 }
 
-/* The living face of a chat at work (actors.js `liven`): a short bob and, about every 16 s, a flip about its upright
-   axis, each face at its own moment; both where the page's clock has them (`--bob-delay`, `--flip-delay`, actors.js
-   `keepPhase`), so a face moved to a new row goes on. Its eyes glance from the script. Off screen it stands still. */
+/* The living face of a chat at work (actors.js `liven`): ten short bobs in a turn of 16 s, the first with a flip about
+   its upright axis, each face at its own moment and where the page's clock has it (`--live-delay`, actors.js
+   `keepPhase`), so a face moved to a new row goes on; one animation of the transform, which the compositor draws. Its
+   eyes glance from the script. Off screen it stands still. */
 .avatar[data-living] {
-  animation:
-    face-bob 1.8s ease-in-out var(--bob-delay, 0s) infinite,
-    face-flip 16s ease-in-out var(--flip-delay, 0s) infinite;
-  animation-play-state: var(--endless), var(--endless);
+  animation: face-live var(--motion-face) ease-in-out var(--live-delay, 0s) infinite;
+  animation-play-state: var(--endless);
 }
 
 .avatar[data-living][data-offscreen] {
-  animation-play-state: paused, paused;
+  animation-play-state: paused;
 }
 
-@keyframes face-bob {
-  50% {
-    translate: 0 -6%;
-  }
-}
-
-@keyframes face-flip {
+@keyframes face-live {
   0% {
-    rotate: y 0deg;
+    transform: translateY(0) rotateY(0deg);
   }
 
-  5%,
+  5% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  10% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  15% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  20% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  25% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  30% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  35% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  40% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  45% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  50% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  55% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  60% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  65% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  70% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  75% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  80% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  85% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
+  90% {
+    transform: translateY(0) rotateY(360deg);
+  }
+
+  95% {
+    transform: translateY(-6%) rotateY(360deg);
+  }
+
   100% {
-    rotate: y 360deg;
+    transform: translateY(0) rotateY(360deg);
   }
 }
 
@@ -5439,7 +5512,7 @@ dialog.modal.versions-dialog {
   outline: 2px solid var(--ring);
   outline-offset: 4px;
   border-radius: var(--radius-control);
-  animation: find-hit-fade 2.4s ease-in forwards;
+  animation: find-hit-fade var(--motion-find) ease-in forwards;
 }
 
 @keyframes find-hit-fade {
@@ -9925,7 +9998,7 @@ dialog.modal.file-dialog[open] {
 
   /* A living face does not move: it glows, slowly, while its chat works. */
   .avatar[data-living] {
-    animation: face-glow 2.4s ease-in-out infinite;
+    animation: face-glow var(--motion-glow) ease-in-out infinite;
     animation-play-state: var(--endless);
   }
 

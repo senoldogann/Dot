@@ -181,9 +181,7 @@ async def test_a_working_chat_wears_its_face_living_and_the_search_has_chips_wid
                 await expect(resting.locator(".side-badge")).to_have_count(1)
                 await expect(resting.locator("[data-living]")).to_have_count(0)
                 # The sidebar paints its rows again as the runs move: the style is read with a retry.
-                await expect(working.locator(".avatar[data-living]")).to_have_css(
-                    "animation-name", "face-bob, face-flip"
-                )
+                await expect(working.locator(".avatar[data-living]")).to_have_css("animation-name", "face-live")
                 await page.screenshot(path=str(tmp_path / f"face-{width}-{scheme}-{language}.png"))
                 # The search's chips stand under it once it has words; All shows the message, the bot and the file.
                 search: Locator = page.get_by_role("searchbox", name=words["search"])
