@@ -88,6 +88,11 @@ const CORE = {
   "composer.teachHint": "Show Dot a task once on the Mac, and it learns to do it",
   "composer.modelOptions": "Model and options",
   "composer.boxTitle": "Type @ for apps, / for skills and commands",
+  "slash.mcpPrompts": "MCP prompts",
+  "composer.starterDescription": "Fill in the starter, then review it in your draft before sending.",
+  "composer.starterRequired": "Required",
+  "composer.starterOptional": "Optional",
+  "composer.insertStarterDraft": "Insert draft",
   "composer.paletteFailed": "Skills and connected apps could not be loaded: {problem}",
   // The Options menu: approvals, goal mode, keep going, plan first, and the picks of a message (runmodes.js,
   // picks.js).

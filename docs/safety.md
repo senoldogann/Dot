@@ -555,9 +555,10 @@ the first step, a `yolo` run can also
 read Dot's own key (`api-token` in Dot's home) and with it do what the web UI does, answer a question of the policy
 among it: in `yolo` the guard stops the steps of the work, not a run set on getting around it.
 
-**Untrusted content.** Web pages, screens, MCP results, the mail and calendars of the accounts you signed in (item
-424) and what `watch_video` reads of a video (item 1212) can be written by third parties. Dot wraps them in a fence with a random marker per call (`<web_content …>`,
-`<screen_content …>`, `<account_content …>`) and tells the model that what is inside is data,
+**Untrusted content.** Web pages, screens, MCP tool results and resource contents, the mail and calendars of the
+accounts you signed in (item 424) and what `watch_video` reads of a video (item 1212) can be written by third
+parties. Dot wraps them in a fence with a random marker per call (`<web_content …>`, `<screen_content …>`,
+`<mcp_content …>`, `<account_content …>`) and tells the model that what is inside is data,
 never instructions; only the end that carries the marker closes a fence, and a closing tag inside, in any case, is
 broken. The reply of a teammate that read such content and the files you attach to a message are fenced the same way. The
 named fields of a call to a [hook](hooks.md) are fenced the same way, and the run the call starts is untrusted from its

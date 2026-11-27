@@ -477,8 +477,8 @@ draft you send from the conversation.
 
 ## MCP servers
 
-Dot can use the tools of [MCP](https://modelcontextprotocol.io) servers that it starts itself over stdio, or reaches
-over streamable HTTP or the older SSE transport. Add one `[[mcp]]` table per server to `config.toml`:
+Dot can use tools, resources and prompts from [MCP](https://modelcontextprotocol.io) servers that it starts over
+stdio, or reaches over streamable HTTP or the older SSE transport. Add one `[[mcp]]` table per server to `config.toml`:
 
 ```toml
 [[mcp]]
@@ -498,6 +498,16 @@ name = "docs"
 url = "https://mcp.example.com/mcp"       # a remote server; transport = "http" (default) or "sse"
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; headers are never logged
 ```
+
+**Resources and prompts.** Settings › Connectors on the web and Settings › Connect apps on the phone list the
+resources and prompts each connected server advertised. Dot discovers these lists when the server connects. A run
+can use `mcp_resource` to list servers and their resources, and read a listed URI as context. Dot fetches the content
+through the MCP server and treats the result as untrusted. The resource group is available when a connected server
+lists a resource. Resource contents stay out of the prompt until a run reads them.
+
+The composer's `/` menu lists MCP prompts by server and name. Pick a prompt, fill in the arguments it asks for, and
+insert its text into the draft. Review and edit the draft before sending it as a message. Text and embedded text
+resources can be inserted. A starter with images, audio, or other non-text content shows an error.
 
 **A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research` (1.4.9,
 item 653), which Dot's own package depends on, so that every install has it ready and on. Its search is a rung of Dot's

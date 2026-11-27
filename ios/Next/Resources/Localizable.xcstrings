@@ -6411,6 +6411,17 @@
         }
       }
     },
+    "Insert draft": {
+      "comment": "Puts the expanded MCP prompt into the composer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taslağa ekle"
+          }
+        }
+      }
+    },
     "Instructions": {
       "comment": "Agents: an agent's instructions\nBot profile: what the agent was told to do",
       "localizations": {
@@ -7140,6 +7151,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Az veri (zayıf bağlantı)"
+          }
+        }
+      }
+    },
+    "MCP prompts": {
+      "comment": "Composer picker header: starters from connected MCP servers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP istemleri"
+          }
+        }
+      }
+    },
+    "MCP servers": {
+      "comment": "Connect apps: resource and prompt catalogs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP sunucuları"
           }
         }
       }
@@ -9760,6 +9793,17 @@
         }
       }
     },
+    "Prompts (%lld)": {
+      "comment": "MCP server prompt count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İstemler (%lld)"
+          }
+        }
+      }
+    },
     "Proof of key": {
       "comment": "This Mac: whether the Mac proved it holds the phone's key",
       "localizations": {
@@ -10519,6 +10563,17 @@
         }
       }
     },
+    "Required": {
+      "comment": "MCP starter form: a required argument",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zorunlu"
+          }
+        }
+      }
+    },
     "Research": {
       "comment": "Connect apps: a section of services\nNew schedule mode: look things up",
       "localizations": {
@@ -10548,6 +10603,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ sıfırlanır"
+          }
+        }
+      }
+    },
+    "Resources (%lld)": {
+      "comment": "MCP server resource count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaynaklar (%lld)"
           }
         }
       }
@@ -10658,6 +10724,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "İnceleme modeli"
+          }
+        }
+      }
+    },
+    "Review the starter in your draft before sending.": {
+      "comment": "MCP starter form instruction",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Göndermeden önce taslaktaki başlangıç metnini inceleyin."
           }
         }
       }

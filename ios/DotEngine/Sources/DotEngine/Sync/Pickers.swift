@@ -7,6 +7,7 @@ import Foundation
 public enum PickerKind: String, Sendable, Equatable {
     case command
     case skill
+    case prompt
     case agent
     case team
     case chat
@@ -20,13 +21,15 @@ public struct PickerItem: Sendable, Equatable, Identifiable {
     public let token: String
     public let name: String
     public let detail: String
+    public let starter: PalettePrompt?
     public var id: String { kind.rawValue + ":" + token }
 
-    public init(kind: PickerKind, token: String, name: String, detail: String) {
+    public init(kind: PickerKind, token: String, name: String, detail: String, starter: PalettePrompt? = nil) {
         self.kind = kind
         self.token = token
         self.name = name
         self.detail = detail
+        self.starter = starter
     }
 }
 
@@ -41,14 +44,16 @@ public struct PickerSection: Sendable, Equatable, Identifiable {
 /// `/api/teams`), the chat list and this chat's changed files.
 public struct ComposerCatalog: Sendable, Equatable {
     public let skills: [PickerItem]
+    public let prompts: [PickerItem]
     public let agents: [PickerItem]
     public let teams: [PickerItem]
     public let chats: [PickerItem]
     public let accounts: [PickerItem]
     public let files: [PickerItem]
 
-    public init(skills: [PickerItem], agents: [PickerItem], teams: [PickerItem], chats: [PickerItem], accounts: [PickerItem], files: [PickerItem]) {
+    public init(skills: [PickerItem], prompts: [PickerItem] = [], agents: [PickerItem], teams: [PickerItem], chats: [PickerItem], accounts: [PickerItem], files: [PickerItem]) {
         self.skills = skills
+        self.prompts = prompts
         self.agents = agents
         self.teams = teams
         self.chats = chats
@@ -86,7 +91,7 @@ public func pickerTrigger(in text: String) -> PickerTrigger? {
 public func pickerSections(_ trigger: PickerTrigger, commands: [PickerItem], catalog: ComposerCatalog, limit: Int) -> [PickerSection] {
     let (typed, groups): (String, [(PickerKind, [PickerItem])]) =
         switch trigger {
-        case .slash(let word): (word, [(.command, commands), (.skill, catalog.skills)])
+        case .slash(let word): (word, [(.command, commands), (.skill, catalog.skills), (.prompt, catalog.prompts)])
         case .at(let word): (word, [(.agent, catalog.agents), (.team, catalog.teams), (.chat, catalog.chats), (.account, catalog.accounts)])
         case .hash(let word): (word, [(.file, catalog.files)])
         }

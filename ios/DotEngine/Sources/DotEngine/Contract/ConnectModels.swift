@@ -91,6 +91,28 @@ public struct ConnectionsView: Codable, Sendable, Hashable {
     }
 }
 
+public struct McpResourceView: Codable, Sendable, Hashable {
+    public let name: String
+    public let uri: String
+}
+
+public struct McpPromptArgumentView: Codable, Sendable, Hashable {
+    public let name: String
+    public let description: String?
+    public let required: Bool
+}
+
+public struct McpPromptView: Codable, Sendable, Hashable {
+    public let name: String
+    public let description: String?
+    public let arguments: [McpPromptArgumentView]
+}
+
+public struct PalettePrompt: Codable, Sendable, Hashable {
+    public let server: String
+    public let prompt: McpPromptView
+}
+
 /// An MCP server Dot has (`GET /api/mcp/servers`): `origin` where it is set up (`connected` on the Connectors page,
 /// `elsewhere` from another agent, `config`, `plugin`, `builtin`), `service` the catalogue's service it serves, `state`
 /// `ready`, `left_out`, `disabled`, `trying` or `signing_in`.
@@ -101,12 +123,20 @@ public struct McpServerView: Codable, Sendable, Hashable {
     public let state: String
     public let error: String?
 
-    public init(name: String, origin: String, service: String?, state: String, error: String?) {
+    public let resources: [McpResourceView]?
+    public let prompts: [McpPromptView]?
+
+    public init(
+        name: String, origin: String, service: String?, state: String, error: String?,
+        resources: [McpResourceView]? = nil, prompts: [McpPromptView]? = nil
+    ) {
         self.name = name
         self.origin = origin
         self.service = service
         self.state = state
         self.error = error
+        self.resources = resources
+        self.prompts = prompts
     }
 }
 

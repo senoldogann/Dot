@@ -628,6 +628,7 @@ public struct PaletteAccount: Codable, Sendable, Hashable {
 public struct PaletteView: Codable, Sendable, Hashable {
     public let skills: [PaletteSkill]
     public let accounts: [PaletteAccount]
+    public let prompts: [PalettePrompt]?
 }
 
 public struct NamedRecord: Codable, Sendable, Hashable {

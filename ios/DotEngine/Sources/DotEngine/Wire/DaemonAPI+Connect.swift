@@ -4,7 +4,23 @@ import Foundation
 // failure with its Retry. A connected app, an official sign-in and 1Password's token are added on the Mac alone (the
 // daemon refuses a phone's key there), so no call here sends a key or a token.
 
+private struct McpPromptRequest: Encodable {
+    let server: String
+    let name: String
+    let arguments: [String: String]
+}
+
+private struct McpPromptDraft: Decodable {
+    let text: String
+}
+
 extension DaemonAPI {
+    public func expandPrompt(_ starter: PalettePrompt, arguments: [String: String]) async throws(DaemonRequestError) -> String {
+        let request: McpPromptRequest = McpPromptRequest(server: starter.server, name: starter.prompt.name, arguments: arguments)
+        let draft: McpPromptDraft = try await send("POST", "/api/mcp/prompts/expand", body: Self.json(request))
+        return draft.text
+    }
+
     /// Everything the sheet reads, asked together.
     public func connectSources() async throws(DaemonRequestError) -> ConnectSources {
         async let plugins: Result<PluginsView, DaemonRequestError> = result { () throws(DaemonRequestError) in try await get("/api/plugins", query: []) }

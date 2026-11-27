@@ -577,6 +577,15 @@ struct BotNewChat: View {
     /// The agent the chat is with (`nil`: Dot), which also keys the draft.
     private var agent: String? { botId == dotAgentId ? nil : botId }
 
+    private var starterSuggestions: ComposerSuggestions {
+        let catalog = ComposerCatalog(
+            skills: [], prompts: mcpStarterItems(model.palette?.prompts ?? []),
+            agents: [], teams: [], chats: [], accounts: [], files: [])
+        return ComposerSuggestions(sections: { trigger in
+            pickerSections(trigger, commands: [], catalog: catalog, limit: 8)
+        })
+    }
+
     private var chip: ModelChoice? {
         guard let ref = effectiveModel(settings.choices, defaultRef: model.chatDefaults?.model) else { return nil }
         return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: settings.choices.effort)
@@ -605,7 +614,7 @@ struct BotNewChat: View {
                     ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
                 buttons: composerButtons(
                     hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty, runActive: false, followUp: .queue, editing: false),
-                perform: { _ in send() }, model: chip, openSettings: { choosing = true }, suggestions: .none)
+                perform: { _ in send() }, model: chip, openSettings: { choosing = true }, suggestions: starterSuggestions)
             .disabled(keepingMessage)
             .padding(.horizontal, Space.s)
             .padding(.bottom, Space.xs)
@@ -617,6 +626,7 @@ struct BotNewChat: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { if let botChat { BotHeader(chat: botChat, find: nil, library: nil) } }
         .task { await model.loadModels() }
+        .task { await model.loadPalette() }
         // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
         .onAppear { text = model.draft(of: AppModel.newChatDraft(agent: agent)) }
         .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft(agent: agent)) }

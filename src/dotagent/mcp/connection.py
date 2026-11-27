@@ -10,9 +10,10 @@ import asyncio
 import os
 import time
 import warnings
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TextIO
+from typing import Protocol, TextIO
 
 import httpx2
 from mcp import Client, MCPDeprecationWarning, MCPError, StdioServerParameters, stdio_client
@@ -25,11 +26,17 @@ from mcp.types import (
     METHOD_NOT_FOUND,
     REQUEST_TIMEOUT,
     CallToolResult,
+    GetPromptResult,
+    ListPromptsResult,
+    ListResourcesResult,
     ListToolsResult,
+    Prompt,
+    ReadResourceResult,
+    Resource,
     Tool,
     ToolAnnotations,
 )
-from pydantic import JsonValue
+from pydantic import JsonValue, ValidationError
 
 from dotagent.config import McpServerConfig, McpTransport
 from dotagent.core.errors import McpError, McpRejected
@@ -38,7 +45,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.mcp.naming import exposed_name
-from dotagent.mcp.types import McpTool, ToolHints
+from dotagent.mcp.types import McpCatalogue, McpPrompt, McpPromptArgument, McpResource, McpTool, ToolHints
 
 # The protocol versions without a ping, from the mcp SDK's own types package (installed with it, not a dependency of
 # Dot's): where a later SDK moves it, every session is pinged as before rather than the daemon failing to start.
@@ -66,6 +73,15 @@ _HTTP_READ_TIMEOUT_S: float = 300.0
 # the server or the network may have dropped it meanwhile, and the calls sent on it would all fail at once.
 _QUIET_CHECK_S: float = 60.0
 _PING_TIMEOUT_S: float = 10.0
+
+
+class _Page(Protocol):
+    @property
+    def next_cursor(self) -> str | None: ...
+
+
+class _ListRequest[P: _Page](Protocol):
+    def __call__(self, *, cursor: str | None) -> Awaitable[P]: ...
 
 
 class _Slot:
@@ -217,6 +233,18 @@ def _to_tool(config: McpServerConfig, tool: Tool) -> McpTool:
     )
 
 
+def _page_tools(page: ListToolsResult) -> list[Tool]:
+    return page.tools
+
+
+def _page_resources(page: ListResourcesResult) -> list[Resource]:
+    return page.resources
+
+
+def _page_prompts(page: ListPromptsResult) -> list[Prompt]:
+    return page.prompts
+
+
 class McpConnection:
     """One configured MCP server. It connects on first use and connects again on the next call after it died. A server
     reached at a URL may sign in (``auth``, :mod:`dotagent.mcp.signin`), which adds its token to each request."""
@@ -238,6 +266,7 @@ class McpConnection:
         self._log_path: Path = log_path
         self._lock: asyncio.Lock = asyncio.Lock()
         self._live: _Live | None = None
+        self.catalogue: McpCatalogue = McpCatalogue()
         # Copied out under ``_lock`` when the session is replaced, so :meth:`instructions` does not read ``_live``
         # while a reconnect clears it.
         self._instructions: str | None = None
@@ -436,34 +465,99 @@ class McpConnection:
         (:meth:`_set_live`), so a reconnect cannot hand back a session that is already gone."""
         return self._instructions
 
+    async def _request[R](self, live: _Live, method: str, timeout_s: float, request: Awaitable[R]) -> R:
+        """Run an MCP catalogue request on the existing transport, with the same session bookkeeping as tool calls."""
+        try:
+            async with asyncio.timeout(timeout_s):
+                result: R = await request
+        except TimeoutError as exc:
+            raise McpError(
+                "the MCP request timed out",
+                {**self._context(), "method": method, "timeout_s": timeout_s},
+            ) from exc
+        except MCPError as exc:
+            if _session_gone(exc):
+                raise await self._lost(live, method, exc) from exc
+            raise McpError(
+                "the MCP server rejected the request",
+                {**self._context(), "method": method, "code": exc.code, "error": exc.message},
+            ) from exc
+        except (ValidationError, OAuthFlowError, httpx2.HTTPError, StreamableHTTPError) as exc:
+            raise McpError(
+                "the MCP request could not be completed",
+                {**self._context(), "method": method, "error": truncate_middle(str(exc), _SHOWN_CAUSE_CHARS)},
+            ) from exc
+        live.answered_at = time.monotonic()
+        return result
+
+    async def _list[P: _Page, T](
+        self,
+        live: _Live,
+        method: str,
+        request: _ListRequest[P],
+        items: Callable[[P], Sequence[T]],
+    ) -> tuple[T, ...]:
+        listed: list[T] = []
+        cursor: str | None = None
+        for _ in range(_MAX_LIST_PAGES):
+            page: P = await self._request(live, method, self._config.startup_timeout_s, request(cursor=cursor))
+            listed.extend(items(page))
+            if page.next_cursor is None:
+                return tuple(listed)
+            cursor = page.next_cursor
+        raise McpError(
+            "the MCP server lists more pages than supported",
+            {**self._context(), "method": method, "pages": _MAX_LIST_PAGES},
+        )
+
     async def list_tools(self) -> tuple[McpTool, ...]:
         """Every tool the server offers, following its pagination."""
         live: _Live = await self._ensure_live()
-        listed: list[Tool] = []
-        cursor: str | None = None
-        for _ in range(_MAX_LIST_PAGES):
-            try:
-                async with asyncio.timeout(self._config.startup_timeout_s):
-                    page: ListToolsResult = await live.client.list_tools(cursor=cursor)
-            except TimeoutError as exc:
-                raise McpError(
-                    "the MCP server did not list its tools in time",
-                    {**self._context(), "timeout_s": self._config.startup_timeout_s},
-                ) from exc
-            except MCPError as exc:
-                if _session_gone(exc):
-                    raise await self._lost(live, "listing its tools", exc) from exc
-                raise McpError(
-                    "the MCP server could not list its tools",
-                    {**self._context(), "code": exc.code, "error": exc.message},
-                ) from exc
-            live.answered_at = time.monotonic()
-            listed.extend(page.tools)
-            if page.next_cursor is None:
-                return tuple(_to_tool(self._config, tool) for tool in listed)
-            cursor = page.next_cursor
-        raise McpError(
-            "the MCP server lists more pages of tools than supported", {**self._context(), "pages": _MAX_LIST_PAGES}
+        if live.client.server_capabilities.tools is None:
+            return ()
+        tools: tuple[Tool, ...] = await self._list(live, "tools/list", live.client.list_tools, _page_tools)
+        return tuple(_to_tool(self._config, tool) for tool in tools)
+
+    async def discover_catalogue(self) -> None:
+        """Snapshot the listings of the resource and prompt capabilities the server advertised."""
+        live: _Live = await self._ensure_live()
+        resources: tuple[Resource, ...] = ()
+        prompts: tuple[Prompt, ...] = ()
+        if live.client.server_capabilities.resources is not None:
+            resources = await self._list(live, "resources/list", live.client.list_resources, _page_resources)
+        if live.client.server_capabilities.prompts is not None:
+            prompts = await self._list(live, "prompts/list", live.client.list_prompts, _page_prompts)
+        self.catalogue = McpCatalogue(
+            resources=tuple(
+                McpResource(name=resource.title or resource.name, uri=resource.uri) for resource in resources
+            ),
+            prompts=tuple(
+                McpPrompt(
+                    name=prompt.name,
+                    description=prompt.description,
+                    arguments=tuple(
+                        McpPromptArgument(
+                            name=argument.name, description=argument.description, required=argument.required is True
+                        )
+                        for argument in prompt.arguments or ()
+                    ),
+                )
+                for prompt in prompts
+            ),
+        )
+
+    async def read_resource(self, uri: str) -> ReadResourceResult:
+        live: _Live = await self._ensure_live()
+        if live.client.server_capabilities.resources is None:
+            raise McpError("the MCP server no longer offers resources", {"server": self.name})
+        return await self._request(live, "resources/read", self._config.call_timeout_s, live.client.read_resource(uri))
+
+    async def get_prompt(self, name: str, arguments: dict[str, str]) -> GetPromptResult:
+        live: _Live = await self._ensure_live()
+        if live.client.server_capabilities.prompts is None:
+            raise McpError("the MCP server no longer offers prompts", {"server": self.name})
+        return await self._request(
+            live, "prompts/get", self._config.call_timeout_s, live.client.get_prompt(name, arguments)
         )
 
     async def call_tool(self, name: str, arguments: JsonObject, read_only: bool) -> CallToolResult:

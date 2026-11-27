@@ -339,6 +339,10 @@ export const TR_VIEWS = {
   "views.channels.reachDotFromTheMessages": "iPhone'unuzdaki Mesajlar uygulamasından Dot'a ulaşın. Kodla oturum açmış bir telefon buraya bakabilir; ama kanalı açıp kapatmayı ve bir numarayı eşleştirip kaldırmayı Mac'inizdeki Ayarlar › Kanallar'dan yapın.",
   "views.channels.checkAgain": "Yeniden denetle",
   // views/connectors.js
+  "views.connectors.resourceOne": "{count} kaynak",
+  "views.connectors.resourceMany": "{count} kaynak",
+  "views.connectors.promptOne": "{count} istem",
+  "views.connectors.promptMany": "{count} istem",
   "views.connectors.countAction": "{count} eylem",
   "views.connectors.countActions": "{count} eylem",
   "views.connectors.countLogin": "{count} oturum bilgisi",

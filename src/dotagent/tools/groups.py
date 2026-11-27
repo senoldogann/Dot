@@ -14,7 +14,7 @@ from collections.abc import Mapping, Sequence
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import Message, ToolSpec
 from dotagent.mcp.naming import PREFIX
-from dotagent.mcp.types import McpPurpose
+from dotagent.mcp.types import RESOURCE_TOOL, McpPurpose
 
 CORE_GROUP: str = "core"
 # The browser tools, which Settings › Browser can keep from every run (item 354).
@@ -46,6 +46,7 @@ _PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
     ("pipeline_", "pipeline"),
 )
 _GROUP_OF_TOOL: dict[str, str] = {
+    RESOURCE_TOOL: "mcp_resources",
     "apple_script": "desktop",
     "memory_update": "memory_admin",
     "memory_forget": "memory_admin",
@@ -94,6 +95,7 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "add_proof": "proof",
 }
 _PURPOSES: dict[str, str] = {
+    "mcp_resources": "list and read resources from connected MCP servers",
     "appearance": "read or change Dot’s theme when the owner asks",
     "worktree": "link the coding run to its Git worktree and pull request",
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",

@@ -48,6 +48,19 @@ export function paletteGroups(commands, palette) {
       })),
     });
   }
+  if ((palette?.prompts?.length ?? 0) > 0) {
+    groups.push({
+      title: t("slash.mcpPrompts"),
+      kind: "prompt",
+      items: palette.prompts.map(({ server, prompt }) => ({
+        id: `prompt-${encodeURIComponent(JSON.stringify([server, prompt.name]))}`,
+        label: `${server} · ${prompt.name}`,
+        hint: prompt.description ?? "",
+        kind: "prompt",
+        starter: { server, prompt },
+      })),
+    });
+  }
   if (palette !== null) {
     for (const server of palette.servers) {
       groups.push({

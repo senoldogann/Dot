@@ -140,6 +140,7 @@ struct ComposerView: View {
     /// The re-encoding of each video on show, so that the × of one gives that export up and not the whole pick.
     @State private var exports: [UUID: Task<ComposerAttachment, any Error>] = [:]
     @State private var mediaError: String?
+    @State private var selectedStarter: PickerItem?
     @State private var trimming: ComposerAttachment?
 
     private var blocksSending: Bool {
@@ -208,6 +209,15 @@ struct ComposerView: View {
                     if !pages.isEmpty { prepare(pages, load: ComposerAttachment.photo) }
                 }
                 .ignoresSafeArea()
+            }
+        }
+        .sheet(item: $selectedStarter) { item in
+            if let starter = item.starter {
+                McpStarterSheet(title: item.name, starter: starter) { draft in
+                    let start = text.lastIndex(where: \.isWhitespace).map { text.index(after: $0) } ?? text.startIndex
+                    text.replaceSubrange(start..., with: draft)
+                    selectedStarter = nil
+                }
             }
         }
         .fullScreenCover(item: $trimming) { attachment in
@@ -481,7 +491,11 @@ extension ComposerView {
                             .accessibilityAddTraits(.isHeader)
                         ForEach(section.items) { item in
                             Button {
-                                text = completing(text, with: item.token)
+                                if item.starter != nil {
+                                    selectedStarter = item
+                                } else {
+                                    text = completing(text, with: item.token)
+                                }
                             } label: {
                                 HStack(alignment: .firstTextBaseline, spacing: Space.s) {
                                     Symbol(name: pickerSymbol(item.kind), context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
@@ -507,6 +521,74 @@ extension ComposerView {
             .frame(maxHeight: 230)
             .fixedSize(horizontal: false, vertical: true)
             .background(Tone.card, in: rounded(Radius.bubble))
+        }
+    }
+}
+
+/// Collect the arguments on the phone before inserting the server's text into the editable draft.
+private struct McpStarterSheet: View {
+    let title: String
+    let starter: PalettePrompt
+    let insert: (String) -> Void
+    @Environment(AppModel.self) private var app: AppModel
+    @Environment(\.dismiss) private var dismiss: DismissAction
+    @State private var arguments: [String: String] = [:]
+    @State private var failure: SettingsFailure?
+    @State private var loading: Bool = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Text(String(localized: "Review the starter in your draft before sending.", comment: "MCP starter form instruction"))
+                ForEach(starter.prompt.arguments, id: \.name) { argument in
+                    VStack(alignment: .leading) {
+                        TextField(argument.name, text: Binding(
+                            get: { arguments[argument.name, default: ""] },
+                            set: { arguments[argument.name] = $0 }))
+                            .textInputAutocapitalization(.never)
+                        if let detail = argument.description { Text(detail).foregroundStyle(Tone.secondary) }
+                        if argument.required {
+                            Text(String(localized: "Required", comment: "MCP starter form: a required argument"))
+                                .foregroundStyle(Tone.secondary)
+                        }
+                    }
+                }
+                if let failure {
+                    Text(failureWords(failure, macPlace: title)).foregroundStyle(Tone.text)
+                }
+            }
+            .disabled(loading)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "Cancel", comment: "Closes an MCP starter form"), role: .cancel) { dismiss() }
+                        .disabled(loading)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "Insert draft", comment: "Puts the expanded MCP prompt into the composer")) {
+                        Task { await expand() }
+                    }
+                    .disabled(loading || starter.prompt.arguments.contains {
+                        $0.required && arguments[$0.name, default: ""].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    })
+                }
+            }
+        }
+        .interactiveDismissDisabled(loading)
+    }
+
+    private func expand() async {
+        guard let api = app.settingsAPI else {
+            failure = .unreachable
+            return
+        }
+        loading = true
+        defer { loading = false }
+        do {
+            insert(try await api.expandPrompt(starter, arguments: arguments.filter { !$0.value.isEmpty }))
+        } catch {
+            failure = settingsFailure(error)
         }
     }
 }

@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+from mcp.types import GetPromptResult
 from pydantic import JsonValue, ValidationError
 
 from dotagent.config import McpServerConfig
@@ -35,7 +36,8 @@ from dotagent.mcp.hub import McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.masking import masked_context, shown_command, shown_url
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
-from dotagent.mcp.types import LEFT_OUT_PATH, LeftOutTool, McpFailure
+from dotagent.mcp.starters import prompt_draft
+from dotagent.mcp.types import LEFT_OUT_PATH, LeftOutTool, McpCatalogue, McpFailure
 from dotagent.oauth.accounts import CameBack, denial_reason
 from dotagent.plugins.catalog import read_again
 from dotagent.plugins.removal import is_dots_own, move_to_trash, trash_folder
@@ -50,6 +52,8 @@ from dotagent.server.views import (
     McpOfferedTool,
     McpOfferedView,
     McpOrigin,
+    McpPromptDraft,
+    McpPromptRequest,
     McpReconnect,
     McpServerAdd,
     McpServerState,
@@ -339,6 +343,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             fallback: str = _TAKEN_NAME if origin == "connected" else "Dot did not start it"
             error = attempt.error if attempt is not None and attempt.error is not None else failure or fallback
         service: str | None = service_of(config)
+        catalogue: McpCatalogue = hub.catalogue(config.name) if state == "ready" else McpCatalogue()
         return McpServerView(
             name=config.name,
             origin=origin,
@@ -351,6 +356,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             if state == "ready"
             else (),
             error=error,
+            resources=catalogue.resources,
+            prompts=catalogue.prompts,
             link=attempt.link if attempt is not None and attempt.running() else None,
             signs_in=config.oauth,
             # A server added on the page that runs may have its tools cut down, and one left out with an allow list may
@@ -460,6 +467,12 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     async def list_servers() -> McpServersView:
         """Every MCP server Dot has, where it is set up and where it stands, and the catalogue's services."""
         return await listing()
+
+    @router.post("/api/mcp/prompts/expand")
+    async def expand_prompt(body: McpPromptRequest) -> McpPromptDraft:
+        """Resolve a starter into editable composer text without starting or steering a run."""
+        result: GetPromptResult = await hub.get_prompt(body.server, body.name, body.arguments)
+        return McpPromptDraft(text=prompt_draft(result, body.server, body.name))
 
     @router.get(LEFT_OUT_PATH)
     async def left_out() -> list[LeftOutTool]:

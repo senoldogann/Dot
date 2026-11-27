@@ -239,6 +239,7 @@ func followUpDetail(_ way: FollowUp) -> String {
 func pickerHeader(_ kind: PickerKind) -> String {
     switch kind {
     case .command: String(localized: "Commands", comment: "Composer picker header: Dot's commands")
+    case .prompt: String(localized: "MCP prompts", comment: "Composer picker header: starters from connected MCP servers")
     case .skill: String(localized: "Skills", comment: "Composer picker header: the skills a run can use")
     case .agent: String(localized: "Agents", comment: "Chat header quick panel: the chat's helpers")
     case .team: String(localized: "Teams", comment: "Composer picker header: the owner's teams")
@@ -252,11 +253,21 @@ func pickerSymbol(_ kind: PickerKind) -> String {
     switch kind {
     case .command: "apple.terminal"
     case .skill: "sparkles"
+    case .prompt: "text.bubble"
     case .agent: "person"
     case .team: "person.3"
     case .chat: "bubble.left"
     case .account: "envelope"
     case .file: "doc.text"
+    }
+}
+
+/// A starter uses the same name and section in a new chat and in an existing chat.
+func mcpStarterItems(_ starters: [PalettePrompt]) -> [PickerItem] {
+    starters.map { starter in
+        PickerItem(
+            kind: .prompt, token: "/\(starter.server)/\(starter.prompt.name)",
+            name: "\(starter.server) · \(starter.prompt.name)", detail: starter.prompt.description ?? "", starter: starter)
     }
 }
 

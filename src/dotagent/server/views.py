@@ -43,7 +43,7 @@ from dotagent.help.elsewhere import FoundElsewhere
 from dotagent.llm.roles import LearningRole, ModelRole
 from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
 from dotagent.mcp.catalogue import ServiceKind
-from dotagent.mcp.types import McpFailure
+from dotagent.mcp.types import McpFailure, McpPrompt, McpResource
 from dotagent.notify.keys import keys_problem
 from dotagent.notify.leases import LeaseState
 from dotagent.policy.types import ApprovalMode
@@ -1829,6 +1829,21 @@ class PaletteAccount(FrozenModel):
     mark: ServiceMark
 
 
+class PalettePrompt(FrozenModel):
+    server: str
+    prompt: McpPrompt
+
+
+class McpPromptRequest(FrozenModel):
+    server: str
+    name: str
+    arguments: dict[str, str]
+
+
+class McpPromptDraft(FrozenModel):
+    text: str
+
+
 class PaletteView(FrozenModel):
     """What the composer's menus offer besides their own commands: the skills a run can use, the MCP servers with the
     tools the model calls, and the accounts signed in (item 496)."""
@@ -1836,6 +1851,7 @@ class PaletteView(FrozenModel):
     skills: tuple[PaletteSkill, ...]
     servers: tuple[PaletteServer, ...]
     accounts: tuple[PaletteAccount, ...]
+    prompts: tuple[PalettePrompt, ...] = ()
 
 
 class PermissionsView(FrozenModel):
@@ -2149,6 +2165,8 @@ class McpServerView(FrozenModel):
     # Tools of a server that is up whose schema Dot could not hand to the model. Empty when none were dropped.
     # The server's state stays ``ready``: the whole server is ``left_out`` only when it is not connected.
     left_out: tuple[McpLeftOut, ...] = ()
+    resources: tuple[McpResource, ...] = ()
+    prompts: tuple[McpPrompt, ...] = ()
 
 
 class McpOfferedTool(FrozenModel):

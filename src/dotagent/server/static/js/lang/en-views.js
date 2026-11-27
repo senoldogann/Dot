@@ -338,6 +338,10 @@ export const EN_VIEWS = {
   "views.channels.reachDotFromTheMessages": "Reach Dot from the Messages app on your iPhone. A phone signed in with a code can look here, but turn the channel on or off and pair or remove a number in Settings › Channels on your Mac.",
   "views.channels.checkAgain": "Check again",
   // views/connectors.js
+  "views.connectors.resourceOne": "{count} resource",
+  "views.connectors.resourceMany": "{count} resources",
+  "views.connectors.promptOne": "{count} prompt",
+  "views.connectors.promptMany": "{count} prompts",
   "views.connectors.countAction": "{count} action",
   "views.connectors.countActions": "{count} actions",
   "views.connectors.countLogin": "{count} login",

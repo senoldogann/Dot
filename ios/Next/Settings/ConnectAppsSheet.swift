@@ -78,13 +78,13 @@ struct ConnectAppsSheet: View {
                 }
             }
         case .loaded(let loaded):
-            list(connectApps(loaded))
+            list(connectApps(loaded), servers: loaded.servers.servers)
         }
     }
 
     private var macPlace: String { String(localized: "Settings › Connectors", comment: "Where on the Mac: the Connectors page") }
 
-    private func list(_ apps: [ConnectApp]) -> some View {
+    private func list(_ apps: [ConnectApp], servers: [McpServerView]) -> some View {
         let words: String = query.trimmingCharacters(in: .whitespaces)
         let skills: [PaletteSkill] = filterSkills(model.palette?.skills ?? [], query: words)
         return ScrollView {
@@ -98,6 +98,7 @@ struct ConnectAppsSheet: View {
                     filtered(filterConnectApps(apps, section: section, onlyConnected: onlyConnected, query: words), skills: skills, words: words)
                 } else {
                     whole(apps)
+                    mcpCatalogues(servers)
                 }
             }
             .padding(.bottom, 64)
@@ -106,6 +107,26 @@ struct ConnectAppsSheet: View {
         .scrollDismissesKeyboard(.interactively)
         .refreshable { await load() }
         .safeAreaInset(edge: .bottom) { searchCapsule }
+    }
+
+    @ViewBuilder private func mcpCatalogues(_ servers: [McpServerView]) -> some View {
+        let ready = servers.filter { $0.state == "ready" && $0.resources != nil && $0.prompts != nil }
+        if !ready.isEmpty {
+            GroupedSection(header: String(localized: "MCP servers", comment: "Connect apps: resource and prompt catalogs"), footer: nil) {
+                ForEach(ready, id: \.name) { server in
+                    let resources = server.resources ?? []
+                    let prompts = server.prompts ?? []
+                    DisclosureGroup(server.name) {
+                        Text(String(localized: "Resources (\(resources.count))", comment: "MCP server resource count")).fontWeight(.medium)
+                        ForEach(resources, id: \.uri) { resource in Text(resource.name) }
+                        Text(String(localized: "Prompts (\(prompts.count))", comment: "MCP server prompt count")).fontWeight(.medium)
+                        ForEach(prompts, id: \.name) { prompt in Text(prompt.name) }
+                    }
+                    .padding(Space.m)
+                }
+            }
+            .padding(.horizontal, Space.gutter)
+        }
     }
 
     /// No chip, no search: Featured, then every section of the catalogue but Featured's.

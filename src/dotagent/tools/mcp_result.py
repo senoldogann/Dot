@@ -32,6 +32,8 @@ from dotagent.tools.third_party import MCP_FOLDER
 
 MAX_IMAGES: int = 4
 FENCE_OVERHEAD_CHARS: int = 300
+# Error fields that may carry words from the server, its stderr or the client library.
+SERVER_WORD_FIELDS: frozenset[str] = frozenset({"error", "stderr_tail", "causes"})
 _NO_CONTENT: str = "(the tool returned no content)"
 _NAME_CHARS: int = 60
 _UNSAFE_NAME: re.Pattern[str] = re.compile(r"[^A-Za-z0-9_.-]+")
