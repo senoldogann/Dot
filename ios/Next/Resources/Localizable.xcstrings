@@ -7060,17 +7060,6 @@
         }
       }
     },
-    "Looking at %@": {
-      "comment": "Chat message of Dot's: a page it looks at; the argument is its site",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ inceleniyor"
-          }
-        }
-      }
-    },
     "Looks every %lld minutes": {
       "comment": "Watcher: how often it looks",
       "localizations": {

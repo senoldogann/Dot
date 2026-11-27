@@ -47,19 +47,18 @@ final class ConversationTests: XCTestCase {
             + [result(13, 11), step(20, "", ["web_search"])] + call(21, "web_search", ["query": .string("gistsmith contact")]) + [result(23, 21)]
     }
 
-    func testAWorkingRunShowsItsWordsAndTheLinesItsWordsDidNotTellAndNoSteps() {
+    /// Owner 2026-11-27: a call is never a line of the conversation ("Code run", "Running a command" stacked); the one
+    /// live line says what the run does.
+    func testAWorkingRunShowsItsWordsAndNoLineOfACallAndNoSteps() {
         let items: [TranscriptItem] = conversation(of: chat(status: "running", events), pending: [], streaming: true, context: .none)
-        XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10", "n:22"], "the page's line stands beside the words that told it: it is not drawn")
-        guard case .narration(_, let told) = items[2] else { return XCTFail("the search is told") }
-        XCTAssertEqual(told.tool, "web_search")
-        XCTAssertEqual(told.target, "gistsmith contact")
+        XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10"])
     }
 
     func testAFinishedRunKeepsTheConversationAndFoldsItsStepsBeforeTheAnswer() {
         let finished: [EventRecord] = events + [step(30, "", ["finish"]), event(31, "run_finished", ["status": .string("done"), "result": .string("Two fields.")])]
         let items: [TranscriptItem] = conversation(of: chat(status: "done", finished), pending: [], streaming: true, context: .none)
-        XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10", "n:22", "f:t:c11", "r:run_a"])
-        guard case .work(let fold) = items[3] else { return XCTFail("the steps fold before the answer") }
+        XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10", "f:t:c11", "r:run_a"])
+        guard case .work(let fold) = items[2] else { return XCTFail("the steps fold before the answer") }
         XCTAssertEqual(fold.items.map(\.id), ["t:c11", "t:c21"])
     }
 
@@ -95,12 +94,5 @@ final class ConversationTests: XCTestCase {
             XCTAssertEqual(items.map(\.id), ["u:run_a", "r:run_a"], "\(mode): the answer once, no Finish row")
         }
         XCTAssertEqual(conversation(of: chat(status: "done", said), pending: [], streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"])
-    }
-
-    func testNoToolModeDrawsALineOfACall() {
-        for mode in ToolCallMode.allCases {
-            let items: [TranscriptItem] = transcript(of: chat(status: "running", events), pending: [], mode: mode, streaming: true, context: .none)
-            XCTAssertFalse(items.contains { if case .narration = $0 { true } else { false } }, "\(mode)")
-        }
     }
 }
