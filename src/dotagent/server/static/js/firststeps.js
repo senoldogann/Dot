@@ -8,6 +8,7 @@ import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { FIRST_STEPS_KEY, HIDDEN, showsFirstSteps, stepsOf } from "./firststepslist.js";
 import { readPref, writePref } from "./prefs.js";
+import { t } from "./i18n.js";
 
 /** @param {{ id: string, title: string, where: string, href: string | null, done: boolean }} step */
 function stepRow(step) {
@@ -20,7 +21,7 @@ function stepRow(step) {
     { class: "first-step", dataset: { step: step.id, done: String(step.done) } },
     el("span", { class: "first-step-mark", "aria-hidden": "true" }, icon(step.done ? "check" : "circleDashed")),
     el("span", { class: "first-step-words" }, title, el("span", { class: "hint" }, step.where)),
-    step.done ? el("span", { class: "visually-hidden" }, "Done") : null,
+    step.done ? el("span", { class: "visually-hidden" }, t("firststeps.done")) : null,
   );
 }
 
@@ -32,11 +33,11 @@ function stepRow(step) {
 export function buildFirstSteps(place) {
   const list = el("ol", { class: "first-steps-list" });
   const count = el("span", { class: "hint first-steps-count" });
-  const hide = el("button", { class: "btn ghost sm", type: "button", title: "Put these steps away for good." }, "Hide");
+  const hide = el("button", { class: "btn ghost sm", type: "button", title: t("firststeps.putTheseStepsAwayFor") }, t("firststeps.hide"));
   const element = el(
     "section",
     { class: "card first-steps", "aria-labelledby": "first-steps-title" },
-    el("div", { class: "card-head" }, icon("squareCheck"), el("span", { id: "first-steps-title", class: "grow" }, "First steps"), count, hide),
+    el("div", { class: "card-head" }, icon("squareCheck"), el("span", { id: "first-steps-title", class: "grow" }, t("firststeps.firstSteps")), count, hide),
     el("div", { class: "card-pad" }, list),
   );
   let disposed = false;
@@ -53,7 +54,7 @@ export function buildFirstSteps(place) {
         }
         const { steps, finished } = stepsOf(view);
         list.replaceChildren(...steps.map(stepRow));
-        count.textContent = `${finished} of ${steps.length} done`;
+        count.textContent = t("firststeps.finishedOfLengthDone", { finished, length: steps.length });
         place(element);
       })
       .catch((error) => {

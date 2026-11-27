@@ -8,6 +8,7 @@
 import { debounce, el } from "./dom.js";
 import { laidOut } from "./history.js";
 import { trackHeight } from "./layout.js";
+import { t } from "./i18n.js";
 
 // A conversation of one message has nothing to walk.
 const MIN_MESSAGES = 2;
@@ -117,7 +118,7 @@ export function messageOutline({ layout, main, thread, dock }) {
     {
       class: "outline-rail",
       type: "button",
-      "aria-label": "Jump to a message",
+      "aria-label": t("outline.jumpToAMessage"),
       onpointermove: (event) => point(event.clientY),
       onpointerleave: () => {
         if (document.activeElement !== rail) {
@@ -142,7 +143,7 @@ export function messageOutline({ layout, main, thread, dock }) {
     el("span", { class: "outline-line" }),
     marks,
   );
-  const element = el("nav", { class: "outline", "aria-label": "Messages of this conversation", hidden: true }, rail, preview);
+  const element = el("nav", { class: "outline", "aria-label": t("outline.messagesOfThisConversation"), hidden: true }, rail, preview);
   const stopDock = trackHeight(dock, element, "--dock-h");
 
   let messages = [];
@@ -178,7 +179,7 @@ export function messageOutline({ layout, main, thread, dock }) {
     paintMarks();
     if (active === null) {
       preview.hidden = true;
-      rail.setAttribute("aria-label", "Jump to a message");
+      rail.setAttribute("aria-label", t("outline.jumpToAMessage"));
       return;
     }
     const message = messages[active];
@@ -188,7 +189,7 @@ export function messageOutline({ layout, main, thread, dock }) {
     reply.hidden = reply.textContent === "";
     preview.style.top = `${placeOf(active, messages.length)}%`;
     preview.hidden = false;
-    rail.setAttribute("aria-label", `Jump to message: ${text}`);
+    rail.setAttribute("aria-label", t("outline.jumpToMessageText", { text }));
   }
 
   function jump() {

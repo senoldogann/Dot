@@ -31,6 +31,7 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_stopped_run_text.py::test_an_emergency_stop_keeps_the_words_too_and_says_stopped_in_turkish` — a run the emergency stop ended kept the daemon's English sentence and lost its streamed words (item 1980's review).
 - `tests/smoke/test_scheduler.py::test_the_emergency_stop_cancels_the_kind_pass_under_way_and_starts_none` — the
   hourly pass that asks the fast model the kind of a note went on under the emergency stop (item 1975's review).
 - `tests/smoke/test_work_orders_page.py::test_a_next_step_written_after_outside_content_is_marked` — the Agents page and the

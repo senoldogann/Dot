@@ -9,17 +9,18 @@ import { clip, el, modelName } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldState, inlineError } from "./panels.js";
 import { attempt, toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 const TITLE_CHARS = 200;
 const WHY_CHARS = 140;
 const NOTE_CHARS = 140;
 const STATE = {
-  doing: { label: "Doing now", mark: "play" },
-  open: { label: "To do", mark: "list" },
-  done: { label: "Done", mark: "check" },
-  dropped: { label: "Let go", mark: "x" },
+  doing: { label: t("initiativecard.doingNow"), mark: "play" },
+  open: { label: t("initiativecard.toDo"), mark: "list" },
+  done: { label: t("initiativecard.done"), mark: "check" },
+  dropped: { label: t("initiativecard.letGo"), mark: "x" },
 };
-const WHO = { owner: "You put it on the list", run: "A run put it on the list" };
+const WHO = { owner: t("initiativecard.youPutItOnThe"), run: t("initiativecard.aRunPutItOn") };
 // Whether the card is folded to its head, kept as the folds of the pages are (panels.js `foldState`, `dot.fold.` and this).
 const FOLD_ID = "initiative";
 
@@ -40,9 +41,9 @@ function todoRow(todo, handlers) {
   const tries = todo.attempts > 0 && todo.status !== "done" ? `${todo.attempts} ${todo.attempts === 1 ? "try" : "tries"}` : null;
   const action =
     todo.status === "open"
-      ? el("button", { class: "btn ghost sm", type: "button", title: "Take it off the list", "aria-label": `Take ${todo.title} off the list`, onclick: () => handlers.onDrop(todo) }, "Remove")
+      ? el("button", { class: "btn ghost sm", type: "button", title: t("initiativecard.takeItOffTheList"), "aria-label": t("initiativecard.takeTitleOffTheList", { title: todo.title }), onclick: () => handlers.onDrop(todo) }, t("initiativecard.remove"))
       : todo.status === "dropped"
-        ? el("button", { class: "btn ghost sm", type: "button", title: "Put it back on the list", "aria-label": `Put ${todo.title} back on the list`, onclick: () => handlers.onAgain(todo) }, "Again")
+        ? el("button", { class: "btn ghost sm", type: "button", title: t("initiativecard.putItBackOnThe"), "aria-label": t("initiativecard.putTitleBackOnThe", { title: todo.title }), onclick: () => handlers.onAgain(todo) }, t("initiativecard.again"))
         : null;
   const text = rowText(todo);
   return el(
@@ -56,7 +57,7 @@ function todoRow(todo, handlers) {
         "div",
         { class: "row" },
         todo.run_id === null ? el("span", { class: "row-title" }, todo.title) : el("a", { class: "row-title", href: `#/runs/${todo.run_id}` }, todo.title),
-        el("span", { class: "chip", title: WHO[todo.source] ?? "Dot put it on the list" }, state.label),
+        el("span", { class: "chip", title: WHO[todo.source] ?? t("initiativecard.dotPutItOnThe") }, state.label),
         tries === null ? null : el("span", { class: "chip" }, tries),
       ),
       text === "" ? null : el("div", { class: "row-text muted", title: `${todo.why}\n${todo.note}`.trim() }, text),
@@ -82,27 +83,27 @@ export function mountInitiative() {
   let disposed = false;
   let ticket = 0;
 
-  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Work on its own while the Mac is idle", disabled: true });
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": t("initiativecard.workOnItsOwnWhile"), disabled: true });
   const count = el("span", { class: "hint" });
   // The mode its runs start in, as the daemon says it (item 756).
-  const mode = el("span", null, "asking only before a message, a post or a release");
+  const mode = el("span", null, t("initiativecard.askingOnlyBeforeAMessage"));
   const lead = el(
     "p",
     { class: "hint watcher-lead" },
-    "While the Mac is idle, Dot does on its own what is on this list, each in a chat of its own, ",
+    t("initiativecard.whileTheMacIsIdle"),
     mode,
-    "; with nothing on it, it looks for work that helps you now and then. What Dot found in a mail or a page while at it is handled as untrusted: what would reach others asks you first, or, in the mode that asks only to pay or send, is refused unless your words call for it.",
+    t("initiativecard.withNothingOnItIt"),
   );
   // The weekday hours its runs wait in (item 826), told in the Mac's own time.
   const peak = el("p", { class: "hint initiative-peak", hidden: true });
   // The model that decides what to do and what a costly try comes to (item 916).
-  const lookName = el("a", { href: "#/settings/models", title: "Choose it in Settings › Models › Own work model" }, "the default model");
+  const lookName = el("a", { href: "#/settings/models", title: t("initiativecard.chooseItInSettingsModels") }, t("initiativecard.theDefaultModel"));
   const costly = el("span");
-  const judge = el("p", { class: "hint initiative-judge" }, "It decides what is worth doing on ", lookName, ". ", costly);
-  const idleNote = el("div", { class: "note warn initiative-idle", hidden: true, role: "status" }, icon("alert"), el("span", null, "macOS does not say how long the Mac has been idle, so Dot starts nothing on its own. The daemon's log has why."));
-  const holder = el("div", { class: "initiative-list" }, el("div", { class: "hint" }, "Reading the list…"));
-  const input = el("input", { class: "input", type: "text", maxlength: String(TITLE_CHARS), placeholder: "Something Dot can do for you on its own", "aria-label": "A thing for Dot's list" });
-  const add = el("button", { class: "btn sm", type: "submit", disabled: true, "aria-label": "Add to the list", title: "Add to the list" }, icon("plus"), el("span", { class: "label" }, "Add"));
+  const judge = el("p", { class: "hint initiative-judge" }, t("initiativecard.itDecidesWhatIsWorth"), lookName, ". ", costly);
+  const idleNote = el("div", { class: "note warn initiative-idle", hidden: true, role: "status" }, icon("alert"), el("span", null, t("initiativecard.macosDoesNotSayHow")));
+  const holder = el("div", { class: "initiative-list" }, el("div", { class: "hint" }, t("initiativecard.readingTheList")));
+  const input = el("input", { class: "input", type: "text", maxlength: String(TITLE_CHARS), placeholder: t("initiativecard.somethingDotCanDoFor"), "aria-label": t("initiativecard.aThingForDotS") });
+  const add = el("button", { class: "btn sm", type: "submit", disabled: true, "aria-label": t("initiativecard.addToTheList"), title: t("initiativecard.addToTheList") }, icon("plus"), el("span", { class: "label" }, t("initiativecard.add")));
   const form = el("form", { class: "row initiative-add" }, input, add);
   const body = el("div", { class: "initiative-body", id: "initiative-body" }, lead, judge, peak, idleNote, holder, form);
   const folding = foldState(FOLD_ID, true);
@@ -111,7 +112,7 @@ export function mountInitiative() {
     "button",
     { class: "fold-toggle initiative-fold", type: "button", "aria-controls": body.id, onclick: () => flipFold() },
     el("span", { class: "chev" }, icon("chevron")),
-    el("span", { class: "fold-title" }, "On its own"),
+    el("span", { class: "fold-title" }, t("initiativecard.onItsOwn")),
   );
   const element = el(
     "section",
@@ -138,25 +139,25 @@ export function mountInitiative() {
     view = fresh;
     toggle.setAttribute("aria-checked", String(view.enabled));
     idleNote.hidden = !view.enabled || view.idle_readable !== false;
-    mode.textContent = view.approvals === "yolo" ? "asking only before a message, a post or a release" : `in the ${view.approvals} approval mode`;
+    mode.textContent = view.approvals === "yolo" ? t("initiativecard.askingOnlyBeforeAMessage") : t("initiativecard.inTheApprovalsApprovalMode", { approvals: view.approvals });
     const hours = view.peak_hours_utc ?? [];
     peak.hidden = hours.length !== 2;
     if (hours.length === 2) {
-      peak.textContent = `On weekdays (by UTC) it starts nothing from ${localHour(hours[0])} to ${localHour(hours[1])} your time, the provider's dearer hours, but a thing you marked [URGENT].`;
+      peak.textContent = t("initiativecard.onWeekdaysByUtcIt", { localHour: localHour(hours[0]), localHour2: localHour(hours[1]) });
     }
-    lookName.textContent = view.look_model === "" ? "the default model" : modelName(view.look_model);
+    lookName.textContent = view.look_model === "" ? t("initiativecard.theDefaultModel") : modelName(view.look_model);
     costly.textContent =
       view.costly_tokens > 0
-        ? `Work that gets done is never cut for what it spends; a try that spends over ${(view.costly_tokens / 1_000_000).toLocaleString()} million word pieces without doing it is tried once more from what it found, and a second such try in a row lets the thing go.`
+        ? t("initiativecard.workThatGetsDoneIs", { toLocaleString: (view.costly_tokens / 1_000_000).toLocaleString() })
         : "";
-    toggle.title = view.enabled ? "Dot works on its own while the Mac is idle: switch it off" : "Switch on: Dot works on its own while the Mac is idle";
+    toggle.title = view.enabled ? t("initiativecard.dotWorksOnItsOwn") : t("initiativecard.switchOnDotWorksOn");
     toggle.disabled = busy;
     add.disabled = busy;
     const waiting = view.todos.filter((todo) => todo.status === "open" || todo.status === "doing").length;
-    count.textContent = view.enabled ? (waiting === 0 ? "On · nothing to do" : `On · ${waiting} to do`) : "Off";
+    count.textContent = view.enabled ? (waiting === 0 ? t("initiativecard.onNothingToDo") : t("initiativecard.onWaitingToDo", { waiting })) : t("initiativecard.off");
     holder.replaceChildren(
       view.todos.length === 0
-        ? el("div", { class: "hint initiative-empty" }, "Nothing on the list yet.")
+        ? el("div", { class: "hint initiative-empty" }, t("initiativecard.nothingOnTheListYet"))
         : el(
             "div",
             { class: "watcher-list" },
@@ -209,13 +210,13 @@ export function mountInitiative() {
   }
 
   const handlers = {
-    onDrop: (todo) => attempt(() => change(() => api.post(`/initiative/todos/${todo.id}/drop`, null), "Taken off the list.")),
-    onAgain: (todo) => attempt(() => change(() => api.post(`/initiative/todos/${todo.id}/again`, null), "Back on the list.")),
+    onDrop: (todo) => attempt(() => change(() => api.post(`/initiative/todos/${todo.id}/drop`, null), t("initiativecard.takenOffTheList"))),
+    onAgain: (todo) => attempt(() => change(() => api.post(`/initiative/todos/${todo.id}/again`, null), t("initiativecard.backOnTheList"))),
   };
 
   toggle.addEventListener("click", () => {
     const enabled = toggle.getAttribute("aria-checked") !== "true";
-    attempt(() => change(() => api.put("/initiative", { enabled }), enabled ? "Dot works on its own while the Mac is idle." : "Dot no longer works on its own."));
+    attempt(() => change(() => api.put("/initiative", { enabled }), enabled ? t("initiativecard.dotWorksOnItsOwn2") : t("initiativecard.dotNoLongerWorksOn")));
   });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -225,7 +226,7 @@ export function mountInitiative() {
       return;
     }
     attempt(async () => {
-      await change(() => api.post("/initiative/todos", { title, why: "" }), "On Dot's list.");
+      await change(() => api.post("/initiative/todos", { title, why: "" }), t("initiativecard.onDotSList"));
       input.value = "";
     });
   });

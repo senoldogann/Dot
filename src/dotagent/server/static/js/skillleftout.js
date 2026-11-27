@@ -1,6 +1,8 @@
 // What Settings › Skills says of a skill Dot could not offer to a task (item 1405): `GET /api/skills/left-out` lists each
 // file or folder with the catalog's reason and where Dot looked for it. Pure, so that it runs under Node without a page.
 
+import { t } from "./i18n.js";
+
 const BUILTIN_SOURCE = "built-in";
 const PLUGIN_SOURCE = "plugin ";
 const SKILL_FILE = "SKILL.md";
@@ -38,15 +40,15 @@ export function leftOutSummary(entries) {
   const broken = entries.length - aside;
   const parts = [];
   if (broken > 0) {
-    parts.push(`Dot could not read ${skills(broken)}, so no task is offered ${broken === 1 ? "it" : "them"}. Mend the file and the next task reads it again.`);
+    parts.push(t(broken === 1 ? "skillleftout.couldNotReadOne" : "skillleftout.couldNotReadMany", { skills: skills(broken) }));
   }
   if (aside > 0) {
-    parts.push(`${skills(aside)} ${aside === 1 ? "is" : "are"} not offered because another skill has the name. Rename one of them.`);
+    parts.push(t(aside === 1 ? "skillleftout.asideOne" : "skillleftout.asideMany", { skills: skills(aside) }));
   }
   return parts.join(" ");
 }
 
 /** The chip on a left-out skill's row: what is wrong in two or three words. */
 export function leftOutChip(entry) {
-  return entry.shadowed ? "Another skill has its name" : "Left out";
+  return entry.shadowed ? t("skillleftout.anotherSkillHasItsName") : t("skillleftout.leftOut");
 }

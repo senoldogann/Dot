@@ -6,7 +6,7 @@
 
 import { actorFace, rememberLook, setActorState, teamDuo, teamFaces } from "../actors.js";
 import { api } from "../api.js";
-import { ago, clip, el, plural } from "../dom.js";
+import { ago, clip, el, } from "../dom.js";
 import { icon } from "../icons.js";
 import { touchFirst, trackHeight } from "../layout.js";
 import { chatLoading, errorPanel, statusBadge } from "../panels.js";
@@ -17,6 +17,7 @@ import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 import { homeSection, startComposer } from "./agents.js";
 import { WORKING_STATES } from "../runstates.js";
+import { t, tCount } from "../i18n.js";
 
 const TITLE_CHARS = 90;
 const LAST_CHARS = 140;
@@ -63,7 +64,7 @@ function who(detail) {
       ? null
       : el(
           "ul",
-          { class: "team-roster", "aria-label": `The ${plural(members.length, "agent", "agents")} of ${record.name}` },
+          { class: "team-roster", "aria-label": t("views.teams.thePartOfName", { part: tCount(members.length, "views.teams.countAgent", "views.teams.countAgents"), name: record.name }) },
           members.map((member) =>
             el("li", null, el("a", { class: "chip", href: `#/agents/${member.id}`, title: member.role }, actorFace(member.id, "idle", member.look), el("span", null, member.name))),
           ),
@@ -81,18 +82,18 @@ function mountPage(root, ctx, teamId) {
   let drawnEmpty = null;
   let folds = readFolds(FOLDS_KEY);
   const top = el("div", { class: "home-start agent-top team-top" });
-  const sections = el("section", { class: "home-today agent-sections", "aria-label": "The team's work" });
+  const sections = el("section", { class: "home-today agent-sections", "aria-label": t("views.teams.theTeamSWork") });
   // As an agent's page (item 1272): Dot's three dots while it is read, and the top kept in the middle of the room.
   const page = el("div", { class: "home agent-home team-home" }, chatLoading());
   const stopCentring = trackHeight(top, page, "--home-start-h");
 
   function stageOf(detail) {
     const { record } = detail;
-    ctx.setTitle(`${record.name} · Agents`);
+    ctx.setTitle(t("views.teams.nameAgents", { name: record.name }));
     setStageTitle(teamDuo(record, "idle"), el("h1", { class: "stage-h1 stage-name" }, record.name));
     setStageTools(
-      el("button", { class: "btn ghost sm", type: "button", title: "Change the team: its name, what it is for and its agents", "aria-label": "Edit the team", onclick: () => attempt(edit) }, icon("pencil"), el("span", { class: "label" }, "Edit")),
-      el("button", { class: "btn ghost sm", type: "button", title: "Remove the team: its agents and its chats stay", "aria-label": "Remove the team", onclick: () => attempt(remove) }, icon("trash"), el("span", { class: "label" }, "Remove")),
+      el("button", { class: "btn ghost sm", type: "button", title: t("views.teams.changeTheTeamItsName"), "aria-label": t("views.teams.editTheTeam"), onclick: () => attempt(edit) }, icon("pencil"), el("span", { class: "label" }, t("views.teams.edit"))),
+      el("button", { class: "btn ghost sm", type: "button", title: t("views.teams.removeTheTeamItsAgents"), "aria-label": t("views.teams.removeTheTeam"), onclick: () => attempt(remove) }, icon("trash"), el("span", { class: "label" }, t("views.teams.remove"))),
     );
   }
 
@@ -114,8 +115,8 @@ function mountPage(root, ctx, teamId) {
       "div",
       { class: "note warn team-empty", role: "status" },
       icon("alert"),
-      el("span", { class: "grow" }, "This team has no agents left, so it takes no messages. Add one of your agents with Edit, or Remove the team."),
-      el("button", { class: "btn sm", type: "button", onclick: () => attempt(edit) }, icon("pencil"), "Edit"),
+      el("span", { class: "grow" }, t("views.teams.thisTeamHasNoAgents")),
+      el("button", { class: "btn sm", type: "button", onclick: () => attempt(edit) }, icon("pencil"), t("views.teams.edit")),
     );
   }
 
@@ -152,15 +153,15 @@ function mountPage(root, ctx, teamId) {
   async function remove() {
     const detail = shownDetail;
     const confirmed = await confirmDialog({
-      title: `Remove ${detail.record.name}?`,
-      message: "Only the team goes. Its agents stay yours, and so do its chats, which stay as chats with Dot.",
-      confirmLabel: "Remove",
+      title: t("views.teams.removeName", { name: detail.record.name }),
+      message: t("views.teams.onlyTheTeamGoesIts"),
+      confirmLabel: t("views.teams.remove"),
       danger: true,
       focusCancel: true,
     });
     if (confirmed) {
       await api.del(`/teams/${detail.record.id}`);
-      toast("ok", `${detail.record.name} removed. Its agents are still yours.`);
+      toast("ok", t("views.teams.nameRemovedItsAgentsAre", { name: detail.record.name }));
       ctx.navigate("/settings/agents");
     }
   }
@@ -175,7 +176,7 @@ function mountPage(root, ctx, teamId) {
     } catch (error) {
       if (!disposed && mine === ticket) {
         page.replaceChildren(error.status === 404 ? gone() : errorPanel(error, () => attempt(reload)));
-        setStageTitle(el("h1", { class: "stage-h1 stage-name" }, "Team"));
+        setStageTitle(el("h1", { class: "stage-h1 stage-name" }, t("views.teams.team")));
         setStageTools();
       }
       return null;
@@ -187,7 +188,7 @@ function mountPage(root, ctx, teamId) {
     return el(
       "div",
       { class: "card team-gone", role: "status" },
-      el("div", { class: "empty" }, icon("alert"), el("div", { class: "row-title" }, "This team is gone"), el("div", { class: "muted" }, "Its agents are still yours, and its chats stay in the list of chats, as chats with Dot."), el("a", { class: "btn", href: "#/agents" }, "Back to the agents")),
+      el("div", { class: "empty" }, icon("alert"), el("div", { class: "row-title" }, t("views.teams.thisTeamIsGone")), el("div", { class: "muted" }, t("views.teams.itsAgentsAreStillYours")), el("a", { class: "btn", href: "#/agents" }, t("views.teams.backToTheAgents"))),
     );
   }
 
@@ -202,7 +203,7 @@ function mountPage(root, ctx, teamId) {
 
   function paintLists(detail) {
     shownDetail = detail;
-    sections.replaceChildren(...[homeSection("chats", "Chats", detail.chats.map(chatRow), folds, toggleFold)].filter((part) => part !== null));
+    sections.replaceChildren(...[homeSection("chats", t("views.teams.chats"), detail.chats.map(chatRow), folds, toggleFold)].filter((part) => part !== null));
     sections.hidden = sections.childElementCount === 0;
     if (top.parentNode !== page) {
       page.replaceChildren(top, sections);
@@ -241,7 +242,7 @@ function mountPage(root, ctx, teamId) {
     }
   }
 
-  root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), "All agents"), page));
+  root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), t("views.teams.allAgents")), page));
   const stopLifecycle = onLifecycle((event) => {
     if (event.kind === "run_started" || event.kind === "run_finished") {
       attempt(refresh);

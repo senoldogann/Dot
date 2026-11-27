@@ -14,6 +14,7 @@ import { readPref, writePref } from "./prefs.js";
 import { PHONE, setShowInspector, showInspector } from "./layout.js";
 import { onThemeChange } from "./theme.js";
 import { showImage } from "./ui.js";
+import { t } from "./i18n.js";
 
 // The page needs this much width for a readable column next to the panel.
 const MIN_WIDTH_PX = 960;
@@ -49,20 +50,20 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   let measuredWidth = -1;
   let drawerOpen = false;
 
-  const empty = el("div", { class: "hint" }, "Screenshots from the desktop and the browser show up here as they are taken.");
+  const empty = el("div", { class: "hint" }, t("inspector.screenshotsFromTheDesktopAnd"));
   const caption = el("span", { class: "small muted" });
   const preview = el("button", { class: "inspector-shot", type: "button", hidden: true });
   const strip = el("div", { class: "inspector-strip", hidden: true });
   const screens = panelSection({
     id: "run-screen",
-    title: "Screenshots",
+    title: t("inspector.screenshots"),
     foldable: true,
     actions: caption,
     body: el("div", { class: "stack tight" }, empty, preview, strip),
   }).element;
   const closeButton = el(
     "button",
-    { class: "icon-btn inspector-close", type: "button", title: "Close", "aria-label": "Close the details", onclick: () => setDrawer(false) },
+    { class: "icon-btn inspector-close", type: "button", title: t("inspector.close"), "aria-label": t("inspector.closeTheDetails"), onclick: () => setDrawer(false) },
     icon("x"),
   );
 
@@ -100,7 +101,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   });
   const tabList = el(
     "div",
-    { class: "inspector-tabs", role: "tablist", "aria-label": "Task details", onkeydown: walkTabs },
+    { class: "inspector-tabs", role: "tablist", "aria-label": t("inspector.taskDetails"), onkeydown: walkTabs },
     tabNodes.map((tab) => tab.button),
   );
   // A phone's sheet has a grabber over its tabs (run.css).
@@ -108,7 +109,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   const head = el("div", { class: "inspector-head" }, grabber, tabList, closeButton);
   // The head stays where it is and the tab under it scrolls, each section's own head sticking to the top of that scroll.
   const body = el("div", { class: "inspector-body" }, tabNodes.map((tab) => tab.panel));
-  const element = el("aside", { class: "inspector", "aria-label": "Task details", hidden: true }, head, body);
+  const element = el("aside", { class: "inspector", "aria-label": t("inspector.taskDetails"), hidden: true }, head, body);
 
   function show(id) {
     for (const tab of tabNodes) {
@@ -153,7 +154,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   const scrim = el("div", { class: "inspector-scrim", hidden: true, onclick: () => setDrawer(false) });
   const toggle = el(
     "button",
-    { class: "icon-btn", type: "button", title: "Show the details", "aria-label": "Task details", "aria-pressed": "false" },
+    { class: "icon-btn", type: "button", title: t("inspector.showTheDetails"), "aria-label": t("inspector.taskDetails"), "aria-pressed": "false" },
     icon("panelRight"),
   );
 
@@ -165,14 +166,14 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
 
   // ---------------------------------------------------------------------------------------------- screens
   function label(index) {
-    return `Screenshot ${index + 1} of ${names.length}`;
+    return t("inspector.screenshotValueOfLength", { value: index + 1, length: names.length });
   }
 
   function select(index) {
     selected = index;
     currentUrl = null;
     caption.textContent = label(index);
-    preview.setAttribute("aria-label", `${label(index)}, show at full size`);
+    preview.setAttribute("aria-label", t("inspector.labelShowAtFullSize", { label: label(index) }));
     const image = el("img", { alt: label(index) });
     preview.replaceChildren(image);
     imageUrl(names[index]).then(
@@ -184,7 +185,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
       },
       (error) => {
         if (selected === index) {
-          preview.replaceChildren(el("span", { class: "small muted" }, `Image unavailable: ${error.message}`));
+          preview.replaceChildren(el("span", { class: "small muted" }, t("inspector.imageUnavailableMessage", { message: error.message })));
         }
       },
     );
@@ -201,7 +202,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
         class: "inspector-thumb",
         type: "button",
         "aria-pressed": "false",
-        "aria-label": `Screenshot ${index + 1}`,
+        "aria-label": t("inspector.screenshotValue", { value: index + 1 }),
         onclick: () => {
           pinned = index !== names.length - 1;
           select(index);
@@ -267,7 +268,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
     }
     const shown = room ? wanted : drawerOpen;
     toggle.setAttribute("aria-pressed", String(shown));
-    toggle.title = shown ? "Hide the details" : "Show the details";
+    toggle.title = shown ? t("inspector.hideTheDetails") : t("inspector.showTheDetails");
   }
 
   // Beside the conversation the panel slides in as it is shown and out before it hides (item 220): the conversation

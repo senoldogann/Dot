@@ -13,17 +13,18 @@ import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 import { toast } from "./ui.js";
 import { openViewer } from "./viewer.js";
+import { t } from "./i18n.js";
 
 // While the view has no frame it keeps the shape of a screen and says why (item 220): a mark, a title and a hint, by
 // the state of the run and of the view. A run that has ended has no page left to watch (item 111): Watch is gone, and
 // so is the hint that offers it. A run of a dotx command works in that command's browser, which the daemon does not
 // cast (item 188).
 const EMPTY_STATES = {
-  "no-page": { mark: "globe", title: "No page yet", hint: "The view starts by itself when the task opens a page in its browser." },
-  waiting: { mark: "monitor", title: "Waiting for the page", hint: "The first picture comes when the page in Dot's browser is drawn." },
-  closed: { mark: "eye", title: "The view is closed", hint: "Watch shows the page Dot's browser is on. Nothing is sent while the view is closed." },
-  ended: { mark: "clock", title: "The task has ended", hint: "Its browser's page is shown here only while a task is going on." },
-  elsewhere: { mark: "terminal", title: "Working elsewhere", hint: "This task was started from Terminal, whose browser is not shown here." },
+  "no-page": { mark: "globe", title: t("computer.noPageYet"), hint: t("computer.theViewStartsByItself") },
+  waiting: { mark: "monitor", title: t("computer.waitingForThePage"), hint: t("computer.theFirstPictureComesWhen") },
+  closed: { mark: "eye", title: t("computer.theViewIsClosed"), hint: t("computer.watchShowsThePageDot") },
+  ended: { mark: "clock", title: t("computer.theTaskHasEnded"), hint: t("computer.itsBrowserSPageIs") },
+  elsewhere: { mark: "terminal", title: t("computer.workingElsewhere"), hint: t("computer.thisTaskWasStartedFrom") },
 };
 
 /**
@@ -43,7 +44,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   let controller = null;
   let objectUrl = null;
 
-  const image = el("img", { class: "computer-image", alt: "The page of Dot's browser", hidden: true });
+  const image = el("img", { class: "computer-image", alt: t("computer.thePageOfDotS"), hidden: true });
   const emptyMark = el("span", { class: "computer-empty-mark", "aria-hidden": "true" });
   const emptyTitle = el("div", { class: "computer-empty-title" });
   const emptyHint = el("div", { class: "hint" });
@@ -55,7 +56,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   let zoomDialog = null;
   const zoomButton = el(
     "button",
-    { class: "btn ghost sm icon-only computer-zoom", type: "button", title: "Zoom", "aria-label": "Zoom into Dot's computer", hidden: true, onclick: () => openZoom() },
+    { class: "btn ghost sm icon-only computer-zoom", type: "button", title: t("computer.zoom"), "aria-label": t("computer.zoomIntoDotSComputer"), hidden: true, onclick: () => openZoom() },
     icon("maximize"),
   );
   const who = el("span", { class: "computer-who" });
@@ -64,8 +65,8 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   // that is touched has it first; one with a mouse, Take over first, which brings Chrome up on the Mac.
   const useButton = el(
     "button",
-    { class: "btn sm", type: "button", title: "Hold the task and use its page from this screen: your taps, scrolls and keys go to it", onclick: () => useHere() },
-    "Use it here",
+    { class: "btn sm", type: "button", title: t("computer.holdTheTaskAndUse"), onclick: () => useHere() },
+    t("computer.useItHere"),
   );
   const controlNote = el("span", { class: "small muted computer-control-note", role: "status" });
   const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
@@ -77,25 +78,25 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   // A section of the panel: the watch button sits beside the title, and the toolbar under it says where the browser is.
   const card = panelSection({
     id: "run-computer",
-    title: "Dot's computer",
+    title: t("computer.dotSComputer"),
     actions: watchButton,
     body: el("div", { class: "stack tight computer-body" }, el("div", { class: "computer-toolbar" }, address, zoomButton, sizes), screen, pill),
   });
   const element = card.element;
   element.classList.add("computer");
-  element.setAttribute("aria-label", "Dot's computer");
+  element.setAttribute("aria-label", t("computer.dotSComputer"));
 
   function paint() {
     const watching = controller !== null;
-    watchButton.textContent = watching ? "Close the view" : "Watch";
+    watchButton.textContent = watching ? t("computer.closeTheView") : t("computer.watch");
     watchButton.setAttribute("aria-pressed", String(watching));
     watchButton.hidden = !isActive;
     if (image.hidden) {
       showEmpty(watching ? "waiting" : isElsewhere ? "elsewhere" : !isActive ? "ended" : hasPage ? "closed" : "no-page");
     }
-    who.textContent = isHeld ? "You have control" : `${name} has control`;
-    handButton.textContent = isHeld ? "Return control" : "Take over";
-    handButton.title = isHeld ? "Let the task go on; it is told the page may have changed" : "Hold the task at its next step and use the browser yourself";
+    who.textContent = isHeld ? t("computer.youHaveControl") : t("computer.nameHasControl", { name });
+    handButton.textContent = isHeld ? t("computer.returnControl") : t("computer.takeOver");
+    handButton.title = isHeld ? t("computer.letTheTaskGoOn") : t("computer.holdTheTaskAtIts");
     useButton.hidden = control !== null;
     // The view is zoomed while it is only watched: while it is used here, a tap is the page's.
     zoomButton.hidden = image.hidden || control !== null;
@@ -139,10 +140,10 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
       return;
     }
     // The viewer's own picture, fitted to its stage and not dragged by the browser (as ui.js shows a screenshot).
-    const picture = el("img", { class: "viewer-picture-image", alt: "The page of Dot's browser", src: image.src, draggable: "false" });
+    const picture = el("img", { class: "viewer-picture-image", alt: t("computer.thePageOfDotS"), src: image.src, draggable: "false" });
     zoomed = picture;
     zoomDialog = openViewer({
-      title: address.textContent || "Dot's computer",
+      title: address.textContent || t("computer.dotSComputer"),
       content: picture,
       page: false,
       onClose: () => {
@@ -179,7 +180,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
         });
       } catch (error) {
         if (!signal.aborted) {
-          toast("error", `The view of Dot's computer stopped: ${error.message}`);
+          toast("error", t("computer.theViewOfDotS", { message: error.message }));
         }
       } finally {
         if (controller !== null && controller.signal === signal) {
@@ -245,7 +246,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     }
     control = createControl({ runId, screen, image, onRefused: refused });
     handButton.before(control.keyboard);
-    controlNote.textContent = "Your taps go to the page.";
+    controlNote.textContent = t("computer.yourTapsGoToThe");
     paint();
   }
 
@@ -272,7 +273,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
    * moment, and a run given back from elsewhere is used here no more. */
   function refused(error) {
     if (error.status === 409 && error.message.includes("still going")) {
-      controlNote.textContent = "Dot is finishing a step; try again in a moment.";
+      controlNote.textContent = t("computer.dotIsFinishingAStep");
       return;
     }
     if (error.status === 409) {
@@ -291,10 +292,10 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     }
     const closeButton = el(
       "button",
-      { class: "icon-btn computer-full-close", type: "button", title: "Close", "aria-label": "Close Dot's computer", onclick: () => full?.dialog.close() },
+      { class: "icon-btn computer-full-close", type: "button", title: t("computer.close"), "aria-label": t("computer.closeDotSComputer"), onclick: () => full?.dialog.close() },
       icon("x"),
     );
-    const dialog = el("dialog", { class: "computer-full", "aria-label": "Dot's computer" }, closeButton);
+    const dialog = el("dialog", { class: "computer-full", "aria-label": t("computer.dotSComputer") }, closeButton);
     full = { dialog, home: element.parentNode, next: element.nextSibling, forUse: false };
     dialog.append(element);
     dialog.addEventListener("close", closeFull);

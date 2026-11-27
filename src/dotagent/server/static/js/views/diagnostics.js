@@ -6,11 +6,12 @@
 
 import { api } from "../api.js";
 import { sizeLabel } from "../attachments.js";
-import { ago, duration, el, plural } from "../dom.js";
+import { ago, duration, el, } from "../dom.js";
 import { icon } from "../icons.js";
 import { inlineError, inlineLoading, pageHead } from "../panels.js";
 import { scrollCue } from "../scrollcue.js";
 import { attempt } from "../ui.js";
+import { t, tCount } from "../i18n.js";
 
 // How often the processes are read again while the page is seen.
 const PROCESSES_EVERY_MS = 5000;
@@ -32,7 +33,7 @@ function wideTable(heads, rows) {
 }
 
 function refreshButton(label, onclick) {
-  return el("button", { class: "btn ghost sm", type: "button", "aria-label": label, title: label, onclick }, icon("refresh"), "Refresh");
+  return el("button", { class: "btn ghost sm", type: "button", "aria-label": label, title: label, onclick }, icon("refresh"), t("views.diagnostics.refresh"));
 }
 
 /** A process of the daemon's tree, set in by how deep it is under the daemon. */
@@ -40,11 +41,11 @@ function processRow(process, daemonPid) {
   return el(
     "tr",
     { dataset: { pid: String(process.pid) } },
-    el("td", null, el("span", { class: "process-name", dataset: { depth: String(Math.min(process.depth, 4)) } }, process.pid === daemonPid ? `${process.name} (Dot itself)` : process.name)),
+    el("td", null, el("span", { class: "process-name", dataset: { depth: String(Math.min(process.depth, 4)) } }, process.pid === daemonPid ? t("views.diagnostics.nameDotItself", { name: process.name }) : process.name)),
     el("td", { class: "mono" }, String(process.pid)),
     el("td", null, `${process.cpu_percent.toFixed(1)} %`),
     el("td", null, sizeLabel(process.memory_bytes)),
-    el("td", null, process.running_s < 1 ? "under a second" : duration(process.running_s)),
+    el("td", null, process.running_s < 1 ? t("views.diagnostics.underASecond") : duration(process.running_s)),
   );
 }
 
@@ -60,7 +61,7 @@ function folderRow(folder) {
 
 /** A time Dot stopped answering (item 1672): when, for how long, and, under Details, where its work was then. */
 function stallRow(stall) {
-  const length = stall.ongoing ? `${stall.seconds.toFixed(1)} s so far` : `${stall.seconds.toFixed(1)} s`;
+  const length = stall.ongoing ? t("views.diagnostics.tofixedSSoFar", { toFixed: stall.seconds.toFixed(1) }) : `${stall.seconds.toFixed(1)} s`;
   return el(
     "div",
     { class: "list-row stall-row" },
@@ -68,7 +69,7 @@ function stallRow(stall) {
       "div",
       { class: "row-main" },
       el("div", { class: "row-title" }, `${ago(stall.began_at)} · ${length}`),
-      el("details", null, el("summary", { class: "small muted" }, "Details"), el("pre", { class: "log-lines" }, stall.stack)),
+      el("details", null, el("summary", { class: "small muted" }, t("views.diagnostics.details")), el("pre", { class: "log-lines" }, stall.stack)),
     ),
   );
 }
@@ -91,8 +92,8 @@ export function mount(root) {
       if (disposed) {
         return;
       }
-      totals.textContent = `${plural(view.processes.length, "process", "processes")} · ${view.cpu_percent.toFixed(1)} % CPU · ${sizeLabel(view.memory_bytes)}`;
-      const table = wideTable(["Process", "PID", "CPU", "Memory", "Running for"], view.processes.map((process) => processRow(process, view.daemon_pid)));
+      totals.textContent = t("views.diagnostics.partTofixedCpuSizelabel", { part: tCount(view.processes.length, "views.diagnostics.countProcess", "views.diagnostics.countProcesses"), toFixed: view.cpu_percent.toFixed(1), sizeLabel: sizeLabel(view.memory_bytes) });
+      const table = wideTable([t("views.diagnostics.process"), "PID", "CPU", t("views.diagnostics.memory"), t("views.diagnostics.runningFor")], view.processes.map((process) => processRow(process, view.daemon_pid)));
       stopCue();
       processesBody.replaceChildren(table);
       stopCue = scrollCue(table);
@@ -139,7 +140,7 @@ export function mount(root) {
       }
       stallsBody.replaceChildren(
         view.stalls.length === 0
-          ? el("div", { class: "card-pad hint" }, `Dot has not stopped answering for more than ${view.stall_s} seconds since it started.`)
+          ? el("div", { class: "card-pad hint" }, t("views.diagnostics.dotHasNotStoppedAnswering", { stall_s: view.stall_s }))
           : el("div", { class: "list" }, view.stalls.map(stallRow)),
       );
     } catch (error) {
@@ -152,14 +153,14 @@ export function mount(root) {
   // The logs: the one written last is shown first; the filter keeps the lines that hold its words.
   let chosen = null;
   let lines = [];
-  const picker = el("select", { class: "select", "aria-label": "Log", onchange: () => attempt(() => loadTail(picker.value)) });
-  const filter = el("input", { class: "input", type: "search", placeholder: "Filter the lines", "aria-label": "Filter the lines", oninput: () => paintLines() });
-  const out = el("pre", { class: "log-lines", tabindex: "0", "aria-label": "The last lines of the log" });
+  const picker = el("select", { class: "select", "aria-label": t("views.diagnostics.log"), onchange: () => attempt(() => loadTail(picker.value)) });
+  const filter = el("input", { class: "input", type: "search", placeholder: t("views.diagnostics.filterTheLines"), "aria-label": t("views.diagnostics.filterTheLines"), oninput: () => paintLines() });
+  const out = el("pre", { class: "log-lines", tabindex: "0", "aria-label": t("views.diagnostics.theLastLinesOfThe") });
 
   function paintLines() {
     const words = filter.value.trim().toLowerCase();
     const shown = words === "" ? lines : lines.filter((line) => line.toLowerCase().includes(words));
-    out.textContent = shown.length > 0 ? shown.join("\n") : words === "" ? "The log is empty." : "No line holds these words.";
+    out.textContent = shown.length > 0 ? shown.join("\n") : words === "" ? t("views.diagnostics.theLogIsEmpty") : t("views.diagnostics.noLineHoldsTheseWords");
     out.scrollTop = out.scrollHeight;
   }
 
@@ -179,7 +180,7 @@ export function mount(root) {
         return;
       }
       if (view.files.length === 0) {
-        logsBody.replaceChildren(el("div", { class: "card-pad hint" }, `No log in ${view.folder} yet.`));
+        logsBody.replaceChildren(el("div", { class: "card-pad hint" }, t("views.diagnostics.noLogInFolderYet", { folder: view.folder })));
         return;
       }
       const name = view.files.some((file) => file.name === chosen) ? chosen : view.files[0].name;
@@ -194,11 +195,11 @@ export function mount(root) {
   }
 
   root.append(
-    pageHead("Diagnostics", "For finding out what went wrong: the programs Dot runs and how much of the Mac they use, the room its files take, and its logs, read on this Mac.", null),
-    card("Processes", totals, processesBody),
-    card("Disk", refreshButton("Measure the folders again", () => attempt(loadDisk)), diskBody),
-    card("Pauses", refreshButton("Read the pauses again", () => attempt(loadStalls)), stallsBody),
-    card("Logs", refreshButton("Read the log again", () => attempt(loadLogs)), logsBody),
+    pageHead(t("views.diagnostics.diagnostics"), t("views.diagnostics.forFindingOutWhatWent"), null),
+    card(t("views.diagnostics.processes"), totals, processesBody),
+    card(t("views.diagnostics.disk"), refreshButton(t("views.diagnostics.measureTheFoldersAgain"), () => attempt(loadDisk)), diskBody),
+    card(t("views.diagnostics.pauses"), refreshButton(t("views.diagnostics.readThePausesAgain"), () => attempt(loadStalls)), stallsBody),
+    card(t("views.diagnostics.logs"), refreshButton(t("views.diagnostics.readTheLogAgain"), () => attempt(loadLogs)), logsBody),
   );
   attempt(async () => {
     await loadProcesses();

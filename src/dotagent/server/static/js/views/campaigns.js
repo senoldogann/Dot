@@ -6,13 +6,14 @@
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN } from "../approvals.js";
-import { ago, clip, compact, dateTime, debounce, el, modelName, plural } from "../dom.js";
+import { ago, clip, compact, dateTime, debounce, el, modelName, } from "../dom.js";
 import { askedLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { approvalLabel } from "../runmodes.js";
 import { onChange, onLifecycle, onStreamBack } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
+import { t, tCount } from "../i18n.js";
 
 // A session starting or ending, or a question asked or decided, changes what the pages show. While a session works, they
 // also follow the status refresh (every 15 s), which brings the entries it writes to the ledger.
@@ -29,7 +30,7 @@ const PREVIEW_CHARS = 220;
 const RESULT_CHARS = 300;
 
 function backLink() {
-  return el("a", { class: "back", href: "#/settings/campaigns" }, icon("arrowLeft"), "All campaigns");
+  return el("a", { class: "back", href: "#/settings/campaigns" }, icon("arrowLeft"), t("views.campaigns.allCampaigns"));
 }
 
 function campaignBadge(status) {
@@ -47,9 +48,9 @@ function nextStep(record, working, nextLocal) {
     return null;
   }
   if (working !== null) {
-    return el("a", { href: `#/runs/${working}` }, "A session is working");
+    return el("a", { href: `#/runs/${working}` }, t("views.campaigns.aSessionIsWorking"));
   }
-  return el("span", null, nextLocal === null ? "No session planned" : `Next session ${nextLocal}`);
+  return el("span", null, nextLocal === null ? t("views.campaigns.noSessionPlanned") : t("views.campaigns.nextSessionNextlocal", { nextLocal }));
 }
 
 /** Reload a page soon after a session starts or ends or a question is asked or decided, and with the status refresh
@@ -86,45 +87,45 @@ function followUpdates(reload, isWorking) {
 
 async function stopCampaign(campaignId, done) {
   const confirmed = await confirmDialog({
-    title: "Stop this campaign?",
-    message: "No session starts after this, and a session that is working now is stopped. You can let it go on later.",
-    confirmLabel: "Stop",
+    title: t("views.campaigns.stopThisCampaign"),
+    message: t("views.campaigns.noSessionStartsAfterThis"),
+    confirmLabel: t("views.campaigns.stop"),
     danger: true,
     focusCancel: true,
   });
   if (confirmed) {
     await api.post(`/campaigns/${campaignId}/stop`, null);
-    toast("ok", "Campaign stopped.");
+    toast("ok", t("views.campaigns.campaignStopped"));
     await done();
   }
 }
 
 async function markAchieved(campaignId, done) {
   const confirmed = await confirmDialog({
-    title: "Mark this campaign achieved?",
-    message: "Nothing checks it: your word closes the campaign, and a session that is working now is stopped.",
-    confirmLabel: "Mark achieved",
+    title: t("views.campaigns.markThisCampaignAchieved"),
+    message: t("views.campaigns.nothingChecksItYourWord"),
+    confirmLabel: t("views.campaigns.markAchieved"),
     danger: false,
     focusCancel: false,
   });
   if (confirmed) {
     await api.post(`/campaigns/${campaignId}/achieved`, null);
-    toast("ok", "Campaign marked achieved.");
+    toast("ok", t("views.campaigns.campaignMarkedAchieved"));
     await done();
   }
 }
 
 async function deleteCampaign(record, done) {
   const confirmed = await confirmDialog({
-    title: "Delete this campaign?",
-    message: `“${clip(record.title, TITLE_CHARS)}” is deleted with its progress notes and its sessions after the first, with all they hold. The conversation it started in stays in your chats. This cannot be undone.`,
-    confirmLabel: "Delete",
+    title: t("views.campaigns.deleteThisCampaign"),
+    message: t("views.campaigns.clipIsDeletedWithIts", { clip: clip(record.title, TITLE_CHARS) }),
+    confirmLabel: t("views.campaigns.delete"),
     danger: true,
     focusCancel: true,
   });
   if (confirmed) {
     await api.del(`/campaigns/${record.id}`);
-    toast("ok", "Campaign deleted.");
+    toast("ok", t("views.campaigns.campaignDeleted"));
     await done();
   }
 }
@@ -143,9 +144,9 @@ function rowActions(summary, done) {
   return el(
     "div",
     { class: "row-actions" },
-    record.status === "active" ? rowButton("stop", "Stop the campaign", `Stop ${name}`, () => stopCampaign(record.id, done)) : null,
-    record.status === "achieved" ? null : rowButton("check", "Mark the campaign achieved", `Mark ${name} achieved`, () => markAchieved(record.id, done)),
-    record.status === "active" || summary.working !== null ? null : rowButton("trash", "Delete the campaign", `Delete ${name}`, () => deleteCampaign(record, done)),
+    record.status === "active" ? rowButton("stop", t("views.campaigns.stopTheCampaign"), t("views.campaigns.stopName", { name }), () => stopCampaign(record.id, done)) : null,
+    record.status === "achieved" ? null : rowButton("check", t("views.campaigns.markTheCampaignAchieved"), t("views.campaigns.markNameAchieved", { name }), () => markAchieved(record.id, done)),
+    record.status === "active" || summary.working !== null ? null : rowButton("trash", t("views.campaigns.deleteTheCampaign"), t("views.campaigns.deleteName", { name }), () => deleteCampaign(record, done)),
   );
 }
 
@@ -159,9 +160,9 @@ function campaignRow(summary, done) {
       "div",
       { class: "row-main" },
       el("div", { class: "row" }, el("a", { class: "row-title", href: `#/campaigns/${record.id}` }, record.title), campaignBadge(record.status)),
-      el("div", { class: "row-meta" }, el("span", null, plural(summary.sessions, "session", "sessions")), nextStep(record, summary.working, summary.next_local)),
+      el("div", { class: "row-meta" }, el("span", null, tCount(summary.sessions, "views.campaigns.countSession", "views.campaigns.countSessions")), nextStep(record, summary.working, summary.next_local)),
       progress === null
-        ? el("div", { class: "row-text faint" }, "No progress recorded yet")
+        ? el("div", { class: "row-text faint" }, t("views.campaigns.noProgressRecordedYet"))
         : el(
             "div",
             { class: "row-meta" },
@@ -189,7 +190,7 @@ function mountList(root) {
       working = summaries.some((summary) => summary.working !== null);
       holder.replaceChildren(
         summaries.length === 0
-          ? emptyPanel("target", "No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the result is checked.")
+          ? emptyPanel("target", t("views.campaigns.noCampaignsYet"), t("views.campaigns.switchOnKeepGoingWhen"))
           : el("div", { class: "card" }, summaries.map((summary) => campaignRow(summary, reload))),
       );
     } catch (error) {
@@ -199,7 +200,7 @@ function mountList(root) {
     }
   }
 
-  root.append(pageHead("Campaigns", "Goals that Dot keeps working on, one session at a time, until a check confirms they are done.", null), holder);
+  root.append(pageHead(t("views.campaigns.campaigns"), t("views.campaigns.goalsThatDotKeepsWorking"), null), holder);
   const stopFollowing = followUpdates(reload, () => working);
   attempt(reload);
   return () => {
@@ -218,16 +219,16 @@ function outline(detail) {
   const { record } = detail;
   const approvals = el(
     "span",
-    { class: "chip", title: "Who answers Dot's safety questions in its sessions" },
-    `Approvals: ${approvalLabel(record.approvals)}`,
+    { class: "chip", title: t("views.campaigns.whoAnswersDotSSafety") },
+    t("views.campaigns.approvalsApprovallabel", { approvalLabel: approvalLabel(record.approvals) }),
   );
   return el(
     "div",
     { class: "card card-pad stack" },
-    textBlock("Goal", record.goal),
+    textBlock(t("views.campaigns.goal"), record.goal),
     record.targets === ""
-      ? textBlock("Targets", "Not set yet: the first session records them.")
-      : el("div", { class: "stack" }, textBlock("Targets", record.targets), textBlock("Verified by", record.verification)),
+      ? textBlock(t("views.campaigns.targets"), t("views.campaigns.notSetYetTheFirst"))
+      : el("div", { class: "stack" }, textBlock(t("views.campaigns.targets"), record.targets), textBlock(t("views.campaigns.verifiedBy"), record.verification)),
     record.status === "achieved" ? el("div", { class: "note ok" }, icon("check"), el("span", null, record.evidence)) : null,
     el(
       "div",
@@ -235,13 +236,13 @@ function outline(detail) {
       el("span", { class: "chip", title: record.model }, modelName(record.model)),
       el(
         "span",
-        { class: "chip", title: "The Chrome its sessions work in" },
-        record.browser === "attach" ? "Browser: your Chrome" : record.browser === "own" ? "Browser: Dot's own" : "Browser: Dot's default",
+        { class: "chip", title: t("views.campaigns.theChromeItsSessionsWork") },
+        record.browser === "attach" ? t("views.campaigns.browserYourChrome") : record.browser === "own" ? t("views.campaigns.browserDotSOwn") : t("views.campaigns.browserDotSDefault"),
       ),
-      el("span", { class: "chip" }, `Reasoning ${askedLabel(record.effort, record.once)}`),
+      el("span", { class: "chip" }, t("views.campaigns.reasoningAskedlabel", { askedLabel: askedLabel(record.effort, record.once) })),
       approvals,
-      el("span", { class: "chip", title: "Usage of its sessions and of the tasks they handed to helpers" }, `${compact(detail.tokens)} usage`),
-      el("span", { class: "faint" }, `Started ${dateTime(record.created_at)}`),
+      el("span", { class: "chip", title: t("views.campaigns.usageOfItsSessionsAnd") }, t("views.campaigns.compactUsage", { compact: compact(detail.tokens) })),
+      el("span", { class: "faint" }, t("views.campaigns.startedDatetime", { dateTime: dateTime(record.created_at) })),
     ),
   );
 }
@@ -259,7 +260,7 @@ function entryRow(entry, numbers) {
         { class: "row-meta" },
         el("span", { class: `badge ${ENTRY_TONES[entry.kind] ?? "b-muted"}` }, entry.kind),
         el("span", { class: "faint", title: dateTime(entry.ts) }, ago(entry.ts)),
-        entry.run_id === null ? null : el("a", { class: "small", href: `#/runs/${entry.run_id}` }, `Session ${numbers.get(entry.run_id) ?? ""}`.trim()),
+        entry.run_id === null ? null : el("a", { class: "small", href: `#/runs/${entry.run_id}` }, t("views.campaigns.sessionValue", { value: numbers.get(entry.run_id) ?? "" }).trim()),
       ),
       el("div", { class: "row-text" }, entry.text),
       Object.keys(entry.numbers).length === 0 ? null : el("div", { class: "row-meta" }, numberChips(entry.numbers)),
@@ -274,20 +275,20 @@ function sessionRow(session, number) {
     el(
       "div",
       { class: "row-main" },
-      el("div", { class: "row" }, el("a", { class: "row-title", href: `#/runs/${session.id}` }, `Session ${number}`), statusBadge(session.status)),
-      el("div", { class: "row-meta" }, el("span", { class: "faint" }, dateTime(session.created_at)), el("span", { class: "faint" }, `${compact(session.input_tokens + session.output_tokens)} usage`)),
+      el("div", { class: "row" }, el("a", { class: "row-title", href: `#/runs/${session.id}` }, t("views.campaigns.sessionNumber", { number })), statusBadge(session.status)),
+      el("div", { class: "row-meta" }, el("span", { class: "faint" }, dateTime(session.created_at)), el("span", { class: "faint" }, t("views.campaigns.compactUsage", { compact: compact(session.input_tokens + session.output_tokens) }))),
       session.result === "" ? null : el("div", { class: "row-text muted" }, clip(session.result, RESULT_CHARS)),
     ),
   );
 }
 
 // What became of a step a session kept for you (item 484): a hand-off, or a question for your yes.
-const KEPT_ANSWERS = { denied: "Skipped", expired: "Not answered in time, and lapsed" };
+const KEPT_ANSWERS = { denied: t("views.campaigns.skipped"), expired: t("views.campaigns.notAnsweredInTimeAnd") };
 
 function decidedRow(question) {
-  const answers = { approved: `Answered: ${question.note}`, denied: "Skipped", expired: "Not answered while the session waited" };
+  const answers = { approved: t("views.campaigns.answeredNote", { note: question.note }), denied: t("views.campaigns.skipped"), expired: t("views.campaigns.notAnsweredWhileTheSession") };
   const kept = question.kept_until !== null && question.kept_until !== undefined;
-  const done = question.severity === "handoff" ? "You did it" : "Allowed once";
+  const done = question.severity === "handoff" ? t("views.campaigns.youDidIt") : t("views.campaigns.allowedOnce");
   const said = question.note === "" ? "" : `: ${question.note}`;
   const answer = kept ? (question.status === "approved" ? `${done}${said}` : (KEPT_ANSWERS[question.status] ?? question.status)) : (answers[question.status] ?? question.status);
   return el(
@@ -314,7 +315,7 @@ function mountPage(root, ctx, campaignId) {
   // The page keeps its parts, and a reload repaints all but the cards of the questions waiting for you: what you type
   // in one, or the answer it is sending, stays.
   const top = el("div", { class: "stack" });
-  const waiting = el("div", { class: "stack tight", hidden: true }, el("div", { class: "section-label" }, "Waiting for you"));
+  const waiting = el("div", { class: "stack tight", hidden: true }, el("div", { class: "section-label" }, t("views.campaigns.waitingForYou")));
   const rest = el("div", { class: "stack" });
   const page = el("div", { class: "stack" }, top, waiting, rest);
   const questionCards = new Map();
@@ -326,7 +327,7 @@ function mountPage(root, ctx, campaignId) {
 
   async function goOn() {
     await api.post(`/campaigns/${campaignId}/resume`, null);
-    toast("ok", "The campaign goes on.");
+    toast("ok", t("views.campaigns.theCampaignGoesOn"));
     await reload();
   }
 
@@ -341,24 +342,24 @@ function mountPage(root, ctx, campaignId) {
             {
               class: "btn danger",
               type: "button",
-              title: "Stop the campaign",
-              "aria-label": "Stop the campaign",
+              title: t("views.campaigns.stopTheCampaign"),
+              "aria-label": t("views.campaigns.stopTheCampaign"),
               onclick: () => attempt(() => stopCampaign(campaignId, reload)),
             },
             icon("stop"),
-            el("span", { class: "label" }, "Stop"),
+            el("span", { class: "label" }, t("views.campaigns.stop")),
           )
         : el(
             "button",
             {
               class: "btn primary",
               type: "button",
-              title: "Let the campaign go on: its next session starts within a minute",
-              "aria-label": "Let the campaign go on",
+              title: t("views.campaigns.letTheCampaignGoOn"),
+              "aria-label": t("views.campaigns.letTheCampaignGoOn2"),
               onclick: () => attempt(goOn),
             },
             icon("arrowRight"),
-            el("span", { class: "label" }, "Go on"),
+            el("span", { class: "label" }, t("views.campaigns.goOn")),
           ),
       record.status === "achieved"
         ? null
@@ -367,12 +368,12 @@ function mountPage(root, ctx, campaignId) {
             {
               class: "btn",
               type: "button",
-              title: "Mark the campaign achieved",
-              "aria-label": "Mark the campaign achieved",
+              title: t("views.campaigns.markTheCampaignAchieved"),
+              "aria-label": t("views.campaigns.markTheCampaignAchieved"),
               onclick: () => attempt(() => markAchieved(campaignId, reload)),
             },
             icon("check"),
-            el("span", { class: "label" }, "Mark achieved"),
+            el("span", { class: "label" }, t("views.campaigns.markAchieved")),
           ),
       deletable
         ? el(
@@ -380,12 +381,12 @@ function mountPage(root, ctx, campaignId) {
             {
               class: "btn danger",
               type: "button",
-              title: "Delete the campaign",
-              "aria-label": "Delete the campaign",
+              title: t("views.campaigns.deleteTheCampaign"),
+              "aria-label": t("views.campaigns.deleteTheCampaign"),
               onclick: () => attempt(() => deleteCampaign(record, () => ctx.navigate("/settings/campaigns"))),
             },
             icon("trash"),
-            el("span", { class: "label" }, "Delete"),
+            el("span", { class: "label" }, t("views.campaigns.delete")),
           )
         : null,
     );
@@ -404,7 +405,7 @@ function mountPage(root, ctx, campaignId) {
       if (!questionCards.has(question.id)) {
         const card = approvalCard({
           approval: fromRecord(question),
-          heading: el("a", { class: "small", href: `#/runs/${question.run_id}` }, "Open session"),
+          heading: el("a", { class: "small", href: `#/runs/${question.run_id}` }, t("views.campaigns.openSession")),
           onSettled: () => attempt(reload),
           leftNote: LEFT_IN_CAMPAIGN,
           onUseHere: null,
@@ -418,7 +419,7 @@ function mountPage(root, ctx, campaignId) {
 
   function paintTop(detail) {
     const { record } = detail;
-    const meta = el("div", { class: "row-meta" }, campaignBadge(record.status), el("span", null, plural(detail.sessions.length, "session", "sessions")), nextStep(record, detail.working, detail.next_local));
+    const meta = el("div", { class: "row-meta" }, campaignBadge(record.status), el("span", null, tCount(detail.sessions.length, "views.campaigns.countSession", "views.campaigns.countSessions")), nextStep(record, detail.working, detail.next_local));
     const deletable = record.status !== "active" && detail.working === null;
     const key = `${record.status}\n${record.title}\n${deletable}`;
     if (head === null || head.key !== key) {
@@ -447,16 +448,16 @@ function mountPage(root, ctx, campaignId) {
     paintQuestions(detail.questions.filter((question) => WAITING_STATUSES.has(question.status)));
     rest.replaceChildren(
       section(
-        "Progress notes",
+        t("views.campaigns.progressNotes"),
         [...detail.entries].reverse().map((entry) => entryRow(entry, numbers)),
-        "Empty: the sessions write what they did here.",
+        t("views.campaigns.emptyTheSessionsWriteWhat"),
       ),
       section(
-        "Sessions",
+        t("views.campaigns.sessions"),
         detail.sessions.map((session, index) => sessionRow(session, index + 1)).reverse(),
-        "None yet.",
+        t("views.campaigns.noneYet"),
       ),
-      ...(decided.length === 0 ? [] : [section("Earlier questions", decided.map(decidedRow).reverse(), "")]),
+      ...(decided.length === 0 ? [] : [section(t("views.campaigns.earlierQuestions"), decided.map(decidedRow).reverse(), "")]),
     );
     if (page.parentNode !== holder) {
       holder.replaceChildren(page);

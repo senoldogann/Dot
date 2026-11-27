@@ -123,7 +123,7 @@ function openMessageSheet(container) {
         // The copy starts inside this press, so that it is still the owner's gesture.
         copyText(body.innerText.trim()).then(
           () => toast("ok", t("code.copied")),
-          (error) => toast("error", `Could not copy: ${error.message}`),
+          (error) => toast("error", t("messagesheet.couldNotCopyMessage", { message: error.message })),
         );
         close();
       }),

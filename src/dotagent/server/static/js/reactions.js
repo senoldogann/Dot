@@ -10,16 +10,17 @@ import { debounce, el } from "./dom.js";
 import { icon } from "./icons.js";
 import { readFailed } from "./state.js";
 import { attempt, toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 /** The palette, in the order it is shown: the daemon's name of a reaction, its sign and the words that say what it means. */
 export const REACTIONS = [
-  { id: "good", symbol: "👍", label: "Good" },
-  { id: "love", symbol: "❤️", label: "Love it" },
-  { id: "wrong", symbol: "👎", label: "Not right" },
-  { id: "again", symbol: "🔁", label: "Do it again" },
-  { id: "remember", symbol: "📌", label: "Remember this" },
-  { id: "explain", symbol: "❓", label: "Explain" },
-  { id: "hold", symbol: "✋", label: "Hold on" },
+  { id: "good", symbol: "👍", label: t("reactions.good") },
+  { id: "love", symbol: "❤️", label: t("reactions.loveIt") },
+  { id: "wrong", symbol: "👎", label: t("reactions.notRight") },
+  { id: "again", symbol: "🔁", label: t("reactions.doItAgain") },
+  { id: "remember", symbol: "📌", label: t("reactions.rememberThis") },
+  { id: "explain", symbol: "❓", label: t("reactions.explain") },
+  { id: "hold", symbol: "✋", label: t("reactions.holdOn") },
 ];
 
 /** @type {WeakMap<Element, { has: (id: string) => boolean, pick: (id: string) => void }>} What each message's react
@@ -85,7 +86,7 @@ function showPalette({ anchor, has, pick }) {
       el("span", { "aria-hidden": "true" }, reaction.symbol),
     ),
   );
-  const node = el("div", { class: "reaction-palette", role: "menu", "aria-orientation": "horizontal", "aria-label": "React to this message" }, choices);
+  const node = el("div", { class: "reaction-palette", role: "menu", "aria-orientation": "horizontal", "aria-label": t("reactions.reactToThisMessage") }, choices);
 
   function move(event) {
     const at = choices.indexOf(/** @type {HTMLButtonElement} */ (document.activeElement));
@@ -242,7 +243,7 @@ export function createReactions({ threadId, signal }) {
         type: "button",
         "aria-pressed": "true",
         "aria-label": reaction.label,
-        title: `${reaction.label}: press to take it back`,
+        title: t("reactions.labelPressToTakeIt", { label: reaction.label }),
         onclick: () => press(runId, message, reaction.id),
       },
       el("span", { "aria-hidden": "true" }, reaction.symbol),
@@ -259,14 +260,14 @@ export function createReactions({ threadId, signal }) {
       {
         class: "btn ghost sm icon-only react-button",
         type: "button",
-        title: "React to this message",
-        "aria-label": "React to this message",
+        title: t("reactions.reactToThisMessage"),
+        "aria-label": t("reactions.reactToThisMessage"),
         "aria-haspopup": "menu",
         "aria-expanded": "false",
       },
       icon("smilePlus"),
     );
-    const chips = el("span", { class: "reaction-chips", role: "group", "aria-label": "Your reactions", "aria-live": "polite", "aria-relevant": "additions removals" });
+    const chips = el("span", { class: "reaction-chips", role: "group", "aria-label": t("reactions.yourReactions"), "aria-live": "polite", "aria-relevant": "additions removals" });
     button.addEventListener("click", () => {
       if (openPalette !== null && button.getAttribute("aria-expanded") === "true") {
         closePalette();

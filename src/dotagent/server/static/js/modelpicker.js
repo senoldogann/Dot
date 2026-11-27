@@ -131,12 +131,12 @@ function openingView(groups, favourites, current) {
 
 /** The words of the daemon's default model, for the row that follows it in the composer's menu. */
 export function defaultRowText(ref) {
-  return ref === null ? "Default model" : `Default (${modelName(ref)})`;
+  return ref === null ? t("modelpicker.defaultModel") : t("modelpicker.defaultModelname", { modelName: modelName(ref) });
 }
 
 /** The models a search looks through in `view`, in words: "OpenAI models", or "favourites". */
 function viewModels(view) {
-  return view === FAVOURITES ? "favourites" : `${providerLabel(view)} models`;
+  return view === FAVOURITES ? "favourites" : t("modelpicker.providerlabelModels", { providerLabel: providerLabel(view) });
 }
 
 // A press on a row or a star leaves the focus in the search.
@@ -203,11 +203,11 @@ export function modelPicker({ onPick, onMakeDefault }) {
       spellcheck: "false",
       "data-autofocus": keyboard ? "" : null,
     });
-    const list = el("div", { class: "model-list", id: listId, role: "listbox", "aria-label": "Models" });
+    const list = el("div", { class: "model-list", id: listId, role: "listbox", "aria-label": t("modelpicker.models") });
     // What the list lacks: no model matches the search, or no model is a favourite yet.
     const note = el("p", { class: "model-note", hidden: true });
     const railItems = views.map((id) => {
-      const label = id === FAVOURITES ? "Favourites" : providerLabel(id);
+      const label = id === FAVOURITES ? t("modelpicker.favourites") : providerLabel(id);
       return el(
         "button",
         { class: "model-rail-item", type: "button", title: label, "aria-label": label, "data-view": id, onclick: () => showView(id) },
@@ -216,7 +216,7 @@ export function modelPicker({ onPick, onMakeDefault }) {
     });
     const rail = el(
       "div",
-      { class: "model-rail", role: "toolbar", "aria-orientation": "vertical", "aria-label": "AI services" },
+      { class: "model-rail", role: "toolbar", "aria-orientation": "vertical", "aria-label": t("modelpicker.aiServices") },
       railItems[0],
       el("div", { class: "model-rail-rule", "aria-hidden": "true" }),
       railItems.slice(1),
@@ -225,7 +225,7 @@ export function modelPicker({ onPick, onMakeDefault }) {
     // The rail presses the view shown, whose models the search looks through, as its placeholder and its label say;
     // the item pressed, or the first, is the rail's one stop for Tab.
     function paintRail() {
-      const scope = `Search ${viewModels(view)}`;
+      const scope = t("modelpicker.searchViewmodels", { viewModels: viewModels(view) });
       search.placeholder = scope;
       search.setAttribute("aria-label", scope);
       for (const item of railItems) {
@@ -269,7 +269,7 @@ export function modelPicker({ onPick, onMakeDefault }) {
 
     function paintStar(star, starred) {
       star.setAttribute("aria-pressed", String(starred));
-      star.title = starred ? "Remove from favourites (⌘D)" : "Add to favourites (⌘D)";
+      star.title = starred ? t("modelpicker.removeFromFavouritesD") : t("modelpicker.addToFavouritesD");
     }
 
     function toggleFavourite(row) {
@@ -376,8 +376,8 @@ export function modelPicker({ onPick, onMakeDefault }) {
           ? el("span", { class: "model-star-room", "aria-hidden": "true" })
           : el(
               "button",
-              { class: "model-change", type: "button", title: "Choose the model new chats start on", onmousedown: keepFocus, onclick: chooseDefault },
-              "Change",
+              { class: "model-change", type: "button", title: t("modelpicker.chooseTheModelNewChats"), onmousedown: keepFocus, onclick: chooseDefault },
+              t("modelpicker.change"),
             );
       return el("div", { class: "model-row", role: "none" }, option, change);
     }
@@ -388,25 +388,25 @@ export function modelPicker({ onPick, onMakeDefault }) {
       "div",
       { class: "model-choosing", hidden: true },
       choosingText,
-      el("button", { class: "model-change", type: "button", onmousedown: keepFocus, onclick: leaveChoosing }, "Cancel"),
+      el("button", { class: "model-change", type: "button", onmousedown: keepFocus, onclick: leaveChoosing }, t("modelpicker.cancel")),
     );
 
     function paintChoosing() {
       choosing.hidden = !choosingDefault;
-      choosingText.textContent = making === null ? "Choose the default model" : `Making ${modelName(making)} the default…`;
+      choosingText.textContent = making === null ? t("modelpicker.chooseTheDefaultModel") : t("modelpicker.makingModelnameTheDefault", { modelName: modelName(making) });
     }
 
     // A model's row: in a view of one provider its name, and "Free" when it costs nothing (and that its provider may
     // train on what it is sent, when it may); among the favourites its provider's name too.
     function modelRow({ info, provider }, key, mixed, starred) {
       const name = modelName(info.ref);
-      const free = info.free ? (info.learns ? "Free, may train on your data" : "Free") : "";
+      const free = info.free ? (info.learns ? t("modelpicker.freeMayTrainOnYour") : t("modelpicker.free")) : "";
       const hint = mixed ? [providerLabel(provider), free.toLowerCase()].filter((part) => part !== "").join(", ") : free;
       const row = optionOf({ lead: providerMark(provider), label: name, hint, key, ref: info.ref });
       row.option.title = info.ref;
       row.star = el(
         "button",
-        { class: "model-star", type: "button", tabindex: "-1", "aria-label": `Favourite ${name}`, onmousedown: keepFocus, onclick: () => toggleFavourite(row) },
+        { class: "model-star", type: "button", tabindex: "-1", "aria-label": t("modelpicker.favouriteName", { name }), onmousedown: keepFocus, onclick: () => toggleFavourite(row) },
         icon("star"),
       );
       paintStar(row.star, starred);
@@ -442,9 +442,9 @@ export function modelPicker({ onPick, onMakeDefault }) {
       if (closed !== null) {
         lack = closed;
       } else if (searching && rows.length === 0) {
-        lack = `No ${viewModels(view)} match “${query.trim()}”.`;
+        lack = t("modelpicker.noViewmodelsMatchTrim", { viewModels: viewModels(view), trim: query.trim() });
       } else if (!searching && view === FAVOURITES && entries.length === 0) {
-        lack = "No favourites yet: star a model to keep it here.";
+        lack = t("modelpicker.noFavouritesYetStarA");
       }
       note.textContent = lack;
       note.hidden = lack === "";

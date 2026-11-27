@@ -7,6 +7,8 @@
 // The title is the page's own `Title:` line, as the fetch writes it at the head of the page's text. It is written by
 // strangers, so the page shows it as text and nothing else, and a title longer than a line is cut.
 
+import { t } from "./i18n.js";
+
 /** @typedef {{ url: string, host: string, title: string }} Source */
 /** @typedef {{ kind: string, data: Record<string, unknown> }} SourceEvent */
 
@@ -69,7 +71,7 @@ function fetchedPage(asked, text) {
 
 // Where an extraction's result lists the sources it could not read, one `- <address>: <why>` line each, after its fence
 // (`render_extractions`, tools/web.py; the fence's JSON writes no line of its own there).
-const NOT_EXTRACTED = "\nNot extracted:\n";
+const NOT_EXTRACTED = t("sourcelist.notExtracted");
 
 /** The addresses among `asked` that the extraction whose result is `text` read: those its result does not list as not
  * extracted. */

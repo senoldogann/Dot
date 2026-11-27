@@ -460,7 +460,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   });
   const refreshChanges = debounce(() => attempt(changes.refresh), CHANGES_SETTLE_MS);
   const codingWorkBody = el("div", { class: "panel-records" });
-  const codingWork = panelSection({ id: "coding-work", title: "Coding worktree", actions: null, body: codingWorkBody });
+  const codingWork = panelSection({ id: "coding-work", title: t("views.run.codingWorktree"), actions: null, body: codingWorkBody });
   codingWork.element.hidden = true;
   async function refreshCodingWork() {
     let work;
@@ -477,22 +477,22 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     if (signal.aborted || work === null) {
       return;
     }
-    const state = work.pr_state === "unverified" ? "Status unverified" : work.pr_state;
+    const state = work.pr_state === "unverified" ? t("views.run.statusUnverified") : work.pr_state;
     codingWorkBody.replaceChildren(
       el("p", { class: "small" }, work.branch, " · ", work.head.slice(0, 12)),
       el("p", { class: "small muted" }, work.worktree),
       work.pr_url === null
         ? null
         : el("p", { class: "small" },
-            el("a", { href: work.pr_url, target: "_blank", rel: "noopener noreferrer" }, "Pull request"), " · ", state,
-            " · ", el("a", { href: `${work.pr_url}/files`, target: "_blank", rel: "noopener noreferrer" }, "Files changed")),
+            el("a", { href: work.pr_url, target: "_blank", rel: "noopener noreferrer" }, t("views.run.pullRequest")), " · ", state,
+            " · ", el("a", { href: `${work.pr_url}/files`, target: "_blank", rel: "noopener noreferrer" }, t("views.run.filesChanged"))),
       el(
         "details",
         null,
-        el("summary", { class: "small" }, "Committed changes from ", work.base.slice(0, 12)),
-        el("pre", { class: "coding-work-stat" }, work.diff_stat || "No committed changes"),
+        el("summary", { class: "small" }, t("views.run.committedChangesFrom"), work.base.slice(0, 12)),
+        el("pre", { class: "coding-work-stat" }, work.diff_stat || t("views.run.noCommittedChanges")),
       ),
-      el("p", { class: "small muted" }, "Captured ", new Date(work.captured_at * 1000).toLocaleString()),
+      el("p", { class: "small muted" }, t("views.run.captured"), new Date(work.captured_at * 1000).toLocaleString()),
     );
     codingWork.element.hidden = false;
   }
@@ -677,9 +677,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     if (notes.length === 0) {
       return [];
     }
-    const said = disliked.reaction === "again" ? "asked to do again (🔁)" : "reacted 👎 to";
+    const said = disliked.reaction === "again" ? t("views.run.askedToDoAgain") : t("views.run.reactedTo");
     return [
-      el("div", { class: "lessons-doubted-head" }, `The run you ${said} was handed these notes. One may be what led it astray: forget the ones that should not guide Dot again.`),
+      el("div", { class: "lessons-doubted-head" }, t("views.run.theRunYouSaidWas", { said })),
       ...notes.map(doubtedRow),
     ];
   }
@@ -693,7 +693,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     lessonsCard.hidden = lessons === null && doubted.length === 0;
     if (lessons === null) {
       const left = disliked?.notes.length ?? 0;
-      lessonsCount.textContent = left > 0 ? `${left} to look at` : `${forgottenNotes.size} forgotten`;
+      lessonsCount.textContent = left > 0 ? t("views.run.leftToLookAt", { left }) : t("views.run.sizeForgotten", { size: forgottenNotes.size });
       lessonsCount.dataset.tone = "";
       lessonCuts.disconnect();
       lessonsBody.replaceChildren(...doubted);
@@ -704,7 +704,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     // Folded, the head says what waits inside: why the lessons could not be drawn, the ones that wait for your
     // decision, else how many there are.
     lessonsCount.textContent =
-      lessons.error !== null ? "could not be drawn" : proposed > 0 ? `${proposed} to decide` : String(lessons.lessons.length);
+      lessons.error !== null ? t("views.run.couldNotBeDrawn") : proposed > 0 ? t("views.run.proposedToDecide", { proposed }) : String(lessons.lessons.length);
     lessonsCount.dataset.tone = lessons.error !== null ? "bad" : proposed > 0 ? "warn" : "";
     lessonCuts.disconnect();
     lessonsBody.replaceChildren(
