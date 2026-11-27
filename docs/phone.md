@@ -1204,7 +1204,9 @@ each file once per chat: `kind` `attachment` is a file the owner attached to a m
 `path` its name), `made` one a run wrote or edited with `write_file` or `edit_file` in a call that did its job (`path`
 as the call named it, `~/` for the home folder; a path the call gave relative to its folder stays relative). A helper's
 file stands under the chat and the run that started its line, the chat the owner sees (`run_id`, the page the web
-opens). Every word of `q`, folded, must be in the file's name (an attachment) or its path (a file made).
+opens). Every word of `q`, folded, must be in the file's name (an attachment) or its path (a file made). The search
+reads the newest 50,000 calls and the newest 5,000 messages of each kind that carry attachments, no further back, so it
+answers in about a tenth of a second whatever the store's size (item 2039); a file older than that is not found.
 
 **Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
 `store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and

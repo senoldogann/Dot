@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2039](2039.md) | done | 2026-11-27 | The files search reads only the newest calls and attachments: 24 s to 0.1 s on a big store |
 | [2034](2034.md) | done | 2026-11-27 | The web says "routine", as the phone does |
 | [2033](2033.md) | done | 2026-11-27 | The web says "bot", as the phone does |
 | [2032](2032.md) | done | 2026-11-27 | The search's chips: All, Messages, Bots, Files, on the phone and the web |

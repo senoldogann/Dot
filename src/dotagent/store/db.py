@@ -437,25 +437,26 @@ _RUNS_FROM: str = (
     " AND (later.created_at, later.rowid) >= (SELECT created_at, rowid FROM runs WHERE id = ?)"
     " ORDER BY later.created_at, later.rowid"
 )
-# The files of every chat, newest first (``search_chat_files``): what the owner attached to a message (an
-# ``attachments`` or a ``steer`` event's ``files``) and the path of a ``write_file`` or ``edit_file`` call whose result
-# says it did its job; each under the chat and the run at the root of its run's line of helpers (the page it opens).
-_FILE_FINDS: str = (
-    "WITH RECURSIVE roots(id, thread_id, root) AS (SELECT id, thread_id, id FROM runs WHERE parent_run_id IS NULL"
-    " UNION ALL SELECT runs.id, roots.thread_id, roots.root FROM runs JOIN roots ON runs.parent_run_id = roots.id)"
-    " SELECT roots.thread_id AS thread_id, roots.root AS run_id, events.ts AS ts, 'attachment' AS kind,"
-    " json_extract(file.value, '$.name') AS name, NULL AS path, json_extract(file.value, '$.id') AS attachment_id"
-    " FROM events JOIN roots ON roots.id = events.run_id, json_each(events.data, '$.files') AS file"
-    " WHERE events.kind IN ('attachments', 'steer') AND json_valid(events.data)"
-    " UNION ALL SELECT roots.thread_id, roots.root, results.ts, 'made', NULL,"
-    " json_extract(calls.data, '$.args.path'), NULL"
-    " FROM events AS calls JOIN roots ON roots.id = calls.run_id"
-    " JOIN events AS results ON results.run_id = calls.run_id AND results.kind = 'tool_result'"
-    " AND json_extract(results.data, '$.call_id') = json_extract(calls.data, '$.call_id')"
-    " AND json_extract(results.data, '$.ok') = 1"
-    " WHERE calls.kind = 'tool_call' AND json_extract(calls.data, '$.tool') IN ('write_file', 'edit_file')"
-    " AND json_type(calls.data, '$.args.path') = 'text'"
-    " ORDER BY ts DESC"
+# What the files search reads (``search_chat_files``), newest first and no further back than these, so that a search
+# costs the same on a store of years: the latest calls (a write is found among them) and the latest events that carry
+# the owner's attachments. Read through ``events_kind_ts`` backwards, each stops at its limit.
+_FILE_CALLS_READ: int = 50_000
+_FILE_ATTACHMENTS_READ: int = 5_000
+_WRITING_TOOLS: tuple[str, ...] = ("write_file", "edit_file")
+_ATTACHED_FILES: str = (
+    "SELECT events.run_id AS run_id, events.ts AS ts, json_extract(file.value, '$.name') AS name,"
+    " json_extract(file.value, '$.id') AS attachment_id FROM (SELECT run_id, ts, data FROM events WHERE kind = ?"
+    " ORDER BY ts DESC LIMIT ?) AS events, json_each(events.data, '$.files') AS file ORDER BY events.ts DESC"
+)
+_WRITE_CALLS: str = (
+    "SELECT calls.run_id AS run_id, calls.ts AS ts, json_extract(calls.data, '$.call_id') AS call_id,"
+    " json_extract(calls.data, '$.args.path') AS path FROM (SELECT run_id, ts, data FROM events"
+    " WHERE kind = 'tool_call' ORDER BY ts DESC LIMIT ?) AS calls"
+    " WHERE json_extract(calls.data, '$.tool') IN (?, ?) AND json_type(calls.data, '$.args.path') = 'text'"
+)
+_WRITES_DONE: str = (
+    "SELECT run_id, json_extract(data, '$.call_id') AS call_id, ts FROM events WHERE kind = 'tool_result' AND ts >= ?"
+    " AND json_extract(data, '$.tool') IN (?, ?) AND json_extract(data, '$.ok') = 1"
 )
 
 
@@ -3700,32 +3701,79 @@ class Store:
         :func:`dotagent.memory.words.search_terms`), newest first, at most ``limit``, each file once per chat: what the
         owner attached to a message (the ``attachments`` and ``steer`` events) and what a run wrote or edited with
         ``write_file`` or ``edit_file`` in a call that did its job. A helper's file stands under the chat of the run at
-        the root of its line, the chat the owner sees."""
+        the root of its line, the chat the owner sees. It reads no further back than the newest
+        :data:`_FILE_CALLS_READ` calls and :data:`_FILE_ATTACHMENTS_READ` events of each kind that carry attachments, so
+        that a search costs the same on a store of years (item 2039: 24 s before on 2.4 million events, 0.1 s since)."""
         if not terms:
             return []
-        rows = await self._all(_FILE_FINDS, ())
+        attached: list[aiosqlite.Row] = []
+        for kind in ("attachments", "steer"):
+            attached.extend(await self._all(_ATTACHED_FILES, (kind, _FILE_ATTACHMENTS_READ)))
+        calls: list[aiosqlite.Row] = await self._all(_WRITE_CALLS, (_FILE_CALLS_READ, *_WRITING_TOOLS))
+        done: dict[tuple[str, str], float] = {}
+        if calls:
+            since: float = min(float(row["ts"]) for row in calls)
+            for row in await self._all(_WRITES_DONE, (since, *_WRITING_TOOLS)):
+                done[(str(row["run_id"]), str(row["call_id"]))] = float(row["ts"])
+        # (time, run, kind, name, path, attachment id), newest first; a write once its result said it did its job.
+        files: list[tuple[float, str, Literal["attachment", "made"], str, str, str | None]] = [
+            (
+                float(row["ts"]),
+                str(row["run_id"]),
+                "attachment",
+                str(row["name"] or ""),
+                str(row["name"] or ""),
+                str(row["attachment_id"] or "") or None,
+            )
+            for row in attached
+        ]
+        for row in calls:
+            at: float | None = done.get((str(row["run_id"]), str(row["call_id"])))
+            if at is not None:
+                path: str = str(row["path"])
+                files.append((at, str(row["run_id"]), "made", Path(path).name, path, None))
+        files.sort(key=lambda file: file[0], reverse=True)
+        matching = [file for file in files if file[3] != "" and all(term in fold_search(file[4]) for term in terms)]
+        roots: dict[str, tuple[str, str]] = await self._run_roots({file[1] for file in matching})
         found: dict[tuple[str, str, str], FileHit] = {}
-        for row in rows:
-            kind: Literal["attachment", "made"] = "attachment" if row["kind"] == "attachment" else "made"
-            path: str = str(row["path"] or "")
-            name: str = str(row["name"] or "") if kind == "attachment" else Path(path).name
-            if name == "" or not all(term in fold_search(path if kind == "made" else name) for term in terms):
+        for at, run_id, kind, name, path, attachment_id in matching:
+            root: tuple[str, str] | None = roots.get(run_id)
+            if root is None:
                 continue
-            key: tuple[str, str, str] = (str(row["thread_id"]), kind, path if kind == "made" else name)
+            key: tuple[str, str, str] = (root[1], kind, path)
             if key in found:
                 continue
             found[key] = FileHit(
-                thread_id=key[0],
-                run_id=str(row["run_id"]),
-                kind=kind,
-                name=name,
-                path=path if kind == "made" else name,
-                attachment_id=None if kind == "made" else str(row["attachment_id"] or "") or None,
-                at=float(row["ts"]),
+                thread_id=root[1], run_id=root[0], kind=kind, name=name, path=path, attachment_id=attachment_id, at=at
             )
             if len(found) >= limit:
                 break
         return list(found.values())
+
+    async def _run_roots(self, run_ids: set[str]) -> dict[str, tuple[str, str]]:
+        """The run at the root of each run's line of helpers and its chat, ``(root id, thread id)`` by run id, read up
+        the ``parent_run_id`` links; a run the store no longer holds is left out."""
+        parents: dict[str, tuple[str | None, str]] = {}
+        wanted: set[str] = set(run_ids)
+        while wanted:
+            chunk: list[str] = sorted(wanted)[:_IN_CHUNK]
+            wanted.difference_update(chunk)
+            marks: str = ", ".join("?" for _ in chunk)
+            for row in await self._all(f"SELECT id, thread_id, parent_run_id FROM runs WHERE id IN ({marks})", chunk):
+                parent: str | None = row["parent_run_id"]
+                parents[str(row["id"])] = (None if parent is None else str(parent), str(row["thread_id"]))
+                if parent is not None and str(parent) not in parents:
+                    wanted.add(str(parent))
+        roots: dict[str, tuple[str, str]] = {}
+        for run_id in run_ids:
+            current: str = run_id
+            seen: set[str] = set()
+            while current in parents and parents[current][0] is not None and current not in seen:
+                seen.add(current)
+                current = str(parents[current][0])
+            if current in parents:
+                roots[run_id] = (current, parents[current][1])
+        return roots
 
     async def chat_messages_around(self, thread_id: str, seq: int, before: int, after: int) -> list[ChatMessage]:
         """The user's and the assistant's messages of the chat's history around place ``seq``: the ``before`` that come
