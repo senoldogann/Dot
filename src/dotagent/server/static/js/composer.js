@@ -562,7 +562,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
       return words;
     },
     giveBack: (words) => {
-      textarea.value = textarea.value.trim() === "" ? words : `${words}\n${textarea.value}`;
+      textarea.value = textarea.value.trim() === "" ? words : words === "" ? textarea.value : `${words}\n${textarea.value}`;
       taken = false;
       drafting = true;
       edited();
