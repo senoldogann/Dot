@@ -126,7 +126,7 @@ async def test_the_capsule_stays_pinned_the_queue_has_arrows_and_the_conversatio
                     await page.goto(ui_url("127.0.0.1", port, TOKEN))
                     await page.goto(f"{address}/#/runs/{parent.id}")
                     await expect(page.locator('[data-segment="helpers"]')).to_have_attribute(
-                        "aria-label", "2 helpers. Waiting on 2 subagents"
+                        "aria-label", "2 helpers. Waiting on 2 helpers"
                     )
                     await expect(page.locator('[data-segment="queue"]')).to_have_attribute("aria-label", "3 queued")
                     where: str = f"at {width}x{height}"

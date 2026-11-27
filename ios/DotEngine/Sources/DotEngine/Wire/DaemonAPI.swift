@@ -380,6 +380,21 @@ extension DaemonAPI {
         return try await data(request(method: "GET", path: path, query: [], body: nil), path: path)
     }
 
+    /// The picture of an image attached to a message (`GET /api/attachments/{id}/image`).
+    public func attachmentPicture(_ id: String) async throws(DaemonRequestError) -> Data {
+        let path: String = "/api/attachments/\(id)/image"
+        return try await data(request(method: "GET", path: path, query: [], body: nil), path: path)
+    }
+
+    /// Where a video or a sound attached to a message is played from (`GET /api/attachments/{id}/media`, served in
+    /// ranges, item 1992) and the header that lets a player in: AVFoundation takes both.
+    public func attachmentMedia(_ id: String) -> (url: URL, headers: [String: String]) {
+        let built: URLRequest = request(method: "GET", path: "/api/attachments/\(id)/media", query: [], body: nil)
+        var headers: [String: String] = built.allHTTPHeaderFields ?? [:]
+        headers["Accept"] = nil
+        return (built.url ?? host.url(path: "/api/attachments/\(id)/media"), headers)
+    }
+
     /// A side question the run answers without seeing it (`/btw`, item 650's aside): the answer's words.
     public func aside(run: String, question: String) async throws(DaemonRequestError) -> AsideAnswer {
         try await send("POST", "/api/runs/\(run)/btw", body: Self.json(AsideBody(text: question)))

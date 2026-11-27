@@ -25,8 +25,8 @@ command itself over its output (one that carries more than its command, a workin
 whole); a read wears an eye and a write a sheet of paper, and each says what it did ("Read notes.txt") without its
 tool's name, which a call keeps only where its words do not say what it is (item 506). A page
 the turn's run showed with `show_page` stands where it came, in its frame
-(item 426). That line opens and folds on a click while the run still works and after it ends,
-and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
+(item 426); the cards it showed with `show_cards` (item 1967) stand there too. That line opens and folds on a click while
+the run still works and after it ends, and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
 Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
 chooses between **Every step** and **What it is doing**, the default since item 830 (a browser that had Dot open before
@@ -78,7 +78,8 @@ the owner's 279 runs of two weeks that made a median of one line a run on Claude
 (at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
 the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
 may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
-the line wears the bot's face, and a finished run's steps fold behind one *Worked for* line before its answer. A run
+the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
+behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
@@ -417,6 +418,19 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   message's level or one with picks, it waits as below. `[agent] busy_parallel = false` queues every message. This is
   the router of DeepSeek Harness's Super-agent design (2026-11-01): with one session that does the work itself, a new
   request waits; in its measure, a model left to decide whether to hand work out did so in none of five runs.
+- Several tasks in one chat (item 1984, slice 1 of [item 1982](../roadmap/1982.md)'s design): with `[agent]
+  chat_tasks` above 1 (1 by default, since the pages do not show lanes yet), a request of its own sent while the chat
+  works starts in a **lane** of the chat rather than a chat of its own: a thread of its own (`threads.lane_of` names
+  the chat) that the chat list does not show, whose first run is given what the chat said so far (the owner's words
+  and Dot's reply of the chat's newest runs and its lanes', not their steps), in front of the owner's words, which
+  stay its goal. A lane keeps everything a chat keeps per thread: one run at a time, its own queue, history, browser
+  tabs, resume and taint. At most `chat_tasks` tasks of a chat work at once, the chat's own run included, counted in
+  one write of the store so that two requests at once cannot both pass; a request past that waits in the chat's queue
+  as before. The answer to a question card a run left goes to that task: when another run works on its thread then,
+  it waits in the thread's queue (it cannot be steered into the run at work) and starts the asker's continuation once
+  that run has ended. `POST /api/threads/{id}/stop` stops every task of the chat (a lane names its chat), each as its
+  own Stop would, so each holds its queue, and a request the fast model was still being asked about starts nothing.
+  Deleting a chat deletes its lanes. With `chat_tasks = 1` all of this is as before.
 - A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
@@ -456,7 +470,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   whose campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
   each, a video or a sound up to 200 MB, sent as the raw body of `PUT /api/attachments/stream` and written to disk as
-  it arrives, as is any file over 2 MB, item 1933). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
+  it arrives, as is any file over 2 MB, item 1933). A video stands in the box, as on Dot Next, as a tile: its first
+  frame, a play glyph, its length at the foot, a ring that fills while it goes up and a × at its corner; over a sent
+  message the same tile stands, and a click on it plays the video full screen (Escape, the × or a click outside closes
+  it), read from `GET /api/attachments/{id}/media` (item 1992). The frame and the length are read from the first 4 MB of
+  the file; a video whose index lies past them (a file some cameras and editors write) is a plain tile that plays all
+  the same. In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
   thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
   the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it
@@ -688,7 +707,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Appearance      | `theme_read`, `theme_apply`, `theme_undo` |
 | Worktrees       | `track_coding_work` |
-| Pages           | `show_page`                                                                                                        |
+| Pages           | `show_page`, `show_cards` (item 1967)                                                                              |
 | Drafts          | `draft_message`                                                                                                    |
 | Mail, calendars | `mail_search`, `mail_read`, `calendar_events`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
 | Skills          | `skill`, `find_help`; `skill_save` (item 893, tool group `skills`): how the owner said to do a kind of work, kept   |
@@ -705,7 +724,9 @@ a model on the owner's Mac sent them 17 times in two days, each call refused), `
 `file_text` too (item 1902: Claude models sent that name, the one Anthropic's text editor tool gives it), `search_files` reads its `pattern` as
 `query` too (item 1176: a run on the Claude plan sent that name four times), `search_files` and `find_files` of a
 path that is not there fail with "path does not exist", as `list_dir` and `read_file` do, not as a failure of
-ripgrep's own (item 1283), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
+ripgrep's own (item 1283), `search_files` reads its pattern in ripgrep's own regex syntax, which its description
+names (no look-around, no backreferences, a match within one line), and fails a pattern ripgrep cannot read as the
+call's error with ripgrep's reason, not as a failure of ripgrep's own (item 1988), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
 comes, ending the search at that and saying so, so that a word a tree holds everywhere no longer costs the daemon
 the 1.8 GB that 397 MB of matches did (item 1956), and a wait or a count asked past its
 bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
@@ -838,7 +859,7 @@ When you are to pick between things that are seen (a layout, a logo, a design), 
 drawn side by side on one page, each tappable, Dot's pick marked. A page that loads another page in its frame is closed,
 with Show it again. A page of up to 500,000 characters is kept in the database under an id that cannot be guessed, which
 is all it takes to read it (`GET /pages/<id>`, no token, never cached); it goes with its chat, and with the events of
-its run under `dotx prune`. `dotx run` prints the page's address. The tool is in a group of its own, `pages`. The system
+its run under `dotx prune`. `dotx run` prints the page's address. The tool is in the group `pages`, with `show_cards`. The system
 prompt asks for a page whenever an answer holds something with a shape (figures to compare, a trend, a ranking, a share,
 a timeline, the steps of a process, how parts connect, a place or a layout), rather than a long list or figures in text,
 one page a question and none for a single number. It asks for a page that lives: animated in (bars that grow, lines that
@@ -878,6 +899,17 @@ the calls, so they stand in the conversation in that order (item 1721). The
 tool's answer gives the page's address on this Mac (`/pages/<id>`), which the run's browser may open to see what it
 showed (item 601, [Browser](browser-and-computer-use.md)).
 
+**Cards in the conversation (item 1967).** `show_cards(cards)` shows up to six validated cards, in order, as one stored
+`cards_shown` event that the web UI draws live and in history: a post draft (platform, account, text, up to four raster
+images; copy, edit and cancel), a chart (line, bar, area, pie or scatter, with its data table), a table, a choice and an
+image gallery. The call is a `meta` action of no risk, so it asks nothing in any mode. A card is data: it carries no
+markup and no approval, and nothing is sent or published by it. Images are workspace rasters named by a relative path,
+read through a held path under the rules of `show_page`'s files and stored with the other images. A choice, like a
+page's, writes its words into your message box and sends nothing: the words are the run's own, which a run that read
+untrusted pages can word, so only your send makes them your message; while the box holds a half-written message the tap
+is refused, so that draft is never lost. The phone's app and the channels do not draw cards
+yet (the system prompt does not ask for them until they do); the run's answer must not depend on one.
+
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the
 Markdown files a crawl wrote, read as a file even when the name looks like an address, `notes.md`) the fast model
@@ -904,8 +936,9 @@ a `shell` command is, a line typed in parts as a whole. Typing never holds Dot: 
 for it, up to 64 KB, and past that `terminal_send` fails with an error that says so until the program reads. A key a line editor acts upon (Tab, an arrow, a Ctrl- shortcut
 other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; once a line has run, the program may be
 in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
-sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
-when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
+sessions whose program runs (3; 0 removes the tools); one whose program ended does not count, and stays to be read, its
+exit status with it, until a read or `terminal_close` closes it (item 1990). Each is closed after `terminal_idle_s`
+without use (30 minutes) and all of them when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
 **A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
 answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the
@@ -1105,7 +1138,7 @@ restarts), or when a call that pays, sends or posts for you was cut while it ran
 chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the
 work again rather than taking it as a failed part. A helper the run still waited for when the daemon stopped ends with
 that run, whose own resume note names the cut `delegate` call. The line over the
-composer says "Waiting on N subagents" only while the run is blocked on them, "N subagents keep working in the
+composer says "Waiting on N helpers" only while the run is blocked on them, "N helpers keep working in the
 background" once it was released, and nothing when none work; on a phone (item 1383) the same words are the first line
 of the sheet that the capsule's **N helpers** segment opens, which also names what each helper does now and has
 **Details** and **Stop**. Calls of `fan_out`, `message_agent` and the work orders

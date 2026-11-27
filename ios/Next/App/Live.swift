@@ -613,6 +613,7 @@ struct BotNewChat: View {
             .padding(.bottom, Space.xs)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("botNewChat")
         .background(Tone.ground)
         .navigationTitle(botChat == nil ? bot?.record.name ?? "" : "")
         .navigationBarTitleDisplayMode(.inline)
@@ -828,7 +829,7 @@ enum LatencyProbe {
             for (text, sent) in model.probeSent {
                 // The run's own first event: its goal drawn from the stream (not the outbox's overlay, keyed "p:").
                 let shown: Bool = items.contains { item in
-                    if case .owner(let id, let words, nil) = item { return id.hasPrefix("u:") && words == text }
+                    if case .owner(let id, let words, nil, _) = item { return id.hasPrefix("u:") && words == text }
                     return false
                 }
                 guard shown else { continue }

@@ -226,7 +226,9 @@ class _Recorder:
 
     def __init__(self, port: int) -> None:
         self.served: list[Served] = []
-        self._app: LocalGuard = LocalGuard(_guarded_app, token=_TOKEN, port=port, reach=frozenset())
+        self._app: LocalGuard = LocalGuard(
+            _guarded_app, token=_TOKEN, port=port, reach=frozenset(), hook_hosts=frozenset()
+        )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

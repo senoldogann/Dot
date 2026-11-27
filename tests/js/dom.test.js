@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clip, compact, duration, joined, modelName, nextNight, plural, repeatsAnswer, showFrom } from "../../src/dotagent/server/static/js/dom.js";
+import { clip, compact, duration, elapsed, joined, modelName, nextNight, plural, repeatsAnswer, showFrom } from "../../src/dotagent/server/static/js/dom.js";
 
 test("plural", () => {
   assert.equal(plural(1, "file", "files"), "1 file");
@@ -21,6 +21,14 @@ test("clip flattens whitespace and ends a cut with an ellipsis within the limit"
   assert.equal(clip("a  b \n c", 10), "a b c");
   assert.equal(clip("abcdef", 4), "abc…");
   assert.equal(clip("abcd", 4), "abcd");
+});
+
+test("elapsed says whole seconds, as the phone's pill does (item 2000)", () => {
+  assert.equal(elapsed(0.9), "0s");
+  assert.equal(elapsed(12.7), "12s");
+  assert.equal(elapsed(125), "2m 05s");
+  assert.equal(elapsed(3900), "1h 05m");
+  assert.equal(elapsed(-3), "0s");
 });
 
 test("duration reads in the unit that fits", () => {

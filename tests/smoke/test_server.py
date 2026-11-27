@@ -143,7 +143,8 @@ async def follow_sse(response: httpx.Response) -> AsyncIterator[SseMessage]:
 def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("home")
     (path / "config.toml").write_text(
-        f'[models]\nmain = "{MODEL_REF}"\n\n[policy]\npreset = "cautious"\napproval_timeout_s = 120.0\n\n'
+        f'[models]\nmain = "{MODEL_REF}"\n\n[store]\nmin_free_gb = 0\n\n'
+        '[policy]\npreset = "cautious"\napproval_timeout_s = 120.0\n\n'
         f'[providers.anthropic]\napi_key_env = "{KEY_VARIABLE}"\n',
         encoding="utf-8",
     )
@@ -1742,6 +1743,18 @@ async def test_a_video_is_sent_as_the_raw_body_and_kept_where_the_json_upload_ke
     assert (
         await live.put("/api/attachments/stream", params={"name": "a.mp4"}, content=b"x", headers={"Authorization": ""})
     ).status_code == 401
+
+    # The phone's chat plays the video from the daemon, in ranges (item 1992); a file that is no media is not served.
+    media: httpx.Response = await live.get(
+        f"/api/attachments/{sent.json()['id']}/media", headers={"Range": "bytes=2-9"}
+    )
+    assert (media.status_code, media.headers["content-type"], media.content) == (206, "video/mp4", b"\x00\x18ftypmp"), (
+        media.text
+    )
+    assert media.headers["content-range"] == f"bytes 2-9/{sum(len(piece) for piece in pieces)}"
+    refused: httpx.Response = await live.get(f"/api/attachments/{notes.json()['id']}/media")
+    assert refused.status_code == 422, refused.text
+    assert (await live.get("/api/attachments/att_missing_000000/media")).status_code == 404
 
     # A disk nearly full refuses the file before it is written, as the JSON route does (item 1938).
     before_floor: set[str] = {path.name for path in (runtime.workspace / "attachments").iterdir()}

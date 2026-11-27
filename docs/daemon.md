@@ -40,7 +40,7 @@ step that needs your answer is not folded out of sight. Its fold is kept in that
 kept from before item 836 is not read as it. At the right of a chat at work the age gives way to **Working** and how long
 since the run was asked for ("12s", "4m", "1h 5m", read again every second). What a chat delegated (item 507), the runs at
 work and those that ended, is one quiet count in its last line (the users mark and how many), and its name for a screen reader
-says how many there are. Nothing hangs under the row: a click on it opens the chat,
+says how many there are. A chat whose run waits on its helpers says **Waiting on 2 helpers…** in its last line, in place of its last words, shimmering as the work line does, and a chat at rest with something still working for it (a helper let go, a command in the background, its loop) says **Waiting · ** and the first of them, quiet (item 2010, as the iPhone app's rows do; read from `GET /api/threads/view` beside the list, so a phone with no link shows what the list alone tells). Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
 (which works in a thread of its own). A run another run delegated stands under the chat its work came from, never as a
 row of its own, also once the run that delegated it has ended (item 1074: a work order's try outlives the lead's turn
@@ -584,26 +584,38 @@ whose turn read pages on the web (`web_fetch`, `web_extract`) has a quiet line b
 1184): the first letter of a few of the sites and how many pages ("3 sources"); opened, each page's title over its site,
 a link that opens it in the browser. A page is counted from the address the run asked for (or the one a redirect ended
 at), never from what a page says; its title is the page's own, shown as text and cut at a line. A turn lists 12 pages
-at most and counts the rest; a fetch that failed and a search read none. A delegated run
-is a row, drawn as a developer tool draws its subagents (item 1331): a small face with its state at the corner (turning
+at most and counts the rest; a fetch that failed and a search read none.
+
+Dot can place cards in the conversation with `show_cards`. The web UI displays charts with a data table, ordinary
+tables, image galleries and choices, whose tap writes the chosen words into the message box for you to send, as a page's
+choice does; while a message is half-written the tap is refused ("Finish the message in the composer first"), so your
+draft is never lost. A channel's step line for the call says "showed cards in the web view": the channel draws none. Post drafts show the platform, account and text together, and related drafts scroll sideways. You can copy,
+edit or cancel a draft in the current view. Cancelled drafts stay visible in muted colours. **Prepare to publish** puts
+a text-only draft in the composer for you to review and send as a request. The resulting run goes through the existing
+post policy. The renderer can show a confirmed X result as a collapsed **Shared** row that opens to the post text and
+its **Open on X** link. Recording that result from a card's Share action requires the planned publisher. Mail and
+iMessage drafts are sent through their own cards.
+
+A delegated run
+is a row, drawn as a developer tool draws its helpers (item 1331): a small face with its state at the corner (turning
 while it works, amber while it waits for you, a check in the text's ink when it is done, item 839, red when it
-failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Subagent
+failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Helper
 1" for a screen reader only; the goal's paths are cut to their last two parts, "…/housestory/brief.md", item 669), under
 it in one quiet line what it does now in the words of the line over the composer ("Running swift test", "Reading
 README.md", "List folder: shelf-3"; item 1331) and, once it ended, the start of its answer as the result (item 245),
 its state in a word beside the time it has taken ("Running 8m 15s": the word in blue while it works, amber while it
 waits, red when it failed; the time counts on every second), the way to its own page (under the pointer, where there
 is one; on a touch screen, on an open row, item 1281) and a chevron that opens its steps. In a group the rows share one
-card with a hairline between them; one subagent alone is a card of its own. Rows that follow each other gather in one
-group: its head shows their faces, how many they are ("3 subagents"), how they stand ("2 working", in blue while one
+card with a hairline between them; one helper alone is a card of its own. Rows that follow each other gather in one
+group: its head shows their faces, how many they are ("3 helpers"), how they stand ("2 working", in blue while one
 works; "2 done · 1 stopped" after) and the time from the first one's start to the last one's end, counting on while
 one works, and a chevron that folds the rows away; while one works a quiet line in the card says how they work: side by
 side while the chat waits, their answers coming back to it. Over the composer, while the task waits for them, a line
-says **Waiting on 2 subagents** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
-and the subagents with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 subagents keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
+says **Waiting on 2 helpers** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
+and the helpers with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 helpers keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
 and hairline in the dock, and the dock is not the conversation: it stands where it is while the chat is scrolled, a phone's
 included, and nothing of the history shows through it (item 1347). A phone does not draw the line (item 1383): its words
-are the first line of the sheet that the capsule's **2 helpers** segment opens, with what each subagent does now,
+are the first line of the sheet that the capsule's **2 helpers** segment opens, with what each helper does now,
 **Details** and **Stop**. An approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
 again. Its steps are put in the page the first time it opens, by you or by an approval, and stay (item 767): until then
@@ -782,7 +794,7 @@ danger colour with a square) and cancels it; a word typed turns it back into the
 send does (item 1320): while the run works a message waits in the chat's queue, **After this
 task**, where its **Steer** sends it into the run at once (see [How a run works](runs.md#how-a-run-works)), unless
 Settings › General › Messages has it steer the run now, **Add to task**; the send, its tooltip, its name to a screen
-reader and the box's placeholder say which. The run's choices (its model, reasoning and options) shown from the
+reader and the box's placeholder say which. A message that starts the chat's next run (the run before it ended) is in the chat the moment it is sent (item 1999, as the iPhone app does it): its words leave the box, its bubble stands under the conversation with a quiet **Pending** at its right edge, and under it the agent's typing dots say **Starting…** until the page of the new run is open; a send Dot refuses takes the bubble away and gives the words back to the box. The run's choices (its model, reasoning and options) shown from the
 button beside the "+" stand at the right, by the microphone and the send, on every page. Where one way alone is open (a held run, a campaign's
 session, a run a Terminal command drives) the send names that way. A message queued waits above the box: a sheet whose head (Queued
 and the count) folds it, with a row per message: an up and a down arrow that move it a place (32 px with a pointer, 44 px on a phone,
@@ -796,16 +808,16 @@ send's way (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
 box (items 352 and 360, drawn since item 1335 as a plain bar on a hairline, no glass and no shadow) says in a few quiet words how long the run has worked, that it waits to start, that it waits
 for you or that it stops (once Stop was pressed, until it has),
-how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its subagents stand
+how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
 composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side
 panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
 part closes it. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
-stacked over the box (item 1383): the line that waits for subagents, the bar, the queue, the loops and the commands at
+stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
-divided by hairlines and each at least 44 px tall: the run's status (**Working · 36 s**, **Waiting for you**,
+divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Reconnecting…**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
@@ -854,11 +866,11 @@ hairline with its title, what sums it up (a count) and its buttons on one line, 
 while its section is in sight and gives way to the next one's; the rows are tight, on the 8 px scale. Beside the
 conversation it is a column at the window's right; on a narrower window a drawer, and on a phone a sheet from the foot,
 nine tenths of what is seen. The Agents tab opens on the **Lineage** (item 1332), titled "Lineage · 2 running": the task that leads and, under
-it, its subagents that work, each a mark, its title, how long it has worked ("8m") and a dot for how it stands (blue
+it, its helpers that work, each a mark, its title, how long it has worked ("8m") and a dot for how it stands (blue
 while it works, amber waiting for you, green done, red failed; the row is the way to its page, and what it does now
 is its tooltip), and a **Previous agents** row with how many failed ("1 failed") and how many there are, which folds
 open the rows of those that ended. The Task tab holds the same Lineage, compact, whenever the chat has handed work to
-a subagent, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
+a helper, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
 `/loop`, a schedule a run made in the chat, a schedule that fires into it), each a calendar-clock mark with a green dot
 while it is on, its title over how it repeats or when it runs and how it stands ("Every 6 hours · paused", "Once,
 Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00") and, under that, how its last run ended and when (item 1355: "Last run done · 09:00",
@@ -1023,7 +1035,7 @@ first match; it reads each page's name, its line and its words), then the settin
 sheet), and at its foot **Back to chats**, to the chat last open (item 852). Every page that configures Dot is a row:
 **General**, **Appearance**, **Rules**, **Memory**, **Vault** and **Snapshots**; under **Agents**
 Agents, Models, Browser, Web search, **Scheduled tasks** (item 1337: what was the Schedules page), Campaigns and
-Self-improvement; under **Connections** Connectors, Plugins, Skills, AI services, Phone and Channels; under
+Self-improvement; under **Connections** Connectors, Plugins, Skills, AI services, Phone, Channels and Hooks; under
 **Maintenance** System, Self-repair and Diagnostics; under **About** Open source licences. A row is a small mark and its
 name, with what it holds at its right (how many notes Dot keeps, how many items the vault holds, how many schedules are
 on, a dot when a phone reaches Dot; no model's name, item 852), and the rows scroll on their own in a short window;
@@ -1349,12 +1361,14 @@ The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any 
 `127.0.0.1`, `localhost` or `::1`, written so (another spelling of a loopback address, such as `127.0.0.2` or `::1` in
 full, would start a server that refuses every request, its own client's too: item 561). Every request must carry
 a path without a `.` or `..` segment (`..%2F`, as a browser sends it, reads as one; item 419), a `Host` of the loopback
-address and, when it has one, an `Origin` of the server itself; every call under `/api` except
-`/api/health`, `/api/proof` and `/api/phone/pair` needs the bearer token in `<home>/api-token` (mode 0600), or the key
-of a paired phone that is still listed (item 670, [Dot on the phone](phone.md)), which pairing codes and the paired
-phones' routes do not take (403). A request's body is read whole only within its limit, after the guard let it
-through: 4 KB on what it lets through without a token (those three routes, the pages and the files), 32 MB on every
-route that needs the token or a phone's key (an attachment of 20 MB in base64); a longer one, declared
+address or a name of `[server] reach` (and, for a call to a hook alone, one of `[server] hook_hosts`) and, when it has
+one, an `Origin` of the server itself; every call under `/api` except
+`/api/health`, `/api/proof`, `/api/phone/pair` and a call to a hook (`POST /api/hooks/<id>`, signed with the hook's own
+secret instead, [Hooks](hooks.md)) needs the bearer token in `<home>/api-token` (mode 0600), or the key
+of a paired phone that is still listed (item 670, [Dot on the phone](phone.md)), which pairing codes, the paired
+phones' routes and the hooks' own routes do not take (403). A request's body is read whole only within its limit, after
+the guard let it through: 4 KB on what it lets through without a token (the three routes, the pages and the files),
+64 KiB on a call to a hook, 32 MB on every route that needs the token or a phone's key (an attachment of 20 MB in base64); a longer one, declared
 or streamed, is answered 413 and read no further (item 942). The one route that takes a file as its raw body,
 `PUT /api/attachments/stream`, is not read whole: a declared length over 200 MiB is answered 413 at once, and the route
 counts the rest as it writes it (item 1933). A page a run showed
@@ -1547,7 +1561,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (`"review"` for `dotx run --review`, kept under Code reviews; a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170); `/events?tail=N` (1 to 2000) reads a run's newest N events instead of the ones after `after`, oldest first, and says it knew `tail` with the header `X-Dot-Events-Tail: N` (item 1370: a client that was away through a long run reads the end of it; one that finds no header is talking to a daemon that ignores `tail`) |
-| `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs (`stored=true`: only those stored so far, item 734); lifecycle of all runs |
+| `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs. A stored read (`stored=true`, item 734) includes any draft outcomes recorded after the run ended. The global stream follows the lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `GET\|POST /runs/{id}/messages/{message}/reactions`, `DELETE /runs/{id}/messages/{message}/reactions/{reaction}` | the reactions on a message of Dot's (item 586; `message` is `answer` or `step-<n>`, `n` written as the number it is, from 1: `step-01` and `step-0` are 422, so that a message has one key; item 612): list them; put one on (`{"reaction": "good"}`, one of `good`, `love`, `wrong`, `again`, `remember`, `explain`, `hold`) and do what it says, 201, or 200 when it was there (the reply has `reactions`, `effect`, `said` and `run_id`; 404 for no run or a step it did not say, 422 for a message with no words, for the answer of a run that works, or for a 📌 on a message that holds a secret); take one back |
@@ -1565,6 +1579,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `PUT /attachments/stream?name=…&media_type=…` (the file as the raw body)         | the same for a video, a sound or a large file (item 1933): the body is written to disk in chunks as it arrives, never held whole in memory, up to 200 MiB for a video or a sound and 20 MiB for any other file (422 past it); a body that is cut or refused leaves no file. Answers as `POST /attachments` does |
 | `GET /attachments/{id}/image`                                                  | the picture of an image kept for a message (item 376), for its small chip in the box that edits a queued message |
+| `GET /attachments/{id}/media`                                                  | a video or a sound kept for a message, served in ranges (`Range` → 206) as the type its name says, for the phone's chat to play it (item 1992); 422 for any other kind of file |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first, each with the face it wears (`actor_id`), the team it is with (`team`, item 610), its last line (`last_message`, `last_role`) and its loop (`loop_cron`, `loop_next_at`, item 580); delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |
 | `GET /threads/{id}/helpers?limit=N`                                            | the runs a chat's runs delegated, newest first (the side panel's Agents tab; 404 for no chat) |
@@ -1623,6 +1638,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /phone/phones`, `DELETE /phone/phones/{id}` (the token only, never a phone's key) | the phones that hold a key of their own, with their names and when they were paired and last used, never the key; a phone removed, its key refused from then on and its open streams ended (404 when it is not paired) (item 670) |
 | `GET /channels`, `POST /channels/imessage/switch` (`{"on": true}`; the switch, the code, the confirmation and the removal take the token only, never a phone's key: item 670) | the channels of Settings › Channels (item 572, [Channels](channels.md)): iMessage's switch, paired numbers and addresses, a code that waits, what macOS granted (`database`, `automation`), what keeps it from working (`problem`, `needs`) and what the channel sees of Messages' database (`seen`, item 595: when it looked, the cursor, the newest row, the sizes and times of `chat.db` and `chat.db-wal`, the last command and error, a `warning` when the log changed for two minutes and nothing Dot reads did, and `cursor_reset`, item 611, when the cursor had to come down to the newest row of a database rebuilt or restored: `{"from_row", "to_row", "at"}`), and the address its links open at (`links`: the name `[server] reach` gives, `null` when it names none and no link is sent); the switch, at once and in `[channels] imessage` (422 when the config file cannot be changed, and the switch stays as it was); `POST /channels/progress` (`{"on": true}`) turns on or off the messages of progress of a run started from a channel (item 618; `progress` in `GET /channels`), at once and in `[channels] progress` (`"steps"` or `"off"`; 422 when the config file cannot be changed) |
 | `POST /channels/imessage/code` (`{"handle": "+358401234567"}`), `POST /channels/imessage/confirm` (`{"code": "482 913"}`), `POST /channels/imessage/remove` (`{"handle": …}`), `POST /channels/imessage/check`, `POST /channels/imessage/poll` | send a pairing code to a number (with its country code) or an address through Messages; pair it when the code is typed back (422 for a wrong one, with the tries left, and for one out of date or used up); forget a paired one; show macOS's question whether Dot may control Messages, a minute for the answer; look at Messages' database now (Check now, item 595): a poll like the loop's, never reading a row twice with it, when the channel is on and a number paired, else a look that reads no message |
+| `POST /hooks/{id}` (no token: signed with the hook's secret, `X-Dot-Timestamp` and `X-Dot-Signature`), `GET /hooks`, `POST /hooks` (`{"name", "binding": "schedule"` or `"agent", "target_id", "template", "fields", "per_minute"}`), `POST /hooks/{id}/rotate`, `POST /hooks/{id}/switch` (`{"enabled": false}`), `POST /hooks/{id}/delete` | the hooks ([Hooks](hooks.md)): a call starts the bound schedule or agent, tainted (202 with `run_id`; 401, 413, 422, 429, 409 or 503 otherwise); the list (no secret), a new hook and a rotated secret (the one answers that carry the secret); every route but the call takes the token only, never a phone's key |
 | `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | Snapshots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
 | `GET /desktop/permissions`, `POST /desktop/permissions`, `POST /desktop/permissions/open` (`{"pane": "screen_recording"}`), `POST /system/restart` | the desktop permissions as macOS reports them, make macOS ask for the missing ones, show a pane, start the service's daemon again (item 409) |
 | `POST /voice/allow` (`{"pane": "microphone"}` or `{"pane": "speech"}`)         | for the composer's microphone in the desktop app (item 636): show System Settings at the pane where Dot.app is allowed the microphone, or speech recognition, from this Mac's own address with the installation's token only (422 from any other, a phone's key among them, and for any other pane). It reads the Dot.app that runs first and answers `{"opened", "app"}`: `ready`, it asks macOS for the microphone, and the pane is shown; `old`, it was built before it asked, so macOS gives it none whatever System Settings shows, and nothing is shown (`opened` false); `unknown`, none was found running, and the pane is shown all the same. A Dot.app or a `codesign` that cannot be read is an error (500), not an answer. It changes no setting: you switch Dot on |

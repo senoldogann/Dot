@@ -18,6 +18,11 @@ struct BotProfile: View {
     @State private var composing: Bool = false
     @State private var editing: Bool = false
     @State private var showsInstructions: Bool = false
+    @State private var orders: Loadable<[WorkOrderView]> = .loading
+    @State private var objectives: Loadable<[ObjectiveRecord]> = .loading
+    @State private var handoffs: Loadable<BotHandoffs> = .loading
+    @State private var pausing: Bool = false
+    @State private var problem: SettingsFailure?
     @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
 
     private var bot: Bot? { model.bots.first { $0.id == botId } }
@@ -25,7 +30,12 @@ struct BotProfile: View {
     var body: some View {
         SettingsScroll(title: "") {
             if let bot {
+                if let problem { FailureBanner(failure: problem, macPlace: String(localized: "Agents", comment: "Where on the Mac: the Agents page"), retry: nil) }
                 header(bot)
+                if bot.record.pausedAt != nil {
+                    Notice(tone: .warn, message: String(localized: "Paused: its routines start nothing by themselves.", comment: "Bot profile: a paused bot"), dismiss: nil)
+                        .accessibilityIdentifier("profile.paused")
+                }
                 GroupedSection(header: nil, footer: nil) {
                     if let latest = bot.latest {
                         Button { library = latest.summary.id } label: {
@@ -36,6 +46,7 @@ struct BotProfile: View {
                     }
                     BotComputerRow(bot: bot)
                 }
+                BotWorkSection(botId: bot.id, orders: orders, objectives: objectives, handoffs: handoffs)
                 GroupedSection(header: String(localized: "Configure the bot", comment: "Bot profile: the section of what the bot does and runs on"), footer: nil) {
                     NavigationRow(
                         systemImage: "clock", title: String(localized: "Routines", comment: "Bot profile: the bot's scheduled tasks"), description: nil,
@@ -72,10 +83,33 @@ struct BotProfile: View {
             }
         }
         .navigationDestination(for: SettingsPage.self) { page in SettingsDestination(page: page, start: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed)) }
+        .toolbar {
+            if let bot, !bot.isDot {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        if bot.record.pausedAt == nil {
+                            Button(String(localized: "Pause bot", comment: "Bot profile menu: its routines stop starting by themselves"), systemImage: "pause.circle") { setPaused(bot, true) }
+                                .accessibilityIdentifier("profile.pause")
+                        } else {
+                            Button(String(localized: "Resume bot", comment: "Bot profile menu: its routines start again"), systemImage: "play.circle") { setPaused(bot, false) }
+                                .accessibilityIdentifier("profile.resume")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .disabled(pausing)
+                    .accessibilityLabel(String(localized: "More", comment: "VoiceOver: the ⋯ menu of a bot's chat"))
+                    .accessibilityIdentifier("profile.menu")
+                }
+            }
+        }
         .task { await loadSchedules() }
+        .task { await loadWork() }
         .refreshable {
+            problem = nil
             await model.loadAgents()
             await loadSchedules()
+            await loadWork()
         }
         .sheet(item: Binding(get: { library.map(LibraryChat.init) }, set: { library = $0?.id })) { chat in
             RunInspector(thread: chat.id, close: { library = nil })
@@ -199,6 +233,36 @@ struct BotProfile: View {
 
     private func loadSchedules() async {
         schedules = await model.read { api throws(DaemonRequestError) in try await api.schedules() }
+    }
+
+    /// The three reads of the Work group, together and each its own (a route that fails leaves the others' counts).
+    private func loadWork() async {
+        async let read: Loadable<[WorkOrderView]> = readOrders(model)
+        async let objectivesRead: Loadable<[ObjectiveRecord]> = readObjectives(model)
+        async let team: Loadable<TeamView> = readTeam(model)
+        let all: Loadable<[WorkOrderView]> = await read
+        orders = all.map { botOrders(botId: botId, orders: $0) }
+        objectives = await objectivesRead.and(all).map { botObjectives(botId: botId, orders: $0.1, objectives: $0.0) }
+        handoffs = await team.map { botHandoffs(botId: botId, team: $0) }
+    }
+
+    /// Pauses the bot or lets it go on (`POST /api/agents/{id}/pause|resume`), then reads the agents again; a refusal is said at the top.
+    private func setPaused(_ bot: Bot, _ paused: Bool) {
+        guard !pausing else { return }
+        Task {
+            pausing = true
+            defer { pausing = false }
+            let result: Result<AgentRecord, SettingsFailureBox> = await model.write { api throws(DaemonRequestError) -> AgentRecord in
+                if paused { return try await api.pauseAgent(bot.id) }
+                return try await api.resumeAgent(bot.id)
+            }
+            switch result {
+            case .success:
+                problem = nil
+                await model.loadAgents()
+            case .failure(let box): problem = box.failure
+            }
+        }
     }
 
     private func changeModel(_ record: AgentRecord, to ref: String) async -> SettingsFailure? {

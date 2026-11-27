@@ -88,7 +88,8 @@ final class WorkLogTests: XCTestCase {
             ])
         let items: [TranscriptItem] = transcript(of: finished, pending: [], mode: .showAll, streaming: true, context: .none)
         guard case .work(let fold) = items[1] else { return XCTFail("the steps fold") }
-        XCTAssertTrue(fold.hasFailure, "a failed fold is drawn open")
+        XCTAssertTrue(fold.hasFailure)
+        XCTAssertTrue(fold.startsOpen, "a failed fold is drawn open beside the steps")
         XCTAssertEqual(fold.items.map(\.id), ["t:c1", "a:12"], "the passing words fold with the steps")
         XCTAssertEqual(transcript(of: finished, pending: [], mode: .zen, streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"])
     }

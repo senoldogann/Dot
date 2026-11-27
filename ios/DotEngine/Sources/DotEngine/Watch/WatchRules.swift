@@ -72,29 +72,13 @@ public func runHold(_ events: [EventRecord]) -> RunHold {
 
 // MARK: What a run does now
 
-/// What the run does to its page or the desktop this moment, for the picture's caption.
+/// What the run does to its page or the desktop this moment, for the picture's caption: the call itself, as the chat's
+/// work log names it (its tool and target), so the live view and the chat say a call alike (item 1996).
 public struct LiveAction: Sendable, Equatable {
-    public enum Kind: String, Sendable, Equatable {
-        case click
-        case type
-        case key
-        case scroll
-        case open
-        case look
-        case wait
-        case other
-    }
+    public let call: HelperStep
 
-    public let kind: Kind
-    /// What it acts on or writes, in its own words (a page's address, the text typed, a key); may be empty.
-    public let detail: String
-    /// How many steps the call holds (a batch of steps reads "and 3 more").
-    public let steps: Int
-
-    public init(kind: Kind, detail: String, steps: Int) {
-        self.kind = kind
-        self.detail = detail
-        self.steps = steps
+    public init(call: HelperStep) {
+        self.call = call
     }
 }
 
@@ -105,44 +89,10 @@ public func liveAction(_ events: [EventRecord]) -> LiveAction? {
     for event in events.reversed() where event.kind == "tool_call" {
         guard let tool: String = event.data["tool"]?.string, tool.hasPrefix("browser_") || tool.hasPrefix("desktop_") else { continue }
         if let call: String = event.data["call_id"]?.string, answered.contains(call) { return nil }
-        return action(tool: tool, args: event.data["args"]?.object ?? [:])
+        return helperStep(of: event).map(LiveAction.init(call:))
     }
     return nil
 }
-
-func action(tool: String, args: [String: JSONValue]) -> LiveAction {
-    let steps: [[String: JSONValue]] = (args["steps"]?.array ?? []).compactMap(\.object)
-    // A batch is told by its first step that acts; the rest is counted.
-    if let first: [String: JSONValue] = steps.first {
-        let verb: String = first["action"]?.string ?? ""
-        let words: String = oneLine(first["text"]?.string ?? first["key"]?.string ?? first["ref"]?.string ?? "")
-        return LiveAction(kind: stepKind(verb), detail: words, steps: steps.count)
-    }
-    let detail: String = oneLine(args["url"]?.string ?? args["text"]?.string ?? args["query"]?.string ?? args["app"]?.string ?? "")
-    switch tool {
-    case "browser_open", "browser_new_tab", "browser_back", "browser_switch_tab", "desktop_open_app": return LiveAction(kind: .open, detail: detail, steps: 1)
-    case "browser_scroll": return LiveAction(kind: .scroll, detail: detail, steps: 1)
-    case "browser_wait_text": return LiveAction(kind: .wait, detail: detail, steps: 1)
-    case "browser_snapshot", "browser_screenshot", "browser_read_text", "browser_find", "browser_links", "browser_extract", "desktop_snapshot",
-        "desktop_screenshot", "desktop_read":
-        return LiveAction(kind: .look, detail: detail, steps: 1)
-    default: return LiveAction(kind: .other, detail: detail, steps: 1)
-    }
-}
-
-private func stepKind(_ verb: String) -> LiveAction.Kind {
-    switch verb {
-    case "click", "double_click", "right_click", "click_at", "press", "check", "uncheck", "select", "menu", "activate": .click
-    case "fill", "type", "insert", "set_value", "paste": .type
-    case "key": .key
-    case "scroll", "scroll_into_view", "drag", "drag_at": .scroll
-    case "hover", "focus": .look
-    case "wait": .wait
-    default: .other
-    }
-}
-
-private func oneLine(_ text: String) -> String { middleCut(text.split(whereSeparator: \.isNewline).joined(separator: " "), 60) }
 
 // MARK: Smoothness
 

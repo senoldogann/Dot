@@ -2762,7 +2762,7 @@
           "type": "string"
         },
         "pattern": {
-          "description": "Regular expression to search for in file contents.",
+          "description": "Regular expression to search for in file contents, in Rust regex syntax, as ripgrep reads it: no look-around ((?=, (?!, (?<=, (?<!) and no backreferences, and a match lies within one line, so a pattern holds no \\n; escape ( ) [ ] { } . | * + ? ^ $ \\ to match them as text.",
           "type": "string"
         }
       },
@@ -2854,6 +2854,264 @@
       },
       "required": [
         "command"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Draw a chart, table, choice or image gallery, or show post drafts in the conversation. Group draft alternatives in one call. Post drafts are previews only. Use draft_message for sendable email and iMessage drafts. Images must be raster files you made in the workspace. Titles and labels take up to 120 characters, a post 5,000, a table cell 240. The web UI draws cards; the phone's app and the channels do not yet, so say what matters in your answer.",
+    "name": "show_cards",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "cards": {
+          "description": "Cards in display order.",
+          "items": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "account": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "post_draft",
+                    "type": "string"
+                  },
+                  "media": {
+                    "default": [],
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "alt": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "description": "Raster file in the workspace.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "alt"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 4,
+                    "type": "array"
+                  },
+                  "platform": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "platform",
+                  "account",
+                  "text"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "chart_type": {
+                    "enum": [
+                      "line",
+                      "bar",
+                      "area",
+                      "pie",
+                      "scatter"
+                    ],
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "chart",
+                    "type": "string"
+                  },
+                  "series": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "values": {
+                          "items": {
+                            "type": "number"
+                          },
+                          "maxItems": 60,
+                          "minItems": 1,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "values"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 6,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "x": {
+                    "description": "Shared x labels, or numeric coordinates for scatter.",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "maxItems": 60,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "x_label": {
+                    "type": "string"
+                  },
+                  "y_label": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title",
+                  "chart_type",
+                  "x",
+                  "series"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "columns": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "const": "table",
+                    "type": "string"
+                  },
+                  "rows": {
+                    "items": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 8,
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "maxItems": 40,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title",
+                  "columns",
+                  "rows"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "choice",
+                    "type": "string"
+                  },
+                  "options": {
+                    "description": "Visible answers; a tap writes one into the owner's message box for them to send.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 6,
+                    "minItems": 2,
+                    "type": "array"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "prompt",
+                  "options"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "images": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "alt": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "description": "Raster file in the workspace.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "alt"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 4,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "const": "image_gallery",
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title",
+                  "images"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "maxItems": 6,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "cards"
       ],
       "type": "object"
     }

@@ -5560,6 +5560,43 @@ dialog.modal.versions-dialog {
   display: none;
 }
 
+/* A message on its way (item 1999, as DotNext says it, items 1919 and 1927): under the bubble a quiet "Pending" at its
+   right edge, the one place it shows, and under the message the agent's typing dots and "Starting…", shimmering as the
+   line of the work does, until the page of the run it starts is open. */
+.pending-place:empty {
+  display: none;
+}
+
+.pending-send {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pending-note {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.starting-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.starting-line > .typing-dots {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 28px;
+  height: 28px;
+}
+
 .message-time {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -8153,8 +8190,10 @@ dialog.message-sheet::backdrop {
 }
 
 /* The flow of a turn (item 374): the agent's words between the folded lines of what it ran, all of them at the
-   answer's text column, the face's width and its gap given over on the left. */
-.turn-say {
+   answer's text column, the face's width and its gap given over on the left. A line a call told (`.turn-told`, item
+   1976) stands in the same column, drawn as the words are, but is no say of the turn's. */
+.turn-say,
+.turn-told {
   padding-left: calc(28px + var(--space-2));
 }
 
@@ -8163,15 +8202,17 @@ dialog.message-sheet::backdrop {
    its paragraphs' room, and a message is drawn live as it will stay (item 274). `:where` keeps the weight of
    `.prose > * + *`, which this follows, so a list, a quote, a block of code and a rule keep the room their own rules
    give them. */
-:where(.turn-say) .prose > * + * {
+:where(.turn-say, .turn-told) .prose > * + * {
   margin-top: var(--space-2);
 }
 
-.turn-say .prose > :first-child {
+.turn-say .prose > :first-child,
+.turn-told .prose > :first-child {
   margin-top: 0;
 }
 
-.turn-say .prose > :last-child {
+.turn-say .prose > :last-child,
+.turn-told .prose > :last-child {
   margin-bottom: 0;
 }
 
@@ -10435,6 +10476,53 @@ button.attach-chip {
   color: var(--bad);
 }
 
+/* Settings › Hooks (docs/hooks.md): an address or a secret, which may be long and is copied whole, and a hook's last
+   calls, one a line, with the run each started. */
+.hook-value {
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.hook-calls {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hook-call {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+.hook-call-status {
+  font-variant-numeric: tabular-nums;
+}
+
+.hook-call-status.ok {
+  color: var(--ok);
+}
+
+.hook-call-status.bad {
+  color: var(--bad);
+}
+
+.hook-call-reason {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.hook-actions {
+  gap: var(--space-2);
+}
+
 /* A queued message's file in the box that edits it (item 376): small, the picture itself or a file's icon, and the ×
    at its corner; no words (the name is its tooltip). */
 .attach-chip.small {
@@ -10514,6 +10602,93 @@ button.attach-chip {
 .attach-chip.picture .attach-open .icon {
   width: 20px;
   height: 20px;
+}
+
+/* A video's tile (item 1992), in the box and over a sent message, the same on the phone's DotNext: its first frame, a play
+   glyph over it, its length at the foot and, while it goes up, a ring that fills. */
+.attach-chip.picture .attach-open,
+.sent-picture {
+  position: relative;
+}
+
+.media-play,
+.media-ring {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.media-play {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--media-shade);
+  color: var(--on-media);
+}
+
+.media-play .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.attach-chip.uploading .media-play {
+  display: none;
+}
+
+.media-ring {
+  width: 22px;
+  height: 22px;
+  background: conic-gradient(var(--on-media) calc(var(--progress, 0) * 360deg), var(--media-track) 0);
+  box-shadow: 0 0 0 6px var(--media-shade);
+  mask: radial-gradient(circle, transparent 6px, var(--media-stage) 7px);
+}
+
+.media-length {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--media-shade);
+  color: var(--on-media);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* The video played full screen over the page, closed by its ×, Escape or a click outside it. */
+.player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: var(--media-stage);
+}
+
+.player-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.player-status {
+  position: absolute;
+  color: var(--on-media);
+}
+
+.player-close {
+  position: absolute;
+  top: max(var(--space-2), env(safe-area-inset-top));
+  left: var(--space-2);
+  z-index: 1;
+  border-radius: 50%;
+  background: var(--media-shade);
+  color: var(--on-media);
 }
 
 .attach-chip.uploading {
@@ -12307,4 +12482,231 @@ dialog.teach {
 
 .watch-status[hidden] {
   display: none;
+}
+
+/* Structured blocks in a run's conversation. */
+.chat-cards {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.chat-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.chat-card > :is(h3, p) {
+  margin: 0;
+}
+
+.chat-draft-carousel {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: min(86%, 21rem);
+  gap: 12px;
+  min-width: 0;
+  padding: var(--space-half) var(--space-half) var(--space-2);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+
+.chat-draft-carousel:has(> :only-child) {
+  grid-auto-columns: min(100%, 32rem);
+}
+
+.chat-draft {
+  grid-template-rows: auto 1fr auto;
+  scroll-snap-align: start;
+}
+
+.chat-draft-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.chat-draft-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.chat-draft-text {
+  white-space: pre-wrap;
+}
+
+.chat-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-card-actions[hidden] {
+  display: none;
+}
+
+.chat-card-actions > .btn {
+  max-width: 100%;
+  height: auto;
+  min-height: 36px;
+  white-space: normal;
+}
+
+.chat-card-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.chat-card-table table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: start;
+}
+
+.chat-card-table :is(th, td) {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+}
+
+.chat-chart > svg {
+  display: block;
+  width: 100%;
+  font-size: var(--text-xl);
+  font-family: var(--font);
+  fill: var(--muted);
+}
+
+.chat-chart-grid {
+  stroke: var(--border-strong);
+}
+
+.chat-chart-area {
+  fill-opacity: 0.18;
+  stroke: none;
+}
+
+.chat-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-chart-legend li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.chat-chart-legend span {
+  flex: none;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: var(--radius-joined);
+  background: currentColor;
+}
+
+.chat-mark-0 {
+  color: var(--text);
+}
+
+.chat-mark-1 {
+  color: var(--card-mark-1);
+}
+
+.chat-mark-2 {
+  color: var(--card-mark-2);
+}
+
+.chat-mark-3 {
+  color: var(--card-mark-3);
+}
+
+.chat-mark-4 {
+  color: var(--card-mark-4);
+}
+
+.chat-mark-5 {
+  color: var(--card-mark-5);
+}
+
+.chat-chart :is(g, circle)[class^="chat-mark-"] {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.chat-chart circle[stroke-dasharray],
+.chat-chart polyline {
+  fill: none;
+}
+
+.chat-card-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  gap: var(--space-3);
+}
+
+.chat-card-media figure {
+  margin: 0;
+}
+
+.chat-card-media img {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+}
+
+.chat-card-media figcaption {
+  color: var(--muted);
+}
+
+.chat-draft-cancelled {
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+.chat-draft:has(> .chat-draft-shared) {
+  align-self: start;
+  grid-template-rows: auto;
+}
+
+.chat-draft-shared summary {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  cursor: pointer;
+}
+
+.chat-draft-shared summary::after {
+  content: "";
+  width: 0.45em;
+  aspect-ratio: 1;
+  border-inline-end: 1px solid currentColor;
+  border-block-end: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.chat-draft-shared[open] summary::after {
+  transform: rotate(225deg);
+}
+
+.chat-draft-shared summary strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }

@@ -43,6 +43,10 @@ port = 8765
 # `tailscale serve --bg 8765` gives https://<mac>.<tailnet>.ts.net, and that name goes here. The daemon itself stays on
 # the loopback address.
 reach = []
+# Host names that reach the hooks alone (POST /api/hooks/<id>, docs/hooks.md), for a tunnel you open to the internet,
+# such as Tailscale Funnel on its own port: "<mac>.<tailnet>.ts.net:8443". Every other address refuses them. Empty: the
+# hooks answer on this Mac and the reach names above only.
+hook_hosts = []
 # Whether the daemon keeps the Mac awake while it charges (caffeinate -s, item 271), so that a phone reaches it from
 # away; Settings › Phone switches it. A closed lid still puts a MacBook to sleep.
 keep_awake = false
@@ -384,6 +388,12 @@ checkpoint_steps = 40
 # that is part of the work under way, or that cannot be told, waits in the chat's queue as before (item 915, after
 # DeepSeek Harness's Super-agent design: a new request never waits for the work under way). false: every message waits.
 busy_parallel = true
+# How many tasks work at once in one chat, the chat's own run included (item 1984). Above 1, a request of its own
+# (busy_parallel) starts in a lane of the chat, a thread of its own the chat list does not show, rather than in a chat
+# of its own, given what the chat said so far; the answer to a question card goes to the task that asked even when
+# another run works on its thread then; and POST /api/threads/{id}/stop stops every task of the chat. 1 keeps one run
+# at a time. The pages do not show lanes yet (item 1982's slice 3), so 1 is the default.
+chat_tasks = 1
 # A reply without a tool call is nudged towards finish; the finish_nudges + 1st such reply in a row ends a task run with
 # that reply as its result (a step with tool calls starts the count again). A reply the model service cut short (its
 # output limit, or another abnormal end it gave) is never a result, in any mode: it is nudged too, and the
@@ -708,8 +718,9 @@ login_env_timeout_s = 20.0
 default_timeout_s = 120
 max_timeout_s = 1800
 # Terminal sessions (terminal_open): a program that asks questions, a REPL, a server that must stay up while a run goes
-# on. At most this many per chat at a time (0 offers no terminal tools); each is closed after terminal_idle_s seconds
-# without a read or a send, and all of them when the daemon stops. The end of a run closes none.
+# on. At most this many per chat whose program runs at a time (0 offers no terminal tools; one whose program ended does
+# not count); each is closed after terminal_idle_s seconds without a read or a send, and all of them when the daemon
+# stops. The end of a run closes none.
 terminal_sessions = 3
 terminal_idle_s = 1800.0
 # Outside yolo, the processes of a run (shell commands, terminal sessions, AppleScript, the search tools) start in a

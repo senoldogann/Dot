@@ -100,16 +100,16 @@ final class WatchRulesTests: XCTestCase {
             .object(["action": .string("click"), "ref": .string("e9")]),
         ])
         let acting: [EventRecord] = [call(1, "browser_act", ["steps": steps], call: "a")]
-        XCTAssertEqual(liveAction(acting), LiveAction(kind: .type, detail: "Ada Lovelace", steps: 2))
+        XCTAssertEqual(liveAction(acting)?.call.tool, "browser_act")
         XCTAssertNil(liveAction(acting + [result(2, call: "a")]), "between steps there is no action")
         XCTAssertNil(liveAction(acting + [event(2, "run_finished", [:])]))
         let opening: [EventRecord] = [call(1, "browser_new_tab", ["url": .string("https://example.com")], call: "b")]
-        XCTAssertEqual(liveAction(opening), LiveAction(kind: .open, detail: "https://example.com", steps: 1))
+        XCTAssertEqual(liveAction(opening).map { [$0.call.tool, $0.call.target] }, ["browser_new_tab", "https://example.com"])
         // The tool a real run opened its page with (claude_code:haiku, 2026-11-25).
         let opened: [EventRecord] = [call(1, "browser_open", ["url": .string("http://127.0.0.1:49905/")], call: "e")]
-        XCTAssertEqual(liveAction(opened)?.kind, .open)
+        XCTAssertEqual(liveAction(opened)?.call.target, "http://127.0.0.1:49905/")
         let desktop: [EventRecord] = [call(1, "desktop_act", ["steps": .array([.object(["action": .string("key"), "key": .string("cmd+s")])])], call: "c")]
-        XCTAssertEqual(liveAction(desktop), LiveAction(kind: .key, detail: "cmd+s", steps: 1))
+        XCTAssertEqual(liveAction(desktop)?.call.tool, "desktop_act")
         XCTAssertNil(liveAction([call(1, "shell", ["command": .string("ls")], call: "d")]))
     }
 
