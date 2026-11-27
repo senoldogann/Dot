@@ -40,7 +40,7 @@ step that needs your answer is not folded out of sight. Its fold is kept in that
 kept from before item 836 is not read as it. At the right of a chat at work the age gives way to **Working** and how long
 since the run was asked for ("12s", "4m", "1h 5m", read again every second). What a chat delegated (item 507), the runs at
 work and those that ended, is one quiet count in its last line (the users mark and how many), and its name for a screen reader
-says how many there are. A chat whose run waits on its helpers says **Waiting on 2 helpers…** in its last line, in place of its last words, shimmering as the work line does, and a chat at rest with something still working for it (a helper let go, a command in the background, its loop) says **Waiting · ** and the first of them, quiet (item 2010, as the iPhone app's rows do; read from `GET /api/threads/view` beside the list, so a phone with no link shows what the list alone tells). Nothing hangs under the row: a click on it opens the chat,
+says how many there are. A chat whose run waits on its helpers says **Waiting for 2 helpers…** in its last line, in place of its last words, shimmering as the work line does, and a chat at rest with something still working for it (a helper let go, a command in the background, its loop) says **Waiting · ** and the first of them, quiet (item 2010, as the iPhone app's rows do; read from `GET /api/threads/view` beside the list, so a phone with no link shows what the list alone tells). Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
 (which works in a thread of its own). A run another run delegated stands under the chat its work came from, never as a
 row of its own, also once the run that delegated it has ended (item 1074: a work order's try outlives the lead's turn
@@ -614,7 +614,7 @@ group: its head shows their faces, how many they are ("3 helpers"), how they sta
 works; "2 done · 1 stopped" after) and the time from the first one's start to the last one's end, counting on while
 one works, and a chevron that folds the rows away; while one works a quiet line in the card says how they work: side by
 side while the chat waits, their answers coming back to it. Over the composer, while the task waits for them, a line
-says **Waiting on 2 helpers** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
+says **Waiting for 2 helpers** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
 and the helpers with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 helpers keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
 and hairline in the dock, and the dock is not the conversation: it stands where it is while the chat is scrolled, a phone's
 included, and nothing of the history shows through it (item 1347). A phone does not draw the line (item 1383): its words
@@ -821,7 +821,7 @@ the commands at work in the chat, which stand right under it. **On a phone** (a 
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
+**Waiting for 2 helpers** (only while the run has stopped for them), **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
 for the secondary segments, then the Stop without its word, then the time without "Working", and at the narrowest a

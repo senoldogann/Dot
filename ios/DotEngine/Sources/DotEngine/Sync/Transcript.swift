@@ -714,7 +714,7 @@ public let helperWaitTools: Set<String> = ["delegate", "message_agent", "task", 
 /// Whether `run` of `chat` has stopped and only waits for its helpers: it writes and thinks nothing, and every call of
 /// its newest step that has no result yet waits on a helper (`helperWaitTools`; a `delegate` with `wait` false does not).
 /// `false` while any other call of that step runs, while it has no open call, and once it ended: then it works or
-/// rests. The capsule says "Waiting on N helpers" only while this holds (the owner's report of 2026-11-27). Pure.
+/// rests. The capsule says "Waiting for N helpers" only while this holds (the owner's report of 2026-11-27). Pure.
 public func waitsOnHelpers(of chat: ChatProjection, run: String) -> Bool {
     if let words: String = chat.writing[run], !words.isEmpty { return false }
     if let thought: LiveThought = chat.thinking[run], !thought.text.isEmpty { return false }

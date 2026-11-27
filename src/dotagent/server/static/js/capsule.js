@@ -59,7 +59,7 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
     plan.setAttribute("aria-label", total === 0 ? t("capsule.planLabel") : t("capsule.planDone", { done: steps.done, total }));
     const blocked = status === "blocked";
     const { live, letGo, waitedFor } = waitCounts(statuses, released);
-    // "Waiting on N helpers" only while the run has stopped for them (`waits`, waitsOnHelpers in waitcounts.js); while it
+    // "Waiting for N helpers" only while the run has stopped for them (`waits`, waitsOnHelpers in waitcounts.js); while it
     // works beside them it says Working, and its helpers keep their own part (the owner's report of 2026-11-27).
     const waitsNow = waits && waitedFor > 0 && status === "running";
     work.hidden = !working;

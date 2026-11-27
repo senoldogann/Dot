@@ -94,7 +94,7 @@ final class ChatUITests: XCTestCase {
         XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
     }
 
-    /// The owner's report of 2026-11-27: the capsule says "Waiting on N helpers" only while the main run has stopped for
+    /// The owner's report of 2026-11-27: the capsule says "Waiting for N helpers" only while the main run has stopped for
     /// them (`n2-helpers`: its step's one open call is a delegate); while it works beside its helper (`n2-chat`) it says
     /// "Working". No spinner on either, and the status takes only its words' width, so that Stop, the plan and the helpers
     /// keep their room.

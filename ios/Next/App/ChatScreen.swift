@@ -764,7 +764,7 @@ struct ChatScreen: View {
         }
     }
 
-    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting on N helpers" only while
+    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting for N helpers" only while
     /// the main run has stopped and every open call of its step waits on a helper (`waitsOnHelpers`, the owner's report of
     /// 2026-11-27; N the helpers it still waits for); `nil` while it works itself, even with helpers at work beside it,
     /// which the capsule says as "Working" with the turn's clock and the helpers' own segment.
