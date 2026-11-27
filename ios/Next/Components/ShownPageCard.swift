@@ -216,6 +216,9 @@ private final class PageNavigation: NSObject, WKNavigationDelegate, WKUIDelegate
         -> WKNavigationActionPolicy
     {
         guard !requested, action.targetFrame?.isMainFrame != false, action.request.url == url else {
+            if accepted, action.navigationType == .linkActivated {
+                Self.logger.notice("A link tried to leave a shown page")
+            }
             return .cancel
         }
         requested = true

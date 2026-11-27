@@ -236,10 +236,11 @@ final class ChatUITests: XCTestCase {
         listener.stateUpdateHandler = { state in
             if case .ready = state { ready.fulfill() }
         }
+        let requestPrefix: String = "GET /pages/page_0123456789ABCDEFGHIJKLMN "
         listener.newConnectionHandler = { connection in
             connection.start(queue: queue)
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { data, _, _, _ in
-                guard let data, String(decoding: data, as: UTF8.self).hasPrefix("GET /pages/page_0123456789ABCDEFGHIJKLMN ") else {
+            connection.receive(minimumIncompleteLength: requestPrefix.utf8.count, maximumLength: 4096) { data, _, _, _ in
+                guard let data, String(decoding: data, as: UTF8.self).hasPrefix(requestPrefix) else {
                     connection.cancel()
                     return
                 }
