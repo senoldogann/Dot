@@ -10,6 +10,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2023](2023.md) | done | 2026-11-27 | Chat settings as native inset groups, and a capsule that says "Waiting on N helpers" only while the run waits, with no spinner |
 | [2022](2022.md) | in progress | 2026-11-27 | Empty states in the app's own type, and the profile's Activity is the real page |
 | [2021](2021.md) | in progress | 2026-11-27 | A routine's message is one compact row, not the owner's bubble |
+| [2018](2018.md) | done | 2026-11-27 | First words in seconds: Dot says it is on it the moment a task starts, then what it looks at first |
 | [2017](2017.md) | done | 2026-11-27 | A change reads by its format, on the phone and the web; This chat's sections start folded |
 | [2016](2016.md) | built | 2026-11-27 | Unattended runs keep the sandbox: a run nobody started seals Dot's own files in yolo and free mode too |
 | [2015](2015.md) | done | 2026-11-27 | The web composer works as DotNext's on every width: one capsule, the model as its mark, its settings in one sheet |

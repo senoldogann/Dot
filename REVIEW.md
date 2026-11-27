@@ -41,6 +41,8 @@ here points at a test that no longer exists.
 - `tests/smoke/test_work_orders_page.py::test_a_next_step_written_after_outside_content_is_marked` — the Agents page and the
   phone's bot profile showed an objective's next step with no outside-words mark: the step has its own flag, which the mark
   left out (item 2009's review).
+- `tests/unit/test_first_words.py::test_a_fault_of_the_first_words_is_logged_not_lost` — the first words are a task
+  nothing awaits, so a fault that was no error of Dot's was dropped with no line in the log (item 2018's review).
 - `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
   on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
   chat deleted (item 1962's review).

@@ -77,7 +77,14 @@ another site; a line names a page by its site, a file by its name and a search b
 the owner's 279 runs of two weeks that made a median of one line a run on Claude Code (at most 17) and six on OpenCode
 (at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
 the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
-may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
+may tell them after, and its line then stays). Whatever the choice, a task you start in a chat says its first words
+the moment it starts (item 2018, `agent/first_words.py`, `[agent] first_words`): *Looking into it…* at once, then in its
+place a line of the fast model (`[models] fast`) of what Dot looks at first, written from your message alone while the
+task gets ready and takes its first step ("Looking at your calendar first."). The line is told only while the task has
+said nothing yet (no words of its own, no call, no question): once it speaks the call is dropped, so the line is never a
+second voice beside the task's own words, and a fast model that fails or takes more than 12 s leaves the first words as
+they were. Neither is a message the task's model reads; the line costs one short call of the fast model and nothing of
+the task's steps. A schedule's, a helper's or a review's task has none. On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
 the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
 behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,

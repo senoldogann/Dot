@@ -415,6 +415,9 @@ struct ChatScreen: View {
         case .narration(_, let step):
             // One of Dot's short messages, drawn as its words are (item 1976).
             AnswerBody(markdown: narrationWords(step), writing: false)
+        case .firstWords(_, let text):
+            // Dot's first words as the run begins (item 2018), drawn as its short messages are.
+            AnswerBody(markdown: firstWordsText(text), writing: false)
         case .helpers(_, _, let list):
             // The run's helpers as one row where it started them, a tap away from a card of each (item 1957); the
             // capsule's people segment keeps them a tap away too.

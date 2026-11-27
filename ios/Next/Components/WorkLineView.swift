@@ -73,6 +73,12 @@ func narrationWords(_ step: HelperStep) -> String {
     return String(localized: "Looking at \(middleCut(site, detailCharacters))", comment: "Chat message of Dot's: a page it looks at; the argument is its site")
 }
 
+/// Dot's first words in a chat (a `first_words` event, item 2018): the fast model's line, or the words said at once when it
+/// has none.
+func firstWordsText(_ text: String) -> String {
+    text.isEmpty ? String(localized: "Looking into it…", comment: "Chat message of Dot's, said the moment a task starts, before it has done anything") : text
+}
+
 /// How long a run has worked, as the live line says it beside its words ("12 s", "3 min").
 func workedFor(_ seconds: TimeInterval) -> String {
     let whole: Int = max(0, Int(seconds))

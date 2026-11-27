@@ -16,7 +16,7 @@ import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { sourcesRow } from "./sources.js";
 import { countKinds, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, toolRow } from "./tools.js";
-import { narrationPhrase } from "./workstatus.js";
+import { firstWordsPhrase, narrationPhrase } from "./workstatus.js";
 
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read before the page is drawn (items 374 and 708), side by side: they stand right
@@ -229,6 +229,17 @@ function drawFlow(past, flow, asked, events, reactions) {
       blocks.push({ internal: event });
       continue;
     }
+    if (event.kind === "first_words") {
+      // Dot's first words (item 2018), in every way of showing the work; the fast model's line takes the place of the words
+      // said at once.
+      const first = blocks.find((block) => block.first !== undefined);
+      if (first === undefined) {
+        blocks.push({ first: firstWordsPhrase(event.data.text ?? "") });
+      } else {
+        first.first = firstWordsPhrase(event.data.text ?? "");
+      }
+      continue;
+    }
     if (event.kind === "narration") {
       // A line of the run told as a conversation (item 1976), drawn with "Messages only" alone and none beside the step's
       // own words; it ends no batch of steps, which stay as they were with the steps shown.
@@ -328,7 +339,9 @@ function drawFlow(past, flow, asked, events, reactions) {
     }
   }
   const nodes = blocks.map((block) =>
-    block.told !== undefined
+    block.first !== undefined
+      ? el("div", { class: "turn-told say-first", role: "article", "aria-label": t("outcome.update") }, prose(block.first))
+      : block.told !== undefined
       ? el("div", { class: "turn-told say-narration", role: "article", "aria-label": t("outcome.update") }, prose(block.told))
       : block.internal !== undefined
       ? internalRecord(block.internal)

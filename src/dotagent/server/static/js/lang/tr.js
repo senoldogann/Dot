@@ -29,6 +29,7 @@ const CORE = {
   "work.showSteps": "Adımları göster",
   "work.hideSteps": "Adımları gizle",
   "work.lookingAt": "{what} inceleniyor",
+  "work.firstWords": "Bakıyorum…",
   "work.forSeconds": "{count} sn",
   "work.forMinutes": "{count} dk",
   "capsule.label": "Görevin durumu",

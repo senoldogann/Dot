@@ -21,6 +21,9 @@ no test reaches it (item 617), as :func:`_owners_pictures_stay_theirs` says. Whe
 to (item 769) is checked on this Mac alone: a server elsewhere counts as one that can be, as
 :func:`_connection_checks_stay_on_this_mac` says.
 
+A run of a test says no first words (item 2018) unless the test is marked ``first_words``, as
+:func:`_no_first_words` says: they would ask a model.
+
 The owner's own Dot is out of every test too (item 1315): ``DOT_HOME``, ``DOT_LOG_DIR`` and ``DOT_CHROME_DIR`` are
 folders of the run's own unless they are set to one already, and a test that reaches ``~/Library/Application
 Support/Dot`` or ``~/Library/Logs/Dot`` fails, as :func:`_owners_dot_stays_theirs` and
@@ -242,6 +245,19 @@ def _owners_dot_stays_theirs(
             if given == "" or _in_the_owners_dot(Path(given).expanduser()):
                 patch.setenv(variable, str(tmp_path_factory.mktemp(variable.lower())))
         yield True
+
+
+@pytest.fixture(autouse=True)
+def _no_first_words(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Dot's first words in a chat (item 2018) ask the fast model as a run of the owner's chat starts. A test's scripted
+    model would answer that call with a reply meant for its run, and a test on the defaults would send it to the fast
+    model they name: so a run starts with no first words in every test but those marked ``first_words``."""
+    if request.node.get_closest_marker("first_words") is None:
+        monkeypatch.setattr("dotagent.agent.manager.tells_first_words", _never_first_words)
+
+
+def _never_first_words(source: str, parent_run_id: str | None, on: bool, ui_source: str) -> bool:
+    return False
 
 
 @pytest.fixture(autouse=True)
