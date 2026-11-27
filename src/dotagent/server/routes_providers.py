@@ -144,10 +144,11 @@ def providers_router(ctx: ServerContext) -> APIRouter:
     async def save_provider(name: str, request: CustomProviderRequest, http: Request) -> CustomProviderView:
         """Add the custom provider ``name`` or change it: the config file keeps it as ``[providers.custom.<name>]``,
         and the next call of one of its models goes to it as it is now. A provider the file cannot hold, or a file
-        that cannot be changed, is refused, and nothing changes. A key goes to the server it was saved for alone: a
-        change of the address of a provider with a key drops the key Settings saved for it (the owner types it again),
-        and is refused for a key from the environment, the Keychain or a name the config file chose, which only the
-        owner's own hand can move."""
+        that cannot be changed, is refused, and the table and the router stay as they were. A key goes to the server it
+        was saved for alone: any change but one that keeps the same key at the same server drops the key Settings saved
+        for it first, before the file is written (so a refusal after that point still leaves the key dropped, and the
+        owner types it again); a key from the environment, the Keychain or a name the config file chose is never sent
+        to a new address from here, which only the owner's own hand can do in ``config.toml``."""
         refuse_from_a_phone(http.scope, "add or change a provider")
         _checked_name(name)
         async with writing:

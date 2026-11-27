@@ -23,6 +23,8 @@ from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.secrets import SecretState, secret_state
+from dotagent.server import routes_providers
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
@@ -221,4 +223,19 @@ async def test_the_api_refuses_a_header_that_carries_a_key_and_a_built_in_name(s
             patch.setenv("DOT_CUSTOM_ACME_API_KEY", "sk-from-the-environment")
             outside = await client.put("/api/providers/custom/acme", json={**provider, "headers": {}})
             assert outside.status_code == 422 and "not one Settings saved" in outside.text
+        # A Keychain item under the same name, found once Dot's own copy is dropped, is refused too (its third review).
+        saved = await client.put("/api/providers/custom/acme", json={**provider, "headers": {}})
+        assert saved.status_code == 200
+        assert (await client.post("/api/keys/DOT_CUSTOM_ACME_API_KEY", json={"value": "sk-saved-for-acme"})).is_success
+
+        def beneath(name: str) -> SecretState:
+            found: SecretState = secret_state(name)
+            return found if found.source is not None else SecretState(source="keychain", saved=False, tail="")
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(routes_providers, "secret_state", beneath)
+            uncovered = await client.put("/api/providers/custom/acme", json=elsewhere)
+        assert uncovered.status_code == 422 and "also kept in the keychain" in uncovered.text
+        assert runtime.router.custom["acme"].base_url == provider["base_url"]
+        assert (await client.delete("/api/providers/custom/acme")).status_code == 200
     assert "acme" not in runtime.router.custom
