@@ -432,7 +432,7 @@ order stands, its title, its bot, tries, age, due time, the last note and a link
 /api/work-orders` gives them (the open ones first, each with its bot's name and the title of its objective) and `GET
 /api/objectives` the objectives. An active objective with no line of progress yet says its next step; the objectives done
 or let go stand last, under "Finished objectives", each with its state (item 2009, so that the web and the phone's
-bot profile list the same). An agent's page has a **Work** section, as the phone's bot profile does (item 2035): its work orders (how many are open), its objectives (how many are active, those its orders serve) and today's hand-offs (how many), each a link to a page of the agent's own (`#/agents/{id}/orders`, `/objectives`, `/handoffs`): the orders open, then finished; the objectives active, then finished; the hand-offs received, then sent to others, each newest first. Dot's pages hold every order and objective, as it hands and keeps them all.
+bot profile list the same). A bot's page has a **Work** section, as the phone's bot profile does (item 2035): its work orders (how many are open), its objectives (how many are active, those its orders serve) and today's hand-offs (how many), each a link to a page of the bot's own (`#/agents/{id}/orders`, `/objectives`, `/handoffs`): the orders open, then finished; the objectives active, then finished; the hand-offs received, then sent to others, each newest first. Dot's pages hold every order and objective, as it hands and keeps them all.
 
 ## Campaigns
 

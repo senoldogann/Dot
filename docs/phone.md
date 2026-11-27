@@ -109,7 +109,7 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
    Work (Work orders, Objectives, with those done or let go below the active ones, and Hand-offs with the two faces and "From → To", each to read, and
    laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; neither the web nor the phone
-   writes them, and both scope them to the agent (the web on an agent's page since item 2035, by the same rules): an agent's page has the orders given to it,
+   writes them, and both scope them to the bot (the web on a bot's page since item 2035, by the same rules): an agent's page has the orders given to it,
    the objectives those serve and the messages to or from it; Dot's own has every order and objective and the messages it sent
    or was sent, not those between two other agents; all within the newest 60 orders and 60 objectives the daemon sends), a ⋯ menu with Pause bot and Resume bot for an agent (`POST /api/agents/{id}/pause|resume`, item 465), then
    Routines, Model, Activity, and a Notifications switch that is the phone's own count of its unread chats and what waits
