@@ -108,6 +108,9 @@ class ThreadRecord(FrozenModel):
     updated_at: float
     team_id: str | None
     agent_id: str | None = None
+    # The chat this thread is a lane of (item 1984): a task that works beside the chat's own run, which the chat list
+    # does not show; ``None`` for a chat, and for every thread from before lanes.
+    lane_of: str | None = None
 
 
 class ChatChoices(FrozenModel):
@@ -704,6 +707,9 @@ class QueuedMessage(FrozenModel):
     source: str
     created_at: float
     follow_up: FollowUpOf | None = None
+    # The question card this message answers (item 1984): the answer to a question whose run's thread had another run
+    # at work then waits here for it, and starts as the continuation of the run that asked (``RunManager._carry_on``).
+    answers: str | None = None
 
 
 class ReactionRecord(FrozenModel):

@@ -153,7 +153,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
-from dotagent.core.text import redact_json, redact_known, redact_secrets, truncate_tail
+from dotagent.core.text import redact_json, redact_known, redact_secrets, truncate_middle, truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.evals import EVAL_SOURCE
@@ -244,6 +244,10 @@ CAMPAIGN_STALL_S: float = 600.0
 STARTED_BESIDE_EVENT: str = "started_beside"
 _BESIDE_JUDGE_S: float = 12.0
 _BESIDE_LINE_CHARS: int = 160
+# What a lane's first run is given of its chat (item 1984): the chat's newest runs of the owner's (its tasks' too), each
+# the owner's words and Dot's reply, so much of each.
+_LANE_CONTEXT_RUNS: int = 12
+_LANE_CONTEXT_CHARS: int = 1500
 # A note a run sent to the run at work in another chat (item 957): the event of the line its page draws there, and how
 # much of the note the line keeps.
 CHAT_NOTE_EVENT: str = "chat_note"
@@ -585,6 +589,9 @@ class RunManager:
         self._releases: set[asyncio.Task[None]] = set()
         # Threads that a run is being launched on and whose handle is not registered yet.
         self._claimed: set[str] = set()
+        # How many times each chat was stopped whole (:meth:`stop_chat`, item 1984), so that a request the fast model
+        # was asked about before a stop starts no task after it.
+        self._chat_stops: dict[str, int] = {}
         # Runs stored and being launched, each with the event set once its handle is registered or its start failed
         # (:meth:`wait`).
         self._launching: dict[str, asyncio.Event] = {}
@@ -2657,7 +2664,9 @@ class RunManager:
         when it is not, when it cannot be told, or when nothing works in the chat, so that the caller queues it as
         before. Only a chat of Dot's own with the owner: an agent's, a campaign's, a delegated run's or one held by
         a ✋ queue as before. The run at work gets a ``started_beside`` event, the line of its chat that leads to the
-        new one."""
+        new one. With ``[agent] chat_tasks`` above 1 (item 1984) the request starts in a lane of the chat rather than a
+        chat of its own (:meth:`_start_lane`), and waits in the queue as before when the chat has that many tasks at
+        work, or when the chat was stopped while the fast model was asked."""
         if not self._runtime.config.agent.busy_parallel:
             return None
         holder: RunHandle | None = self._active_on(thread_id)
@@ -2668,8 +2677,11 @@ class RunManager:
             return None
         # A chat with a team (item 610) works as the team: a request sent there is the team's, so it waits in the
         # chat's queue rather than start in a chat of Dot's alone (the pre-push review).
-        if (await self._runtime.store.get_thread(thread_id)).team_id is not None:
+        thread: ThreadRecord = await self._runtime.store.get_thread(thread_id)
+        if thread.team_id is not None:
             return None
+        chat_id: str = thread_id if thread.lane_of is None else thread.lane_of
+        stops: int = self._chat_stops.get(chat_id, 0)
         separate: bool = await is_separate(
             self._runtime.router,
             self._runtime.roles.fast(),
@@ -2680,11 +2692,17 @@ class RunManager:
         )
         # The run at work may have ended while the fast model answered: the chat is free then, and the queue starts the
         # message there at once, as it would have (the pre-push review).
-        if not separate or self._active_on(thread_id) is not holder:
+        if not separate or self._active_on(thread_id) is not holder or self._chat_stops.get(chat_id, 0) != stops:
             return None
-        run: RunRecord = await self.start(
-            text, mode, model, None, source, None, effort, speed, None, approvals, goal_mode, files
-        )
+        run: RunRecord | None
+        if self._runtime.config.agent.chat_tasks > 1:
+            run = await self._start_lane(chat_id, text, files, mode, model, effort, speed, approvals, goal_mode, source)
+            if run is None:
+                return None
+        else:
+            run = await self.start(
+                text, mode, model, None, source, None, effort, speed, None, approvals, goal_mode, files
+            )
         await self._runtime.bus.emit(
             holder.run_id,
             STARTED_BESIDE_EVENT,
@@ -2693,6 +2711,77 @@ class RunManager:
         )
         log.info("started_beside", thread_id=thread_id, run_id=run.id, beside=holder.run_id)
         return run
+
+    async def _start_lane(
+        self,
+        chat_id: str,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+    ) -> RunRecord | None:
+        """Start ``text`` in a new lane of the chat ``chat_id`` (item 1984), given what the chat said so far
+        (:meth:`_chat_so_far`) in front of the owner's words, which stay its goal; ``None``, starting nothing, when the
+        chat has ``[agent] chat_tasks`` tasks at work (:meth:`Store.create_lane`). A lane whose run could not start is
+        deleted, so that it does not count against the cap."""
+        store: Store = self._runtime.store
+        cap: int = self._runtime.config.agent.chat_tasks
+        lane: ThreadRecord | None = await store.create_lane(chat_id, thread_title(text), cap)
+        if lane is None:
+            log.info("chat_tasks_full", thread_id=chat_id, cap=cap)
+            return None
+        try:
+            so_far: str = await self._chat_so_far(chat_id)
+            return await self.start_picked(
+                text,
+                mode,
+                model,
+                lane.id,
+                source,
+                None,
+                effort,
+                speed,
+                None,
+                approvals,
+                goal_mode,
+                files,
+                NO_PICKS,
+                model_text=f"{so_far}\n\n{text}",
+            )
+        except BaseException:
+            await _uncancelled(store.drop_unstarted_lane(lane.id))
+            raise
+
+    async def _chat_so_far(self, chat_id: str) -> str:
+        """What the chat ``chat_id`` said before a new lane of it starts (item 1984): the owner's words and Dot's reply
+        of its newest runs and its lanes' (not their helpers'), oldest first, each cut to ``_LANE_CONTEXT_CHARS``. The
+        lane sees nothing more of the other tasks: their steps stay theirs."""
+        store: Store = self._runtime.store
+        runs: list[RunRecord] = []
+        for thread_id in (chat_id, *await store.lanes_of(chat_id)):
+            runs.extend(
+                run for run in await store.list_runs(_LANE_CONTEXT_RUNS, thread_id) if run.parent_run_id is None
+            )
+        newest: list[RunRecord] = sorted(runs, key=lambda run: run.created_at)[-_LANE_CONTEXT_RUNS:]
+        lines: list[str] = [
+            "This is a new task of a chat whose other tasks may still be at work beside it. What the chat said before "
+            "it, oldest first (you see nothing more of the other tasks):"
+        ]
+        for run in newest:
+            lines.append(f"- The owner: {truncate_middle(run.goal, _LANE_CONTEXT_CHARS)}")
+            said: str = (
+                "(still at work)"
+                if run.status in WORKING_STATUSES
+                else truncate_middle(run.result, _LANE_CONTEXT_CHARS)
+            )
+            lines.append(f"  Dot: {said}")
+        lines.append("The new task, the owner's words:")
+        return "\n".join(lines)
 
     async def edit_queued(self, message_id: str, text: str) -> str:
         """Change the text of a queued message; returns its chat. One starting as the chat's next run is refused."""
@@ -2737,6 +2826,12 @@ class RunManager:
                 "a message queued with plugins, skills or Plan first starts a run of its own, since the run at work "
                 "cannot take them: it stays in the queue",
                 {"message_id": message_id, "thread_id": message.thread_id},
+            )
+        if message.answers is not None:
+            raise InvalidValueError(
+                "the answer to a question goes on with the task that asked, not with the run at work: it stays in the "
+                "queue",
+                {"message_id": message_id, "thread_id": message.thread_id, "approval_id": message.answers},
             )
         if self._active_on(message.thread_id) is None:
             raise RunConflict("no run works on the chat to steer", {"thread_id": message.thread_id})
@@ -2889,6 +2984,29 @@ class RunManager:
             log.info("run_stop_asked", run_id=run_id)
             return
         self.cancel(run_id)
+
+    async def stop_chat(self, thread_id: str) -> list[str]:
+        """Stop every task of the chat ``thread_id`` (item 1984), the chat's own run and each of its lanes' (a lane
+        names its chat), as the Stop of each would (:meth:`stop`): each stopped run holds its own queue, as a stop does,
+        and a request the fast model is still being asked about starts nothing (:meth:`start_beside`). Returns the runs
+        asked to stop; a run that ended meanwhile is left out."""
+        store: Store = self._runtime.store
+        thread: ThreadRecord = await store.get_thread(thread_id)
+        chat_id: str = thread_id if thread.lane_of is None else thread.lane_of
+        self._chat_stops[chat_id] = self._chat_stops.get(chat_id, 0) + 1
+        stopped: list[str] = []
+        for task_thread in (chat_id, *await store.lanes_of(chat_id)):
+            newest: list[RunRecord] = await store.list_runs(1, task_thread)
+            if not newest or newest[0].status not in WORKING_STATUSES:
+                continue
+            try:
+                await self.stop(newest[0].id)
+            except RunConflict as exc:
+                log.info("chat_stop_run_ended", thread_id=chat_id, run_id=newest[0].id, reason=exc.message)
+                continue
+            stopped.append(newest[0].id)
+        log.info("chat_stopped", thread_id=chat_id, runs=stopped)
+        return stopped
 
     def _watch_asks(self) -> None:
         """Read the asks of other processes (:meth:`_answer_asks`) from this process's first run at work on."""
@@ -3409,6 +3527,20 @@ class RunManager:
         # to one a run nobody answers left is the owner's message to the run, which restores it.
         vouches: bool = not can_ask_user(asked.source, asked.parent_run_id, asked.approvals)
         active: RunHandle | None = self._active_on(asked.thread_id)
+        if active is not None and active.run_id != asked.id and self._runtime.config.agent.chat_tasks > 1:
+            # Another task works on the thread of the run that asked now (item 1984): the answer is the asker's, so it
+            # waits in the thread's queue and starts the asker's continuation once that run has ended, as its next
+            # message, rather than steer a run it was not for.
+            waiting: QueuedMessage = await self._runtime.store.add_queued_answer(asked, question.id, answer, source)
+            await self._queue_changed(asked.thread_id, None, None, None)
+            log.info(
+                "question_answered",
+                approval_id=question.id,
+                run_id=active.run_id,
+                delivered="queue",
+                message_id=waiting.id,
+            )
+            return
         if active is not None:
             try:
                 active.inbox.put_nowait(
@@ -3427,6 +3559,15 @@ class RunManager:
                 "a run of another process is working on this thread; answer the question once it has ended",
                 {"approval_id": question.id, "thread_id": asked.thread_id, "run_id": newest.id},
             )
+        run: RunRecord = await self._launch_answer(question, asked, newest, source, answer, vouches)
+        log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
+
+    async def _launch_answer(
+        self, question: ApprovalRecord, asked: RunRecord, newest: RunRecord, source: str, answer: str, vouches: bool
+    ) -> RunRecord:
+        """Start the continuation of the run ``asked`` with the owner's ``answer`` to its ``question``, as a new run on
+        its thread, whose newest run is ``newest``: with the goal of the run that asked and its choices."""
+        text: str = _answer_text(question, answer)
         # The goal, which the review model takes as the owner's words, holds their answer alone; the question, which
         # the run wrote, is in what the model reads first (the review of 2026-11-01).
         goal: str = f"{asked.goal}\n\n{_answer_said(answer)}"
@@ -3456,7 +3597,17 @@ class RunManager:
             # As the agent the run that asked ran as, within its bounds, as a resumed run is.
             asked.agent_id,
         )
-        log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
+        return run
+
+    async def _start_answer(self, message: QueuedMessage, question_id: str) -> RunRecord:
+        """Start a queued answer to the question card ``question_id`` (item 1984, :meth:`_carry_on`) as the
+        continuation of the run that asked, now that the run before it on the thread has ended."""
+        store: Store = self._runtime.store
+        question: ApprovalRecord = await store.get_approval(question_id)
+        asked: RunRecord = await store.get_run(question.run_id)
+        newest: RunRecord = (await store.list_runs(1, asked.thread_id))[0]
+        vouches: bool = not can_ask_user(asked.source, asked.parent_run_id, asked.approvals)
+        return await self._launch_answer(question, asked, newest, message.source, message.text, vouches)
 
     async def _decide_for_session(
         self, question: ApprovalRecord, approve: bool, source: str, note: str
@@ -4738,7 +4889,10 @@ class RunManager:
             self._left_claims[thread_id] = end
 
     async def _start_queued(self, message: QueuedMessage) -> RunRecord:
-        """Start a queued message as its chat's next run, with the choices and the files it was sent with."""
+        """Start a queued message as its chat's next run, with the choices and the files it was sent with; the answer
+        to a question card (item 1984) as the continuation of the run that asked."""
+        if message.answers is not None:
+            return await self._start_answer(message, message.answers)
         files: tuple[StoredAttachment, ...] = await load_attachments(self._runtime.workspace, message.attachments)
         return await self._start_in_chat(
             message.thread_id,

@@ -607,6 +607,7 @@ def _thread(row: aiosqlite.Row) -> ThreadRecord:
         updated_at=row["updated_at"],
         team_id=row["team_id"],
         agent_id=row["agent_id"],
+        lane_of=row["lane_of"],
     )
 
 
@@ -1156,6 +1157,7 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
         source=row["source"],
         created_at=row["created_at"],
         follow_up=None if follow_up is None else FollowUpOf.model_validate_json(follow_up),
+        answers=row["answers"],
     )
 
 
@@ -1489,6 +1491,8 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("picks", "TEXT"),
     # What a reaction's follow-up is a follow-up of (item 586; a ``FollowUpOf`` as JSON, NULL for any other message).
     ("follow_up", "TEXT"),
+    # The question card a message answers (item 1984; NULL for any other message).
+    ("answers", "TEXT"),
 )
 # Columns of ``harness_probes`` added later (item 589): the approvals the attempt's run asked, and how many of the
 # task's checks held of how many; an attempt recorded before holds none of the three.
@@ -1517,6 +1521,8 @@ _ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (
     ("agent_id", "TEXT"),
     # The chat's revision (item 1686, :mod:`dotagent.store.revisions`): 0 until something of its state changes.
     ("revision", "INTEGER NOT NULL DEFAULT 0"),
+    # The chat a thread is a lane of (item 1984): NULL for a chat, and for every thread from before lanes.
+    ("lane_of", "TEXT"),
 )
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -1626,6 +1632,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS threads_team ON threads(team_id)")
     # The chat an agent is with, which is its home chat however many chats are newer.
     await connection.execute("CREATE INDEX IF NOT EXISTS threads_agent ON threads(agent_id, updated_at)")
+    # The lanes of a chat (item 1984), which its tasks at work are counted over and which go with it when it is deleted.
+    await connection.execute("CREATE INDEX IF NOT EXISTS threads_lane ON threads(lane_of)")
     # The campaign whose conversation a chat is, which the list of chats marks (item 705).
     await connection.execute("CREATE INDEX IF NOT EXISTS campaigns_thread ON campaigns(thread_id, created_at)")
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
@@ -1992,7 +2000,9 @@ def _thread_summaries_sql(where: str, order: str) -> str:
         "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
         " FROM runs WHERE parent_run_id IS NULL AND rewound_at IS NULL"
         " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns))"
-        " AND (? IS NULL OR thread_id IN (SELECT id FROM threads WHERE team_id = ?)))"
+        " AND (? IS NULL OR thread_id IN (SELECT id FROM threads WHERE team_id = ?))"
+        # A lane of a chat (item 1984) is a task of that chat, not a chat of its own.
+        " AND thread_id NOT IN (SELECT id FROM threads WHERE lane_of IS NOT NULL))"
         " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
         "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
         "  r.created_at AS latest_created_at,"
@@ -2863,6 +2873,69 @@ class Store:
         )
         return None if row is None else _run(row)
 
+    @_writing
+    async def create_lane(self, chat_id: str, title: str, cap: int) -> ThreadRecord | None:
+        """A new lane of the chat ``chat_id`` (item 1984), with its source, team and agent, unless ``cap`` tasks of the
+        chat work already, in one write, so that two lanes asked for at once cannot both pass the cap: the chat and each
+        of its lanes count while a run of their own (not a helper's) works there, and a lane with no run yet counts
+        too, since its first run is about to start. ``None`` when the cap is reached."""
+        chat: ThreadRecord = await self.get_thread(chat_id)
+        if chat.lane_of is not None:
+            raise InvalidValueError("a lane belongs to a chat, not to another lane", {"thread_id": chat_id})
+        now: float = time.time()
+        record: ThreadRecord = ThreadRecord(
+            id=new_id("thr"),
+            title=title,
+            source=chat.source,
+            created_at=now,
+            updated_at=now,
+            team_id=chat.team_id,
+            agent_id=chat.agent_id,
+            lane_of=chat_id,
+        )
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "INSERT INTO threads(id, title, source, created_at, updated_at, team_id, agent_id, lane_of)"
+            " SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE ("
+            " SELECT COUNT(*) FROM threads AS t WHERE (t.id = ? OR t.lane_of = ?) AND ("
+            " EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id AND runs.parent_run_id IS NULL"
+            f" AND runs.status IN ({_WORKING_SQL}))"
+            " OR (t.lane_of IS NOT NULL AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id)))"
+            ") < ?",
+            (
+                record.id,
+                record.title,
+                record.source,
+                record.created_at,
+                record.updated_at,
+                record.team_id,
+                record.agent_id,
+                record.lane_of,
+                chat_id,
+                chat_id,
+                cap,
+            ),
+        )
+        await self._db.commit()
+        return record if cursor.rowcount == 1 else None
+
+    @_writing
+    async def drop_unstarted_lane(self, lane_id: str) -> None:
+        """Delete the lane ``lane_id`` when no run has started in it (its first run could not start), so that it no
+        longer counts against its chat's cap; a lane with a run is left as it is."""
+        await self._db.execute(
+            "DELETE FROM threads WHERE id = ? AND lane_of IS NOT NULL"
+            " AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = threads.id)",
+            (lane_id,),
+        )
+        await self._db.commit()
+
+    async def lanes_of(self, chat_id: str) -> list[str]:
+        """The lanes of the chat ``chat_id`` (item 1984), oldest first."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT id FROM threads WHERE lane_of = ? ORDER BY created_at, rowid", (chat_id,)
+        )
+        return [str(row["id"]) for row in rows]
+
     async def get_thread(self, thread_id: str) -> ThreadRecord:
         row: aiosqlite.Row | None = await self._one("SELECT * FROM threads WHERE id = ?", (thread_id,))
         if row is None:
@@ -3039,12 +3112,17 @@ class Store:
         """The transaction of :meth:`delete_threads`: the ids of the chats that existed and the screenshot files they
         named, once it is committed."""
         await self._db.execute("BEGIN IMMEDIATE")
-        await self._refuse_working_chats(named, "chats with a run under way cannot be deleted")
         found: list[aiosqlite.Row] = await self._all(
             f"SELECT id FROM threads WHERE id IN ({','.join('?' * len(named))})", named
         )
         existing: set[str] = {str(row["id"]) for row in found}
-        candidates: set[str] = await self._delete_chats(named)
+        # A chat's lanes (item 1984) are its tasks: they go with it, and a task at work keeps it as its own run does.
+        lanes: list[aiosqlite.Row] = await self._all(
+            f"SELECT id FROM threads WHERE lane_of IN ({','.join('?' * len(named))})", named
+        )
+        with_lanes: tuple[str, ...] = (*named, *(str(row["id"]) for row in lanes))
+        await self._refuse_working_chats(with_lanes, "chats with a run under way cannot be deleted")
+        candidates: set[str] = await self._delete_chats(with_lanes)
         await self._db.commit()
         return existing, candidates
 
@@ -6038,12 +6116,44 @@ class Store:
         await self._db.commit()
         return record
 
+    @_writing
+    async def add_queued_answer(self, asked: RunRecord, question_id: str, answer: str, source: str) -> QueuedMessage:
+        """Put the owner's ``answer`` to the question card ``question_id`` of the run ``asked`` at the end of that run's
+        chat's queue (item 1984), with the choices of the run that asked: another run works there now, and the answer
+        starts the continuation of the task that asked once that run has ended, as the queue's next message."""
+        row = await self._one(
+            "SELECT COALESCE(MAX(position), 0) AS top FROM queued_messages WHERE thread_id = ?", (asked.thread_id,)
+        )
+        record: QueuedMessage = QueuedMessage(
+            id=new_id("que"),
+            thread_id=asked.thread_id,
+            position=(0 if row is None else int(row["top"])) + 1,
+            text=answer,
+            attachments=(),
+            mode=asked.mode,
+            model=asked.model,
+            effort=asked.effort,
+            speed=asked.speed,
+            once=asked.once,
+            picks=NO_PICKS,
+            approvals=asked.approvals,
+            goal_mode=asked.goal_mode,
+            agent_id=asked.agent_id,
+            source=source,
+            created_at=time.time(),
+            follow_up=None,
+            answers=question_id,
+        )
+        await self._insert_queued(record)
+        await self._db.commit()
+        return record
+
     async def _insert_queued(self, record: QueuedMessage) -> None:
         """Store ``record`` in its chat's queue; the caller commits."""
         await self._db.execute(
             "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, speed, once,"
-            " picks, approvals, goal_mode, agent_id, source, created_at, follow_up)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " picks, approvals, goal_mode, agent_id, source, created_at, follow_up, answers)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -6062,6 +6172,7 @@ class Store:
                 record.source,
                 record.created_at,
                 None if record.follow_up is None else record.follow_up.model_dump_json(),
+                record.answers,
             ),
         )
 

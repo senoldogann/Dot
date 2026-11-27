@@ -1118,6 +1118,18 @@
           ],
           "title": "Agent Id"
         },
+        "answers": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Answers"
+        },
         "approvals": {
           "anyOf": [
             {
@@ -2535,6 +2547,18 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "lane_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lane Of"
         },
         "source": {
           "title": "Source",
