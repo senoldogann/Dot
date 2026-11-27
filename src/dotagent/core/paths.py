@@ -37,6 +37,12 @@ def token_path() -> Path:
     return dot_home() / "api-token"
 
 
+def hooks_path() -> Path:
+    """The hooks that start work when called (:mod:`dotagent.hooks`): each one's binding, template, secret and last
+    calls, readable by the owner only."""
+    return dot_home() / "hooks.json"
+
+
 def phones_path() -> Path:
     """The phones paired with Dot (item 670): each one's id, name and dates, and the SHA-256 of its key, not the key."""
     return dot_home() / "phones.json"

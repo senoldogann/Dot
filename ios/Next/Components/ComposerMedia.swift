@@ -8,10 +8,18 @@ import UniformTypeIdentifiers
 
 private let composerLogger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "composer")
 
+/// How far a video's re-encoding has got (item 1992), for its tile's ring.
+@MainActor @Observable final class ExportProgress: Equatable {
+    var fraction: Double = 0
+    nonisolated static func == (left: ExportProgress, right: ExportProgress) -> Bool { left === right }
+}
+
 struct ComposerAttachment: Identifiable, Equatable {
     enum Content: Equatable {
         case ready(OutgoingAttachment)
         case needsTrim(MovieFile, name: String, bytes: Int)
+        /// A video being re-encoded: its tile is on show at once, with the first frame and a ring that fills.
+        case exporting(name: String, ExportProgress)
     }
 
     let id: UUID
@@ -31,7 +39,14 @@ struct ComposerAttachment: Identifiable, Equatable {
         switch content {
         case .ready(let file): file.name
         case .needsTrim(_, let name, _): name
+        case .exporting(let name, _): name
         }
+    }
+
+    /// The ring of a video still being prepared; `nil` once it is ready.
+    var exportProgress: ExportProgress? {
+        if case .exporting(_, let progress) = content { return progress }
+        return nil
     }
 
     var size: String {
@@ -39,6 +54,7 @@ struct ComposerAttachment: Identifiable, Equatable {
         switch content {
         case .ready(let file): bytes = file.byteCount
         case .needsTrim(_, _, let count): bytes = count
+        case .exporting: return ""
         }
         return Int64(bytes).formatted(.byteCount(style: .file))
     }
@@ -66,7 +82,8 @@ struct ComposerAttachment: Identifiable, Equatable {
         guard info.isRegularFile == true, let bytes = info.fileSize, bytes > 0 else { throw ComposerMediaError.invalidDocument(name) }
         let type: UTType = info.contentType ?? .data
         if type.conforms(to: .movie) || type.conforms(to: .video) {
-            return try await video(MovieFile.copy(url), name: name)
+            let movie: MovieFile = try MovieFile.copy(url)
+            return try await video(movie, name: name, id: UUID(), progress: nil)
         }
         if type.conforms(to: .audio) {
             // A sound goes as it is, as a file (item 1933): the daemon keeps it for watch_video up to the video's limit.
@@ -84,15 +101,32 @@ struct ComposerAttachment: Identifiable, Equatable {
         return ComposerAttachment(id: UUID(), content: .ready(file), preview: thumbnail, duration: nil, icon: icon)
     }
 
-    static func video(_ source: MovieFile, name: String) async throws -> ComposerAttachment {
+    /// The tile of a video on show before it is re-encoded: its first frame and length, read from the source.
+    @MainActor static func exportingVideo(_ source: MovieFile, name: String, id: UUID) async throws -> ComposerAttachment {
+        let asset: AVURLAsset = AVURLAsset(url: source.url)
+        let duration: Double = try await asset.load(.duration).seconds
+        guard duration.isFinite, duration > 0 else { throw ComposerMediaError.invalidVideo(name) }
+        let generator: AVAssetImageGenerator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 240, height: 240)
+        let frame: CGImage = try await generator.image(at: .zero).image
+        let shown: String = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent + ".mp4"
+        return ComposerAttachment(
+            id: id, content: .exporting(name: shown, ExportProgress()), preview: UIImage(cgImage: frame), duration: duration, icon: "film")
+    }
+
+    /// A video made ready to send: re-encoded to the target bitrate, as ``id``'s tile (the one ``exportingVideo`` showed, whose ring
+    /// is ``progress``).
+    static func video(_ source: MovieFile, name: String, id: UUID, progress: ExportProgress?) async throws -> ComposerAttachment {
         defer { withExtendedLifetime(source) {} }
         let asset: AVURLAsset = AVURLAsset(url: source.url)
         let duration: Double = try await asset.load(.duration).seconds
         guard duration.isFinite, duration > 0 else { throw ComposerMediaError.invalidVideo(name) }
         let output: MovieFile = MovieFile(fileExtension: "mp4")
-        // Re-encoded for a target bitrate (item 1933, `VideoTarget`), not to a preset: a minute is about 14 MB.
+        // Re-encoded for a target bitrate (item 1992, `VideoTarget`), not to a preset: a minute is about 14 MB.
+        let ring: Ring = Ring(progress)
         do {
-            try await VideoTranscoder.export(from: source.url, to: output.url)
+            try await VideoTranscoder.export(from: source.url, to: output.url, progress: { ring.set($0) })
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -110,9 +144,28 @@ struct ComposerAttachment: Identifiable, Equatable {
         let exportedName: String = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent + ".mp4"
         guard bytes > OutgoingAttachment.maximumMediaBytes else {
             let video: OutgoingAttachment = OutgoingAttachment(name: exportedName, mediaType: "video/mp4", file: output.url, byteCount: bytes)
-            return ComposerAttachment(id: UUID(), content: .ready(video), preview: UIImage(cgImage: frame), duration: duration, icon: "film", holds: output)
+            return ComposerAttachment(id: id, content: .ready(video), preview: UIImage(cgImage: frame), duration: duration, icon: "film", holds: output)
         }
-        return ComposerAttachment(id: UUID(), content: .needsTrim(output, name: exportedName, bytes: bytes), preview: UIImage(cgImage: frame), duration: duration, icon: "film")
+        return ComposerAttachment(id: id, content: .needsTrim(output, name: exportedName, bytes: bytes), preview: UIImage(cgImage: frame), duration: duration, icon: "film")
+    }
+}
+
+/// Hands an export's progress to the main actor, a step of 2 % at a time: a frame at 30 a second is not a change of the ring.
+private final class Ring: @unchecked Sendable {
+    private let progress: ExportProgress?
+    private let lock: NSLock = NSLock()
+    private var last: Double = 0
+
+    init(_ progress: ExportProgress?) { self.progress = progress }
+
+    func set(_ fraction: Double) {
+        guard let progress else { return }
+        let step: Bool = lock.withLock {
+            guard fraction - last >= 0.02 else { return false }
+            last = fraction
+            return true
+        }
+        if step { Task { @MainActor in progress.fraction = fraction } }
     }
 }
 
@@ -219,37 +272,68 @@ struct ComposerAttachmentChip: View {
     let trim: () -> Void
     let remove: () -> Void
 
-    @ScaledMetric(relativeTo: .caption) private var thumbnailSize: CGFloat = 44
     @ScaledMetric(relativeTo: .caption) private var nameWidth: CGFloat = 160
 
     var body: some View {
-        HStack(spacing: Space.xs) {
-            HStack(spacing: Space.xs) {
-                if let preview = attachment.preview {
-                    Image(uiImage: preview).resizable().scaledToFill()
-                        .frame(width: thumbnailSize, height: thumbnailSize).clipShape(rounded(Radius.inner))
-                        .accessibilityHidden(true)
-                } else {
-                    Image(systemName: attachment.icon).foregroundStyle(Tone.secondary).accessibilityHidden(true)
+        if attachment.preview != nil {
+            tile
+        } else {
+            fileChip
+        }
+    }
+
+    /// A photo or a video: its picture as a tile, with the play glyph, the length and the ring over it, and the × at its corner
+    /// (item 1992); a video still too big says so under it, with the way to trim it.
+    private var tile: some View {
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            MediaTile(
+                preview: attachment.preview, duration: attachment.duration, playable: attachment.icon == "film",
+                icon: attachment.icon, progress: attachment.exportProgress.map(\.fraction))
+                .overlay(alignment: .topTrailing) {
+                    Button(action: remove) {
+                        Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.palette).foregroundStyle(.white, .black.opacity(0.6))
+                            .frame(width: Metric.hit, height: Metric.hit)
+                    }
+                    .accessibilityLabel(String(localized: "Remove \(attachment.name)", comment: "VoiceOver: removes an attachment from the message"))
+                    .accessibilityIdentifier("composer.remove")
                 }
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text(verbatim: attachment.name).textRole(.footnote).lineLimit(1).truncationMode(.middle)
-                        .frame(maxWidth: nameWidth, alignment: .leading)
-                    if let length = attachment.length {
-                        Text(verbatim: "\(length) · \(attachment.size)").textRole(.label).foregroundStyle(Tone.secondary)
-                            .accessibilityIdentifier("composer.videoDuration")
-                    } else {
-                        Text(verbatim: attachment.size).textRole(.label).foregroundStyle(Tone.secondary)
-                    }
-                    if attachment.outgoing == nil {
-                        Text(String(localized: "Over the 200 MiB limit", comment: "On a video chip when the exported video is still too big"))
-                            .textRole(.label).foregroundStyle(Tone.failure)
-                    }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(tileWords)
+                .accessibilityIdentifier(attachment.icon == "film" ? "composer.videoTile" : "composer.photoTile")
+            if attachment.outgoing == nil && attachment.exportProgress == nil {
+                Text(String(localized: "Over the 200 MiB limit", comment: "On a video chip when the exported video is still too big"))
+                    .textRole(.label).foregroundStyle(Tone.failure)
+                if case .needsTrim(let file, _, _) = attachment.content, UIVideoEditorController.canEditVideo(atPath: file.url.path) {
+                    Button(String(localized: "Trim video", comment: "Composer button: opens the video trimmer"), action: trim)
+                        .textRole(.footnote).frame(minHeight: Metric.hit)
                 }
             }
-            if case .needsTrim(let file, _, _) = attachment.content, UIVideoEditorController.canEditVideo(atPath: file.url.path) {
-                Button(String(localized: "Trim video", comment: "Composer button: opens the video trimmer"), action: trim)
-                    .textRole(.footnote).frame(minHeight: Metric.hit)
+            if attachment.icon == "film" {
+                Text(verbatim: attachment.size).textRole(.label).foregroundStyle(Tone.secondary)
+                    .accessibilityIdentifier("composer.videoSize")
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// What VoiceOver says of the tile: the kind, its name, and a video's length.
+    private var tileWords: String {
+        if attachment.icon == "film", let length = attachment.length {
+            return String(localized: "Video \(attachment.name), \(length)", comment: "VoiceOver: a video in the composer; the arguments are its name and its length")
+        }
+        return attachment.icon == "film"
+            ? String(localized: "Video \(attachment.name)", comment: "VoiceOver: a video in the composer that is being prepared; the argument is its name")
+            : String(localized: "Photo \(attachment.name)", comment: "VoiceOver: a photo the owner's message carried; the argument is its name")
+    }
+
+    private var fileChip: some View {
+        HStack(spacing: Space.xs) {
+            Image(systemName: attachment.icon).foregroundStyle(Tone.secondary).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text(verbatim: attachment.name).textRole(.footnote).lineLimit(1).truncationMode(.middle)
+                    .frame(maxWidth: nameWidth, alignment: .leading)
+                Text(verbatim: attachment.size).textRole(.label).foregroundStyle(Tone.secondary)
             }
             Button(action: remove) {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(Tone.secondary).frame(width: Metric.hit, height: Metric.hit)

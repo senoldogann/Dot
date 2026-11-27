@@ -78,7 +78,8 @@ the owner's 279 runs of two weeks that made a median of one line a run on Claude
 (at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
 the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
 may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
-the line wears the bot's face, and a finished run's steps fold behind one *Worked for* line before its answer. A run
+the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
+behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
@@ -469,7 +470,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   whose campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
   each, a video or a sound up to 200 MB, sent as the raw body of `PUT /api/attachments/stream` and written to disk as
-  it arrives, as is any file over 2 MB, item 1933). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
+  it arrives, as is any file over 2 MB, item 1933). A video stands in the box, as on Dot Next, as a tile: its first
+  frame, a play glyph, its length at the foot, a ring that fills while it goes up and a × at its corner; over a sent
+  message the same tile stands, and a click on it plays the video full screen (Escape, the × or a click outside closes
+  it), read from `GET /api/attachments/{id}/media` (item 1992). The frame and the length are read from the first 4 MB of
+  the file; a video whose index lies past them (a file some cameras and editors write) is a plain tile that plays all
+  the same. In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
   thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
   the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it
