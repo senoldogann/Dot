@@ -168,13 +168,13 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                 try:
                     for width, scheme in _SHOTS:
                         page: Page = await _open_sidebar(browser, address, width, scheme)
-                        button: Locator = page.get_by_role("button", name="Your agents", exact=True)
+                        button: Locator = page.get_by_role("button", name="Your bots", exact=True)
                         # No face stands at the top any more, and no phone's rows: one button.
                         await expect(page.locator(".side-agent-faces, .side-bots, nav.side-links")).to_have_count(0)
                         await button.click()
                         # A narrow window with a mouse has the menu; a touch screen's sheet is
                         # test_agent_conversation.py's.
-                        menu: Locator = page.get_by_role("menu", name="Your agents")
+                        menu: Locator = page.get_by_role("menu", name="Your bots")
                         items: Locator = menu.get_by_role("menuitem")
                         # Dot first (item 1245), then the newest, as neither has worked yet; every entry its count.
                         await expect(items).to_have_text(
@@ -182,8 +182,8 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                                 re.compile(r"Dot\s*0$"),
                                 re.compile(r"Competitor Watch\s*0$"),
                                 re.compile(r"Scout( Two)?\s*0$"),
-                                "All agents",
-                                "New agent",
+                                "All bots",
+                                "New bot",
                                 "Campaigns",
                             ]
                         )
@@ -207,12 +207,12 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                         await button.click()
                         await expect(watch).to_have_attribute("aria-current", "true")
                         await expect(scout).not_to_have_attribute("aria-current", "true")
-                        await items.filter(has_text="All agents").click()
+                        await items.filter(has_text="All bots").click()
                         # The page of every agent is Settings › Agents since item 1336: the sidebar is the settings' nav
                         # while it is open, with Agents its marked row, and Back to chats gives the chats' sidebar back.
                         await expect(page).to_have_url(f"{address}/#/settings/agents")
                         settings: Locator = page.get_by_role("navigation", name="Settings")
-                        await expect(settings.locator("[aria-current='page'] .snav-label")).to_have_text("Agents")
+                        await expect(settings.locator("[aria-current='page'] .snav-label")).to_have_text("Bots")
                         await settings.get_by_role("link", name="Back to chats").click()
                         # An agent renamed from a page shows its new name at once, in the menu and on its chats' rows.
                         await page.evaluate(
@@ -238,9 +238,9 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                     agents.clear()
                     async with page.expect_response(re.compile(r"/api/agents$")):
                         await page.evaluate("() => window.dispatchEvent(new CustomEvent('dot:agents-changed'))")
-                    await page.get_by_role("button", name="Your agents", exact=True).click()
-                    await expect(page.get_by_role("menu", name="Your agents").get_by_role("menuitem")).to_have_text(
-                        [re.compile(r"Dot\s*0$"), "All agents", "New agent", "Campaigns"]
+                    await page.get_by_role("button", name="Your bots", exact=True).click()
+                    await expect(page.get_by_role("menu", name="Your bots").get_by_role("menuitem")).to_have_text(
+                        [re.compile(r"Dot\s*0$"), "All bots", "New bot", "Campaigns"]
                     )
                     await page.close()
                 finally:

@@ -394,7 +394,7 @@ async def test_the_helpers_sheet_says_what_the_task_waits_on_and_has_the_details
             # Details opens the Agents tab, and the sheet gives way to it.
             await sheet.get_by_role("button", name="Details").tap()
             await expect(_open_sheet(page)).to_have_count(0)
-            await expect(page.get_by_role("tab", name=re.compile("^Agents"))).to_have_attribute("aria-selected", "true")
+            await expect(page.get_by_role("tab", name=re.compile("^Bots"))).to_have_attribute("aria-selected", "true")
             await expect(_segment(page, "status")).to_have_attribute("aria-expanded", "true")
             await page.keyboard.press("Escape")
             await expect(_segment(page, "status")).to_have_attribute("aria-expanded", "false")
