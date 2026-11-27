@@ -54,7 +54,8 @@ dotx scope remove "Bugcrowd · Klaviyo"
 The scopes live in `scopes.toml` in Dot's home, which `dotx scope` writes and every call reads by its stamp: a scope
 added in one run holds for the next one without a restart. A file that cannot be read (not TOML, a host with a
 wildcard) is named with what is wrong: the port scan and `security_scan` wait for it, the passive audit goes on and its
-report says the scope is unknown. A run whose commands run outside the sandbox (a yolo run) registers the program
+report says the scope is unknown. A run whose commands run outside the sandbox (a yolo run you started; a run nobody
+started keeps the sandbox in yolo too, item 2016) registers the program
 itself — it reads the program's published scope in the browser, then one `dotx scope add` — and goes on. Under the
 sandbox Dot's home is closed to a run's commands ([Safety](safety.md)), so there the run hands you that one
 `dotx scope add` line to run, never a toml block.

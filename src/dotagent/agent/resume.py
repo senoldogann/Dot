@@ -28,7 +28,7 @@ from dotagent.agent.plan import PlanPayload, plan_lines
 from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.agent.verify import new_facts
 from dotagent.config import ResumeMode
-from dotagent.core.errors import DotError, PolicyDenied, StoreError
+from dotagent.core.errors import DotError, NotFoundError, PolicyDenied, StoreError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_tail
@@ -54,6 +54,29 @@ log = get_logger(__name__)
 # The ``source`` of the runs that resume another run.
 RESUME_SOURCE: str = "resume"
 RESUMED_EVENT: str = "resumed"
+
+# How many resumes back :func:`origin_source` follows a run to the one it goes on from.
+RESUMES_FOLLOWED: int = 20
+
+
+async def origin_source(runtime: Runtime, run: RunRecord) -> str | None:
+    """The source of the run ``run`` goes on from: its own, or, for a run that resumes another (:data:`RESUME_SOURCE`),
+    the source of the first run of the chain that is no resume, followed back through each one's ``resumed`` event,
+    however many times it was resumed. ``None`` when the chain cannot be read (an event or a run gone, or more than
+    :data:`RESUMES_FOLLOWED` resumes): the caller decides what an unknown origin means. Reads the store."""
+    for _ in range(RESUMES_FOLLOWED):
+        if run.source != RESUME_SOURCE:
+            return run.source
+        resumed: EventRecord | None = await runtime.store.last_event(run.id, RESUMED_EVENT)
+        origin: JsonValue = None if resumed is None else resumed.data.get("from_run_id")
+        if not isinstance(origin, str):
+            return None
+        try:
+            run = await runtime.store.get_run(origin)
+        except NotFoundError:
+            return None
+    return None
+
 
 # The policy kinds of calls that change nothing when they run again. A delegated run may have done anything its mode
 # allows, so a delegation is not one of them, and neither is a ``meta`` call: that kind holds the tools that make an
