@@ -17,6 +17,7 @@ const CORE = {
   "work.schedule": "Zamanlama kuruyor",
   "work.memory": "Notlarına bakıyor",
   "work.helper": "Bir yardımcıya verildi",
+  "work.helperWith": "Bir yardımcıya verildi: {title}",
   "work.other": "Çalışıyor",
   "work.commandOf": "Çalıştırıyor: {what}",
   "work.readOf": "Okuyor: {what}",

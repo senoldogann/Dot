@@ -14,9 +14,11 @@ test("a call is said in plain words, never by a tool's name (owner 2026-11-27)",
   assert.equal(callPhrase("list_dir", { path: "." }), "Working");
 });
 
-test("work handed to a helper is said in plain words, never delegate or subagent (item 2002)", () => {
-  // The live line says no tool's name: a call with no phrase of its own is "Working" (owner 2026-11-27).
-  for (const args of [{ goal: "Check the dentist's free slots" }, {}]) {
+test("work handed to a helper is said in plain words with its short title, never delegate or subagent (item 2002)", () => {
+  const goal = { goal: "Check the dentist's free slots. Then say which suit." };
+  assert.equal(callPhrase("delegate", goal), "Handed to a helper: Check the dentist's free slots");
+  assert.equal(callPhrase("delegate", {}), "Handed to a helper");
+  for (const args of [goal, {}]) {
     assert.doesNotMatch(callPhrase("delegate", args), /delegat|subagent|child/i);
   }
 });

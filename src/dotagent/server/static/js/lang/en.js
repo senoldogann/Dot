@@ -18,6 +18,7 @@ const CORE = {
   "work.schedule": "Setting up a schedule",
   "work.memory": "Checking its notes",
   "work.helper": "Handed to a helper",
+  "work.helperWith": "Handed to a helper: {title}",
   "work.other": "Working",
   "work.commandOf": "Running {what}",
   "work.readOf": "Reading {what}",
