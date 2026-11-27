@@ -504,8 +504,7 @@ logo, the icon or the letters, in the chip's colour on no tile, item 946), Dot's
 server until the daemon's palette has named it (a draft kept, a message sent; the plug before item 581); the chip of an
 account names its provider with the provider's mark (Google, Microsoft; item 946), its address in its title, once the
 palette names it, and its address with the mail icon until then and for an account signed out since; Plan first is a
-chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **Options** menu's
-**How Dot works** group, under the approvals (item 353). The picks go with the message (`plugins`, `skills`, `accounts` and
+chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **How Dot works** group of the Chat settings, under the Options rows (items 353 and 2015). The picks go with the message (`plugins`, `skills`, `accounts` and
 `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is sent they stand at the head of its text as
 words in their colours, with no border, as a skill stands in a line of text (the run's `picks` event; item 858); a message added to the run under way leaves them for the next one, which a note over the box says before the send (with **Send after this task instead**), and a toast after a send the other way with ⌘⇧Enter,
 and a queued message with picks is not steered into the run at work: it stays queued to start a run of its own. A run
@@ -822,14 +821,11 @@ once, as the screen it was sent from does: when the run is queued, once the page
 a phone's page that the browser loads again opens; what was typed there and not sent goes with it. A page of an earlier
 run of the chat (opened from the sidebar's Activity, a link or its address) stays where it is, and so does a page while
 a question its run left is open on it, until none is (item 451). In a campaign's chat the message steers the
-session. The box wears the home's pills too: the mode (none on Auto, which a chat keeps for its next messages,
-each settled by its own words), the model with its reasoning and the Options (approvals and goal mode) of the chat,
-and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
+session. The box holds the home's choices too, in its Chat settings (item 2015): the mode (Auto, which a chat keeps for its next messages, each settled by its own words), the model with its reasoning, and the approvals and goal mode of the chat, and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
 for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a
 chat from before has the open run's until its next run starts; a Task kept before Auto, item 495, reads as Auto, which
 settles a task unless a message's words ask only to look). They are not kept in the browser as the home's are, and
-Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
-next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
+Keep going stays a new chat's choice. The run under way keeps its own: while it works, the model's pill steps back and says that the choices wait for the next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
 window up to 200 000, items 396 and 732); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows
 the figures, the point past which Dot summarizes the older part of the run, the model's window, and why the budget is

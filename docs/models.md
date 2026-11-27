@@ -597,7 +597,7 @@ works](runs.md#how-a-run-works)); without a model it shows `[models] main`.
 **Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped
 to one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model
 that offers fewer than two has no choice to make, and its picker stays hidden. `models.effort` is the default; one run
-picks another with `dotx run --effort high`, with the Reasoning menu of the composer in the web UI, or with `effort` in
+picks another with `dotx run --effort high`, with the Reasoning row of the composer's Chat settings in the web UI, or with `effort` in
 `POST /api/runs`. The run keeps the level it was started with (the facts under the side panel's More show it). A level
 the model does not offer is refused (a 422 over HTTP); the configured default, which is not tied to one model, is
 rounded to the nearest
@@ -609,8 +609,7 @@ the Start, Build and Scale usage tiers, with a rate limit of its own and no acce
 a research preview that Anthropic lets an organization into from a waitlist. It is not for the Batch API or a Priority
 Tier commitment. The Models API does not say which models have it, so Dot names them from Anthropic's page
 (`FAST_MODE_MODELS` in `llm/anthropic.py`); Settings › Models marks them `fast mode` (`fast_mode` in `GET /api/models`).
-The Reasoning menu of the composer has Speed, Standard or Fast, for such a model, off at first; the pill then reads
-`High · Fast`. A chat keeps it with its choices, a new chat's box in this browser, and the run it starts keeps it as its
+The Reasoning row of the composer's Chat settings has Speed, Standard or Fast, for such a model, off at first; the model's pill then says `High · Fast` in grey after its name. A chat keeps it with its choices, a new chat's box in this browser, and the run it starts keeps it as its
 model and level (`speed` in `POST /api/runs` and in the queue; the facts under the side panel's More say so). Each step
 of such a run on a model with fast mode asks for it (`speed: "fast"` with the beta `fast-mode-2026-02-01`, which the
 preview models need
@@ -622,7 +621,7 @@ have it too, which Claude Code runs off on a plan without extra usage: there the
 run goes at the standard speed and its answer says so (item 1014, above). Fast mode for a
 model without it is refused (a 422 over HTTP). Switching the speed of a chat starts the prompt cache again.
 
-**Ultrathink and Ultracode.** The Reasoning menu has two choices for one message, under This message only (item 251).
+**Ultrathink and Ultracode.** The Reasoning row has two choices for one message, under This message only (item 251).
 Ultrathink, for a model that offers `max`, asks it for Max for this message. Ultracode, for a model that offers `xhigh`,
 asks it for Extra high and tells the run, in its instructions, to split the goal: each part that needs no other part's
 result goes to a helper of its own (a `delegate`, several in one turn, each with its plan step), and the run does itself
