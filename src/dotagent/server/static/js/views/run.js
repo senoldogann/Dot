@@ -1615,12 +1615,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
    * or past the start of a long answer, is offered the way back too; a live run's is the follow the reader left.
    */
   function paintJump() {
-    const below = answerNode === null && active ? !following : answerBelow() || !nearBottom();
+    const belowAnswer = answerBelow();
+    const below = answerNode === null && active ? !following : belowAnswer || !nearBottom();
     // The arrow shows while the end, or the answer, is below the window and the answer is not on its way into view.
     const show = below && !landing;
     jumpVisible = show;
     jump.hidden = !show;
-    const words = answerBelow() ? t("run.jumpAnswer") : t("run.jumpLatest");
+    const words = belowAnswer ? t("run.jumpAnswer") : t("run.jumpLatest");
     jump.title = words;
     jump.setAttribute("aria-label", words);
     dockBar.setEnd(show, words);

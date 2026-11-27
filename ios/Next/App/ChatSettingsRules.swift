@@ -222,11 +222,13 @@ func followsAfterScroll(following: Bool, atEnd: Bool, ownerScrolls: Bool) -> Boo
 /// is kept (pure).
 func modelNameWithoutProvider(_ label: String, provider: String) -> String {
     let title: String = providerTitle(provider)
-    let separators: String = " ·:/-–—"
+    let marks: String = "·:/-–—"
     guard !title.isEmpty, let range = label.range(of: title, options: [.anchored, .caseInsensitive]) else { return label }
-    let tail: Substring = label[range.upperBound...]
-    guard let first = tail.first, separators.contains(first) else { return label }
-    let rest: Substring = tail.drop { separators.contains($0) }
+    // A mark of punctuation must stand between the provider's name and the model's: "Mistral Large" of the provider Mistral
+    // is a model's own name.
+    let tail: Substring = label[range.upperBound...].drop { $0 == " " }
+    guard let mark = tail.first, marks.contains(mark) else { return label }
+    let rest: Substring = tail.dropFirst().drop { $0 == " " }
     return rest.isEmpty ? label : String(rest)
 }
 

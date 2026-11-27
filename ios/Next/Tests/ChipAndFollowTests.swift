@@ -11,6 +11,7 @@ final class ChipAndFollowTests: XCTestCase {
         XCTAssertEqual(modelNameWithoutProvider("Opus 5.5", provider: "anthropic"), "Opus 5.5")
         XCTAssertEqual(modelNameWithoutProvider("Anthropic", provider: "anthropic"), "Anthropic", "a label that is only the provider is kept")
         XCTAssertEqual(modelNameWithoutProvider("Anthropicus 3", provider: "anthropic"), "Anthropicus 3", "a longer word is not the provider")
+        XCTAssertEqual(modelNameWithoutProvider("Mistral Large", provider: "mistral"), "Mistral Large", "a model named like its provider keeps its name")
     }
 
     func testTheChipsGreyWordsAreTheLevelAndFast() {

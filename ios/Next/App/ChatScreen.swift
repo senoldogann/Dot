@@ -318,7 +318,15 @@ struct ChatScreen: View {
         // A row opened or closed by the owner stays where it is: the follow stops (see `disclosureToggled`).
         .environment(\.disclosureToggled, { pinned = false })
         .scrollDismissesKeyboard(.interactively)
-        .onScrollPhaseChange { _, now in ownerScrolls = now == .interacting || now == .decelerating }
+        .onScrollPhaseChange { _, now, context in
+            ownerScrolls = now == .interacting || now == .decelerating
+            // Whether the end is away is read from the geometry as the scroll begins (item 1991): the value kept from the
+            // last change may be older than the chat (one opened at a remembered place never changed it), and a stale "at the
+            // end" would make the owner's first scroll start the follow.
+            let geometry: ScrollGeometry = context.geometry
+            atEnd = isAtEnd(distanceFromEnd: Double(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.contentOffset.y - geometry.containerSize.height))
+            pinned = followsAfterScroll(following: pinned, atEnd: atEnd, ownerScrolls: ownerScrolls)
+        }
         // Follow new words only while the owner is at the end (plan §13 S5, item 1848): their own scroll away stops it,
         // their scroll back to the end starts it again; words that grow the transcript never stop it.
         .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -326,10 +334,6 @@ struct ChatScreen: View {
         } action: { _, now in
             atEnd = now
             pinned = followsAfterScroll(following: pinned, atEnd: now, ownerScrolls: ownerScrolls)
-        }
-        // The owner's own scroll, begun while the end is already away (it moved by itself first), stops the follow too.
-        .onChange(of: ownerScrolls) { _, now in
-            pinned = followsAfterScroll(following: pinned, atEnd: atEnd, ownerScrolls: now)
         }
         // New words are followed when the transcript's end changes, never when its height does (item 1932): a lazy
         // stack estimates the rows out of sight, so its height moves as rows come into sight, and following each move

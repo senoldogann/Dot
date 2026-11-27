@@ -54,8 +54,9 @@ class _ByGoal:
         return _PROVIDER
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
-        opening: str = next((message.content for message in request.messages if message.role == "user"), "")
-        if _ASK_GOAL in opening:
+        # The run's own goal is its newest user message: a run in a chat reads the chat's earlier words first.
+        goal: str = [message.content for message in request.messages if message.role == "user"][-1]
+        if _ASK_GOAL in goal:
             ask: ScriptedTurn = ScriptedTurn(
                 text="",
                 calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Which colour?", "wait": True}),),
@@ -488,6 +489,10 @@ async def test_the_way_down_follows_the_reader_while_a_run_is_at_work(
         False,
         (),
     )
+    # The run is at work, waiting on its question: the test stands on that, not on the page being open.
+    async with asyncio.timeout(_RUN_WAIT_S):
+        while not await runtime.store.run_questions(second.id, ASK_USER_TOOL):  # noqa: ASYNC110 - polls the store
+            await asyncio.sleep(0.1)
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch()
@@ -526,9 +531,9 @@ async def test_the_way_down_follows_the_reader_while_a_run_is_at_work(
                 await page.evaluate(to_top)
                 await expect(arrow).to_be_visible(timeout=4000)
                 await arrow.click()
-                # The run waits on a question, which is its answer: the first press leads to its start, and if the end is
-                # still away the arrow stays and the next press leads there. The scroll is smooth; a loaded machine
-                # takes its time.
+                # The run waits on a question, which is its answer: the first press leads to its start, and if the end
+                # is still away the arrow stays and the next press leads there. The scroll is smooth; a loaded
+                # machine takes its time.
                 await page.wait_for_timeout(1500)
                 if await arrow.is_visible():
                     await arrow.click()
