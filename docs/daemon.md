@@ -25,7 +25,7 @@ face or creature stands in a row): the **badge** of its agent (a 20 px square on
 Reviewer" is CR and "Dot" is DO) and its name, with the run's age at the right; the chat's title under them, in the heavier
 weight, on one line cut by an ellipsis; and a last line that holds the marks of its loop and its campaign, the team it is
 with, what it delegated and its last words (the answer of its latest run in plain words, or your message after "You:" while
-the run works; for a run its model's service stopped, a few words of what stopped it) and the dot of an unread chat. A chat is
+the run works; for a run its model's service stopped or that ended for a fault of Dot's, a few words of what stopped it (item 1981: "Stopped: Dot ran into a problem"); "Stopped" for a run you stopped, item 1980; and, for a chat that waits for you, the step that waits without the policy's reason for asking, item 1979) and the dot of an unread chat. A chat is
 the team's when it leads it, else the agent's of its latest run, else Dot's. The mark of a chat's loop (item 580) is a small
 line icon of two arrows: a chat that asks again by itself, with a loop of `/loop` or a schedule a run of it made that goes
 on in it, wears it, and its tooltip and the row's name for a screen reader say how often and when next ("Loops every 30
@@ -295,14 +295,21 @@ browser (item 230); on a touch screen Return always adds a line and the round se
 General › Messages › **Language** chooses the language of Dot's own words in the chats, the sidebar and the sign-in
 screen (English or Türkçe, kept in this browser, English until chosen; it never follows the browser, the model or a
 chat's words, and what you and Dot write stays as it was written; a change draws the page again): the words are in
-`js/lang/en.js` and `js/lang/tr.js`, whose keys `tsc` and `tests/js/i18n.test.js` hold together, and the dates follow
+`js/lang/en*.js` and `js/lang/tr*.js` (the core in `en.js` and `tr.js`, the pages of Settings and the other screens of
+`views/` in `en-views.js` and `tr-views.js`, every other module's in `en-app.js` and `tr-app.js`), whose keys `tsc` and
+`tests/js/i18n.test.js` hold together, and the dates follow
 the language too. Item 1172 brought the rest of a chat's flow into it: the steps and their group titles, the
 thoughts, the notes and resume lines between them, the tool words of a step's row and the model, mode and Options
 menus; item 1173 the run page's own words (its foot, plan, lessons, rewind and live-update notes), the sidebar's,
 the reasoning levels' names (the level ids the daemon and the models take are unchanged), the side panel's Set up and
 the tooltips and limit of a message's picks, and the toast a page shows when it could not read again what it shows;
 item 1187 the dialogs' own Cancel, Close and question before dropping what was typed, the rows of a phone's message
-sheet and the buttons of a block of code and of a table. The other settings pages are in English yet. The markdown
+sheet and the buttons of a block of code and of a table. Item 1977 brought the rest: every page of Settings, the first
+conversation, the cards that ask (an approval, a question, a secret), the composer and the notes between steps are in
+Turkish too, and `tests/js/i18n-literals.test.js` fails for a line of English that a module writes in its code and that
+reaches the screen (`tests/js/i18n-exempt.json` names the few lines only the program reads, each with its reason). What
+the daemon writes itself and sends as data (the descriptions of the agent templates, of the search engines, of the
+connectors and of the plugins in the gallery, a macOS tool's message) is English still. The markdown
 in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
@@ -478,12 +485,24 @@ and for one nobody answered "Nobody answered in time, so the step did not run.",
 asks again. A card whose run is gone (the daemon restarted, or the `dotx` command that drove it died) settles as
 expired too, live and when the chat opens again (item 1049); and a run that asked two things at once, in a step of
 read-only calls, stays waiting until both are answered (item 1050).
+A run you stop keeps the words it had streamed, in its answer's place, with a quiet **Stopped** note under them instead
+of the daemon's sentence ("The run was stopped.", the emergency stop's, or that of a run cut off when the daemon shut down
+or its `dotx` command was told to end; item 1980; the words are the page's own while it is open, so a page that
+reads the run again later shows the note alone). A run that ended for a fault of Dot's (an internal error, empty
+replies, replies cut short, a stall, a limit, a restart, a start that failed, a model's refusal, or an end that carried an error of the
+daemon's, whose words begin in lower case as a line of a log does) says in a sentence what happened and what to do, with
+the program's own words under a closed **Details** (item 1981), as a run its model's service stopped already did; the
+agent's own report of what it could not do is its answer and is not rewritten. Where the page has no error object (a
+chat's row in the sidebar, a run read again), the line is told apart by its shape alone.
 A waiting card says each thing once (item 872, after OpenMausBot's quiet approvals): the command or
 what the step acts on in its box alone, not in the words above it again, which keep what the step does ("Runs vercel;
 vercel puts a project's change live"); why Dot asks once: the line under the box says it for a chat of Dot's own
-initiative and for what yolo asks you, and the words above leave out only that sentence; any other reason (a payment's
-amount and caps, a guard's why) and what the review model passed on to you stay under the words; and no chip that the
-words say already, in whole words. On a phone the note has its row, and Deny and Approve share the
+initiative and for what yolo asks you, and the words above leave out only that sentence; a preset's reason ("aggressive
+preset still asks for: privilege") is one plain sentence under the words ("Dot asks because this needs administrator
+rights."), and any other reason (a payment's amount and caps, a guard's why) and what the review model passed on to you
+stay under the words as they are. The card's head has no badge of the step's risk (item 1979, after the 2026-11-26
+review): what the step counts as (its chips, with no chip that the words say already, in whole words), its risk and the
+policy's own words are folded under **Details**, closed until pressed, and the command stays in view. On a phone the note has its row, and Deny and Approve share the
 next one. While a note is written, Approve says **Send note** (item 1140): the step waits until Dot read the note, and
 is taken only if the note still calls for it ([Safety](safety.md#safety)).
 

@@ -15,6 +15,7 @@ import { PALETTES } from "./palettes.js";
 import { MORE_PALETTES } from "./palettes-more.js";
 import { lookTokens, paletteTokens } from "./tokens.js";
 import { isVsCodeTheme, vsCodeThemeFile } from "./vscode.js";
+import { t } from "../i18n.js";
 
 /** The schemes a theme has a palette for, in order. */
 const SCHEMES_OF_THEMES = ["light", "dark"];
@@ -76,7 +77,7 @@ function checkedVariants(value, appearance) {
     if (scheme === appearance) {
       throw new ThemeFileError(`The variants repeat the theme's own appearance, ${scheme}.`);
     }
-    variants[scheme] = checkedPalette(palette, `${scheme} colours`);
+    variants[scheme] = checkedPalette(palette, t("appearance.own.schemeColours", { scheme }));
   }
   return variants;
 }
@@ -221,7 +222,7 @@ function described(id, file) {
   return {
     id,
     label: file.name,
-    hint: schemes.length === 2 ? "Your own, for light and dark." : `Your own, for ${schemes[0]} only.`,
+    hint: schemes.length === 2 ? t("appearance.own.yourOwnForLightAnd") : t("appearance.own.yourOwnForValueOnly", { value: schemes[0] }),
     look: false,
     own: true,
     foldSteps: true,

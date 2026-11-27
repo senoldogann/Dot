@@ -12,7 +12,7 @@ import { mountCheckin } from "../checkincard.js";
 import { mountInitiative } from "../initiativecard.js";
 import { mountTells } from "../tellspanel.js";
 import { mountWatchers } from "../watcherspanel.js";
-import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
+import { ago, clip, debounce, el, joined, modelName, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { moreButton } from "../menu.js";
@@ -23,7 +23,7 @@ import { getSnapshot, loadModels, onLifecycle, onStreamBack, readFailed } from "
 import { attempt, confirmDialog, toast } from "../ui.js";
 import { explain } from "../errors.js";
 import { stateOfControls } from "../formflow.js";
-import { t } from "../i18n.js";
+import { t, tCount } from "../i18n.js";
 
 // A run starting or ending, and a schedule switched off after its runs failed in a row (item 458), paint the list again.
 const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "schedule_stopped"]);
@@ -32,18 +32,18 @@ const GOAL_PREVIEW_CHARS = 220;
 // A firing's answer is shown by its first line, cut to this.
 const FIRING_RESULT_CHARS = 120;
 const REPEATS = [
-  { id: "cron", label: "Repeats", hint: "Starts again and again on a schedule" },
-  { id: "once", label: "Once", hint: "Starts a single time" },
+  { id: "cron", label: t("views.schedules.repeats"), hint: t("views.schedules.startsAgainAndAgainOn") },
+  { id: "once", label: t("views.schedules.once"), hint: t("views.schedules.startsASingleTime") },
 ];
 const CRON_PRESETS = [
-  { label: "Every hour", cron: "0 * * * *" },
-  { label: "Daily at 09:00", cron: "0 9 * * *" },
-  { label: "Weekdays at 09:00", cron: "0 9 * * 1-5" },
-  { label: "Mondays at 09:00", cron: "0 9 * * 1" },
+  { label: t("views.schedules.everyHour"), cron: "0 * * * *" },
+  { label: t("views.schedules.dailyAt0900"), cron: "0 9 * * *" },
+  { label: t("views.schedules.weekdaysAt0900"), cron: "0 9 * * 1-5" },
+  { label: t("views.schedules.mondaysAt0900"), cron: "0 9 * * 1" },
 ];
 const MODES = [
-  { id: "task", label: "Task — do the job" },
-  { id: "research", label: "Research — look things up, change nothing" },
+  { id: "task", label: t("views.schedules.taskDoTheJob") },
+  { id: "research", label: t("views.schedules.researchLookThingsUpChange") },
 ];
 const ZONE_LIST_ID = "schedule-zones";
 
@@ -86,9 +86,9 @@ function defaultsNow() {
 const HISTORY_COUNTS = [0, 1, 3, 5, 10];
 // How the end of a schedule's run is told on the phone and the desktop (item 461).
 const NOTIFY_LEVELS = [
-  { id: "always", label: "Always" },
-  { id: "problems", label: "Only when it fails or needs me" },
-  { id: "never", label: "Never" },
+  { id: "always", label: t("views.schedules.always") },
+  { id: "problems", label: t("views.schedules.onlyWhenItFailsOr") },
+  { id: "never", label: t("views.schedules.never") },
 ];
 
 function notifyLabel(level) {
@@ -99,7 +99,7 @@ function notifyLabel(level) {
 const STOP_COUNTS = [0, 3, 5, 10, 20];
 
 function stopLabel(count) {
-  return count === 0 ? "Never" : `After ${count} failed tasks in a row`;
+  return count === 0 ? t("views.schedules.never") : t("views.schedules.afterCountFailedTasksIn", { count });
 }
 
 /** The row's note of runs that failed in a row, with when the schedule switches itself off, or null. */
@@ -111,9 +111,9 @@ function failedInRow(record) {
   // A schedule switched off, by you or by its failures, switches nothing off again.
   const title =
     record.enabled && record.cron !== null && limit !== null && limit > 0
-      ? `It switches itself off at ${limit} failed tasks in a row`
-      : "Its last tasks failed one after the other";
-  return el("span", { class: "badge b-bad", title }, `${record.runs_failed_in_row} failed in a row`);
+      ? t("views.schedules.itSwitchesItselfOffAt", { limit })
+      : t("views.schedules.itsLastTasksFailedOne");
+  return el("span", { class: "badge b-bad", title }, t("views.schedules.runsFailedInRowFailed", { runs_failed_in_row: record.runs_failed_in_row }));
 }
 
 /** The row's note of firings skipped one after the other (item 1401), from two on and while the last status is a skip,
@@ -124,15 +124,15 @@ function skippedInRow(record) {
   if (count < 2 || !record.last_status.startsWith("skipped")) {
     return null;
   }
-  return el("span", { class: "badge b-warn", title: "Its last firings were skipped one after the other, so no task started: the last reason is beside it" }, `Skipped ${count} in a row`);
+  return el("span", { class: "badge b-warn", title: t("views.schedules.itsLastFiringsWereSkipped") }, t("views.schedules.skippedCountInARow", { count }));
 }
 
 function historyLabel(count) {
-  return count === 0 ? "None" : count === 1 ? "The last task" : `The last ${count} tasks`;
+  return count === 0 ? t("views.schedules.none") : count === 1 ? t("views.schedules.theLastTask") : t("views.schedules.theLastCountTasks", { count });
 }
 
 function chatLabel(same) {
-  return same ? "The same chat" : "A new chat each time";
+  return same ? t("views.schedules.theSameChat") : t("views.schedules.aNewChatEachTime");
 }
 
 /** The goal of a schedule; a long one shows its beginning with a button to read all of it. */
@@ -143,11 +143,11 @@ function goalText(text) {
   const preview = clip(text, GOAL_PREVIEW_CHARS);
   let expanded = false;
   const body = el("div", { class: "row-text muted" }, preview);
-  const toggle = el("button", { class: "btn ghost sm", type: "button", "aria-expanded": "false" }, "Show all");
+  const toggle = el("button", { class: "btn ghost sm", type: "button", "aria-expanded": "false" }, t("views.schedules.showAll"));
   toggle.addEventListener("click", () => {
     expanded = !expanded;
     body.textContent = expanded ? text : preview;
-    toggle.textContent = expanded ? "Show less" : "Show all";
+    toggle.textContent = expanded ? t("views.schedules.showLess") : t("views.schedules.showAll");
     toggle.setAttribute("aria-expanded", String(expanded));
   });
   return el("div", null, body, toggle);
@@ -168,34 +168,34 @@ function optionChips(record, agent) {
   // Only what this schedule chose for itself, and what its agent chose where it left them open (item 462): the
   // defaults it takes are the ones every run takes, and saying them on every row buries what is its own (item 373).
   return [
-    el("span", { class: "chip", title: "Mode" }, record.mode),
-    agent === null ? null : el("span", { class: "chip", title: "Its tasks run as this agent, within its limits" }, `As ${agent.name}`),
+    el("span", { class: "chip", title: t("views.schedules.mode") }, record.mode),
+    agent === null ? null : el("span", { class: "chip", title: t("views.schedules.itsTasksRunAsThis") }, t("views.schedules.asName", { name: agent.name })),
     approvals === null
       ? null
       : el(
           "span",
           {
             class: "chip",
-            title: options.approvals === null ? "Who answers Dot's safety questions: its agent's choice" : "Who answers Dot's safety questions",
+            title: options.approvals === null ? t("views.schedules.whoAnswersDotSSafety") : t("views.schedules.whoAnswersDotSSafety2"),
           },
-          `Approvals: ${approvalLabel(approvals)}`,
+          t("views.schedules.approvalsApprovallabel", { approvalLabel: approvalLabel(approvals) }),
         ),
-    options.goal_mode === null ? null : el("span", { class: "chip" }, `Goal mode ${goalMode ? "on" : "off"}`),
+    options.goal_mode === null ? null : el("span", { class: "chip" }, goalMode ? t("views.schedules.goalModeOn") : t("views.schedules.goalModeOff")),
     options.model === null ? null : el("span", { class: "chip", title: model }, modelName(model)),
-    options.effort === null ? null : el("span", { class: "chip" }, `Reasoning ${levelLabel(options.effort)}`),
-    options.speed === "fast" ? el("span", { class: "chip", title: "Its tasks start in fast mode" }, "Fast") : null,
-    options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier tasks it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
+    options.effort === null ? null : el("span", { class: "chip" }, t("views.schedules.reasoningLevellabel", { levelLabel: levelLabel(options.effort) })),
+    options.speed === "fast" ? el("span", { class: "chip", title: t("views.schedules.itsTasksStartInFast") }, t("views.schedules.fast")) : null,
+    options.history_runs === null ? null : el("span", { class: "chip", title: t("views.schedules.earlierTasksItKnows") }, t("views.schedules.knowsHistorylabel", { historyLabel: historyLabel(options.history_runs) })),
     options.same_chat === null ? null : el("span", { class: "chip" }, chatLabel(options.same_chat)),
     // Only a repeating schedule is switched off by its failures (item 458).
     options.stop_after_failures === null || record.cron === null
       ? null
-      : el("span", { class: "chip", title: "When it switches itself off" }, `Switch off: ${stopLabel(options.stop_after_failures).toLowerCase()}`),
+      : el("span", { class: "chip", title: t("views.schedules.whenItSwitchesItselfOff") }, t("views.schedules.switchOffTolowercase", { toLowerCase: stopLabel(options.stop_after_failures).toLowerCase() })),
     options.notify === null
       ? null
-      : el("span", { class: "chip", title: "How the end of its tasks is told" }, `Notifications: ${notifyLabel(options.notify).toLowerCase()}`),
+      : el("span", { class: "chip", title: t("views.schedules.howTheEndOfIts") }, t("views.schedules.notificationsTolowercase", { toLowerCase: notifyLabel(options.notify).toLowerCase() })),
     options.precheck === null || options.precheck === undefined
       ? null
-      : el("span", { class: "chip mono", title: "A check runs first, without a model, and starts the task only when it says to wake" }, `Check: ${options.precheck}`),
+      : el("span", { class: "chip mono", title: t("views.schedules.aCheckRunsFirstWithout") }, t("views.schedules.checkPrecheck", { precheck: options.precheck })),
   ];
 }
 
@@ -204,23 +204,23 @@ function optionChips(record, agent) {
 function pausedBadge(agent) {
   return agent === null || agent.paused_at === null
     ? null
-    : el("span", { class: "badge b-warn", title: "It starts nothing by itself until you resume the agent" }, `${agent.name} is paused`);
+    : el("span", { class: "badge b-warn", title: t("views.schedules.itStartsNothingByItself") }, t("views.schedules.nameIsPaused", { name: agent.name }));
 }
 
 /** What Run now says it starts: real work, as at the schedule's time, with the approvals its run takes. */
 function runNowTitle(record, agent) {
   const approvals = chosenApprovals(record, agent) ?? defaultsNow().approvals;
   if (approvals === null) {
-    return "Run now: it does real work, as it does at its time";
+    return t("views.schedules.runNowItDoesReal");
   }
-  const asks = approvals === "yolo" ? ", asking only to pay or send" : "";
-  return `Run now: it does real work, as it does at its time (approvals: ${approvalLabel(approvals)}${asks})`;
+  const asks = approvals === "yolo" ? t("views.schedules.askingOnlyToPayOr") : "";
+  return t("views.schedules.runNowItDoesReal2", { approvalLabel: approvalLabel(approvals), asks });
 }
 
 /** A schedule's last firings, newest first: how each went, when, its chat, and the first line of its answer. */
 function firingsList(firings) {
   if (firings.length === 0) {
-    return el("div", { class: "hint" }, "Not run yet");
+    return el("div", { class: "hint" }, t("views.schedules.notRunYet"));
   }
   return el(
     "ul",
@@ -253,7 +253,7 @@ function scheduleRow(view, handlers) {
     { class: "schedule-details", hidden: !open },
     el("div", { class: "row-meta" }, optionChips(record, agent)),
     goalText(record.goal),
-    el("h4", { class: "schedule-details-label" }, "History"),
+    el("h4", { class: "schedule-details-label" }, t("views.schedules.history")),
     firings,
   );
   const detailsToggle = el(
@@ -262,10 +262,10 @@ function scheduleRow(view, handlers) {
       class: "btn ghost sm schedule-details-toggle",
       type: "button",
       "aria-expanded": String(open),
-      "aria-label": `Details of ${record.name}`,
+      "aria-label": t("views.schedules.detailsOfName", { name: record.name }),
       onclick: () => handlers.onFirings(record, detailsToggle, details),
     },
-    "Details",
+    t("views.schedules.details"),
   );
   // A one-time schedule that ran at its moment, as the daemon says (item 723): it read "switched off", as one the owner
   // had switched off, and switching it on was refused.
@@ -275,8 +275,8 @@ function scheduleRow(view, handlers) {
     type: "button",
     role: "switch",
     "aria-checked": String(record.enabled),
-    "aria-label": `${record.enabled ? "Switch off" : "Switch on"} ${record.name}`,
-    title: done ? "It ran once and has no run left: Edit gives it a new time" : record.enabled ? "Switch this schedule off" : "Switch this schedule on",
+    "aria-label": `${record.enabled ? t("views.schedules.switchOff") : t("views.schedules.switchOn")} ${record.name}`,
+    title: done ? t("views.schedules.itRanOnceAndHas") : record.enabled ? t("views.schedules.switchThisScheduleOff") : t("views.schedules.switchThisScheduleOn"),
     disabled: done,
     onclick: () => handlers.onToggle(record),
   });
@@ -284,45 +284,45 @@ function scheduleRow(view, handlers) {
   // the row's chips name), Edit, the switch, and "…" for Delete.
   const runNow = el(
     "button",
-    { class: "btn ghost sm", type: "button", title: runNowTitle(record, agent), "aria-label": `Run now ${record.name}`, onclick: () => handlers.onRunNow(record) },
+    { class: "btn ghost sm", type: "button", title: runNowTitle(record, agent), "aria-label": t("views.schedules.runNowName", { name: record.name }), onclick: () => handlers.onRunNow(record) },
     icon("play"),
-    "Run now",
+    t("views.schedules.runNow"),
   );
   const edit = view.brief
-    ? el("button", { class: "btn ghost sm", type: "button", "aria-label": `Edit ${record.name}`, title: "Edit the brief's settings", onclick: () => handlers.onEdit(view) }, "Edit")
-    : el("a", { class: "btn ghost sm", href: `#/settings/schedules/${record.id}`, "aria-label": `Edit ${record.name}` }, "Edit");
+    ? el("button", { class: "btn ghost sm", type: "button", "aria-label": t("views.schedules.editName", { name: record.name }), title: t("views.schedules.editTheBriefSSettings"), onclick: () => handlers.onEdit(view) }, t("views.schedules.edit"))
+    : el("a", { class: "btn ghost sm", href: `#/settings/schedules/${record.id}`, "aria-label": t("views.schedules.editName", { name: record.name }) }, t("views.schedules.edit"));
   const more = moreButton({
     name: record.name,
-    items: () => [{ label: "Delete", icon: "trash", danger: true, run: () => handlers.onDelete(record) }],
+    items: () => [{ label: t("views.schedules.delete"), icon: "trash", danger: true, run: () => handlers.onDelete(record) }],
   });
   let next = null;
   if (done) {
     // Grey, as it says nothing of how the run went: the badge of its last status beside it says that.
-    next = el("span", { class: "badge b-muted", title: "A one-time schedule: it ran at its time, and waits for nothing more" }, "ran once");
+    next = el("span", { class: "badge b-muted", title: t("views.schedules.aOneTimeScheduleIt") }, t("views.schedules.ranOnce"));
   } else if (!record.enabled) {
-    next = el("span", { class: "badge b-muted" }, "paused");
+    next = el("span", { class: "badge b-muted" }, t("views.schedules.paused"));
   } else if (view.next_local !== null) {
     // A time keeps one line: its date's hyphens let a phone break it as "2026-10-" over "28 05:15" (item 778).
-    next = el("span", { class: "nowrap" }, `Next ${view.next_local}`);
+    next = el("span", { class: "nowrap" }, t("views.schedules.nextNextLocal", { next_local: view.next_local }));
   } else {
-    next = el("span", null, "Will not run again");
+    next = el("span", null, t("views.schedules.willNotRunAgain"));
   }
   const last =
     view.last_local === null
-      ? el("span", null, record.last_status === "" ? "Never ran" : "Not run yet")
-      : el("span", { class: "nowrap" }, `Last ${view.last_local}`);
+      ? el("span", null, record.last_status === "" ? t("views.schedules.neverRan") : t("views.schedules.notRunYet"))
+      : el("span", { class: "nowrap" }, t("views.schedules.lastLastLocal", { last_local: view.last_local }));
   const row = setRow({
     title: el(
       "span",
       { class: "sched-title" },
       el("span", { class: "row-title" }, record.name),
-      view.brief ? el("span", { class: "badge b-info", title: "Dot writes it each morning; the Morning brief under your schedules sets it" }, "Brief") : null,
-      record.thread_id === null ? null : el("span", { class: "badge b-muted", title: "Made in a chat: it asks the chat's message again" }, "Loop"),
+      view.brief ? el("span", { class: "badge b-info", title: t("views.schedules.dotWritesItEachMorning") }, t("views.schedules.brief")) : null,
+      record.thread_id === null ? null : el("span", { class: "badge b-muted", title: t("views.schedules.madeInAChatIt") }, t("views.schedules.loop")),
       // A task the owner taught and asked to repeat (item 666): its runs start with that skill.
       (record.options.skills ?? []).length > 0
-        ? el("span", { class: "badge b-info", title: `Its runs start with the skill ${record.options.skills.join(", ")}` }, "Taught task")
+        ? el("span", { class: "badge b-info", title: t("views.schedules.itsRunsStartWithThe", { join: record.options.skills.join(", ") }) }, t("views.schedules.taughtTask"))
         : null,
-      agent === null ? null : el("span", { class: "badge b-muted", title: "Its tasks run as this agent" }, agent.name),
+      agent === null ? null : el("span", { class: "badge b-muted", title: t("views.schedules.itsTasksRunAsThis2") }, agent.name),
     ),
     // One line of when and how it went, its parts kept by a dot: a phone wraps it in two lines, not one a part.
     lead: el(
@@ -336,7 +336,7 @@ function scheduleRow(view, handlers) {
         failedInRow(record),
         skippedInRow(record),
         pausedBadge(agent),
-        view.zone === localZone() ? null : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
+        view.zone === localZone() ? null : el("span", { class: "faint", title: t("views.schedules.theTimeZoneThisSchedule") }, view.zone),
       ]),
       detailsToggle,
     ),
@@ -352,8 +352,8 @@ function scheduleRow(view, handlers) {
 function whenWords(when) {
   const cron = when.startsWith("cron ") ? when.slice("cron ".length) : null;
   const said = cron === null ? null : loopRhythm(cron);
-  const text = said === null ? (cron === null ? `${when.charAt(0).toUpperCase()}${when.slice(1)}` : "On a repeating schedule") : `${said.charAt(0).toUpperCase()}${said.slice(1)}`;
-  return el("span", cron === null ? { title: "When it runs" } : { title: `cron ${cron}`, "data-expert": "" }, text);
+  const text = said === null ? (cron === null ? `${when.charAt(0).toUpperCase()}${when.slice(1)}` : t("views.schedules.onARepeatingSchedule")) : `${said.charAt(0).toUpperCase()}${said.slice(1)}`;
+  return el("span", cron === null ? { title: t("views.schedules.whenItRuns") } : { title: `cron ${cron}`, "data-expert": "" }, text);
 }
 
 /** This Mac's time zone, as the browser names it. */
@@ -408,22 +408,22 @@ function scheduleForm({ view }) {
       : record.options;
   const now = defaultsNow();
 
-  const name = el("input", { class: "input", type: "text", maxlength: "120", autocomplete: "off", placeholder: "Morning briefing", "aria-label": "Name" });
+  const name = el("input", { class: "input", type: "text", maxlength: "120", autocomplete: "off", placeholder: t("views.schedules.morningBriefing"), "aria-label": t("views.schedules.name") });
   const goal = el("textarea", {
     class: "textarea",
     rows: record === null ? "3" : "6",
-    placeholder: "What should Dot do each time? Be as specific as for a normal task.",
-    "aria-label": "Goal",
+    placeholder: t("views.schedules.whatShouldDotDoEach"),
+    "aria-label": t("views.schedules.goal"),
   });
-  const mode = select("Mode", MODES, record === null ? "task" : record.mode);
+  const mode = select(t("views.schedules.mode"), MODES, record === null ? "task" : record.mode);
   const approvals = select(
-    "Approvals",
-    [{ id: "", label: "Default" }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label} — ${option.hint}` }))],
+    t("views.schedules.approvals"),
+    [{ id: "", label: t("views.schedules.default") }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label} — ${option.hint}` }))],
     options.approvals ?? "",
   );
   // The owner's agent its runs run as (item 462): Dot, or one of theirs, whose model, reasoning and approvals its runs
   // take where the schedule leaves them on Default. The list comes from the daemon; until then the schedule's own.
-  const agent = el("select", { class: "select", "aria-label": "Agent" }, el("option", { value: "" }, "Dot"));
+  const agent = el("select", { class: "select", "aria-label": t("views.schedules.agent") }, el("option", { value: "" }, "Dot"));
   let agents = view === null || view.agent === null ? [] : [view.agent];
   // Once the owner picked one, the list read later keeps their pick.
   let picked = false;
@@ -438,9 +438,9 @@ function scheduleForm({ view }) {
     const chosen = agents.find((record) => record.id === agent.value) ?? null;
     const first = approvals.options[0];
     if (chosen !== null && chosen.approvals !== null) {
-      first.textContent = `Default (the agent's: ${approvalLabel(chosen.approvals)})`;
+      first.textContent = t("views.schedules.defaultTheAgentSApprovallabel", { approvalLabel: approvalLabel(chosen.approvals) });
     } else {
-      first.textContent = now.approvals === null ? "Default" : `Default (${approvalLabel(now.approvals)})`;
+      first.textContent = now.approvals === null ? t("views.schedules.default") : t("views.schedules.defaultApprovallabel", { approvalLabel: approvalLabel(now.approvals) });
     }
   }
   agent.addEventListener("change", () => {
@@ -458,19 +458,19 @@ function scheduleForm({ view }) {
       console.warn("the agents could not be listed", error);
     });
   const goalMode = select(
-    "Goal mode",
+    t("views.schedules.goalMode"),
     [
-      { id: "", label: now.goalMode === null ? "Default" : `Default (${now.goalMode ? "on" : "off"})` },
-      { id: "on", label: "On — Dot checks its answer and keeps working until the goal is reached" },
-      { id: "off", label: "Off" },
+      { id: "", label: now.goalMode === null ? t("views.schedules.default") : now.goalMode ? t("views.schedules.defaultGoalModeOn") : t("views.schedules.defaultGoalModeOff") },
+      { id: "on", label: t("views.schedules.onDotChecksItsAnswer") },
+      { id: "off", label: t("views.schedules.off") },
     ],
     options.goal_mode === null ? "" : options.goal_mode ? "on" : "off",
   );
   const counts = [...new Set([...HISTORY_COUNTS, ...(options.history_runs === null ? [] : [options.history_runs])])].sort((a, b) => a - b);
   const history = select(
-    "Earlier tasks it knows",
+    t("views.schedules.earlierTasksItKnows"),
     [
-      { id: "", label: now.historyRuns === null ? "Default" : `Default (${historyLabel(now.historyRuns)})` },
+      { id: "", label: now.historyRuns === null ? t("views.schedules.default") : t("views.schedules.defaultHistorylabel", { historyLabel: historyLabel(now.historyRuns) }) },
       ...counts.map((count) => ({ id: String(count), label: historyLabel(count) })),
     ],
     options.history_runs === null ? "" : String(options.history_runs),
@@ -479,25 +479,25 @@ function scheduleForm({ view }) {
     (a, b) => a - b,
   );
   const stopAfter = select(
-    "Switch off after",
+    t("views.schedules.switchOffAfter"),
     [
-      { id: "", label: now.stopAfterFailures === null ? "Default" : `Default (${stopLabel(now.stopAfterFailures)})` },
+      { id: "", label: now.stopAfterFailures === null ? t("views.schedules.default") : t("views.schedules.defaultStoplabel", { stopLabel: stopLabel(now.stopAfterFailures) }) },
       ...stops.map((count) => ({ id: String(count), label: stopLabel(count) })),
     ],
     options.stop_after_failures === null ? "" : String(options.stop_after_failures),
   );
   const notify = select(
-    "Notifications",
+    t("views.schedules.notifications"),
     [
-      { id: "", label: now.notify === null ? "Default" : `Default (${notifyLabel(now.notify)})` },
+      { id: "", label: now.notify === null ? t("views.schedules.default") : t("views.schedules.defaultNotifylabel", { notifyLabel: notifyLabel(now.notify) }) },
       ...NOTIFY_LEVELS.map(({ id, label }) => ({ id, label })),
     ],
     options.notify ?? "",
   );
   const chat = select(
-    "Chat",
+    t("views.schedules.chat"),
     [
-      { id: "", label: now.sameChat === null ? "Default" : `Default (${chatLabel(now.sameChat)})` },
+      { id: "", label: now.sameChat === null ? t("views.schedules.default") : t("views.schedules.defaultChatlabel", { chatLabel: chatLabel(now.sameChat) }) },
       { id: "new", label: chatLabel(false) },
       { id: "same", label: chatLabel(true) },
     ],
@@ -505,13 +505,13 @@ function scheduleForm({ view }) {
   );
   const model = el(
     "select",
-    { class: "select", "aria-label": "Model" },
-    el("option", { value: "" }, now.model === null ? "Default model" : `Default (${modelName(now.model)})`),
+    { class: "select", "aria-label": t("views.schedules.model") },
+    el("option", { value: "" }, now.model === null ? t("views.schedules.defaultModel") : t("views.schedules.defaultModelname", { modelName: modelName(now.model) })),
     options.model === null ? null : el("option", { value: options.model }, options.model),
   );
   model.value = options.model ?? "";
-  const effort = el("select", { class: "select", "aria-label": "Reasoning level" }, el("option", { value: "" }, "Default"));
-  const effortRow = setRow({ title: "Reasoning", lead: "How much the model thinks before it answers.", control: effort });
+  const effort = el("select", { class: "select", "aria-label": t("views.schedules.reasoningLevel") }, el("option", { value: "" }, t("views.schedules.default")));
+  const effortRow = setRow({ title: t("views.schedules.reasoning"), lead: t("views.schedules.howMuchTheModelThinks"), control: effort });
   effortRow.hidden = true;
   let models = [];
 
@@ -519,13 +519,13 @@ function scheduleForm({ view }) {
     const info = models.find((candidate) => candidate.ref === model.value) ?? null;
     const keep = effort.value === "" ? options.effort ?? "" : effort.value;
     if (info === null || info.efforts.length < 2) {
-      effort.replaceChildren(el("option", { value: "" }, "Default"));
+      effort.replaceChildren(el("option", { value: "" }, t("views.schedules.default")));
       effort.value = "";
       effortRow.hidden = true;
       return;
     }
     effort.replaceChildren(
-      el("option", { value: "" }, info.default_effort === null ? "Default" : `Default (${levelLabel(info.default_effort)})`),
+      el("option", { value: "" }, info.default_effort === null ? t("views.schedules.default") : t("views.schedules.defaultLevellabel", { levelLabel: levelLabel(info.default_effort) })),
       ...info.efforts.map((level) => el("option", { value: level }, levelLabel(level))),
     );
     effort.value = info.efforts.includes(keep) ? keep : "";
@@ -540,7 +540,7 @@ function scheduleForm({ view }) {
       const known = new Set(models.map((candidate) => candidate.ref));
       model.replaceChildren(
         model.firstElementChild,
-        ...(chosen !== "" && !known.has(chosen) ? [el("option", { value: chosen }, `${chosen} (not offered now)`)] : []),
+        ...(chosen !== "" && !known.has(chosen) ? [el("option", { value: chosen }, t("views.schedules.chosenNotOfferedNow", { chosen }))] : []),
         ...models.map((candidate) => el("option", { value: candidate.ref }, candidate.ref)),
       );
       model.value = chosen;
@@ -556,12 +556,12 @@ function scheduleForm({ view }) {
     autocomplete: "off",
     spellcheck: "false",
     list: ZONE_LIST_ID,
-    placeholder: "Dot's own time zone",
-    "aria-label": "Time zone",
+    placeholder: t("views.schedules.dotSOwnTimeZone"),
+    "aria-label": t("views.schedules.timeZone"),
   });
   zone.value = options.timezone ?? "";
 
-  const cron = el("input", { class: "input mono", type: "text", autocomplete: "off", spellcheck: "false", placeholder: "0 9 * * 1-5", "aria-label": "Custom timing" });
+  const cron = el("input", { class: "input mono", type: "text", autocomplete: "off", spellcheck: "false", placeholder: "0 9 * * 1-5", "aria-label": t("views.schedules.customTiming") });
   const presets = el(
     "div",
     { class: "cluster" },
@@ -581,13 +581,13 @@ function scheduleForm({ view }) {
     ),
   );
   const cronRow = setRow({
-    title: "Custom timing",
-    lead: "Five parts separated by spaces: minute, hour, day of the month, month, day of the week. Very frequent schedules are refused.",
+    title: t("views.schedules.customTiming"),
+    lead: t("views.schedules.fivePartsSeparatedBySpaces"),
     control: cron,
     body: el("div", { class: "set-row-body" }, presets),
   });
-  const at = el("input", { class: "input", type: "datetime-local", "aria-label": "Date and time" });
-  const atRow = setRow({ title: "Date and time", lead: "Read in the schedule's time zone.", control: at });
+  const at = el("input", { class: "input", type: "datetime-local", "aria-label": t("views.schedules.dateAndTime") });
+  const atRow = setRow({ title: t("views.schedules.dateAndTime"), lead: t("views.schedules.readInTheScheduleS"), control: at });
   const startsOnce = record !== null && record.cron === null;
   const repeats = segmented(REPEATS, startsOnce ? "once" : "cron", (choice) => {
     cronRow.hidden = choice !== "cron";
@@ -602,18 +602,18 @@ function scheduleForm({ view }) {
     autocomplete: "off",
     spellcheck: "false",
     placeholder: "price-drop.sh",
-    "aria-label": "Check",
+    "aria-label": t("views.schedules.check"),
   });
   precheck.value = options.precheck ?? "";
   const precheckRow = setRow({
-    title: "Check first",
-    lead: 'Optional. The file name of an executable script in Dot\'s "checks" folder. It runs before each time, without a model; its last line {"wake": true} starts the task with what it printed, {"wake": false} skips it quietly, and anything else is told as a failure.',
+    title: t("views.schedules.checkFirst"),
+    lead: t("views.schedules.optionalTheFileNameOf"),
     control: precheck,
   });
   cronRow.hidden = startsOnce;
   atRow.hidden = !startsOnce;
   precheckRow.hidden = startsOnce;
-  const enabled = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(record === null || record.enabled), "aria-label": "Switched on" });
+  const enabled = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(record === null || record.enabled), "aria-label": t("views.schedules.switchedOn") });
   // Whether the owner moved the form's switch: an edit that leaves it alone keeps the schedule on or off as it is then,
   // not as it was when the form opened (item 723).
   let enabledTouched = false;
@@ -672,10 +672,10 @@ function scheduleForm({ view }) {
     if (record === null) {
       // The page makes the form anew for the next one, its choices back at their defaults (item 559).
       await api.post("/schedules", body);
-      toast("ok", "Schedule added.");
+      toast("ok", t("views.schedules.scheduleAdded"));
     } else {
       await api.patch(`/schedules/${record.id}`, enabledTouched ? { ...body, enabled: enabled.getAttribute("aria-checked") === "true" } : body);
-      toast("ok", "Schedule saved.");
+      toast("ok", t("views.schedules.scheduleSaved"));
     }
     return true;
   }
@@ -684,43 +684,43 @@ function scheduleForm({ view }) {
   // leave. A control with room to spare goes beside its title; the goal and the custom timing go under theirs.
   const sections = [
     setSection({
-      title: "Task",
+      title: t("views.schedules.task"),
       body: setCard(
-        setRow({ title: "Name", lead: "What the schedule is called in lists and notices.", control: name }),
-        setRow({ title: "Goal", lead: "What Dot does each time. Be as specific as for a normal task.", body: el("div", { class: "set-row-body" }, goal) }),
-        setRow({ title: "Agent", lead: "Its tasks run as this agent: with its instructions and abilities, and its model, reasoning and approvals where these are left on Default.", control: agent }),
+        setRow({ title: t("views.schedules.name"), lead: t("views.schedules.whatTheScheduleIsCalled"), control: name }),
+        setRow({ title: t("views.schedules.goal"), lead: t("views.schedules.whatDotDoesEachTime"), body: el("div", { class: "set-row-body" }, goal) }),
+        setRow({ title: t("views.schedules.agent"), lead: t("views.schedules.itsTasksRunAsThis3"), control: agent }),
       ),
     }),
     setSection({
-      title: "When",
+      title: t("views.schedules.when"),
       body: setCard(
-        setRow({ title: "Repeat", lead: "A repeating schedule starts again and again; a single one starts once.", control: repeats.element }),
+        setRow({ title: t("views.schedules.repeat"), lead: t("views.schedules.aRepeatingScheduleStartsAgain"), control: repeats.element }),
         cronRow,
         atRow,
         precheckRow,
-        setRow({ title: "Time zone", lead: "A name such as Europe/Istanbul; empty uses Dot's own time zone.", control: zone }),
+        setRow({ title: t("views.schedules.timeZone"), lead: t("views.schedules.aNameSuchAsEurope"), control: zone }),
         record === null
           ? null
-          : switchRow(setRow({ title: "Switched on", lead: "A schedule that is paused starts nothing until it is switched on.", control: enabled }), enabled),
+          : switchRow(setRow({ title: t("views.schedules.switchedOn"), lead: t("views.schedules.aScheduleThatIsPaused"), control: enabled }), enabled),
       ),
     }),
     setSection({
-      title: "How its tasks run",
+      title: t("views.schedules.howItsTasksRun"),
       body: setCard(
-        setRow({ title: "Mode", lead: "Scheduled tasks work on their own.", control: mode }),
-        setRow({ title: "Model", lead: "The model every step of the task uses, and the summaries of its older part, until it moves to a fallback model.", control: model }),
+        setRow({ title: t("views.schedules.mode"), lead: t("views.schedules.scheduledTasksWorkOnTheir"), control: mode }),
+        setRow({ title: t("views.schedules.model"), lead: t("views.schedules.theModelEveryStepOf"), control: model }),
         effortRow,
-        setRow({ title: "Approvals", lead: "Tasks that work by themselves cannot wait for you: with Ask, a question stops the task until you answer.", control: approvals }),
-        setRow({ title: "Goal mode", lead: "Dot checks its answer and keeps working until the goal is reached.", control: goalMode }),
+        setRow({ title: t("views.schedules.approvals"), lead: t("views.schedules.tasksThatWorkByThemselves"), control: approvals }),
+        setRow({ title: t("views.schedules.goalMode"), lead: t("views.schedules.dotChecksItsAnswerAnd"), control: goalMode }),
       ),
     }),
     setSection({
-      title: "What its tasks leave",
+      title: t("views.schedules.whatItsTasksLeave"),
       body: setCard(
-        setRow({ title: "Earlier tasks it knows", lead: "Each task starts with the dated answers of the last tasks, to build on them instead of doing the same work again.", control: history }),
-        setRow({ title: "Chat", lead: "In the same chat each task reads the conversation of the tasks before it instead.", control: chat }),
-        setRow({ title: "Notifications", lead: "How the end of its tasks is told on your phone and desktop; a question, a draft and a switch-off are told always, and a task you start by hand too.", control: notify }),
-        setRow({ title: "Switch off after", lead: "A repeating schedule whose tasks fail so many times in a row is switched off, and you are told; a task you stop counts neither way.", control: stopAfter }),
+        setRow({ title: t("views.schedules.earlierTasksItKnows"), lead: t("views.schedules.eachTaskStartsWithThe"), control: history }),
+        setRow({ title: t("views.schedules.chat"), lead: t("views.schedules.inTheSameChatEach"), control: chat }),
+        setRow({ title: t("views.schedules.notifications"), lead: t("views.schedules.howTheEndOfIts2"), control: notify }),
+        setRow({ title: t("views.schedules.switchOffAfter"), lead: t("views.schedules.aRepeatingScheduleWhoseTasks"), control: stopAfter }),
       ),
     }),
   ];
@@ -749,16 +749,16 @@ function mountList(root, ctx) {
   const holder = el("div", { class: "set-sections" }, loadingPanel());
   // The form that adds a schedule is a page of its own (item 1337); the list is what this page is for.
   const addButton = el("a", { class: "btn primary sm", href: "#/settings/schedules/new" });
-  markOpener(addButton, "New schedule");
-  ctx.head.setLead("Goals that Dot works on by itself, once or on a repeating schedule. Schedules work only while Dot is running and this Mac is awake: a time that passes while Dot is off is skipped, not made up later.");
+  markOpener(addButton, t("views.schedules.newSchedule"));
+  ctx.head.setLead(t("views.schedules.goalsThatDotWorksOn"));
   ctx.head.setActions(addButton);
-  const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Schedules are paused, so nothing starts until Dot starts again."));
+  const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, t("views.schedules.schedulesArePausedSoNothing")));
   const filterNote = el(
     "div",
     { class: "note", hidden: thread === "" },
     icon("refresh"),
-    el("span", null, "Showing the tasks that repeat in one chat."),
-    el("a", { class: "btn ghost sm", href: "#/settings/schedules" }, "Show all"),
+    el("span", null, t("views.schedules.showingTheTasksThatRepeat")),
+    el("a", { class: "btn ghost sm", href: "#/settings/schedules" }, t("views.schedules.showAll")),
   );
   // The brief's card reads again whenever the list does: a switch in the list, a run's end, a failure that switched it off.
   const brief = mountBrief(ctx, () => reload());
@@ -793,11 +793,11 @@ function mountList(root, ctx) {
     if (thread === "") {
       sections.push(
         setSection({
-          title: "Schedules",
-          lead: plain.length === 0 ? "" : plural(plain.length, "schedule", "schedules"),
+          title: t("views.schedules.schedules"),
+          lead: plain.length === 0 ? "" : tCount(plain.length, "views.schedules.countSchedule", "views.schedules.countSchedules"),
           body:
             plain.length === 0
-              ? el("div", { class: "set-card" }, emptyPanel("calendar", "No schedules yet", "Add one with New schedule and Dot will start it by itself."))
+              ? el("div", { class: "set-card" }, emptyPanel("calendar", t("views.schedules.noSchedulesYet"), t("views.schedules.addOneWithNewSchedule")))
               : listOf(plain, handlers),
         }),
       );
@@ -805,9 +805,9 @@ function mountList(root, ctx) {
     if (loops.length > 0 || thread !== "") {
       sections.push(
         setSection({
-          title: thread === "" ? "Loops" : "Repeating in this chat",
-          lead: "Made in a chat with /loop: each asks the chat's message again and again until it is stopped.",
-          body: loops.length === 0 ? el("div", { class: "set-card" }, emptyPanel("refresh", "Nothing repeats in this chat", "Write /loop 30m <message> in the chat to make it ask again.")) : listOf(loops, handlers),
+          title: thread === "" ? t("views.schedules.loops") : t("views.schedules.repeatingInThisChat"),
+          lead: t("views.schedules.madeInAChatWith"),
+          body: loops.length === 0 ? el("div", { class: "set-card" }, emptyPanel("refresh", t("views.schedules.nothingRepeatsInThisChat"), t("views.schedules.writeLoop30mMessageIn"))) : listOf(loops, handlers),
         }),
       );
     }
@@ -852,7 +852,7 @@ function mountList(root, ctx) {
   // No question first: the button says what it starts, and its run's page, where it can be stopped, opens at once.
   async function runNow(record) {
     const run = await api.post(`/schedules/${record.id}/run`, null);
-    toast("ok", `Started ${record.name}.`);
+    toast("ok", t("views.schedules.startedName", { name: record.name }));
     ctx.navigate(`/runs/${run.id}`);
   }
 
@@ -892,9 +892,9 @@ function mountList(root, ctx) {
 
   async function remove(record) {
     const confirmed = await confirmDialog({
-      title: "Delete this schedule?",
-      message: `“${clip(record.name, 80)}” will not run again. Tasks it started earlier stay in the history.`,
-      confirmLabel: "Delete",
+      title: t("views.schedules.deleteThisSchedule"),
+      message: t("views.schedules.clipWillNotRunAgain", { clip: clip(record.name, 80) }),
+      confirmLabel: t("views.schedules.delete"),
       danger: true,
       focusCancel: true,
     });
@@ -902,7 +902,7 @@ function mountList(root, ctx) {
       return;
     }
     await api.del(`/schedules/${record.id}`);
-    toast("ok", "Schedule deleted.");
+    toast("ok", t("views.schedules.scheduleDeleted"));
     await reload();
   }
 
@@ -914,7 +914,7 @@ function mountList(root, ctx) {
 
   const status = getSnapshot().status;
   schedulerNote.hidden = status === null || status.scheduler_running;
-  ctx.setTitle("Scheduled tasks · Settings");
+  ctx.setTitle(t("views.schedules.scheduledTasksSettings"));
   root.append(schedulerNote, filterNote, holder, ...others, zoneList());
   const stopLifecycle = onLifecycle((event) => {
     if (LIFECYCLE_KINDS.has(event.kind)) {
@@ -954,8 +954,8 @@ function mountEditor(root, ctx, id) {
   let asksBeforeLeaving = () => true;
   let onClose = null;
   const stopAsking = ctx.onBeforeLeave(() => asksBeforeLeaving());
-  ctx.setTitle(id === "new" ? "New schedule · Settings" : "Edit schedule · Settings");
-  ctx.setCrumb(id === "new" ? "New schedule" : "Edit schedule");
+  ctx.setTitle(id === "new" ? t("views.schedules.newScheduleSettings") : t("views.schedules.editScheduleSettings"));
+  ctx.setCrumb(id === "new" ? t("views.schedules.newSchedule") : t("views.schedules.editSchedule"));
 
   async function open() {
     let view = null;
@@ -975,12 +975,12 @@ function mountEditor(root, ctx, id) {
     const record = view === null ? null : view.record;
     ctx.head.setLead(
       record === null
-        ? "Dot works on the goal by itself, once or on a repeating schedule, while Dot is running."
-        : "Change it here: its next task starts with the new choices.",
+        ? t("views.schedules.dotWorksOnTheGoal")
+        : t("views.schedules.changeItHereItsNext"),
     );
     const problem = el("div", { class: "note bad", role: "alert", hidden: true });
-    const save = el("button", { class: "btn primary", type: "button" }, record === null ? "Add schedule" : "Save changes");
-    const cancel = el("a", { class: "btn ghost", href: `#${list}` }, "Cancel");
+    const save = el("button", { class: "btn primary", type: "button" }, record === null ? t("views.schedules.addSchedule") : t("views.schedules.saveChanges"));
+    const cancel = el("a", { class: "btn ghost", href: `#${list}` }, t("views.schedules.cancel"));
     // What the owner has typed or picked, against the fields as they stood when the page opened (and, once the agents and
     // the models the selects offer are read, as they stood then, unless a field was touched by then).
     let baseline = form.state();
@@ -1031,8 +1031,8 @@ function mountEditor(root, ctx, id) {
     });
     if (record !== null) {
       ctx.head.setActions(
-        el("button", { class: "btn ghost sm", type: "button", onclick: () => attempt(() => runNow(record)) }, icon("play"), "Run now"),
-        el("button", { class: "btn ghost sm danger", type: "button", onclick: () => attempt(() => remove(record)) }, icon("trash"), "Delete"),
+        el("button", { class: "btn ghost sm", type: "button", onclick: () => attempt(() => runNow(record)) }, icon("play"), t("views.schedules.runNow")),
+        el("button", { class: "btn ghost sm danger", type: "button", onclick: () => attempt(() => remove(record)) }, icon("trash"), t("views.schedules.delete")),
       );
     }
     holder.replaceChildren(...form.sections, problem, el("div", { class: "set-savebar" }, cancel, save), form.zones);
@@ -1055,7 +1055,7 @@ function mountEditor(root, ctx, id) {
     leaving = true;
     try {
       const run = await api.post(`/schedules/${record.id}/run`, null);
-      toast("ok", `Started ${record.name}.`);
+      toast("ok", t("views.schedules.startedName", { name: record.name }));
       ctx.navigate(`/runs/${run.id}`);
     } catch (error) {
       leaving = false;
@@ -1065,9 +1065,9 @@ function mountEditor(root, ctx, id) {
 
   async function remove(record) {
     const confirmed = await confirmDialog({
-      title: "Delete this schedule?",
-      message: `“${clip(record.name, 80)}” will not run again. Tasks it started earlier stay in the history.`,
-      confirmLabel: "Delete",
+      title: t("views.schedules.deleteThisSchedule"),
+      message: t("views.schedules.clipWillNotRunAgain", { clip: clip(record.name, 80) }),
+      confirmLabel: t("views.schedules.delete"),
       danger: true,
       focusCancel: true,
     });
@@ -1077,7 +1077,7 @@ function mountEditor(root, ctx, id) {
     await api.del(`/schedules/${record.id}`);
     // The schedule is gone: there is nothing left to keep what was typed for.
     saved = true;
-    toast("ok", "Schedule deleted.");
+    toast("ok", t("views.schedules.scheduleDeleted"));
     ctx.navigate(list);
   }
 

@@ -172,7 +172,7 @@ def test_every_theme_the_page_ships_is_an_id_a_theme_file_may_not_take() -> None
     theme_js: str = (_APPEARANCE.parent / "theme.js").read_text(encoding="utf-8")
     more_js: str = (_APPEARANCE / "palettes-more.js").read_text(encoding="utf-8")
     shipped: set[str] = set(re.findall(r'^\s+(?:look|palette)\("([a-z0-9-]+)"', theme_js, re.M))
-    shipped |= set(re.findall(r'^\s+\["([a-z0-9-]+)", "', more_js, re.M))
+    shipped |= set(re.findall(r'^\s+\["([a-z0-9-]+)", (?:"|t\()', more_js, re.M))
     assert len(shipped) == 15, shipped
     assert RESERVED_THEME_IDS - {"system", "light", "dark"} == shipped
     for theme_id in sorted(shipped):

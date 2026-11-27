@@ -88,12 +88,12 @@ function currentQuery() {
 // `parent(params)` is the page a phone's Back leads to when nothing was opened before this page (item 338), or null
 // for a page whose way back is the list of chats.
 const ROUTES = [
-  { tab: "runs", layout: "home", title: "Chat", pattern: /^\/runs$/, view: runs, parent: () => null },
-  { tab: "runs", layout: "run", title: "Task", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run, parent: () => null },
+  { tab: "runs", layout: "home", title: t("main.chat"), pattern: /^\/runs$/, view: runs, parent: () => null },
+  { tab: "runs", layout: "run", title: t("main.task"), pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run, parent: () => null },
   {
     tab: "agents",
     layout: "page",
-    title: "Agents",
+    title: t("main.agents"),
     pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/,
     load: () => import("./views/agents.js"),
     // An agent's page is its conversation (item 1233), so its way back is the list of chats, as a chat's is: the sidebar
@@ -101,15 +101,15 @@ const ROUTES = [
     // page, it still goes back there.
     parent: () => null,
   },
-  { tab: "agents", layout: "page", title: "Handoffs", pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
+  { tab: "agents", layout: "page", title: t("main.handoffs"), pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
   // A team of the owner's (item 610): its agents' faces, a box for a message to it and its chats.
-  { tab: "agents", layout: "page", title: "Team", pattern: /^\/teams\/([A-Za-z0-9_-]+)$/, load: () => import("./views/teams.js"), parent: () => "/agents" },
+  { tab: "agents", layout: "page", title: t("main.team"), pattern: /^\/teams\/([A-Za-z0-9_-]+)$/, load: () => import("./views/teams.js"), parent: () => "/agents" },
   // The Mac's screen, live (item 1264).
-  { tab: "watch", layout: "watch", title: "Watch", pattern: /^\/watch$/, load: () => import("./views/watch.js"), parent: () => null },
+  { tab: "watch", layout: "watch", title: t("main.watch"), pattern: /^\/watch$/, load: () => import("./views/watch.js"), parent: () => null },
   {
     tab: "settings",
     layout: "page",
-    title: "Settings",
+    title: t("main.settings"),
     pattern: /^\/settings(?:\/([a-z]+)(?:\/([A-Za-z0-9_-]+))?)?$/,
     load: () => import("./views/settings.js"),
     // On a phone a page is a page of the list of the settings (item 330) and a page's own page (a schedule's editor)
@@ -117,7 +117,7 @@ const ROUTES = [
     parent: ([tab, id]) => (tab === undefined || !PHONE.matches ? null : id === undefined ? "/settings" : `/settings/${tab}`),
   },
   // Every control of the interface on one page, for checking a look; not linked from the sidebar.
-  { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, load: () => import("./views/controls.js"), parent: () => null },
+  { tab: "settings", layout: "page", title: t("main.controls"), pattern: /^\/controls$/, load: () => import("./views/controls.js"), parent: () => null },
 ];
 
 // The build a tab loaded again for as it opened, its pages being of another build than the daemon's (the service worker
@@ -368,20 +368,20 @@ function renderUnreachable(message) {
   const when = el("span", null, "");
   screen(
     el("div", { class: "note bad" }, icon("alert"), el("span", null, message)),
-    el("p", { class: "muted" }, "This page tries again by itself."),
+    el("p", { class: "muted" }, t("main.thisPageTriesAgainBy")),
     el("p", { class: "muted" }, when),
-    el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: retryNow }, icon("refresh"), "Try again")),
+    el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: retryNow }, icon("refresh"), t("main.tryAgain"))),
     el(
       "details",
       { class: "error-details" },
-      el("summary", null, "More help"),
-      el("p", { class: "small muted" }, "If you started Dot from Terminal, start it again there with ", el("code", { class: "mono" }, "dotx daemon"), "."),
+      el("summary", null, t("main.moreHelp")),
+      el("p", { class: "small muted" }, t("main.ifYouStartedDotFrom"), el("code", { class: "mono" }, "dotx daemon"), "."),
     ),
   );
   const due = Date.now() + retryPause;
   retryPause = Math.min(retryPause * 2, RETRY_MAX_MS);
   const tell = () => {
-    when.textContent = `Trying again in ${Math.max(1, Math.ceil((due - Date.now()) / 1000))} s.`;
+    when.textContent = t("main.tryingAgainInMaxS", { max: Math.max(1, Math.ceil((due - Date.now()) / 1000)) });
   };
   const inView = () => {
     if (document.visibilityState === "visible") {
@@ -406,16 +406,16 @@ function renderUnreachable(message) {
 function renderFailed(error) {
   const cause = error.context && typeof error.context.error === "string" ? error.context.error : null;
   screen(
-    el("div", { class: "note bad" }, icon("alert"), el("span", null, "Dot is open, but it could not answer just now. Try again in a moment.")),
-    el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: () => attempt(connect) }, icon("refresh"), "Try again")),
+    el("div", { class: "note bad" }, icon("alert"), el("span", null, t("main.dotIsOpenButIt"))),
+    el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: () => attempt(connect) }, icon("refresh"), t("main.tryAgain"))),
     el(
       "details",
       { class: "error-details" },
-      el("summary", null, "Details"),
+      el("summary", null, t("main.details")),
       el("p", { class: "small muted mono" }, `${error.status}: ${error.message}`),
       cause === null ? null : el("p", { class: "small muted mono" }, cause),
       // The log's folder is where the daemon was told to keep it (DOT_LOG_DIR), which this page cannot know.
-      el("p", { class: "small muted" }, "Dot's log has more. In Terminal, ", el("code", { class: "mono" }, "dotx service status"), " names its folder."),
+      el("p", { class: "small muted" }, t("main.dotSLogHasMore"), el("code", { class: "mono" }, "dotx service status"), t("main.namesItsFolder")),
     ),
   );
 }
@@ -661,7 +661,7 @@ function beginSession() {
       layout: found.route.layout,
       back: backFrom(found, linked),
     });
-    setPageTitle(`${found.route.title} · Dot`);
+    setPageTitle(t("main.titleDot", { title: found.route.title }));
     const ctx = {
       params: found.params,
       navigate: (target) => {
@@ -678,7 +678,7 @@ function beginSession() {
         setTimeout(goOn, 0);
       },
       setTitle: (text) => {
-        setPageTitle(`${text} · Dot`);
+        setPageTitle(t("main.textDot", { text }));
       },
       // Ask `hook` before this page is left; false keeps the page and the address. Returns what takes the hook away.
       onBeforeLeave: (hook) => leaving.onBeforeLeave(hook),
@@ -698,7 +698,7 @@ function beginSession() {
       }
       const { text, details } = explain(error);
       shell.main.replaceChildren(
-        el("div", { class: "card empty" }, icon("alert"), el("div", null, `This page could not open. ${text}`), detailsFold(details === "" ? error.message : details)),
+        el("div", { class: "card empty" }, icon("alert"), el("div", null, t("main.thisPageCouldNotOpen", { text })), detailsFold(details === "" ? error.message : details)),
       );
       liftCurtain();
     }
@@ -757,7 +757,7 @@ function beginSession() {
 
   runLifecycle(controller.signal, () => handleAuthLost()).catch((error) => {
     console.error("the event stream ended", error);
-    toast("error", "Dot stopped sending updates. Reload the page to get them again.", null, error.message);
+    toast("error", t("main.dotStoppedSendingUpdatesReload"), null, error.message);
   });
 
   session = {
@@ -816,7 +816,7 @@ async function connect() {
       keepTrying(null);
       if (before !== null) {
         setToken(before, false);
-        toast("error", "The access key in this address is not the one Dot uses, so this browser keeps the key it already had.");
+        toast("error", t("main.theAccessKeyInThis"));
         await connect();
         return;
       }

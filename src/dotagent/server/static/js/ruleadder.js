@@ -15,6 +15,7 @@ import { outcomeLabel, previewLines } from "./rulepreview.js";
 import { ruleSentence } from "./rulesentence.js";
 import { ANSWERS, answerOf, CHOICES, DEFAULT_CHOICE, draftSentence, LATELY_DAYS, latelyLine, WANTS_CHARS } from "./rulewords.js";
 import { attempt, toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 /**
  * The rule as its parts, read back as a sentence: the line "Dot understood: …", the buttons that add it or take the
@@ -33,7 +34,7 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
     autocomplete: "off",
     spellcheck: "false",
     placeholder: "shell",
-    "aria-label": "Tool",
+    "aria-label": t("ruleadder.tool"),
   });
   const pattern = el("input", {
     class: "input mono",
@@ -41,12 +42,12 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
     maxlength: "500",
     autocomplete: "off",
     spellcheck: "false",
-    placeholder: "\\bgit (status|diff|log)\\b",
-    "aria-label": "Pattern",
+    placeholder: t("ruleadder.bgitStatusDiffLogB"),
+    "aria-label": t("ruleadder.pattern"),
   });
   const answer = el(
     "select",
-    { class: "select", "aria-label": "Answer" },
+    { class: "select", "aria-label": t("ruleadder.answer") },
     ANSWERS.map((each) => el("option", { value: each.id }, each.choice)),
   );
   const why = el("input", {
@@ -54,8 +55,8 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
     type: "text",
     maxlength: "300",
     autocomplete: "off",
-    placeholder: "Reading the state of a repository is harmless",
-    "aria-label": "Why",
+    placeholder: t("ruleadder.readingTheStateOfA"),
+    "aria-label": t("ruleadder.why"),
   });
   tool.value = rule.tool_glob;
   pattern.value = rule.match_regex;
@@ -73,12 +74,12 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
   }
 
   const line = el("p", { class: "rule-understood" });
-  const addIt = el("button", { class: "btn primary", type: "button" }, "Add it");
-  const back = el("button", { class: "btn ghost rule-back", type: "button" }, "Change the words");
+  const addIt = el("button", { class: "btn primary", type: "button" }, t("ruleadder.addIt"));
+  const back = el("button", { class: "btn ghost rule-back", type: "button" }, t("ruleadder.changeTheWords"));
   // What the rule would have done lately (item 469), in a line the owner reads before adding it; the whole of it is in Details.
   const lately = el("p", { class: "rule-lately", role: "status" });
   const tried = el("div", { class: "rule-tryout stack tight", role: "status", hidden: true });
-  const tryButton = el("button", { class: "btn", type: "button" }, `Test on the last ${LATELY_DAYS} days`);
+  const tryButton = el("button", { class: "btn", type: "button" }, t("ruleadder.testOnTheLastLately", { LATELY_DAYS }));
   // Which try-out may still show: one that answers after the rule changed is left unshown.
   let tryTicket = 0;
 
@@ -87,10 +88,10 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
     // that stops Dot and narrow for one that lets it act, so it is not changed alone. Once another part is the owner's
     // own, the answer is too.
     answer.disabled = understood;
-    answerHint.textContent = understood ? "The answer you chose above. Change another part to set it here." : answerOf(answer.value).text;
+    answerHint.textContent = understood ? t("ruleadder.theAnswerYouChoseAbove") : answerOf(answer.value).text;
     line.replaceChildren(
       icon("check"),
-      el("span", { class: "rule-understood-label" }, understood ? "Dot understood:" : "Your rule:"),
+      el("span", { class: "rule-understood-label" }, understood ? t("ruleadder.dotUnderstood") : t("ruleadder.yourRule")),
       " ",
       ruleSentence(current()),
     );
@@ -129,7 +130,7 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
     tryTicket += 1;
     const ticket = tryTicket;
     tryButton.disabled = true;
-    lately.replaceChildren(el("span", { class: "spinner" }), "Trying it on what Dot did lately…");
+    lately.replaceChildren(el("span", { class: "spinner" }), t("ruleadder.tryingItOnWhatDot"));
     try {
       const view = await api.post("/rules/preview", {
         behavior: now.behavior,
@@ -203,11 +204,11 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
   tryButton.addEventListener("click", () => attempt(tryOut));
   addIt.addEventListener("click", () => attempt(add));
   back.addEventListener("click", onBack);
-  const toolField = field("Tool", tool, "What Dot would use: shell, write_file, browser_*, desktop_*, mcp__*. A * stands for any run of letters.");
-  const answerField = field("Answer", answer, "");
+  const toolField = field(t("ruleadder.tool"), tool, t("ruleadder.whatDotWouldUseShell"));
+  const answerField = field(t("ruleadder.answer"), answer, "");
   answerField.classList.add("wide");
   answerField.append(answerHint);
-  const whyField = field("Why", why, "Optional. Shown when the rule decides.");
+  const whyField = field(t("ruleadder.why"), why, t("ruleadder.optionalShownWhenTheRule"));
   whyField.classList.add("wide");
   // The parts of the rule, for whoever wants them: shut, unless they are the owner's to fill in.
   const body = el(
@@ -218,9 +219,9 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
       { class: "form-grid" },
       toolField,
       field(
-        "Pattern",
+        t("ruleadder.pattern"),
         pattern,
-        "Optional. Searched, capitals or not, in what the action says it does (a command's starts with “Run:”) and in what it acts on. Empty means every time.",
+        t("ruleadder.optionalSearchedCapitalsOrNot"),
       ),
       answerField,
       whyField,
@@ -232,7 +233,7 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
     "button",
     { class: "btn ghost sm rule-more", type: "button", "aria-expanded": String(byHand), "aria-controls": body.id },
     el("span", { class: "chev" }, icon("chevron")),
-    "Details",
+    t("ruleadder.details"),
   );
   more.addEventListener("click", () => {
     body.hidden = !body.hidden;
@@ -241,7 +242,7 @@ function buildPending({ rule, byHand, onAdd, onBack }) {
   paint();
   const element = el(
     "div",
-    { class: "rule-pending", role: "group", "aria-label": "The rule to add" },
+    { class: "rule-pending", role: "group", "aria-label": t("ruleadder.theRuleToAdd") },
     line,
     lately,
     el("div", { class: "rule-pending-buttons" }, more, back, addIt),
@@ -269,29 +270,29 @@ export function buildAdder({ onAdded, isDisposed }) {
     autocapitalize: "none",
     spellcheck: "false",
     enterkeyhint: "go",
-    placeholder: "e.g. open a website",
-    "aria-label": "When Dot wants to",
+    placeholder: t("ruleadder.eGOpenAWebsite"),
+    "aria-label": t("ruleadder.whenDotWantsTo"),
   });
   const should = el(
     "select",
-    { class: "select", "aria-label": "It should" },
+    { class: "select", "aria-label": t("ruleadder.itShould") },
     CHOICES.map((id) => el("option", { value: id }, answerOf(id).choice)),
   );
   should.value = DEFAULT_CHOICE;
-  const add = el("button", { class: "btn primary", type: "submit", disabled: true }, "Add rule");
+  const add = el("button", { class: "btn primary", type: "submit", disabled: true }, t("ruleadder.addRule"));
   const form = el(
     "form",
     { class: "rule-adder", novalidate: true },
-    el("span", { class: "rule-adder-label rule-adder-when", "aria-hidden": "true" }, "When Dot wants to"),
+    el("span", { class: "rule-adder-label rule-adder-when", "aria-hidden": "true" }, t("ruleadder.whenDotWantsTo")),
     wants,
-    el("span", { class: "rule-adder-label rule-adder-it", "aria-hidden": "true" }, "It should"),
+    el("span", { class: "rule-adder-label rule-adder-it", "aria-hidden": "true" }, t("ruleadder.itShould")),
     should,
     add,
   );
   const hint = el("p", { class: "rule-hint" });
   const outcome = el("div", { class: "rule-outcome", role: "status", hidden: true });
   const slot = el("div", { class: "rule-pending-slot", hidden: true });
-  const element = el("section", { class: "set-card rule-adder-card", "aria-label": "Add a rule" }, el("div", { class: "rule-adder-row" }, form, hint), outcome, slot);
+  const element = el("section", { class: "set-card rule-adder-card", "aria-label": t("ruleadder.addARule") }, el("div", { class: "rule-adder-row" }, form, hint), outcome, slot);
   // True while the words are being drafted, and while the rule drafted waits to be added: the box and the choice are the
   // ones the draft was made of, so they stay as they are until the owner goes back to the words.
   let drafting = false;
@@ -341,7 +342,7 @@ export function buildAdder({ onAdded, isDisposed }) {
 
   async function addRule(rule) {
     await api.post("/rules", rule);
-    toast("ok", "Rule added at the end of your list.");
+    toast("ok", t("ruleadder.ruleAddedAtTheEnd"));
     reset();
     // The box is ready for the next rule, where a keyboard is a key away; on a touch screen it would raise one.
     if (matchMedia("(pointer: fine)").matches) {
@@ -380,7 +381,7 @@ export function buildAdder({ onAdded, isDisposed }) {
     el(
       "button",
       { class: "btn sm", type: "button", onclick: () => openPending({ behavior: should.value, tool_glob: "", match_regex: "", description: "" }, true) },
-      "Fill in the details yourself",
+      t("ruleadder.fillInTheDetailsYourself"),
     );
 
   function failed(error) {
@@ -391,9 +392,9 @@ export function buildAdder({ onAdded, isDisposed }) {
       el(
         "div",
         { class: "rule-outcome-text" },
-        el("p", { class: "rule-outcome-title" }, error.status === 422 ? "Dot could not make a rule of these words." : "Dot could not read your words as a rule just now."),
+        el("p", { class: "rule-outcome-title" }, error.status === 422 ? t("ruleadder.dotCouldNotMakeA") : t("ruleadder.dotCouldNotReadYour")),
         el("p", null, error.message),
-        el("p", { class: "hint" }, "Your words are still in the box. Say what Dot wants to do, like “open a website”, and try again, or fill in the details yourself."),
+        el("p", { class: "hint" }, t("ruleadder.yourWordsAreStillIn")),
         el("div", { class: "cluster" }, byHandButton()),
       ),
     );
@@ -406,9 +407,9 @@ export function buildAdder({ onAdded, isDisposed }) {
       el(
         "div",
         { class: "rule-outcome-text" },
-        el("p", { class: "rule-outcome-title" }, "Dot read your words differently from your choice."),
-        el("p", null, "It understood: ", ruleSentence(drafted)),
-        el("p", { class: "hint" }, `You chose “${answerOf(should.value).choice}”, so nothing was added. Change the words, or the choice, and try again.`),
+        el("p", { class: "rule-outcome-title" }, t("ruleadder.dotReadYourWordsDifferently")),
+        el("p", null, t("ruleadder.itUnderstood"), ruleSentence(drafted)),
+        el("p", { class: "hint" }, t("ruleadder.youChoseChoiceSoNothing", { choice: answerOf(should.value).choice })),
         el("div", { class: "cluster" }, byHandButton()),
       ),
     );
@@ -426,7 +427,7 @@ export function buildAdder({ onAdded, isDisposed }) {
     const chosen = should.value;
     drafting = true;
     paint();
-    say("busy", el("span", { class: "spinner" }), el("span", null, "Dot is reading your words…"));
+    say("busy", el("span", { class: "spinner" }), el("span", null, t("ruleadder.dotIsReadingYourWords")));
     let drafted;
     try {
       drafted = await api.post("/rules/draft", { sentence: draftSentence(words, chosen) });

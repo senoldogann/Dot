@@ -5,6 +5,7 @@
 // way), so an answer that was lost after the daemon took it, a page killed while it sent and a link that came back twice
 // send it once.
 
+
 /** How long the daemon keeps a message's key: a message that waited as long is the owner's to send again. */
 export const DAY_MS = 24 * 60 * 60 * 1000;
 

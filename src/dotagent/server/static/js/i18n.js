@@ -2,7 +2,7 @@
 // as the other interface settings are, and English until it is chosen. It never follows the browser, the model nor
 // what a conversation is written in, so that a page reads the same on every Mac, a test's among them; the words of
 // the conversation stay as they were written.
-// The words themselves are in lang/en.js and lang/tr.js, one catalogue each with the same keys (`tsc` holds a
+// The words themselves are in lang/en.js and lang/tr.js (with lang/en-*.js and lang/tr-*.js, which they gather), one catalogue each with the same keys (`tsc` holds a
 // Turkish catalogue to every English key, and tests/js/i18n.test.js checks both ways and the placeholders). A change of
 // the language reloads the page, so that every screen is drawn in it at once.
 
@@ -62,6 +62,15 @@ export function fill(template, values, key) {
     }
     return String(values[name]);
   });
+}
+
+/**
+ * `items` read as a list the language's way: "a, b and c" in English, "a, b ve c" in Turkish.
+ * @param {readonly string[]} items
+ * @returns {string}
+ */
+export function listAnd(items) {
+  return new Intl.ListFormat(LOCALES[LANGUAGE], { style: "long", type: "conjunction" }).format(items);
 }
 
 /**

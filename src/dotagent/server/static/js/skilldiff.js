@@ -1,6 +1,8 @@
 // The versions of a learned skill, said in words and compared (item 585): what the Skills page shows of how a version came
 // to be, and the steps of one version against the steps of another, as a diff the owner reads. Pure: no page, no network.
 
+import { t, tCount, listAnd } from "./i18n.js";
+
 /**
  * @typedef {object} StepChange
  * @property {" " | "+" | "-"} sign " " for a step both have, "-" for one only the earlier has, "+" for one only the later has
@@ -77,17 +79,17 @@ export function countChanges(changes) {
 export function describeVersion(note) {
   switch (note.change) {
     case "learned":
-      return "Learned from a task";
+      return t("skilldiff.learnedFromATask");
     case "relearned":
-      return "Rewritten by a later task";
+      return t("skilldiff.rewrittenByALaterTask");
     case "taught":
-      return "Taught by you";
+      return t("skilldiff.taughtByYou");
     case "restored":
-      return `Restored from version ${note.from_version}`;
+      return t("skilldiff.restoredFromVersionFromVersion", { from_version: note.from_version });
     case "merged":
-      return note.merged.length > 0 ? `Merged with ${note.merged.join(", ")}` : "Merged with another skill";
+      return note.merged.length > 0 ? t("skilldiff.mergedWithJoin", { join: note.merged.join(", ") }) : t("skilldiff.mergedWithAnotherSkill");
     case "revised":
-      return note.words ? `Revised at your word: ${note.words}` : "Revised at your word";
+      return note.words ? t("skilldiff.revisedAtYourWordWords", { words: note.words }) : t("skilldiff.revisedAtYourWord");
     default:
       return note.change;
   }
@@ -101,9 +103,9 @@ export function describeVersion(note) {
  */
 export function markOf(tainted) {
   if (tainted === null) {
-    return "Origin unknown";
+    return t("skilldiff.originUnknown");
   }
-  return tainted ? "From outside content" : null;
+  return tainted ? t("skilldiff.fromOutsideContent") : null;
 }
 
 /**
@@ -117,7 +119,7 @@ export function stepsSummary(fields, first) {
   const steps = fields.find((field) => field.field === "steps");
   const counts = countChanges(steps === undefined ? [] : steps.lines);
   const written = counts.kept + counts.added;
-  return `${written} ${written === 1 ? "step" : "steps"}: ${counts.added} new, ${counts.dropped} dropped, ${counts.kept} kept from ${first}.`;
+  return t("skilldiff.stepsNewDroppedKept", { steps: tCount(written, "skilldiff.countStep", "skilldiff.countSteps"), added: counts.added, dropped: counts.dropped, kept: counts.kept, first });
 }
 
 /**
@@ -126,7 +128,7 @@ export function stepsSummary(fields, first) {
  * @returns {string}
  */
 export function proposalTitle(proposal) {
-  return proposal.kind === "merge" ? `Merge ${proposal.names.join(" and ")}` : `Change ${proposal.names[0]}`;
+  return proposal.kind === "merge" ? t("skilldiff.mergeNames", { names: listAnd(proposal.names) }) : t("skilldiff.changeValue", { value: proposal.names[0] });
 }
 
 /**
@@ -138,12 +140,12 @@ export function proposalTitle(proposal) {
  */
 export function proposalEffects(proposal) {
   const [first, ...others] = proposal.names;
-  const written = `${first} gets all of the above as a new version; the file it has now is kept as the version before.`;
+  const written = t("skilldiff.firstGetsAllOfThe", { first });
   if (proposal.kind !== "merge") {
     return [written];
   }
   return [
     written,
-    ...others.map((name) => `${name} rests, kept whole: wake it to offer it again, or restore ${first}'s earlier version to undo the merge.`),
+    ...others.map((name) => t("skilldiff.nameRestsKeptWholeWake", { name, first })),
   ];
 }

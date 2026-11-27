@@ -18,7 +18,8 @@
 
 import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, sharedGet, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, setText, workingFor } from "./dom.js";
-import { serviceFailure, serviceWords } from "./errors.js";
+import { withoutPolicyReason } from "./approvalwords.js";
+import { isStoppedResult, runFailure, serviceWords } from "./errors.js";
 import { t, tCount } from "./i18n.js";
 import { goTo } from "./hop.js";
 import { icon } from "./icons.js";
@@ -235,12 +236,14 @@ function chatText(chat, agent, children, waits = null, right = null, unread = fa
   const dot = unread ? el("span", { class: "side-unread" }) : null;
   if (waits !== null) {
     const more = waits.length > 1 ? ` (+${waits.length - 1})` : "";
-    return el("span", { class: "side-chat-text" }, top, title, waitsLine(`${WAITS_WORDS}: ${waits[0].title}${more}`, ...marks));
+    return el("span", { class: "side-chat-text" }, top, title, waitsLine(`${WAITS_WORDS}: ${withoutPolicyReason(waits[0].title)}${more}`, ...marks));
   }
   // A chat its model service stopped says so in a few words of what stopped it (the service's sentence, a billing link
   // and all, stood here after item 1136); its own line stands in the chat. Any other chat ends on its last words.
-  const stopped = chat.latest_status === "failed" ? serviceFailure(chat.last_message ?? "") : null;
-  const words = stopped === null ? serviceWords(chat.last_message ?? "").text : stopped.short;
+  const stopped = chat.latest_status === "failed" ? runFailure(chat.last_message ?? "", null) : null;
+  // A chat the owner stopped says so in the owner's language, not in the daemon's sentence for it.
+  const stoppedByYou = chat.latest_status === "cancelled" && isStoppedResult(chat.last_message ?? "");
+  const words = stoppedByYou ? t("outcome.stoppedNote") : stopped === null ? serviceWords(chat.last_message ?? "").text : stopped.short;
   const state = waitsOn(chat);
   const said = words === "" || chat.last_role !== "user" || stopped !== null ? words : t("side.you", { words });
   const last = state === null ? said : state.words;
@@ -584,7 +587,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // this one set (item 836's pre-push review found the question asked apart in four places, each round one of them
   // missing a group).
   let above = new Set();
-  const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
+  const activityNav = el("nav", { class: "side-activity-nav", "aria-label": t("sidebar.activity"), hidden: true });
   const settledNav = el("nav", { class: "side-settled-nav", "aria-label": SETTLED.label, hidden: true });
   // Working's label folds what works; what waits for the owner is never folded out of sight.
   const workingCount = el("span", { class: "side-label-count" });
@@ -1031,7 +1034,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (kept === undefined) {
       const words = id === "settled" ? SETTLED.label : CHANNEL_SECTIONS[id].label;
       const count = el("span", { class: "side-label-count" });
-      const unread = el("span", { class: "side-label-dot", role: "img", "aria-label": "unread", hidden: true });
+      const unread = el("span", { class: "side-label-dot", role: "img", "aria-label": t("sidebar.unread"), hidden: true });
       kept = { count, unread, label: foldLabel("h3", false, () => toggleFold(id), `${words} `, unread, count) };
       keptLabels.set(id, kept);
     }
@@ -1674,7 +1677,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   // The sidebar is one component, in the window beside the page and as the drawer over it on a phone (item 294): a head
   // with the title, the search row, the list and its dock, and the foot's four tools, the same on both.
-  const body = el("div", { class: "side-body" }, el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav));
+  const body = el("div", { class: "side-body" }, el("nav", { class: "side-recent", "aria-label": t("sidebar.chats") }, head, bar, list, channelsNav));
   // The dock under the list (the sidebar of the reference app): what works and waits under Working, then what rests past a week,
   // Settled. It keeps its place while the list scrolls.
   const dock = el("div", { class: "side-dock" }, activityNav, settledNav);
@@ -1700,7 +1703,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const settingsNav = buildSettingsNav({ homeHref, onCollapse, onNavigate });
   const element = el(
     "aside",
-    { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
+    { class: "sidebar", id: "sidebar", "aria-label": t("sidebar.sidebar") },
     sideHead,
     top,
     body,

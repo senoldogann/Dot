@@ -11,6 +11,7 @@
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
+import { t } from "./i18n.js";
 
 /**
  * The panel. `hold(node)` takes a card of the conversation and leaves a mark where it stood; `release(node)` puts it back
@@ -21,14 +22,14 @@ export function createAsksDock() {
   const count = el("span", { class: "asks-count" });
   const fold = el(
     "button",
-    { class: "btn ghost sm asks-fold", type: "button", "aria-expanded": "true", "aria-label": "Fold what Dot asked", title: "Fold" },
+    { class: "btn ghost sm asks-fold", type: "button", "aria-expanded": "true", "aria-label": t("asksdock.foldWhatDotAsked"), title: t("asksdock.fold") },
     el("span", { class: "asks-chev" }, icon("chevron")),
   );
   const list = el("div", { class: "asks-list" });
   const element = el(
     "section",
-    { class: "asks", hidden: true, "aria-label": "Dot asked you" },
-    el("div", { class: "asks-head" }, el("span", { class: "asks-title" }, "Your answer is needed"), count, fold),
+    { class: "asks", hidden: true, "aria-label": t("asksdock.dotAskedYou") },
+    el("div", { class: "asks-head" }, el("span", { class: "asks-title" }, t("asksdock.yourAnswerIsNeeded")), count, fold),
     list,
   );
   /** The marks of the cards held, by card. */
@@ -42,8 +43,8 @@ export function createAsksDock() {
     element.toggleAttribute("data-folded", folded);
     list.hidden = folded;
     fold.setAttribute("aria-expanded", String(!folded));
-    fold.setAttribute("aria-label", folded ? "Show what Dot asked" : "Fold what Dot asked");
-    fold.title = folded ? "Show" : "Fold";
+    fold.setAttribute("aria-label", folded ? t("asksdock.showWhatDotAsked") : t("asksdock.foldWhatDotAsked"));
+    fold.title = folded ? t("asksdock.show") : t("asksdock.fold");
   }
 
   fold.addEventListener("click", () => {
@@ -62,7 +63,7 @@ export function createAsksDock() {
     element,
     /** @param {HTMLElement} node */
     hold(node) {
-      const mark = document.createComment("a card waiting for an answer");
+      const mark = document.createComment(t("asksdock.aCardWaitingForAn"));
       node.replaceWith(mark);
       marks.set(node, mark);
       arrived(node);

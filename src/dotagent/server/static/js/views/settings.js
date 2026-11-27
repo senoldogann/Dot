@@ -27,6 +27,7 @@ import * as snapshots from "./snapshots.js";
 import * as websearch from "./websearch.js";
 import * as vault from "./vault.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
+import { t } from "../i18n.js";
 
 const MOUNTS = {
   general: mountGeneral,
@@ -80,7 +81,7 @@ function listRow(row, value) {
  * Appearance tells the theme on screen, Memory how many notes Dot keeps, Vault how many entries it holds and Scheduled
  * tasks how many are on. */
 function mountList(root, ctx) {
-  ctx.setTitle("Settings");
+  ctx.setTitle(t("views.settings.settings"));
   const values = new Map(["appearance", "memory", "vault", "schedules"].map((id) => [id, el("span", { class: "settings-row-value" })]));
   const entries = [];
   const groups = SETTINGS_GROUPS.map((group) => {
@@ -97,8 +98,8 @@ function mountList(root, ctx) {
     );
     return { section, rows };
   });
-  const search = el("input", { class: "snav-input", type: "search", autocomplete: "off", spellcheck: "false", placeholder: "Search settings", "aria-label": "Search settings" });
-  const empty = el("p", { class: "snav-empty", hidden: true }, "No setting matches.");
+  const search = el("input", { class: "snav-input", type: "search", autocomplete: "off", spellcheck: "false", placeholder: t("views.settings.searchSettings"), "aria-label": t("views.settings.searchSettings") });
+  const empty = el("p", { class: "snav-empty", hidden: true }, t("views.settings.noSettingMatches"));
   search.addEventListener("input", () => {
     const typed = search.value.trim();
     let shown = 0;
@@ -111,12 +112,12 @@ function mountList(root, ctx) {
     }
     empty.hidden = shown !== 0;
   });
-  const sheet = el("nav", { class: "settings-list", "aria-label": "Settings" }, el("label", { class: "snav-search" }, icon("search"), search), ...groups.map((group) => group.section), empty);
+  const sheet = el("nav", { class: "settings-list", "aria-label": t("views.settings.settings") }, el("label", { class: "snav-search" }, icon("search"), search), ...groups.map((group) => group.section), empty);
   root.append(sheet);
   // What a Dot that started afresh has to set up (item 811) stands under the sheet while a step is left: it comes once
   // the daemon answers, and over the rows it pushed them down under a finger on its way to one (item 996, main's CI).
   const steps = buildFirstSteps((card) => sheet.after(card));
-  setStageTitle(el("h1", { class: "stage-h1" }, "Settings"));
+  setStageTitle(el("h1", { class: "stage-h1" }, t("views.settings.settings")));
 
   function paintTheme() {
     values.get("appearance").textContent = findTheme(themePicks()[shownScheme()]).label;
@@ -153,13 +154,13 @@ function mountList(root, ctx) {
  */
 function breadcrumb(tab) {
   // The nav of the parts (`aria-label` Breadcrumb) holds the page's own name as its h1, the last part.
-  const element = el("nav", { class: "crumbs", "aria-label": "Breadcrumb" });
+  const element = el("nav", { class: "crumbs", "aria-label": t("views.settings.breadcrumb") });
   let detail = "";
   const sep = () => el("span", { class: "crumb-sep crumb-far", "aria-hidden": "true" }, "/");
   const here = (text) => el("h1", { class: "crumb crumb-here" }, text);
   function paint() {
     element.replaceChildren(
-      el("a", { class: "crumb crumb-far", href: "#/settings" }, "Settings"),
+      el("a", { class: "crumb crumb-far", href: "#/settings" }, t("views.settings.settings")),
       sep(),
       ...(detail === "" ? [here(tab.label)] : [el("a", { class: "crumb crumb-far", href: settingsHref(tab.id) }, tab.label), sep(), here(detail)]),
     );
@@ -187,7 +188,7 @@ export function mount(root, ctx) {
     location.replace(`${location.pathname}${location.search}#/settings/${DEFAULT_TAB}`);
     return () => undefined;
   }
-  ctx.setTitle(`${tab.label} · Settings`);
+  ctx.setTitle(t("views.settings.labelSettings", { label: tab.label }));
   const head = settingsHead();
   const pane = el("div", { class: "settings-pane", dataset: { page: tab.id } }, head.element);
   root.append(el("div", { class: "settings-frame" }, pane));

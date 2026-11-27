@@ -14,33 +14,34 @@
 import { accountsCard } from "../accounts.js";
 import { createCatalogue, MCP_STATE_TONES, MCP_STATE_WORDS, pluginMark, serviceWords, STATE_WORDS, STEP_LABELS, WAY_NAMES, CONNECTED_STATES } from "../catalogue.js";
 import { customizeHead } from "../customizehead.js";
-import { el, foldSearch, plural } from "../dom.js";
+import { el, foldSearch, } from "../dom.js";
 import { icon } from "../icons.js";
 import { markContent, markTile } from "../marks.js";
 import { emptyPanel, errorPanel, field, loadingPanel, segmented, switchToggle } from "../panels.js";
 import { attempt, formDialog } from "../ui.js";
+import { t, tCount } from "../i18n.js";
 
 /** The sections of the services, in the order the page shows them and its chips name them (items 492 and 545). */
 const SECTIONS = [
-  { id: "popular", title: "Popular" },
-  { id: "passwords", title: "Password managers" },
-  { id: "code", title: "Code" },
-  { id: "design", title: "Design" },
-  { id: "data", title: "Data" },
-  { id: "research", title: "Research" },
-  { id: "communication", title: "Communication" },
-  { id: "productivity", title: "Productivity" },
-  { id: "business", title: "Business" },
-  { id: "support", title: "Support" },
-  { id: "mac", title: "This Mac" },
+  { id: "popular", title: t("views.connectors.popular") },
+  { id: "passwords", title: t("views.connectors.passwordManagers") },
+  { id: "code", title: t("views.connectors.code") },
+  { id: "design", title: t("views.connectors.design") },
+  { id: "data", title: t("views.connectors.data") },
+  { id: "research", title: t("views.connectors.research") },
+  { id: "communication", title: t("views.connectors.communication") },
+  { id: "productivity", title: t("views.connectors.productivity") },
+  { id: "business", title: t("views.connectors.business") },
+  { id: "support", title: t("views.connectors.support") },
+  { id: "mac", title: t("views.connectors.thisMac") },
 ];
 // The chip the page opens on (item 1000).
 const POPULAR = "popular";
 const MCP_ORIGIN_WORDS = {
-  config: "Set up in Dot's settings file; remove it there.",
-  plugin: "Comes with one of Dot's plugins; Remove plugin takes the plugin out.",
-  elsewhere: "Added from another agent of this Mac (Settings › Skills › Found on this Mac).",
-  builtin: "Comes with Dot: it searches the web and reads pages.",
+  config: t("views.connectors.setUpInDotS"),
+  plugin: t("views.connectors.comesWithOneOfDot"),
+  elsewhere: t("views.connectors.addedFromAnotherAgentOf"),
+  builtin: t("views.connectors.comesWithDotItSearches"),
 };
 // A server's tile names this many of its tools.
 const SHOWN_TOOLS = 6;
@@ -48,32 +49,32 @@ const SHOWN_TOOLS = 6;
 /** The tools a server offers to runs, the first few by name. */
 function toolLine(tools) {
   const shown = tools.slice(0, SHOWN_TOOLS).join(", ");
-  return `${plural(tools.length, "action", "actions")}: ${shown}${tools.length > SHOWN_TOOLS ? ", …" : ""}`;
+  return `${tCount(tools.length, "views.connectors.countAction", "views.connectors.countActions")}: ${shown}${tools.length > SHOWN_TOOLS ? ", …" : ""}`;
 }
 
 /** How to sign in to the applications of the web, the same for each of them: it depends on Dot's browser alone. */
 function webNote(listing) {
   if (listing.browser_mode === "attach") {
-    return "Dot works in your own Chrome (Settings › Browser › My Chrome), where you are signed in as you always are.";
+    return t("views.connectors.dotWorksInYourOwn");
   }
   return listing.headless
-    ? "Dot's browser works without a window, so there is nowhere to sign in. Choose My Chrome in Settings › Browser to use your own Chrome, where you are already signed in."
-    : "Sign in opens the page in Dot's browser on the Mac; check again once you are in.";
+    ? t("views.connectors.dotSBrowserWorksWithout")
+    : t("views.connectors.signInOpensThePage");
 }
 
 /** What to do or to know for an application, by where it stands: one line, or none. `runner` is the name macOS asks
  * for Dot under and lists in Privacy & Security (Dot for the service, item 288). */
 function appGuide(app, runner) {
   if (app.waiting) {
-    return "macOS is asking on the Mac: answer its question there, then check again.";
+    return t("views.connectors.macosIsAskingOnThe");
   }
   switch (app.state) {
     case "refused":
-      return `macOS was told no. In Privacy & Security › Automation, open ${runner} and switch on ${app.name}.`;
+      return t("views.connectors.macosWasToldNoIn", { runner, name: app.name });
     case "not_installed":
-      return `Install ${app.name} to use it with Dot.`;
+      return t("views.connectors.installNameToUseIt", { name: app.name });
     case "not_synced":
-      return `${app.name} syncs no folder yet: open it and sign in.`;
+      return t("views.connectors.nameSyncsNoFolderYet", { name: app.name });
     default:
       return null;
   }
@@ -83,13 +84,13 @@ function appGuide(app, runner) {
 function serverGuide(server) {
   switch (server.state) {
     case "signing_in":
-      return "Sign in on the service's page; Dot connects once it sends you back here.";
+      return t("views.connectors.signInOnTheService");
     case "trying":
-      return "Dot is connecting to it.";
+      return t("views.connectors.dotIsConnectingToIt");
     case "left_out":
       return server.error;
     case "disabled":
-      return server.origin === "builtin" ? "Switched off. Its switch starts it." : "Switched off in Dot's settings file.";
+      return server.origin === "builtin" ? t("views.connectors.switchedOffItsSwitchStarts") : t("views.connectors.switchedOffInDotS");
     default:
       return null;
   }
@@ -102,34 +103,34 @@ function serverActions(catalogue, server, service) {
   const working = server.state === "trying" || server.state === "signing_in";
   const actions = [];
   if (server.state === "signing_in" && server.link !== null) {
-    actions.push(el("a", { class: "btn sm primary", href: server.link, target: "_blank", rel: "noopener noreferrer" }, icon("external"), "Open the sign-in page"));
+    actions.push(el("a", { class: "btn sm primary", href: server.link, target: "_blank", rel: "noopener noreferrer" }, icon("external"), t("views.connectors.openTheSignInPage")));
   }
   const again = server.origin === "connected" || server.origin === "builtin" || (server.origin === "config" && server.signs_in);
   const acting = catalogue.busy(`server:${server.name}`);
   if (again && !working && (server.signs_in || server.state === "left_out")) {
-    const button = el("button", { class: "btn sm", type: "button", disabled: acting }, server.signs_in ? "Sign in again" : "Try again");
+    const button = el("button", { class: "btn sm", type: "button", disabled: acting }, server.signs_in ? t("views.connectors.signInAgain") : t("views.connectors.tryAgain"));
     button.addEventListener("click", () => attempt(() => catalogue.connectAgain(server)));
     actions.push(button);
   }
   if (server.picks_tools && server.origin === "connected" && !working) {
     // The way back in for a server left out with its allow list; for one that runs, a way to cut its tools down.
     const kind = server.state === "left_out" ? "btn sm primary" : "btn sm";
-    actions.push(el("button", { class: kind, type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose actions"));
+    actions.push(el("button", { class: kind, type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, t("views.connectors.chooseActions")));
   }
   if (server.origin === "connected" || server.origin === "elsewhere") {
-    actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, "Remove"));
+    actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, t("views.connectors.remove")));
   }
   if (server.origin === "builtin") {
     // The server is on while it is not switched off: left out, it is still on, and Try again starts it once more.
     const on = server.state !== "disabled";
-    const toggle = switchToggle({ label: `Use ${server.name}`, read: () => on, write: (next) => catalogue.switchServer(server, next), onToggled: () => undefined });
+    const toggle = switchToggle({ label: t("views.connectors.useName", { name: server.name }), read: () => on, write: (next) => catalogue.switchServer(server, next), onToggled: () => undefined });
     toggle.setAttribute("aria-checked", String(on));
     toggle.disabled = acting || working;
     actions.push(toggle);
   }
   if (server.origin === "plugin" && server.plugin !== null) {
     actions.push(
-      el("button", { class: "btn sm", type: "button", disabled: acting, title: `Take the plugin ${server.plugin} out of Dot`, onclick: () => attempt(() => catalogue.removePlugin(server)) }, "Remove plugin"),
+      el("button", { class: "btn sm", type: "button", disabled: acting, title: t("views.connectors.takeThePluginPluginOut", { plugin: server.plugin }), onclick: () => attempt(() => catalogue.removePlugin(server)) }, t("views.connectors.removePlugin")),
     );
   }
   return actions.length === 0 ? null : el("div", { class: "plugin-actions" }, ...actions);
@@ -139,17 +140,17 @@ function serverActions(catalogue, server, service) {
 function vaultGuide(vault) {
   if (!vault.connected) {
     return vault.cli === null
-      ? el("span", null, "The 1Password command-line tool is not installed on this Mac. Install it, then check again.", el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, "In Terminal: ", el("code", { class: "mono" }, "brew install 1password-cli"))))
+      ? el("span", null, t("views.connectors.the1passwordCommandLineTool"), el("details", { class: "error-details" }, el("summary", null, t("views.connectors.details")), el("p", { class: "small muted" }, t("views.connectors.inTerminal"), el("code", { class: "mono" }, "brew install 1password-cli"))))
       : vault.app === false
-        ? "1Password's app is not on this Mac, and Connect goes through it. You do not need 1Password: Settings › Vault keeps your logins and Dot fills them. To use it all the same, install its app or paste a service account token."
-        : "Connect makes the vault Shared with Dot and a service account that only reads it, through the 1Password app, which asks you first: turn on its Settings › Developer › Integrate with 1Password CLI.";
+        ? t("views.connectors.1passwordSAppIsNot")
+        : t("views.connectors.connectMakesTheVaultShared");
   }
   if (vault.error !== null) {
     return vault.error;
   }
   const names = vault.vaults.map((one) => one.name).join(", ");
   const logins = vault.vaults.reduce((sum, one) => sum + one.logins, 0);
-  return `Reads ${plural(logins, "login", "logins")} in ${names}: the logins you move there are the ones tasks may fill in.`;
+  return t("views.connectors.readsPartInNamesThe", { part: tCount(logins, "views.connectors.countLogin", "views.connectors.countLogins"), names });
 }
 
 /** The buttons of 1Password's way (item 493): Connect 1Password and a token instead while it is not connected, the token
@@ -157,12 +158,12 @@ function vaultGuide(vault) {
 function vaultActions(catalogue, vault) {
   const acting = catalogue.busy("vault");
   if (vault.connected) {
-    return el("div", { class: "plugin-actions" }, el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.disconnectVault()) }, "Disconnect"));
+    return el("div", { class: "plugin-actions" }, el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.disconnectVault()) }, t("views.connectors.disconnect")));
   }
   const connect = el(
     "button",
     { class: "btn sm primary", type: "button", disabled: acting || vault.cli === null, onclick: () => attempt(() => catalogue.connectVault()) },
-    acting ? "Waiting for 1Password…" : "Connect 1Password",
+    acting ? t("views.connectors.waitingFor1password") : t("views.connectors.connect1password"),
   );
   // A token is read with op too: without it neither way connects.
   const token = el(
@@ -175,7 +176,7 @@ function vaultActions(catalogue, vault) {
       disabled: acting || vault.cli === null,
       onclick: () => attempt(() => catalogue.askVault(() => document.querySelector("[data-vault-token]"))),
     },
-    "Use a service account key instead",
+    t("views.connectors.useAServiceAccountKey"),
   );
   return el("div", { class: "plugin-actions" }, connect, token);
 }
@@ -190,12 +191,12 @@ function wayRow(catalogue, way) {
   let actions = null;
   if (way.kind === "mcp") {
     if (now.server === null && now.service !== null && now.service.added) {
-      badge = el("span", { class: "badge b-muted" }, "Name taken");
-      guideLine = `A connection set up in Dot's settings file or by a plugin is named ${way.ref} already: Connected lists it.`;
+      badge = el("span", { class: "badge b-muted" }, t("views.connectors.nameTaken"));
+      guideLine = t("views.connectors.aConnectionSetUpIn", { ref: way.ref });
     } else if (now.server === null) {
       const service = now.service;
       const keyed = service !== null && service !== undefined && service.secrets.length > 0;
-      const button = el("button", { class: "btn sm primary", type: "button", disabled: catalogue.busy(`mcp:${way.ref}`) }, "Add");
+      const button = el("button", { class: "btn sm primary", type: "button", disabled: catalogue.busy(`mcp:${way.ref}`) }, t("views.connectors.add"));
       if (keyed) {
         button.setAttribute("aria-haspopup", "dialog");
       }
@@ -221,12 +222,12 @@ function wayRow(catalogue, way) {
     badge = el("span", { class: `badge ${CONNECTED_STATES.has(app.state) ? "b-ok" : app.state === "refused" ? "b-bad" : "b-muted"}` }, STATE_WORDS[app.state] ?? app.state);
     guideLine = appGuide(app, listing.runner) ?? (way.kind === "web" && !CONNECTED_STATES.has(app.state) ? webNote(listing) : null);
     if (guideLine !== null && guideLine === webNote(listing) && listing.headless && listing.browser_mode !== "attach") {
-      guideTitle = "In the settings file: [browser] headless = false";
+      guideTitle = t("views.connectors.inTheSettingsFileBrowser");
     }
     if (app.step !== null) {
       // While macOS asks, the button says so, as Connect apps' did.
       const asking = catalogue.busy(`app:${app.id}`);
-      const label = asking && app.step === "ask" ? "Waiting for macOS…" : STEP_LABELS[app.step];
+      const label = asking && app.step === "ask" ? t("views.connectors.waitingForMacos") : STEP_LABELS[app.step];
       const button = el("button", { class: app.step === "settings" ? "btn sm" : "btn sm primary", type: "button", disabled: asking }, label);
       button.addEventListener("click", () => attempt(() => catalogue.takeStep(app)));
       actions = el("div", { class: "plugin-actions" }, button);
@@ -271,14 +272,14 @@ function serviceParts(catalogue, plugin) {
       pluginMark(plugin),
       el("div", { class: "plugin-main" }, el("h2", { class: "plugin-title" }, plugin.name), el("div", { class: "plugin-does" }, plugin.does), el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), catalogue.standing(plugin))),
     ),
-    does.length < 2 ? null : card("does", "What Dot does with it", "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
-    card("ways", "How it connects", "link", plugin.ways.map((way) => wayRow(catalogue, way))),
-    tools.length === 0 ? null : card("tools", "Actions", "bolt", el("ul", { class: "plugin-list plugin-tools mono" }, tools.map((name) => el("li", null, name)))),
+    does.length < 2 ? null : card("does", t("views.connectors.whatDotDoesWithIt"), "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
+    card("ways", t("views.connectors.howItConnects"), "link", plugin.ways.map((way) => wayRow(catalogue, way))),
+    tools.length === 0 ? null : card("tools", t("views.connectors.actions"), "bolt", el("ul", { class: "plugin-list plugin-tools mono" }, tools.map((name) => el("li", null, name)))),
     leftOut.length === 0
       ? null
       : card(
           "left-out",
-          "Not offered",
+          t("views.connectors.notOffered"),
           "alert",
           el(
             "ul",
@@ -286,7 +287,7 @@ function serviceParts(catalogue, plugin) {
             leftOut.map((item) => el("li", null, el("span", { class: "mono" }, item.name), `: ${item.reason}`)),
           ),
         ),
-    data.length === 0 ? null : card("data", "Where its data goes", "shield", el("ul", { class: "plugin-list" }, data.map((way) => el("li", null, named(way, way.data))))),
+    data.length === 0 ? null : card("data", t("views.connectors.whereItsDataGoes"), "shield", el("ul", { class: "plugin-list" }, data.map((way) => el("li", null, named(way, way.data))))),
   ];
   return parts.filter((part) => part !== null);
 }
@@ -313,7 +314,7 @@ export function mount(root, ctx) {
     } else if (step !== null && step.link !== undefined) {
       action = el(
         "a",
-        { class: "btn sm primary plugin-add", href: step.link, target: "_blank", rel: "noopener noreferrer", "aria-label": `Open the sign-in page of ${plugin.name}` },
+        { class: "btn sm primary plugin-add", href: step.link, target: "_blank", rel: "noopener noreferrer", "aria-label": t("views.connectors.openTheSignInPage2", { name: plugin.name }) },
         icon("external"),
         step.label,
       );
@@ -344,7 +345,7 @@ export function mount(root, ctx) {
         { class: "plugin-main" },
         el("a", { class: "plugin-name", href: `#/settings/connectors/${plugin.id}` }, plugin.name),
         el("div", { class: "plugin-does" }, plugin.does),
-        el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), waiting ? el("span", { class: "badge b-warn" }, "Waiting for macOS…") : catalogue.standing(plugin)),
+        el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), waiting ? el("span", { class: "badge b-warn" }, t("views.connectors.waitingForMacos")) : catalogue.standing(plugin)),
       ),
       action,
     );
@@ -371,13 +372,13 @@ export function mount(root, ctx) {
         el("div", { class: "mono plugin-address" }, server.address),
         server.tools.length === 0 ? null : el("div", { class: "plugin-does" }, toolLine(server.tools)),
         server.origin in MCP_ORIGIN_WORDS
-          ? el("div", { class: "plugin-does", title: server.origin === "config" ? "It is set up in your settings file: to remove it, take its [[mcp]] block out of config.toml." : null }, MCP_ORIGIN_WORDS[server.origin])
+          ? el("div", { class: "plugin-does", title: server.origin === "config" ? t("views.connectors.itIsSetUpIn") : null }, MCP_ORIGIN_WORDS[server.origin])
           : null,
         el(
           "div",
           { class: "plugin-meta" },
-          el("span", { class: "chip" }, "Connected app"),
-          server.origin === "builtin" ? el("span", { class: "chip" }, "Built in") : null,
+          el("span", { class: "chip" }, t("views.connectors.connectedApp")),
+          server.origin === "builtin" ? el("span", { class: "chip" }, t("views.connectors.builtIn")) : null,
           el("span", { class: `badge ${MCP_STATE_TONES[server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[server.state] ?? server.state),
         ),
         serverGuide(server) === null ? null : el("div", { class: "plugin-guide" }, serverGuide(server)),
@@ -389,7 +390,7 @@ export function mount(root, ctx) {
   /** The form that adds an MCP server of one's own by its name and address, in a dialog (item 615): Dot tries the server
    * before it keeps it. */
   function addServer() {
-    const name = el("input", { class: "input", type: "text", maxlength: "24", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "my-app", "aria-label": "Name of the connected app" });
+    const name = el("input", { class: "input", type: "text", maxlength: "24", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "my-app", "aria-label": t("views.connectors.nameOfTheConnectedApp") });
     const address = el("input", {
       class: "input mono",
       type: "text",
@@ -397,13 +398,13 @@ export function mount(root, ctx) {
       autocapitalize: "off",
       spellcheck: "false",
       placeholder: "https://example.com/your-app",
-      "aria-label": "Address or command",
+      "aria-label": t("views.connectors.addressOrCommand"),
     });
     formDialog({
-      title: "Add your own connected app",
-      description: "Dot tries the connection before it keeps it, signs in to it in this browser when it asks, and offers what it can do to the tasks that start after.",
-      body: [field("Name", name, "Lowercase letters, digits and dashes."), field("Address", address, "Its web address, or the command that starts it on this Mac.")],
-      submitLabel: "Add",
+      title: t("views.connectors.addYourOwnConnectedApp"),
+      description: t("views.connectors.dotTriesTheConnectionBefore"),
+      body: [field(t("views.connectors.name"), name, t("views.connectors.lowercaseLettersDigitsAndDashes")), field(t("views.connectors.address"), address, t("views.connectors.itsWebAddressOrThe"))],
+      submitLabel: t("views.connectors.add"),
       size: "narrow",
       returnFocus: () => document.querySelector("[data-add-server]"),
       onSubmit: () => catalogue.add({ service: null, name: name.value.trim(), address: address.value.trim(), secrets: {} }),
@@ -414,15 +415,15 @@ export function mount(root, ctx) {
     return words === "" || foldSearch(`${plugin.name} ${plugin.does}`).includes(words);
   }
 
-  const search = el("input", { class: "input customize-search", type: "search", placeholder: "Search connectors", "aria-label": "Search connectors", autocomplete: "off", spellcheck: "false" });
+  const search = el("input", { class: "input customize-search", type: "search", placeholder: t("views.connectors.searchConnectors"), "aria-label": t("views.connectors.searchConnectors"), autocomplete: "off", spellcheck: "false" });
   search.addEventListener("input", () => {
     words = foldSearch(search.value);
     paint();
   });
   const tabs = segmented(
     [
-      { id: "connected", label: "Connected", hint: "The services Dot is connected to" },
-      { id: "all", label: "All", hint: "Every service Dot works with" },
+      { id: "connected", label: t("views.connectors.connected"), hint: t("views.connectors.theServicesDotIsConnected") },
+      { id: "all", label: t("views.connectors.all"), hint: t("views.connectors.everyServiceDotWorksWith") },
     ],
     shown,
     (id) => {
@@ -431,12 +432,12 @@ export function mount(root, ctx) {
     },
   );
   tabs.element.classList.add("plugin-tabs");
-  tabs.element.setAttribute("aria-label", "Connectors to show");
-  const recheck = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
+  tabs.element.setAttribute("aria-label", t("views.connectors.connectorsToShow"));
+  const recheck = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), t("views.connectors.checkAgain"));
   // Out of what paints again, so that the search keeps the focus while the tiles are drawn anew; a service's page has
   // none of it.
   const head = customizeHead({
-    line: "Dot works in the apps and services you use. Connect one once, and every task can read it and act there, asking you first for what matters.",
+    line: t("views.connectors.dotWorksInTheApps"),
     search,
     controls: [tabs.element, recheck],
   });
@@ -444,7 +445,7 @@ export function mount(root, ctx) {
   // The sections as chips (item 545, as Connect apps' dialog had them): one shows its section alone, All every one;
   // the page opens on Popular (item 1000).
   let chosen = POPULAR;
-  const chipButtons = [{ id: "all", title: "All" }, ...SECTIONS].map(({ id, title }) =>
+  const chipButtons = [{ id: "all", title: t("views.connectors.all") }, ...SECTIONS].map(({ id, title }) =>
     el(
       "button",
       {
@@ -463,13 +464,13 @@ export function mount(root, ctx) {
       title,
     ),
   );
-  const chips = el("div", { class: "customize-chips", role: "group", "aria-label": "Sections", hidden: pluginId !== undefined }, chipButtons);
+  const chips = el("div", { class: "customize-chips", role: "group", "aria-label": t("views.connectors.sections"), hidden: pluginId !== undefined }, chipButtons);
 
   function paintTabs() {
     const [connectedButton, allButton] = tabs.element.children;
     const others = catalogue.servers.servers.filter((server) => server.service === null).length;
-    connectedButton.textContent = `Connected ${catalogue.plugins.filter(catalogue.connected).length + others}`;
-    allButton.textContent = `All ${catalogue.plugins.length}`;
+    connectedButton.textContent = t("views.connectors.connectedValue", { value: catalogue.plugins.filter(catalogue.connected).length + others });
+    allButton.textContent = t("views.connectors.allLength", { length: catalogue.plugins.length });
   }
 
   // The page opens on its Popular chip (item 1000, the owner's ask of 2026-11-05 for a plain page: every section at
@@ -505,7 +506,7 @@ export function mount(root, ctx) {
     const parts = sections(showing);
     if (browsing()) {
       const rest = showing.filter((plugin) => plugin.section !== "popular").length;
-      parts.push(el("p", { class: "hint connect-browse" }, `${plural(rest, "more app", "more apps")}: choose All or a section above, or search.`));
+      parts.push(el("p", { class: "hint connect-browse" }, t("views.connectors.partChooseAllOrA", { part: tCount(rest, "views.connectors.countMoreApp", "views.connectors.countMoreApps") })));
     }
     // The servers of no service belong to no section: Connected and a search, which look in every section, list them.
     if (others.length > 0 && (shown === "connected" || words !== "")) {
@@ -513,7 +514,7 @@ export function mount(root, ctx) {
         el(
           "section",
           { class: "plugin-section", dataset: { section: "servers" } },
-          el("h2", { class: "section-label plugin-section-title" }, "Other connected apps"),
+          el("h2", { class: "section-label plugin-section-title" }, t("views.connectors.otherConnectedApps")),
           el("div", { class: "plugin-grid" }, others.map(serverTile)),
         ),
       );
@@ -523,8 +524,8 @@ export function mount(root, ctx) {
     if (parts.every((part) => part === null)) {
       parts.push(
         words !== ""
-          ? emptyPanel("search", "No connector matches the search", "")
-          : emptyPanel("plug", "Dot is connected to nothing yet", "All lists what it works with."),
+          ? emptyPanel("search", t("views.connectors.noConnectorMatchesTheSearch"), "")
+          : emptyPanel("plug", t("views.connectors.dotIsConnectedToNothing"), t("views.connectors.allListsWhatItWorks")),
       );
     }
     parts.push(
@@ -535,13 +536,13 @@ export function mount(root, ctx) {
           "div",
           { class: "card-head" },
           icon("plug"),
-          el("span", { class: "grow" }, "Your own connected app"),
-          el("button", { class: "btn sm", type: "button", "aria-haspopup": "dialog", dataset: { addServer: "" }, onclick: addServer }, icon("plus"), "Add connected app"),
+          el("span", { class: "grow" }, t("views.connectors.yourOwnConnectedApp")),
+          el("button", { class: "btn sm", type: "button", "aria-haspopup": "dialog", dataset: { addServer: "" }, onclick: addServer }, icon("plus"), t("views.connectors.addConnectedApp")),
         ),
         el(
           "div",
           null,
-          el("p", { class: "hint connect-hint" }, "A connected app gives Dot more things it can do. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers what it can do to the tasks that start after."),
+          el("p", { class: "hint connect-hint" }, t("views.connectors.aConnectedAppGivesDot")),
           shown === "all" && words === "" ? others.map(serverTile) : null,
         ),
       ),
@@ -550,9 +551,9 @@ export function mount(root, ctx) {
   }
 
   function paintPlugin(plugin) {
-    ctx.setTitle(`${plugin.name} · Connectors`);
-    const again = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
-    holder.replaceChildren(el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/settings/connectors" }, icon("arrowLeft"), "Connectors"), again), ...serviceParts(catalogue, plugin));
+    ctx.setTitle(t("views.connectors.nameConnectors", { name: plugin.name }));
+    const again = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), t("views.connectors.checkAgain"));
+    holder.replaceChildren(el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/settings/connectors" }, icon("arrowLeft"), t("views.connectors.connectors")), again), ...serviceParts(catalogue, plugin));
   }
 
   function paint() {
@@ -565,7 +566,7 @@ export function mount(root, ctx) {
     }
     const plugin = catalogue.plugins.find((one) => one.id === pluginId);
     if (plugin === undefined) {
-      holder.replaceChildren(el("a", { class: "back", href: "#/settings/connectors" }, icon("arrowLeft"), "Connectors"), errorPanel(new Error(`Dot lists no connector ${pluginId}.`)));
+      holder.replaceChildren(el("a", { class: "back", href: "#/settings/connectors" }, icon("arrowLeft"), t("views.connectors.connectors")), errorPanel(new Error(`Dot lists no connector ${pluginId}.`)));
     } else {
       paintPlugin(plugin);
     }

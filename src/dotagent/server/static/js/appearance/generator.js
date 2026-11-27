@@ -7,6 +7,7 @@
 // out as `#rrggbb`, as a theme file holds them.
 
 import { contrast, inkFor, luminance, mix, oklchToRgb, parseColour, rgbToOklch, solveLightness, toHex } from "./colour.js";
+import { t } from "../i18n.js";
 
 /** The colour roles of a palette; dotagent/themes.py names the same. */
 export const THEME_ROLES = [
@@ -254,19 +255,19 @@ export function vividPalette(canvasValue, accentValue) {
  * error and the warning.
  */
 export const FAMILIES = [
-  { role: "canvas", label: "Background" },
-  { role: "sidebar", label: "Sidebar" },
-  { role: "surface", label: "Surface" },
-  { role: "accentSurface", label: "Highlight surface" },
-  { role: "border", label: "Border" },
-  { role: "input", label: "Input border" },
-  { role: "text", label: "Text" },
-  { role: "textMuted", label: "Muted text" },
-  { role: "accent", label: "Accent" },
-  { role: "messageAction", label: "Action" },
-  { role: "messageSurface", label: "Message surface" },
-  { role: "error", label: "Error" },
-  { role: "warning", label: "Warning" },
+  { role: "canvas", label: t("appearance.generator.background") },
+  { role: "sidebar", label: t("appearance.generator.sidebar") },
+  { role: "surface", label: t("appearance.generator.surface") },
+  { role: "accentSurface", label: t("appearance.generator.highlightSurface") },
+  { role: "border", label: t("appearance.generator.border") },
+  { role: "input", label: t("appearance.generator.inputBorder") },
+  { role: "text", label: t("appearance.generator.text") },
+  { role: "textMuted", label: t("appearance.generator.mutedText") },
+  { role: "accent", label: t("appearance.generator.accent") },
+  { role: "messageAction", label: t("appearance.generator.action") },
+  { role: "messageSurface", label: t("appearance.generator.messageSurface") },
+  { role: "error", label: t("appearance.generator.error") },
+  { role: "warning", label: t("appearance.generator.warning") },
 ];
 
 /**

@@ -29,11 +29,12 @@ import {
   listeningWay,
   nextWave,
 } from "./voice.js";
+import { t } from "./i18n.js";
 
-const START = "Dictate your message";
-const STOP = "Stop dictating";
+const START = t("microphone.dictateYourMessage");
+const STOP = t("microphone.stopDictating");
 // What the recorder says while the Mac writes a recording down (item 626).
-const WRITING = "Writing down what you said…";
+const WRITING = t("microphone.writingDownWhatYouSaid");
 // How many bars the wave holds, and how often a new one comes in: the oldest go out at the left, past the recorder's width.
 const BARS = 96;
 const WAVE_MS = 90;
@@ -82,12 +83,12 @@ export function createMicrophone({ textarea, setInterim }) {
   const button = el("button", { class: "btn ghost sm mic-button", type: "button", "aria-pressed": "false" }, icon("mic"));
   const cancel = el(
     "button",
-    { class: "btn ghost sm mic-cancel", type: "button", title: "Cancel", "aria-label": "Cancel the dictation" },
+    { class: "btn ghost sm mic-cancel", type: "button", title: t("microphone.cancel"), "aria-label": t("microphone.cancelTheDictation") },
     icon("x"),
   );
   const done = el(
     "button",
-    { class: "btn primary mic-done", type: "button", title: "Done", "aria-label": "Put the words in the box" },
+    { class: "btn primary mic-done", type: "button", title: t("microphone.done"), "aria-label": t("microphone.putTheWordsInThe") },
     icon("check"),
   );
   const bars = Array.from({ length: BARS }, () => el("span", { class: "mic-bar" }));
@@ -98,7 +99,7 @@ export function createMicrophone({ textarea, setInterim }) {
   const clock = el("span", { class: "mic-time" }, clockText(0));
   const recorder = el(
     "div",
-    { class: "mic-recorder", role: "group", "aria-label": "Dictation" },
+    { class: "mic-recorder", role: "group", "aria-label": t("microphone.dictation") },
     cancel,
     wave,
     writingLine,
@@ -259,7 +260,7 @@ export function createMicrophone({ textarea, setInterim }) {
       toast(
         "error",
         offer?.reload ? deafWords(words, macVoice()) : words,
-        offer?.reload ? { label: "Reload", run: () => window.location.reload() } : null,
+        offer?.reload ? { label: t("microphone.reload"), run: () => window.location.reload() } : null,
       );
     },
     began() {

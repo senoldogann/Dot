@@ -30,6 +30,11 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1984](1984.md) | built | 2026-11-27 | Several tasks in one chat, slice 1: lanes, the answer's queue, Stop for the whole chat |
 | [1983](1983.md) | done | 2026-11-27 | DotNext's Memory: add a note, pin it, and bring a forgotten one back from the trash |
 | [1982](1982.md) | design | 2026-11-27 | Several tasks at once in one chat: design |
+| [1981](1981.md) | done | 2026-11-27 | A run that ended for a fault says what happened in a plain sentence, with the program's words under Details |
+| [1980](1980.md) | done | 2026-11-27 | A stopped run keeps the words it had streamed, with a quiet "Stopped" note under them |
+| [1979](1979.md) | done | 2026-11-27 | An approval card says what Dot wants to do and why it asks in plain words, with the policy's words folded |
+| [1978](1978.md) | done | 2026-11-27 | An English line is no longer capitals under a Turkish page: the question card's header is plain |
+| [1977](1977.md) | done | 2026-11-27 | The web UI speaks Turkish on every screen, and a check fails for a line of English that is not in the catalogue |
 | [1976](1976.md) | done | 2026-11-27 | A chat told as a conversation: Dot's short messages of what it turns to, and the live line with its face and time |
 | [1975](1975.md) | done | 2026-11-27 | Typed memory: every note has a kind, and a run's starting notes are ranked by kind for where it came from |
 | [1974](1974.md) | done | 2026-11-26 | The Desktop section's batch line is back: a batch's result is the run's look |
