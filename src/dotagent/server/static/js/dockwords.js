@@ -18,6 +18,7 @@ const RHYTHM_CHARS = 18;
  * @property {boolean} reconnecting the page lost the run's stream and has not got it back
  * @property {{ done: number, total: number } | null} plan how far the run's plan has come
  * @property {{ live: number, waitedFor: number, letGo: number }} helpers the helpers that work (waitcounts.js)
+ * @property {boolean} waits the run has stopped and only waits for its helpers (`waitsOnHelpers`, waitcounts.js)
  * @property {{ count: number, rhythm: string | null, problem: boolean }} loops the loops of the chat; `rhythm` is how often
  *   the one loop repeats, in few words
  * @property {{ count: number, held: boolean, problem: boolean, sending: boolean }} queue the messages queued for after the run
@@ -36,8 +37,8 @@ const RHYTHM_CHARS = 18;
  */
 
 /**
- * The status segment: how long the run has worked, or that it waits for the owner, waits to start, stops or has lost
- * its stream.
+ * The status segment: how long the run has worked, or that it waits for the owner, waits on its helpers (only while it
+ * has stopped for them, the owner's report of 2026-11-27), waits to start, stops or has lost its stream.
  * @param {DockState} state
  * @returns {DockSegment}
  */
@@ -57,6 +58,11 @@ function statusSegment(state) {
   if (state.status === "blocked") {
     const label = t("work.waitingForYou");
     return { id: "status", label, short: label, name: label, tone: "waiting", sheet: false };
+  }
+  const { waitedFor } = state.helpers;
+  if (state.waits && waitedFor > 0) {
+    const label = tCount(waitedFor, "capsule.waitOne", "capsule.waitMany");
+    return { id: "status", label, short: label, name: label, tone: "work", sheet: false };
   }
   const took = elapsed(state.took);
   const label = t("dock.working", { took });

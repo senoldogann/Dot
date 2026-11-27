@@ -684,3 +684,29 @@ public func activity(of chat: ChatProjection, run: String) -> RunActivity? {
     }
     return nil
 }
+
+/// The tools whose open call holds a run until a helper ends: `delegate` (unless it asked for no wait) and the agent
+/// tools of the coding CLIs.
+public let helperWaitTools: Set<String> = ["delegate", "message_agent", "task", "agent"]
+
+/// Whether `run` of `chat` has stopped and only waits for its helpers: it writes and thinks nothing, and every call of
+/// its newest step that has no result yet waits on a helper (`helperWaitTools`; a `delegate` with `wait` false does not).
+/// `false` while any other call of that step runs, while it has no open call, and once it ended: then it works or
+/// rests. The capsule says "Waiting on N helpers" only while this holds (the owner's report of 2026-11-27). Pure.
+public func waitsOnHelpers(of chat: ChatProjection, run: String) -> Bool {
+    if let words: String = chat.writing[run], !words.isEmpty { return false }
+    if let thought: LiveThought = chat.thinking[run], !thought.text.isEmpty { return false }
+    let events: [EventRecord] = chat.runs[run]?.events ?? []
+    guard !events.contains(where: { $0.kind == "run_finished" }) else { return false }
+    let since: ArraySlice<EventRecord> = events[((events.lastIndex { $0.kind == "assistant" }) ?? -1) + 1..<events.count]
+    let done: Set<String> = Set(since.filter { $0.kind == "tool_result" }.compactMap { $0.data["call_id"]?.string })
+    let open: [EventRecord] = since.filter { event in
+        guard event.kind == "tool_call", let tool: String = event.data["tool"]?.string, !silentTools.contains(tool) else { return false }
+        guard let call: String = event.data["call_id"]?.string else { return true }
+        return !done.contains(call)
+    }
+    return !open.isEmpty && open.allSatisfy { event in
+        let tool: String = event.data["tool"]?.string?.lowercased() ?? ""
+        return helperWaitTools.contains(tool) && event.data["args"]?.object?["wait"]?.bool != false
+    }
+}

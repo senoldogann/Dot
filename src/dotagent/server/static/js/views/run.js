@@ -66,7 +66,7 @@ import { createStageSize } from "../stagesize.js";
 import { RUN_BACK_EVENT } from "../shell.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, breakToldAt, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
-import { waitCounts } from "../waitcounts.js";
+import { waitCounts, waitsOnHelpers } from "../waitcounts.js";
 import { createWorkStatus } from "../workstatus.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { attemptWithFallback } from "../modelrefused.js";
@@ -1462,6 +1462,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       helpers: timeline.helperStatuses(),
       helpersNow: timeline.helperNow(),
       released: timeline.helperReleased(),
+      waits: waitsOnHelpers(timeline.rootOpenCalls()),
       queued: queue.count(),
     });
     // The plan's bubble goes with its part: once the run no longer works, it is not left open over nothing (item 644).
@@ -1489,6 +1490,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       reconnecting,
       plan: steps.length === 0 ? null : { done, total: steps.length },
       helpers: waitCounts(timeline.helperStatuses(), timeline.helperReleased()),
+      waits: waitsOnHelpers(timeline.rootOpenCalls()),
       loops: loopsNow,
       queue: queueNow,
       running: runningNow,

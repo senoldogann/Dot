@@ -99,7 +99,7 @@ _SLOW_S: float = 0.6
 _NEWER_WAIT_S: float = 5.0
 # The longest a page's caches may take to hold what a test waits for.
 _UNTIL_S: float = 15.0
-_WORDS: tuple[str, ...] = ("Reconnecting", "Connection lost", "Connecting")
+_WORDS: tuple[str, ...] = ("Can't reach", "Reconnecting", "Connection lost", "Connecting")
 # What the pages of an updated daemon are, as the status a page reads tells it.
 _OTHER_PAGES: str = "0" * 16
 
