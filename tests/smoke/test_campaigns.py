@@ -300,7 +300,8 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
                 _verdict("continue", "The ledger measures 5 leads, not 50."),
                 _turn(_progress("Wrote 45 more leads; wc -l counts 51 lines.", 50)),
                 _turn(_call(CAMPAIGN_ACHIEVED_TOOL, {"evidence": claim})),
-                _verdict("achieved", "The newest progress entry measures 50 leads, as the targets ask."),
+                # Reached, with a better result in reach (item 1946): the targets are met, so the claim is accepted.
+                _verdict("improve", "The newest progress entry measures 50 leads, as the targets ask."),
                 _finish("The campaign is achieved: 50 leads are in leads.csv."),
             ],
         )

@@ -25,6 +25,7 @@ import { markdownMirror } from "./mirror.js";
 import { loadPalette } from "./palette.js";
 import { arePicks, createPicks } from "./picks.js";
 import { readPref, removePref, writePref } from "./prefs.js";
+import { QUOTE_EVENT, quoteInto, splitQuote } from "./quotebutton.js";
 import { takesSnapshots } from "./snapshots.js";
 import { filterGroups, menuSections, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
 import { openTeachPanel } from "./teach.js";
@@ -326,12 +327,17 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
 
   let drafting = true;
 
+  // What is typed besides a quote at the start (item 1972): a quote alone is no message.
+  function typedWords() {
+    return splitQuote(textarea.value).words.trim();
+  }
+
   function keep() {
     if (key === null || !drafting) {
       return;
     }
     const files = attachments.ready();
-    if (textarea.value.trim() === "" && files.length === 0 && picks.count() === 0) {
+    if (typedWords() === "" && files.length === 0 && picks.count() === 0) {
       removePref(key);
       return;
     }
@@ -357,11 +363,11 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
   let stop = null;
 
   function stopping() {
-    return stop !== null && textarea.value.trim() === "" && attachments.count() === 0;
+    return stop !== null && typedWords() === "" && attachments.count() === 0;
   }
 
   function paintEmpty() {
-    element.toggleAttribute("data-empty", textarea.value.trim() === "");
+    element.toggleAttribute("data-empty", typedWords() === "");
     const stopShown = stopping();
     element.toggleAttribute("data-stop", stopShown);
     const words = stopShown ? t("composer.stop") : sendWords;
@@ -461,6 +467,15 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
   textarea.addEventListener("input", onInput);
   textarea.addEventListener("focus", onFocus);
   textarea.addEventListener("blur", onBlur);
+  // A Quote button of a message (item 1972) starts the text with that message as a "> quote".
+  const onQuote = (/** @type {CustomEvent<string>} */ event) => {
+    textarea.value = quoteInto(textarea.value, event.detail);
+    wired.autosize();
+    edited();
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  };
+  document.addEventListener(QUOTE_EVENT, onQuote);
 
   const draft = draftKey === null ? null : readDraft(draftKey);
   if (draft !== null) {
@@ -541,6 +556,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);
       textarea.removeEventListener("blur", onBlur);
+      document.removeEventListener(QUOTE_EVENT, onQuote);
     },
   };
 }

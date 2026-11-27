@@ -10,11 +10,15 @@ from a commit whose macOS runs passed, and a red one is seen:
   runs, is read from its other jobs). A red verdict opens the issue "main is red on macOS", or adds a comment to the
   open one, with the runs and jobs that failed; a green one closes it; a pending one leaves it.
 
-The runs read are the newest run of ``gate.yml`` on main for the commit (the push's own or a run by hand's), and the
+The runs read are the newest run of ``gate.yml`` on main for the commit (the push's own or a run by hand's), the
 newest run of ``ios.yml`` for a push to main, whatever its commit: ios.yml runs only for a push that changed ``ios/``,
 so its last verdict stands until a later push changes the app again (a commit that did not touch ``ios/`` does not make
-a red iPhone run green). A commit with no gate run yet is pending: runs of main that wait replace one another (item
-1011), so the newest commit's run is the one that comes.
+a red iPhone run green), and the newest finished run of ``browser.yml`` on main (item 1936): the whole browser suite
+runs each night, or by hand (``gh workflow run browser.yml --ref main``), and a push runs only the parts its files can
+affect, so a red night stands until a later run of the whole suite passes. A browser run still going is not waited
+for (it takes hours, every night), and one cancelled (a newer run replaced it) says nothing. A commit with no gate run
+yet is pending: runs of main that wait replace one another (item 1011), so the newest commit's run is the one that
+comes.
 Stdlib only, as the job that runs it installs nothing; GitHub is asked through ``gh``.
 """
 
@@ -26,7 +30,9 @@ from typing import Literal
 
 ISSUE_TITLE: str = "main is red on macOS"
 GATE: str = "gate.yml"
-WORKFLOWS: tuple[str, ...] = (GATE, "ios.yml")
+IOS: str = "ios.yml"
+BROWSER: str = "browser.yml"
+WORKFLOWS: tuple[str, ...] = (GATE, IOS, BROWSER)
 GREEN: frozenset[str] = frozenset({"success", "skipped"})
 # The job of each macOS workflow that runs ``report`` (gate.yml, ios.yml): its own run is read from its other jobs.
 REPORT_JOB: str = "main-health"
@@ -104,28 +110,55 @@ def this_run(workflow: str, url: str, jobs: list[dict[str, object]]) -> Run:
     )
 
 
+def query(workflow: str, sha: str) -> str:
+    """Which runs of ``workflow`` on main are asked for: the gate's of this commit; the iPhone app's last of a push,
+    whatever its commit; the browser suite's last few, whatever their event, as :func:`newest` skips some."""
+    if workflow == GATE:
+        return f"head_sha={sha}"
+    if workflow == IOS:
+        return "event=push&per_page=1"
+    return "per_page=20"
+
+
+def newest(workflow: str, runs: list[dict[str, object]], current: str | None) -> dict[str, object] | None:
+    """The run of ``workflow`` that speaks for main, of those GitHub listed (``None`` when none does). The newest for
+    the gate and ios.yml; for the browser suite the newest finished and not cancelled, or the run ``current`` (the
+    report job's own) when it is listed, as a night's own report reads its own run."""
+    if workflow == BROWSER:
+        runs = [
+            run
+            for run in runs
+            if (current is not None and str(run.get("id")) == current)
+            or (run.get("status") == "completed" and run.get("conclusion") != "cancelled")
+        ]
+    return max(runs, key=lambda r: str(r.get("created_at", ""))) if runs else None
+
+
 def _runs(sha: str, current: str | None) -> list[Run]:
     found: list[Run] = []
     for workflow in WORKFLOWS:
-        # The gate's run of this commit; the iPhone app's last run of a push, whatever its commit.
-        which: str = f"head_sha={sha}" if workflow == GATE else "event=push&per_page=1"
         listed: object = json.loads(
-            _gh(["api", f"repos/{{owner}}/{{repo}}/actions/workflows/{workflow}/runs?branch=main&{which}"])
+            _gh(
+                [
+                    "api",
+                    f"repos/{{owner}}/{{repo}}/actions/workflows/{workflow}/runs?branch=main&{query(workflow, sha)}",
+                ]
+            )
         )
         if not isinstance(listed, dict) or not isinstance(listed.get("workflow_runs"), list):
             raise RuntimeError(f"the runs of {workflow} for {sha} came back as {listed!r}")
         runs: list[dict[str, object]] = [r for r in listed["workflow_runs"] if isinstance(r, dict)]
-        if not runs:
+        chosen: dict[str, object] | None = newest(workflow, runs, current)
+        if chosen is None:
             continue
-        newest: dict[str, object] = max(runs, key=lambda r: str(r.get("created_at", "")))
-        url: str = str(newest.get("html_url", ""))
-        if current is not None and str(newest.get("id")) == current:
+        url: str = str(chosen.get("html_url", ""))
+        if current is not None and str(chosen.get("id")) == current:
             found.append(this_run(workflow, url, _jobs(current)))
             continue
-        status: str = str(newest.get("status", ""))
-        conclusion: str = str(newest.get("conclusion") or "")
+        status: str = str(chosen.get("status", ""))
+        conclusion: str = str(chosen.get("conclusion") or "")
         failed: tuple[str, ...] = (
-            _failed(_jobs(str(newest["id"]))) if status == "completed" and conclusion not in GREEN else ()
+            _failed(_jobs(str(chosen["id"]))) if status == "completed" and conclusion not in GREEN else ()
         )
         found.append(Run(workflow=workflow, status=status, conclusion=conclusion, url=url, failed_jobs=failed))
     return found

@@ -4,6 +4,7 @@ locations."""
 import errno
 import fcntl
 import fnmatch
+import functools
 import os
 import tempfile
 from pathlib import Path
@@ -81,9 +82,10 @@ _NOT_A_FOLDER: frozenset[int] = frozenset(
 )
 
 
-def _folder_path(folder: Path) -> Path | None:
+def _folder_path(folder: str) -> Path | None:
     """The path the kernel names for ``folder`` (``F_GETPATH``), or None when ``folder`` is no folder this process can
-    open: not there, a file, a pipe, a device, a link, or closed to it (:data:`_NOT_A_FOLDER`)."""
+    open: not there, a file, a pipe, a device, a link, or closed to it (:data:`_NOT_A_FOLDER`). It takes the text of the
+    folder: a :class:`Path` of thousands of parts takes as long to make as to read them all."""
     try:
         descriptor: int = os.open(folder, _folder_flags())
     except OSError as error:
@@ -101,17 +103,29 @@ def kernel_path(path: Path) -> Path:
     """``path`` (absolute, its links resolved) as the kernel names the place it reaches (item 399): the deepest folder
     on it that this process can open is asked its path, and the rest of ``path`` follows that. A spelling through the
     Data volume (``/System/Volumes/Data/Users/…``, which the firmlinks of macOS join to ``/Users/…``) or in another
-    letter case is so classified by the place it names, where ``realpath`` follows links alone."""
-    folder: Path = path
-    rest: list[str] = []
-    named: Path | None = _folder_path(folder)
-    while named is None:
-        if folder.parent == folder:
-            raise PolicyDenied("the kernel names no folder of the path", {"path": str(path)})
-        rest.insert(0, folder.name)
-        folder = folder.parent
-        named = _folder_path(folder)
-    return named.joinpath(*rest)
+    letter case is so classified by the place it names, where ``realpath`` follows links alone.
+
+    The folders are cut from the text of ``path``, the deepest first: made from its parts again for each, a path of
+    thousands of parts that a shell line names took seconds (item 1945)."""
+    parts: tuple[str, ...] = path.parts
+    text: str = str(path)
+    # Where the folder of the first ``depth`` parts ends in ``text``: a root ends with a slash, a name is joined by one.
+    ends: list[int] = []
+    for depth, part in enumerate(parts):
+        joined: int = 0 if depth == 0 or (depth == 1 and path.root) else 1
+        ends.append((ends[-1] if ends else 0) + joined + len(part))
+    for depth in range(len(parts), 0, -1):
+        if ends[depth - 1] >= _KERNEL_PATH_BYTES:
+            # Longer than MAXPATHLEN, so the open fails with ENAMETOOLONG: not cut and handed to the kernel at all.
+            continue
+        named: Path | None = _folder_path(text[: ends[depth - 1]])
+        if named is not None:
+            return named.joinpath(*parts[depth:])
+    # A path that is not absolute is in the folder this process is in.
+    here: Path | None = None if path.root else _folder_path(".")
+    if here is None:
+        raise PolicyDenied("the kernel names no folder of the path", {"path": str(path)})
+    return here.joinpath(*parts)
 
 
 def expand_path(raw: str, cwd: Path) -> Path:
@@ -181,14 +195,24 @@ def runs_as_git_code(path: Path) -> bool:
     return False
 
 
+@functools.cache
+def _resolved_roots(prefixes: tuple[str, ...]) -> tuple[Path, ...]:
+    """``prefixes`` with their links followed, resolved once for each set (item 4 of the review of 2026-11-26): every
+    path a tool names was classified with a ``realpath`` of each, a lookup of the disk on the event loop that froze the
+    daemon for 10-15 s at a time on a slow disk. They are the system's own places and links (``/tmp`` is
+    ``/private/tmp``), which a run cannot change; the temporary folder of this process is one too, held from the first
+    look, so a link a run later puts in its place does not move it."""
+    return tuple(Path(os.path.realpath(prefix)) for prefix in prefixes)
+
+
 def _is_temp(path: Path) -> bool:
-    roots: list[Path] = [Path(os.path.realpath(prefix)) for prefix in _TEMP_PREFIXES]
-    roots.append(Path(os.path.realpath(tempfile.gettempdir())))
-    return any(within(path, root) for root in roots)
+    # ``gettempdir`` reads ``TMPDIR`` once for the process and keeps it; the folder it names is a key of the cache, so a
+    # process that names another one (``tempfile.tempdir``) has its own roots resolved.
+    return any(within(path, root) for root in _resolved_roots((*_TEMP_PREFIXES, tempfile.gettempdir())))
 
 
 def _is_system(path: Path) -> bool:
-    return any(within(path, Path(os.path.realpath(prefix))) for prefix in _SYSTEM_PREFIXES)
+    return any(within(path, root) for root in _resolved_roots(_SYSTEM_PREFIXES))
 
 
 def _without_root_names(parts: tuple[str, ...]) -> tuple[str, ...]:

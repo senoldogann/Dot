@@ -23,12 +23,8 @@ public struct SystemClock: EngineClock {
 public enum StreamRules {
     /// The new streams write a keepalive every 5 s: one silent for 12 s is broken.
     public static let silenceLimit: Double = 12
-    /// A stream whose last byte is younger than this is alive when the app comes back.
-    public static let probeAge: Double = 6
     /// The backoff starts again only after a connection stayed up this long.
     public static let stableAfter: Double = 30
-    /// Away at least this long, every stream is opened again from its cursors on return.
-    public static let resubscribeAfter: Double = 10
     public static let firstWait: Double = 0.5
     public static let longestWait: Double = 15
 }

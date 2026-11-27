@@ -5,6 +5,13 @@
 A run is a loop. The model answers with tool calls; Dot checks each call against the [policy](safety.md#safety), runs the ones
 that pass (up to `parallel_tools` at once) and hands the results back, until the model calls `finish`.
 
+Before its first model call a run reads what it starts with, and what needs nothing else it reads at once (item 1918):
+the model's profile, its agent and the team, the accounts signed in, the skills offered, the notes recalled for its
+goal, when a model last answered in its chat and the harness's texts; the first of them that fails ends the run with
+its error, as before. The profile counts each finished run's events once and again only when they change, and a skill's
+frontmatter is parsed again only when its file's text changed. The run's page shows when its first call began and when
+its first word came: the `model_call` event carries the call's `seconds` and `first_token_seconds`.
+
 Every run's prompt, on Dot's own models and on your Claude plan, tells the model to analyse thoroughly and recommend
 boldly (item 1023, your word of 2026-11-07): an analysis weighs every side that matters, its evidence, risks and costs,
 and a recommendation names the option it would take and why, even a big change, rather than a cautious list. What a
@@ -57,7 +64,21 @@ and the time, where the pointer rests (item 842; on a touch screen it is a row o
 and turns to *Hide the steps* once
 pressed. Approvals, questions, notes and the messages stay in sight either way; the changes of the memory stand with the
 steps, with **What it is doing** (item 830), and an agent's message is folded until you open it, in either choice
-(item 859). The choice is kept by the browser. A run
+(item 859). The choice is kept by the browser. A third choice, **Messages only** (item 1976, after Grok Bot's chats),
+tells the run as a conversation: the steps and thoughts fold out as with *What it is doing*; what the run says on the way
+to its calls is drawn as one of its messages and stays where it was said; and a call that turns the run to other work
+which its own words did not tell is one of Dot's short messages too, in the words the line uses for it ("Searching the
+web for “GistSmith contact”", "Looking at gistsmith.com", "Running a command"). The line under them says what the run
+does now and for how long ("Reading README.md… · 2 min"). Those lines come from the daemon's `narration` events
+(`agent/narration.py`), one beside a call's `tool_call` in every harness (Dot's own loop, Claude Code, OpenCode, whose own tools are told as the Dot tool that does the same): no model
+is asked for them and the model never reads them, so they cost no token. A stretch of one kind of work is one line: a
+call of a kind one of the run's four newest lines told is not told again, but for a search of other words or a page on
+another site; a line names a page by its site, a file by its name and a search by its words, never a command's text. Over
+the owner's 279 runs of two weeks that made a median of one line a run on Claude Code (at most 17) and six on OpenCode
+(at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
+the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
+may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
+the line wears the bot's face, and a finished run's steps fold behind one *Worked for* line before its answer. A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
@@ -194,11 +215,11 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `scaffold = "measured"` a model is weak when at least `profile_min_calls` tool calls of its newest 30 finished runs
   were measured and at least `weak_refusal_share` of them were refused before they ran (an unknown tool, or arguments
   that were not valid JSON or did not fit the tool). `scaffold = "fixed"`, the default, keeps every model standard.
-  Every model, after three acting steps in a row whose `browser_act` or `desktop_act` calls carried one step each on
+  Every model, after three acting steps in a row whose `browser_act`, `safari_act` or `desktop_act` calls carried one step each on
   the same page or application, is told once to batch the steps it can predict into one call (each call costs a model
   round trip; `dotx stats` counts the single-step share), and the timeline shows the note; `steer_single_actions =
-  false` in `[agent]` turns it off. Every tool result records its channel (a command, an API, the web, the browser, the
-  desktop, or the run's own tools), and `dotx stats` shows the calls per channel and the share of the acting calls that
+  false` in `[agent]` turns it off. Every tool result records its channel (a command, an API, the web, the browser and
+  the Safari tools, the desktop, or the run's own tools), and `dotx stats` shows the calls per channel and the share of the acting calls that
   went through a GUI: the prompt sends the agent to a command or an API first, the browser second, the desktop last.
   The side panel's Task tab shows under Set up a budget cut to the window, why a model is weak, and each reminder
   (item 365).
@@ -434,7 +455,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
   whose campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
-  each). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
+  each, a video or a sound up to 200 MB, sent as the raw body of `PUT /api/attachments/stream` and written to disk as
+  it arrives, as is any file over 2 MB, item 1933). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
   thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
   the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it
@@ -653,9 +675,10 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Vault           | `vault_contacts` (item 621): the contact details you saved in Settings › Vault and the billing address of each card, for a run to type where a form asks; it never shows a password, a card number, an expiry or a security code (a card is kept, and no tool of a run fills it) |
 | Meetings        | `meeting_join`, `meeting_read`, `meeting_post`, `meeting_leave` (item 1138): notes of the owner's Google Meet call, answers to whoever speaks to Dot there (item 1150); a task's post asks the owner every time ([Meetings](meetings.md)) |
 | Video           | `watch_video` (item 1212, tool group `video`): a video file or a link, as frames with their moments and a transcript by the minute ([Watching videos](video.md)) |
+| Pictures        | `generate_image` (item 1969, tool group `images`): a PNG saved in the workspace and shown in the chat, drawn by Dot's browser from an SVG or HTML the run writes, or a photo from Google's picture model on the owner's `GOOGLE_API_KEY` ([Making pictures](image-generation.md)) |
 | Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` or a registered scope ([Recon](recon.md)) |
 | Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts` or a registered scope, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
-| Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
+| Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write`, and the pages of the owner's own Safari: `safari_open`, `safari_read`, `safari_act` (item 1959, [Browser and computer use](browser-and-computer-use.md#the-owners-own-safari)) |
 | Phone           | while `[phone] enabled` (item 1196): `phone_status`, whether the owner's iPhone answers over WebDriverAgent and is locked ([Dot and your iPhone](phone-control.md)) |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
@@ -682,7 +705,9 @@ a model on the owner's Mac sent them 17 times in two days, each call refused), `
 `file_text` too (item 1902: Claude models sent that name, the one Anthropic's text editor tool gives it), `search_files` reads its `pattern` as
 `query` too (item 1176: a run on the Claude plan sent that name four times), `search_files` and `find_files` of a
 path that is not there fail with "path does not exist", as `list_dir` and `read_file` do, not as a failure of
-ripgrep's own (item 1283), and a wait or a count asked past its
+ripgrep's own (item 1283), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
+comes, ending the search at that and saying so, so that a word a tree holds everywhere no longer costs the daemon
+the 1.8 GB that 397 MB of matches did (item 1956), and a wait or a count asked past its
 bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
 60 s; `memory_search`'s `limit`, 20), never a bound that keeps an action safe. Any error of a tool fails that
 call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log
@@ -882,6 +907,15 @@ in another directory, so later lines are judged from the home folder. A chat kee
 sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
 when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
+**A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
+answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the
+checks are pending, and it runs no `gh pr checks` loop, no `sleep` and no `wait_until` on them. Over a week on the
+owner's Mac, 382 shell calls of that kind took 9.3 of the 29 hours of the helpers' shell time, in 37 of 76 helper
+runs, and each poll of a Claude Code helper read its whole context again. The parent, which has a chat, starts
+`gh pr checks <number> --watch` with `terminal_open` and `background` (the shell's and the delegate tool's descriptions
+say so) and ends its run or goes on; the chat is told when the command ends, and a run reads the checks then, as for
+any command in the background. This asks the owner nothing and changes no policy: it is words in two prompts.
+
 `wait_until` (item 887, after OpenMausBot's waits) waits for something to happen, checked in code, with no model turn
 spent on the wait. It names one condition:
 
@@ -1020,8 +1054,9 @@ and updates when a new one arrives. Both show the capture time.
 ## Delegation
 
 `delegate(goal, model?, step?, wait?)` hands a sub-goal to a separate run with a conversation of its own and returns
-its result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
-helper model that `model` names when that one can answer (see [Helpers and standby](models.md#models-and-providers)).
+its result, so a long investigation does not fill the parent's context. The helper takes the model named by `model`
+when that model can answer. With no explicit choice, [Task models](models.md#models-and-providers) can select a model
+for the brief. The parent's current model is the default for an unmapped brief.
 Several calls in one turn run side by side (up to `parallel_tools`; a group chat's lead sends its agents their parts all
 at once, as many as the team has, up to eight, when its reply's calls all send parts, item 831), which is how a plan's
 independent steps run at the same time; `step` names the plan step the part is, and the report closes it (see the plan

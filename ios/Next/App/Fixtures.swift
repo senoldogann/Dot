@@ -24,6 +24,8 @@
         case failed = "n2-failed"
         /// The phone offline with nothing saved of the chat.
         case offline = "n2-offline"
+        /// No link, with the chat's copy saved on the phone (item 1931: the pill says Offline over it).
+        case offlineSaved = "n2-offline-saved"
         /// A chat deleted on the Mac while open.
         case deleted = "n2-deleted"
         /// The agents sheet (§19's one-line titles).
@@ -32,6 +34,9 @@
         case inspector = "n2-inspector"
         /// The chat's settings sheet: models, options, catalog (PLAN §24).
         case model = "n2-model"
+        /// A working chat whose command rows return long output (a test run of 600 lines, a file of 400): the jank check of
+        /// opening and closing a row (`UITests/WorkLogJankUITests.swift`).
+        case jank = "n2-jank"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -49,9 +54,11 @@
         /// The snapshot the scene draws.
         func snapshot(now: Double) -> EngineSnapshot {
             var snapshot: EngineSnapshot = .empty
-            snapshot.transport = self == .offline ? .offline : .up
-            snapshot.online = self != .offline
-            let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : .live
+            let linked: Bool = self != .offline && self != .offlineSaved
+            snapshot.transport = linked ? .up : .offline
+            snapshot.online = linked
+            if self == .offlineSaved { snapshot.savedAt[Self.thread] = now - 240 }
+            let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : self == .offlineSaved ? .cached : .live
             if self != .offline {
                 let view: ThreadView = decode(viewJSON(now: now))
                 var chat: ChatProjection = ChatProjection.drawn(view: view, events: decode(eventsJSON(now: now)), freshness: freshness)
@@ -129,14 +136,14 @@
                  "summary":null,
                  "runs":[
                    {"id":"run_a","thread_id":"thr_fixture","goal":"Find out why the site's build fails on CI and fix it","mode":"task","model":"claude_code:opus","status":"done","created_at":\(now - 3000),"finished_at":\(now - 2866),"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":48210,"output_tokens":3120,"approvals":"auto"},
-                   {"id":"run_b","thread_id":"thr_fixture","goal":"Book me the dentist for next week, afternoons if you can.","mode":"task","model":"claude_code:opus","status":"\(runB)","created_at":\(now - 2475),"finished_at":null,"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":20110,"output_tokens":800,"approvals":"auto"}
+                   {"id":"run_b","thread_id":"thr_fixture","goal":"Book me the dentist for next week, afternoons if you can.","mode":"task","model":"claude_code:opus","status":"\(runB)","created_at":\(now - 2475),"finished_at":null,"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":3212154,"output_tokens":8132,"approvals":"auto"}
                  ],
                  "older":false,"newest":null,"newest_events":[],"newest_events_cut":false,
                  "queue":{"held":false,"messages":\(queue),"beside_run_id":"run_b","beside_thread_id":null},
                  "asks":\(asks),
                  "helpers":[
-                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"Claude","model":"Opus 5.5","effort":"Medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
-                   {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"Claude","model":"Sonnet 5.5","effort":"Low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
+                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
+                   {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"claude_code","model":"sonnet","effort":"low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
                  ],
                  "background":[],
                  "reactions":[{"run_id":"run_a","message":"answer","reaction":"good"}],
@@ -156,7 +163,7 @@
                 #"{"id":6,"run_id":"run_a","ts":\#(a + 62),"kind":"tool_result","data":{"call_id":"a3","ok":true,"text":"{}"}}"#,
                 #"{"id":7,"run_id":"run_a","ts":\#(a + 63),"kind":"tool_call","data":{"call_id":"a4","tool":"shell","args":{"command":"npm test"}}}"#,
                 #"{"id":8,"run_id":"run_a","ts":\#(a + 134),"kind":"tool_result","data":{"call_id":"a4","ok":true,"text":"42 passed"}}"#,
-                ###"{"id":9,"run_id":"run_a","ts":\###(a + 134),"kind":"run_finished","data":{"status":"done","result":"## Fixed\nThe build failed because **Node 18** was pinned on CI while the lock file needs Node 22.\n\n| Step | Before | After |\n|---|---|---|\n| Node | 18.19 | 22.11 |\n| Build | failed | 41 s |\n\n```yaml\n- uses: actions/setup-node@v4\n  with:\n    node-version: 22\n```\n\nSee [the run](https://github.com/example/site/actions) for the green check."}}"###,
+                ###"{"id":9,"run_id":"run_a","ts":\###(a + 134),"kind":"run_finished","data":{"status":"done","result":"## Fixed\nThe build failed because **Node 18** was pinned on CI while the lock file needs Node 22.\n\n| Agent | Job |\n|---|---|\n| Invention Scout | Checks a lost invention against two independent sources and lists the Commons images with their licences → `research/<date>-<slug>.md` |\n| Story Scripter | Writes 9 scenes of 130–145 words in English to `script.json` (the hook in the first 3 s, an ironic close) |\n| Channel Analyst | Measures the weekly views |\n\n```yaml\n- uses: actions/setup-node@v4\n  with:\n    node-version: 22\n```\n\nhttps://github.com/example/site/pull/1012 merged, see [Node's release notes](https://nodejs.org/en/blog) for 22. The notes are in `~/Desktop/ci-notes.md`."}}"###,
                 #"{"id":20,"run_id":"run_b","ts":\#(b + 2),"kind":"plan","data":{"steps":[{"text":"Read next week's calendar","status":"done"},{"text":"Find free afternoon slots at the dentist","status":"in_progress"},{"text":"Book the slot you choose","status":"pending"}]}}"#,
                 #"{"id":21,"run_id":"run_b","ts":\#(b + 3),"kind":"tool_call","data":{"call_id":"b1","tool":"delegate","args":{"goal":"Check the dentist's free slots"}}}"#,
                 #"{"id":22,"run_id":"run_b","ts":\#(b + 4),"kind":"tool_result","data":{"call_id":"b1","ok":true,"text":"started"}}"#,
@@ -167,6 +174,7 @@
                 #"{"id":27,"run_id":"run_b","ts":\#(b + 42),"kind":"assistant","data":{"text":"Your Tuesday and Thursday afternoons are free; the dentist shows two slots.","thinking":"Compare the calendar with the dentist's free slots before answering.","step":4}}"#,
                 #"{"id":28,"run_id":"run_b","ts":\#(b + 43),"kind":"tool_call","data":{"call_id":"b4","tool":"wait_until","args":{"command":"test -f /tmp/slots"}}}"#,
             ]
+            if self == .jank { events.insert(contentsOf: jankEvents(at: b), at: events.count - 1) }
             switch self {
             case .work:
                 events.append(#"{"id":29,"run_id":"run_b","ts":\#(b + 50),"kind":"steer","data":{"text":"A helper that read the calendar ended: Tuesday 14:00 and Thursday 10:30 are free.","of_dot":true}}"#)
@@ -180,6 +188,24 @@
                 break
             }
             return "[" + events.joined(separator: ",") + "]"
+        }
+
+        /// Two rows of long output among short ones: 600 lines of test results and 400 of a source file, as a JSON string's
+        /// escaped newlines (no quote or backslash in the lines, so the JSON stays valid).
+        private func jankEvents(at b: Double) -> [String] {
+            let tests: String = (1...600).map { "  PASS  suite \($0) > handles case \($0) in 12 ms, expect(received).toEqual(expected) deep equality holds" }.joined(separator: "\\n")
+            let source: String = (1...400).map { "    const value\($0) = await client.fetch(path\($0), { retries: \($0 % 5), timeout: 30_000 }); // line \($0)" }.joined(separator: "\\n")
+            // Words of the model between the rows, so that the rows are not read as one group ("Ran 3 commands", item 1909).
+            return [
+                #"{"id":40,"run_id":"run_b","ts":\#(b + 44),"kind":"tool_call","data":{"call_id":"j1","tool":"shell","args":{"command":"pnpm vitest run --reporter=verbose"}}}"#,
+                #"{"id":41,"run_id":"run_b","ts":\#(b + 45),"kind":"tool_result","data":{"call_id":"j1","ok":true,"text":"\#(tests)"}}"#,
+                #"{"id":42,"run_id":"run_b","ts":\#(b + 45.5),"kind":"assistant","data":{"text":"The tests pass; reading the client next.","step":5}}"#,
+                #"{"id":43,"run_id":"run_b","ts":\#(b + 46),"kind":"tool_call","data":{"call_id":"j2","tool":"read_file","args":{"path":"~/Projects/site/src/client.ts"}}}"#,
+                #"{"id":44,"run_id":"run_b","ts":\#(b + 47),"kind":"tool_result","data":{"call_id":"j2","ok":true,"text":"\#(source)"}}"#,
+                #"{"id":45,"run_id":"run_b","ts":\#(b + 47.5),"kind":"assistant","data":{"text":"The client looks fine; checking the tree.","step":6}}"#,
+                #"{"id":46,"run_id":"run_b","ts":\#(b + 48),"kind":"tool_call","data":{"call_id":"j3","tool":"shell","args":{"command":"git status --short"}}}"#,
+                #"{"id":47,"run_id":"run_b","ts":\#(b + 49),"kind":"tool_result","data":{"call_id":"j3","ok":true,"text":" M src/client.ts"}}"#,
+            ]
         }
 
         private func helperViewJSON(now: Double) -> String {

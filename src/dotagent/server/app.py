@@ -18,6 +18,7 @@ from dotagent.core.errors import (
     BrowserError,
     ChannelError,
     ConfigError,
+    DiskSpaceError,
     DotError,
     ElsewhereError,
     GalleryError,
@@ -74,6 +75,7 @@ from dotagent.server.routes_keys import keys_router
 from dotagent.server.routes_mcp import mcp_router
 from dotagent.server.routes_pages import pages_router
 from dotagent.server.routes_phone import phone_router
+from dotagent.server.routes_phone_metrics import phone_metrics_router
 from dotagent.server.routes_proactive import proactive_router
 from dotagent.server.routes_providers import providers_router
 from dotagent.server.routes_queue import queue_router
@@ -133,6 +135,8 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     # A check that failed when the owner started its schedule by hand: they read why.
     (PrecheckError, 422),
     (ProviderError, 502),
+    # A large write refused on a disk nearly full (item 1938): the owner frees space; no fault of Dot's to log as one.
+    (DiskSpaceError, 507),
 )
 
 
@@ -238,6 +242,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(files_router(ctx, looks))
     app.include_router(looks_router(looks))
     app.include_router(phone_router(ctx, phones))
+    app.include_router(phone_metrics_router(ctx, phones))
     app.include_router(channels_router(ctx))
     app.include_router(snapshots_router(ctx))
     app.include_router(watch_router(ctx))

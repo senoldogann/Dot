@@ -30,6 +30,7 @@ MACOS_ONLY: tuple[str, ...] = (
     "test_service_install_from_a_terminal.py",
     "test_shell_guard_awk.py",
     "test_shell_guard_git.py",
+    "test_shell_guard_linear.py",
     "test_shell_guard_ordinary.py",
     "test_shell_guard_programs.py",
     "test_shell_guard_zsh.py",

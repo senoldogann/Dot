@@ -33,7 +33,7 @@ final class ChatListLiveUITests: XCTestCase {
         let label: String = ProcessInfo.processInfo.environment["DOTNEXT_E2E_MODEL"] ?? ""
         XCTAssertTrue(app.buttons["chats.new"].waitForExistence(timeout: 20))
         app.buttons["chats.new"].tap()
-        let chip: XCUIElement = app.buttons["newChat.model"]
+        let chip: XCUIElement = app.buttons["composer.model"]
         XCTAssertTrue(chip.waitForExistence(timeout: 10))
         chip.tap()
         XCTAssertTrue(app.navigationBars["Chat settings"].waitForExistence(timeout: 10))
@@ -58,7 +58,7 @@ final class ChatListLiveUITests: XCTestCase {
         any(app, "chatSettings.approval.yolo").firstMatch.tap()
         app.navigationBars["Approvals"].buttons.element(boundBy: 0).tap()
         app.buttons["chatSettings.done"].tap()
-        XCTAssertTrue(chip.label.contains(label), "the bar wears the picked model: \(chip.label)")
+        XCTAssertTrue(chip.label.hasPrefix("Model: ") && chip.label.contains(label), "the chip names the picked model: \(chip.label)")
 
         let field: XCUIElement = any(app, "composer.field").firstMatch
         field.tap()

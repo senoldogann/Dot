@@ -36,6 +36,9 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case rename(thread: String, title: String)
         case pin(thread: String, pinned: Bool)
         case delete(thread: String)
+        /// Several chats deleted in one request (`DELETE /threads` with their ids, item 1964): the list hides them at
+        /// once and shows them again if the daemon refuses.
+        case deleteChats(threads: [String])
         /// A reaction put on (`on`) or taken off a message of Dot's (`message` is `answer` or `step-N`).
         case react(run: String, thread: String, message: String, reaction: String, on: Bool)
         /// The model and effort the chat's next follow-up starts with (`PATCH /threads/{id}` choices).
@@ -62,6 +65,8 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case unreadable
         /// A photo of the message could not be read from the phone; the message is kept for the owner.
         case photoMissing(name: String)
+        case attachmentMissing(name: String)
+        case uploadCancelled
     }
 
     /// The item's id; for a keyed message, the key the daemon starts it once by.
@@ -73,6 +78,11 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
     public var attempts: Int
     public var phase: Phase
     public var failure: Failure?
+    public internal(set) var attachmentUpload: AttachmentUploadProgress? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case id, action, kind, createdAt, attempts, phase, failure
+    }
 
     public init(id: String, action: Action, createdAt: Double) {
         self.id = id
@@ -102,7 +112,7 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
             .editQueued(let thread, _, _, _), .resumeQueue(let thread), .rename(let thread, _), .pin(let thread, _), .delete(let thread),
             .react(_, let thread, _, _, _), .choices(let thread, _):
             thread
-        case .newChat: nil
+        case .newChat, .deleteChats: nil
         }
     }
 

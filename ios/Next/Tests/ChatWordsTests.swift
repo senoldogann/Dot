@@ -102,4 +102,47 @@ final class ChatWordsTests: XCTestCase {
         let other: ToolEntry = ToolEntry(id: "o", tool: "notify", kind: .other, target: "", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1)
         XCTAssertEqual(toolGroupWords([other, search], locale: english), "Used 1 tool and searched the web 1 time")
     }
+
+    /// Item 1932: a line that waits on the owner or for a stop is still; only work shimmers (the asks scene held the
+    /// phone at 100 % CPU redrawing "Waiting for you" thirty to sixty times a second).
+    func testOnlyWorkShimmers() {
+        XCTAssertFalse(workLineMoves(.waitingForYou))
+        XCTAssertFalse(workLineMoves(.stopping))
+        XCTAssertTrue(workLineMoves(.thinking))
+        XCTAssertTrue(workLineMoves(.typing))
+    }
+
+    /// Item 1957: the helpers group says what works first, then what waits, then what ended, and keeps its clock running
+    /// while one helper works; once all ended it stops at the last end.
+    func testTheHelpersGroupTalliesAndSpan() {
+        XCTAssertEqual(
+            helperTallies([.done, .working, .failed, .working]),
+            [HelperTally(state: .working, count: 2), HelperTally(state: .failed, count: 1), HelperTally(state: .done, count: 1)])
+        XCTAssertEqual(helperTallies([]), [])
+        func helper(_ id: String, _ status: String, _ start: Double, _ end: Double?) -> HelperView {
+            HelperView(
+                runId: id, parentRunId: "r", threadId: "t" + id, agentId: nil, title: id, status: status, startedAt: start,
+                finishedAt: end, provider: "claude_code", model: "opus", effort: "high", step: nil, blocking: false, stop: "")
+        }
+        let live: (start: Date, end: Date?) = helperGroupSpan([helper("a", "done", 100, 160), helper("b", "running", 90, nil)])
+        XCTAssertEqual(live.start.timeIntervalSince1970, 90)
+        XCTAssertNil(live.end, "a helper works: the clock runs")
+        let ended: (start: Date, end: Date?) = helperGroupSpan([helper("a", "done", 100, 160), helper("b", "failed", 90, 200)])
+        XCTAssertEqual(ended.end?.timeIntervalSince1970, 200)
+        let options: [ProviderModels] = [ProviderModels(provider: "claude_code", models: [], error: nil)]
+        XCTAssertEqual(engineLine(helper("a", "done", 0, 1), models: options), "Claude Code · opus · " + effortTitle("high"), "the model's id when the list does not hold it")
+    }
+
+    /// Item 1931: the pill's link line comes from the transport alone: a healthy stream never says Reconnecting.
+    func testThePillsLinkLineIsTheTransportsRealState() {
+        XCTAssertEqual(linkLine(transport: .offline, freshness: .cached, mac: "MacBook Air"), .offline)
+        XCTAssertEqual(linkLine(transport: .reconnecting(attempt: 2), freshness: .cached, mac: "MacBook Air"), .reconnecting(mac: "MacBook Air"))
+        XCTAssertEqual(linkLine(transport: .up, freshness: .syncing, mac: "MacBook Air"), .syncing)
+        XCTAssertNil(linkLine(transport: .up, freshness: .live, mac: "MacBook Air"), "a live chat on a healthy stream says nothing")
+        XCTAssertNil(linkLine(transport: .keyRefused, freshness: .cached, mac: "MacBook Air"), "a refused key is the subtitle's")
+        XCTAssertEqual(linkLine(transport: .up, freshness: nil, mac: "MacBook Air"), .syncing, "a chat not loaded yet is brought up to date")
+        XCTAssertNil(linkLine(transport: .up, freshness: .deleted, mac: "MacBook Air"), "a deleted chat says so itself")
+        XCTAssertEqual(linkLine(transport: .connecting, freshness: .cached, mac: "MacBook Air"), .syncing, "the first connection brings it up to date")
+        XCTAssertTrue(LinkLine.reconnecting(mac: "MacBook Air").words.contains("MacBook Air"), "the paired Mac by its name, in the phone's language")
+    }
 }

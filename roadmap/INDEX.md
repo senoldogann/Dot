@@ -6,7 +6,64 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1983](1983.md) | done | 2026-11-27 | DotNext's Memory: add a note, pin it, and bring a forgotten one back from the trash |
+| [1982](1982.md) | design | 2026-11-27 | Several tasks at once in one chat: design |
+| [1976](1976.md) | done | 2026-11-27 | A chat told as a conversation: Dot's short messages of what it turns to, and the live line with its face and time |
+| [1974](1974.md) | done | 2026-11-26 | The Desktop section's batch line is back: a batch's result is the run's look |
+| [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |
+| [1972](1972.md) | done | 2026-11-26 | Swipe a message to quote it |
+| [1971](1971.md) | done | 2026-11-26 | The pre-push hook checks the prompt surface before it asks a model |
+| [1969](1969.md) | done | 2026-11-26 | Dot makes pictures: `generate_image` draws a logo, diagram or card in its own browser, or asks Google's picture model for a photo, with no key of its own |
+| [1968](1968.md) | done | 2026-11-26 | A voice call with a bot is designed, and its first slice, a local speech prototype with measurements, is in |
+| [1966](1966.md) | done | 2026-11-26 | DotNext speaks the language chosen in it, whatever the iPhone's |
+| [1965](1965.md) | done | 2026-11-26 | DotNext's screens agree on which chats are left |
+| [1964](1964.md) | done | 2026-11-26 | DotNext deletes many chats in one request, gone from the list at once |
+| [1963](1963.md) | done | 2026-11-26 | DotNext's bot profile is Grok's: avatar, name and Edit, Library and Computer, Configure the bot, Notifications |
+| [1962](1962.md) | done | 2026-11-26 | A new bot opens its first chat with a message of its own, within seconds |
+| [1961](1961.md) | done | 2026-11-26 | DotNext shows an answer's links and files in its words, and a table's long cells inside their rows |
+| [1960](1960.md) | done | 2026-11-26 | Fewer turns on the desktop path: a batch's result is the look, and Safari's pages go to the Safari tools |
+| [1959](1959.md) | done | 2026-11-26 | The owner's own Safari, driven like Dot's Chrome: a page's elements with refs, batches of steps, the same policy |
+| [1958](1958.md) | done | 2026-11-26 | A login refused on another host says the one step the owner takes for it to fill there |
+| [1957](1957.md) | done | 2026-11-26 | DotNext shows a run's helpers as one group row, a tap away from a card of each |
+| [1956](1956.md) | done | 2026-11-26 | `search_files` and `find_files` read ripgrep's output up to a cap, as it comes |
+| [1954](1954.md) | done | 2026-11-26 | The pre-push review leaves the Claude plan when it is spent or the diff is a security one, reads only what is new, and gives DeepSeek a budget |
+| [1953](1953.md) | done | 2026-11-26 | A helper ends at its open pull request, and the checks are watched in the background |
+| [1952](1952.md) | done | 2026-11-26 | A schedule's run that only the owner can unblock ends done and waiting, and its next firings skip that part |
+| [1951](1951.md) | done | 2026-11-26 | A schedule whose chat is busy waits for it, due, instead of skipping the firing |
+| [1950](1950.md) | done | 2026-11-26 | A schedule that goes on in its chat reads what was said there, not every step of its earlier runs |
 | [1949](1949.md) | built | 2026-11-26 | Custom providers: any OpenAI- or Anthropic-compatible API as a provider of its own |
+| [1947](1947.md) | done | 2026-11-26 | The review model reads the owner's instructions whole |
+| [1946](1946.md) | done | 2026-11-26 | A goal that is reached is never ended failed for a better result in reach |
+| [1945](1945.md) | done | 2026-11-26 | The shell guard reads a long line in time that grows with its length |
+| [1944](1944.md) | done | 2026-11-26 | The daemon no longer freezes on a path's classification or a log line |
+| [1941](1941.md) | done | 2026-11-26 | A restart whose load launchd refuses tries again with waits that grow |
+| [1940](1940.md) | done | 2026-11-26 | An OpenCode run that hangs ends: a silence watch, and the time limit kept by the clock |
+| [1939](1939.md) | done | 2026-11-26 | A review model whose key is missing no longer crashes a long run |
+| [1938](1938.md) | done | 2026-11-26 | A floor of free space: the owner is told once, and large writes wait |
+| [1937](1937.md) | done | 2026-11-26 | The night's update syncs the environment to main's lock before it restarts |
+| [1936](1936.md) | done | 2026-11-26 | A red night of the browser suite keeps main red |
+| [1935](1935.md) | done | 2026-11-26 | DotNext opens an answer's links and files in place |
+| [1933](1933.md) | done | 2026-11-26 | A phone's video is sent by target bitrate and streamed to disk, so a quarter of an hour fits |
+| [1932](1932.md) | done | 2026-11-26 | DotNext's chat settles when nothing happens: the asks scene no longer holds the phone at 100% CPU |
+| [1931](1931.md) | done | 2026-11-26 | DotNext's pill says how the link to the Mac stands: Reconnecting to <Mac>…, Syncing messages…, Offline |
+| [1930](1930.md) | done | 2026-11-26 | DotNext attaches videos and files from the composer |
+| [1929](1929.md) | done | 2026-11-26 | Check goals and helper results on a model of another family |
+| [1928](1928.md) | done | 2026-11-26 | Route new runs and helpers by task kind |
+| [1927](1927.md) | done | 2026-11-26 | DotNext says "Pending" under the owner's message until the Mac took it |
+| [1926](1926.md) | done | 2026-11-26 | DotNext's live streaming is light on the iPhone's battery and data, measured before and after, and the app's own performance record goes to the owner's Mac |
+| [1924](1924.md) | done | 2026-11-26 | DotNext's composer is one capsule with the model as its provider's mark |
+| [1923](1923.md) | done | 2026-11-26 | DotNext's open chat never changes by itself when a newer chat of the bot comes |
+| [1922](1922.md) | done | 2026-11-26 | DotNext's "This chat" sheet is plain and compact |
+| [1921](1921.md) | done | 2026-11-26 | DotNext opens and closes a work-log row without a hitch |
+| [1920](1920.md) | done | 2026-11-26 | DotNext's rows say where each chat and bot stands |
+| [1919](1919.md) | done | 2026-11-26 | DotNext's chat moves the moment a message is sent, not 10-15 s later when the run's first event comes |
+| [1918](1918.md) | done | 2026-11-26 | A run reads what it starts with at once, before its first model call |
+| [1917](1917.md) | done | 2026-11-26 | A pull request that changes ios/ builds the iPhone app once, on macOS |
+| [1916](1916.md) | done | 2026-11-26 | DotNext's New chat with a bot opens as a chat, with the bot's face centred |
+| [1915](1915.md) | done | 2026-11-26 | DotNext's chats can show only the messages: "Show steps" in Settings › Chat and in a chat's This chat sheet |
+| [1914](1914.md) | done | 2026-11-26 | DotNext keeps a new chat's half-written words per bot |
+| [1913](1913.md) | done | 2026-11-26 | Several chats under Dot or one agent: the audit, and a chat shown twice stays open |
+| [1912](1912.md) | done | 2026-11-26 | DotNext's Dot no longer wears an unread mark for its own work |
 | [1911](1911.md) | done | 2026-11-26 | DotNext makes a scheduled task, and shows each schedule's history |
 | [1910](1910.md) | done | 2026-11-26 | DotNext's home opens the settings from an avatar icon, not from the owner's initials |
 | [1909](1909.md) | done | 2026-11-26 | DotNext's work log reads like a coding agent's: tool calls grouped in plain words, each helper its own row, and one quiet line while the run waits |

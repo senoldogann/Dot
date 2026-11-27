@@ -4,7 +4,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 
 | Key                 | Used for                                                                                  | Default                     |
 | ------------------- | ----------------------------------------------------------------------------------------- | --------------------------- |
-| `main`              | the agent loop of a run that names no model; Settings › Models sets it                    | `ollama:minimax-m2.7:cloud` |
+| `main`              | the agent loop of a run with no chosen model or task-kind mapping; Settings › Models sets it                    | `ollama:minimax-m2.7:cloud` |
 | `vision`            | describing the images a tool returns, when `main` cannot see them; Settings › Models sets it | `ollama:gemma4:cloud`    |
 | `fast`              | writing the summary of a compaction (see [Tools](runs.md#tools)) and a run's recap (its page's Task tab, item 536); Settings › Models sets it | `ollama:gpt-oss:20b-cloud`  |
 | `search`            | relaying a web search through the Anthropic API's own search tool (see [Tools](runs.md#tools))   | `anthropic:claude-haiku-5-5` |
@@ -14,12 +14,21 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `standby`           | models a run moves to when its own model cannot answer (see below); Settings › Models sets it | `[]`                    |
 | `helper_cooldown_s` | how long a model that could not answer is left out of `helpers` and `standby`             | `600`                       |
 | `context`           | a model's context size where it is not `[agent] context_tokens` (see below); Settings › Models sets it | `{}`         |
-| `kinds`             | the model a run of a kind of task starts on when none is chosen: `security` (see below); Settings › Models sets it | `{}` |
+| `check_other_family` | optional model for independent goal and helper checks, when its family differs from the worker | `""` (off) |
+| `kinds`             | models for kinds of work: `security`, `quick`, `deep`, `writing`, `code`; Settings › Models sets them | `{}` |
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
 With `[agent] lessons = "auto"` the warning also says that lessons are approved by the run's own model, and that an
 independent check needs another `[models] review` model.
+**Other-family check model** in Settings › Models (`PUT /api/models/check-other-family`) chooses a specific model
+for the goal check and for a final check of a successful delegated result before its parent sees the report. Dot
+compares model lineages across providers, for example Claude on the API and on the Claude plan. It compares with
+the current worker after a standby switch. If the two known families differ, the check goes to the selected model
+alone. A refused or unavailable check is reported with the result. A helper’s scheduled follow-up can satisfy the
+check when it is scheduled to run in the parent’s chat. If either family is unknown or both are the same,
+the run uses its usual goal check and the helper reports normally. Off is the default.
+
 What `review` is asked has the secrets Dot holds and the ones it recognises masked, as it may be another provider's.
 
 Settings › Models chooses `fast`, `review` and `vision` under the default model (item 232), each from the models that
@@ -31,11 +40,19 @@ the model that decides what Dot does on its own initiative (`[initiative] look_m
 models that call tools, or **Default model** for `[models] main`; it holds from the next look on
 (`PUT /api/initiative/look-model`, [Dot comes to you](proactive.md)). **Use my Claude plan** (shown once Claude Code
 lists its models) puts the review model on `claude_code:opus` and the roles of the night's learning on it (item 1033).
-**Security research model** (item 1889) chooses the model a task of security research within a scope starts on when no
-model is chosen for it: a goal that names a host of `[recon] owned_hosts` or of a bug bounty scope (`dotx scope`,
-[Security scan](security.md)) and asks for security work. It is kept as `[models.kinds] security`, **Default model** for
-none (`PUT /api/models/kinds`), and holds from the next such task on; a model chosen in the message box, a chat's own
-model or a schedule's still wins. The right model then takes the work before any refusal, rather than after one.
+**Task models** sets `[models.kinds]` (`PUT /api/models/kinds`). A model chosen for the message, chat, schedule or
+agent takes precedence. A helper can also be given a specific model when its work is delegated. The four general kinds
+use cues in the opening request or delegation brief, in English or Turkish, with no model call:
+
+- `code` for an explicit change to a repository or code.
+- `writing` for composing or editing a text deliverable.
+- `deep` for an explicit investigation, analysis or design.
+- `quick` for a single lookup of up to 24 words.
+
+When the request is ambiguous or the kind has no mapping, Dot uses the default for the workflow. A helper normally
+inherits its parent’s model. If a mapped model is unavailable at launch, Dot reports the failure. The existing
+`security` mapping applies to a start request that names no model and asks for security work on a host covered by
+`[recon] owned_hosts` or a bug bounty scope ([Security scan](security.md)).
 Under the roles, the page says how many schedules and agents run on each model, each chosen on its own page; and
 **Night's learning and self-repair** chooses the model of each role of the improvement loop ([The
 harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. **Usage**, before the list of every
@@ -281,7 +298,8 @@ answer keeps its words, Ollama's too.
   `https://generativelanguage.googleapis.com/v1beta/openai`; `dotx auth set GOOGLE_API_KEY` stores it. The key's
   project is on the free tier until billing is set up, and each model keeps its own daily request limit there (Gemini 3.x
   Flash 20 a day, Flash Lite 500, Gemma 14.4K); a prompt on the free tier may be used to improve Google's products.
-  `dotx models google` lists the ids the key can reach. Google wraps an error in an array (`[{"error": …}]`), which
+  `dotx models google` lists the ids the key can reach. The same key makes photos for `generate_image` (`[providers.google] image_model`; pictures are not on the free
+  tier and need a billed project, [Making pictures](image-generation.md)). Google wraps an error in an array (`[{"error": …}]`), which
   Dot reads as the error itself, so a model id the key cannot reach fails with Google's own words ("models/… is not
   found") after the HTTP status, not a bare "provider answered HTTP 404" (item 1898).
 - **Antigravity**: the models of a Google Antigravity plan, straight over Cloud Code Assist, with no proxy and no key.

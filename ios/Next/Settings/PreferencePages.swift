@@ -17,6 +17,7 @@ struct GeneralPage: View {
     @State private var ownerName: String = ""
     @State private var problem: SettingsFailure?
     @State private var saving: Bool = false
+    @State private var appLanguage: AppLanguage = AppLanguage.chosen(.standard)
     @Environment(\.locale) private var locale: Locale
 
     var body: some View {
@@ -33,14 +34,17 @@ struct GeneralPage: View {
             }
             GroupedSection(
                 header: String(localized: "Language", comment: "General section: the app's language"),
-                footer: String(localized: "Dot Next speaks the language iOS Settings sets for it.", comment: "General: footer under the language")
+                footer: appLanguage.isSpoken(running: Bundle.main.preferredLocalizations.first ?? "")
+                    ? String(localized: "Dot Next speaks this language whatever the iPhone's, as the web's own choice does.", comment: "General: footer under the language")
+                    : String(localized: "Dot Next opens in it the next time it starts.", comment: "General: footer once another language is chosen")
             ) {
-                Button {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-                } label: {
-                    ListRow(systemImage: "globe", title: String(localized: "App language", comment: "General: the app's language row"), description: nil, accessory: .detailAndChevron(languageName))
+                ForEach(AppLanguage.allCases, id: \.self) { language in
+                    RadioRow(title: language.title, description: nil, isSelected: appLanguage == language) {
+                        appLanguage = language
+                        language.keep(.standard)
+                    }
+                    .accessibilityIdentifier("general.language.\(language.rawValue)")
                 }
-                .buttonStyle(RowPressStyle())
             }
             GroupedSection(header: String(localized: "Timestamps", comment: "General section: how clocks read"), footer: nil) {
                 ForEach(TimestampFormat.allCases, id: \.self) { format in
@@ -77,10 +81,6 @@ struct GeneralPage: View {
 
     private var sampleTime: Date { Calendar.current.date(bySettingHour: 14, minute: 5, second: 0, of: .now) ?? .now }
 
-    private var languageName: String {
-        let code: String = Bundle.main.preferredLocalizations.first ?? "en"
-        return Locale.current.localizedString(forLanguageCode: code)?.capitalized(with: .current) ?? code
-    }
 
     private func nameField(_ title: String, text: Binding<String>) -> some View {
         HStack(spacing: Space.s) {
@@ -341,6 +341,7 @@ struct SchemePreview: View {
 struct ChatSettingsPage: View {
     @Environment(AppModel.self) private var model: AppModel
     @AppStorage(PrefKey.haptics) private var haptics: Bool = true
+    @AppStorage(PrefKey.showSteps) private var showSteps: Bool = true
     @State private var reactions: Loadable<ReactionsConfig> = .loading
     @State private var problem: SettingsFailure?
 
@@ -350,6 +351,16 @@ struct ChatSettingsPage: View {
                 ToggleRow(
                     systemImage: "hand.tap", title: String(localized: "Haptics", comment: "Chat settings: touch feedback"),
                     description: String(localized: "A light tap when you copy, swipe or send, and when an answer comes", comment: "Chat settings: what haptics do"), isOn: $haptics)
+            }
+            GroupedSection(
+                header: String(localized: "Messages", comment: "Chat settings section: what a chat shows"),
+                footer: String(localized: "Each chat's This chat sheet can show or hide them for that chat alone.", comment: "Chat settings: footer of Show steps (item 1915)")
+            ) {
+                ToggleRow(
+                    systemImage: "list.bullet.indent", title: String(localized: "Show steps", comment: "Settings switch: a chat shows its runs' tool calls and thoughts (item 1915)"),
+                    description: String(localized: "Off: only the messages, and one line that says what Dot is doing. A finished run's steps open from its Worked for line.", comment: "Description of the Show steps switch (item 1915)"),
+                    isOn: $showSteps)
+                .accessibilityIdentifier("settings.showSteps")
             }
             if let problem { FailureBanner(failure: problem, macPlace: String(localized: "Settings › General › Reactions", comment: "Where on the Mac: the reactions settings"), retry: nil) }
             LoadedPage(state: reactions, macPlace: String(localized: "Settings › General › Reactions", comment: "Where on the Mac: the reactions settings"), retry: { Task { await load() } }) { config in

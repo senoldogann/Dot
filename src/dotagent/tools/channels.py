@@ -24,6 +24,8 @@ _PREFIXES: tuple[tuple[str, Channel], ...] = (
     ("terminal_", "command"),
     ("web_", "web"),
     ("browser_", "browser"),
+    # The owner's own Safari, driven in its pages as the browser's are (item 1959).
+    ("safari_", "browser"),
     ("desktop_", "desktop"),
     ("mail_", "api"),
     ("calendar_", "api"),

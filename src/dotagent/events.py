@@ -71,6 +71,9 @@ class EventBus:
         # The ids of the stored events published lately, oldest first, and the same as a set to look them up.
         self._told: deque[int] = deque()
         self._told_ids: set[int] = set()
+        # Held while a call's line of the conversation is weighed against the run's newest and emitted (item 1976): the
+        # calls of a step run at once, and each would else read the lines before any of them was told.
+        self.narrating: asyncio.Lock = asyncio.Lock()
 
     async def emit(self, run_id: str, kind: str, data: JsonObject, persist: bool) -> EventRecord:
         """Publish an event. Persisted events get a database id; live-only events use id 0."""

@@ -70,6 +70,9 @@ backup_every_hours = 1.0
 backup_dir = ""
 backup_keep_hourly = 24
 backup_keep_days = 14
+# Below min_free_gb GiB free on the disk of Dot's home (item 1938) the owner is told once, and a copy of the database or
+# an uploaded file is refused with an error that says so, rather than failing half way on a full disk; 0 sets no floor.
+min_free_gb = 5.0
 
 [models]
 # "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter, google (the Gemini models of a
@@ -107,8 +110,11 @@ helper_cooldown_s = 600
 context = {}
 # The model a run of a kind starts on when no model is chosen for it (item 1889), so that the right model takes the work
 # before any refusal: "security" is security research within a scope (a goal that names a host of [recon] owned_hosts or
-# of a scope, and speaks of security work). Settings › Models sets it: kinds = { security = "anthropic:claude-opus-5-5" }.
+# of a scope, and speaks of security work), quick lookups, deep investigations, writing and repository changes.
+# Settings › Models sets it: kinds = { code = "anthropic:claude-opus-5-5" }.
 kinds = {}
+# An optional model for goal and helper result checks when its family differs from the worker's.
+check_other_family = ""
 
 [providers.ollama]
 base_url = "http://localhost:11434"
@@ -140,6 +146,10 @@ max_concurrent = 4
 # limits (docs/models.md). api_key_env holds the AI Studio key; `dotx models google` lists what it can use.
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 api_key_env = "GOOGLE_API_KEY"
+# The photo path of generate_image (docs/image-generation.md): Gemini's picture model on the same key. Pictures are not on
+# the free tier, so the key's project needs billing; `dotx models google` lists text models only.
+image_model = "gemini-3.1-flash-lite-image"
+image_base_url = "https://generativelanguage.googleapis.com/v1"
 connect_timeout_s = 10.0
 read_timeout_s = 600.0
 attempts = 6
@@ -171,6 +181,9 @@ start_timeout_s = 60.0
 idle_stop_s = 600.0
 # How long the list of free models is kept without asking OpenCode again; OpenCode refreshes its own catalog hourly.
 models_ttl_s = 3600.0
+# A run whose session says nothing for silence_s seconds while no tool works for it and no permission waits on you is
+# ended, and fails (item 1940); the run's time limit ([agent] run_max_minutes) is kept by the clock too.
+silence_s = 600.0
 
 [providers.claude_code]
 # Claude Code on your own Claude plan (item 1013): a run on "claude_code:fable", "claude_code:opus",
@@ -1163,8 +1176,10 @@ max_schedules = 50
 # own; the last five, item 291) and in how many characters at most.
 history_runs = 5
 history_chars = 4000
-# Whether a firing goes on in the chat of the one before (its run reads their conversation, not the digest)
-# instead of a new chat; a schedule may choose its own.
+# Whether a firing goes on in the chat of the one before instead of a new chat; a schedule may choose its own. Its run
+# reads what was said in that chat (the owner's messages and the final answers, in as many characters as history_chars,
+# not every step of the earlier runs; item 1950), and a firing whose chat has a run at work waits, due, for it (item
+# 1951).
 same_chat = false
 # How many of a repeating schedule's runs in a row may end failed before it is switched off and you are told (item 458;
 # 0 = never, as before; a schedule may choose its own). A run cancelled counts neither way, and one done starts again.

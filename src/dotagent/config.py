@@ -16,8 +16,9 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.learned_text import LINE_BREAKS, hidden_character
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.llm.families import model_family
 from dotagent.llm.traits import is_known_label
-from dotagent.llm.types import KNOWN_PROVIDERS, Effort, custom_provider_name, split_model_ref
+from dotagent.llm.types import KNOWN_PROVIDERS, Effort, answers_role, custom_provider_name, split_model_ref
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 from dotagent.store.models import BrowserMode, NotifyLevel
 from dotagent.web.ladder import SearchEngine
@@ -132,13 +133,15 @@ class StoreConfig(FrozenModel):
     deleted by itself; the daemon thins only its own copies of it.
     The copies of the database (item 526): made every ``backup_every_hours`` hours while the daemon runs (0: none),
     kept in ``backup_dir`` (``<home>/backups`` when empty), the newest ``backup_keep_hourly`` and one of each of the
-    last ``backup_keep_days`` days."""
+    last ``backup_keep_days`` days. Below ``min_free_gb`` GiB free on the disk (0: no floor), the owner is told once and
+    the copies and uploaded files wait (item 1938)."""
 
     retention_days: int = Field(ge=1)
     backup_every_hours: float = Field(ge=0, le=24 * 7, allow_inf_nan=False)
     backup_dir: str
     backup_keep_hourly: int = Field(ge=1, le=24 * 14)
     backup_keep_days: int = Field(ge=0, le=365)
+    min_free_gb: float = Field(ge=0, le=10_000, allow_inf_nan=False)
 
     @field_validator("backup_dir")
     @classmethod
@@ -197,12 +200,14 @@ class OpenCodeConfig(FrozenModel):
     """OpenCode's own agent, the one client Zen's free models serve (item 283), which Dot starts as a local server of
     its own when a run needs it. ``command`` is the ``opencode`` program: a path, or a name looked up on the login
     shell's PATH and in Homebrew's folders. The server stops once it has served nothing for ``idle_stop_s``; the free
-    models OpenCode lists are kept for ``models_ttl_s`` without asking it again."""
+    models OpenCode lists are kept for ``models_ttl_s`` without asking it again. A run whose session says nothing for
+    ``silence_s`` while no tool works for it and no permission waits on the owner fails (item 1940)."""
 
     command: str = Field(min_length=1)
     start_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     idle_stop_s: float = Field(gt=0, allow_inf_nan=False)
     models_ttl_s: float = Field(gt=0, allow_inf_nan=False)
+    silence_s: float = Field(gt=0, allow_inf_nan=False)
 
 
 class ClaudeCodeConfig(FrozenModel):
@@ -241,6 +246,10 @@ class GoogleConfig(FrozenModel):
 
     base_url: ServiceAddress
     api_key_env: str
+    # The picture model of ``generate_image``'s photo path and the Gemini API route it is called on (item 1969): the
+    # same key, not on the free tier (docs/image-generation.md).
+    image_model: str
+    image_base_url: ServiceAddress
     connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     attempts: int = Field(ge=1)
@@ -452,8 +461,8 @@ class ProvidersConfig(FrozenModel):
 
 # The kinds of task a model can be named for up front (item 1889, `[models] kinds`): ``security`` is security research
 # within a scope, a goal that names a host a scope covers and speaks of security work (dotagent.agent.refusal).
-type TaskKind = Literal["security"]
-TASK_KINDS: tuple[TaskKind, ...] = ("security",)
+type TaskKind = Literal["security", "quick", "deep", "writing", "code"]
+TASK_KINDS: tuple[TaskKind, ...] = ("security", "quick", "deep", "writing", "code")
 
 
 class ModelsConfig(FrozenModel):
@@ -472,6 +481,19 @@ class ModelsConfig(FrozenModel):
     context: dict[ModelReference, ContextSize]
     # The model a run of a kind starts on when none is chosen for it (item 1889); Settings › Models sets it.
     kinds: dict[TaskKind, ModelReference] = Field(default_factory=dict)
+    # A different family can independently check a run's goal or a helper's result.
+    check_other_family: Literal[""] | ModelReference = ""
+
+    @field_validator("check_other_family")
+    @classmethod
+    def _independent_checker(cls, value: str) -> str:
+        if value != "":
+            provider: str = value.partition(":")[0].strip()
+            if model_family(value) is None or not answers_role("review", provider):
+                raise ValueError(
+                    "check_other_family must name a model of a known family that can answer review questions"
+                )
+        return value
 
     @field_validator("search")
     @classmethod

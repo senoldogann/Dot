@@ -52,6 +52,8 @@ from dotagent.policy import engine
 from dotagent.policy.engine import OWNERS_REASON, decide
 from dotagent.policy.types import ActionInfo, ApprovalMode, Decision, Preset
 from dotagent.runtime import Runtime, _tool_groups, close_runtime, open_runtime
+from dotagent.safari.desk import SafariDesk
+from dotagent.safari.types import PageElement, PageRead, TabPin
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord, ThreadRecord, VaultRecord
 from dotagent.tools.base import ACTING_MODES, PreparedCall, RegisteredTool, ToolArgs, make_tool, ok
@@ -207,6 +209,34 @@ SHOP: Page = Page(
 )
 LOGIN_PAGE: Page = Page(url="https://github.com/login")
 
+# The same shop as the owner's Safari shows it to a read of the page (item 1959), and a sign-in form with a password.
+SAFARI_SHOP: PageRead = PageRead(
+    url="https://shop.example.invalid/checkout",
+    title="Checkout",
+    ready="complete",
+    elements=(
+        PageElement(ref="s1", role="button", name="Save draft", tag="button", mark=""),
+        PageElement(ref="s2", role="textbox", name="Comment", tag="textarea", mark="", value=""),
+        PageElement(ref="s3", role="button", name="Post", tag="button", mark=""),
+        PageElement(ref="s4", role="button", name="Send", tag="button", mark=""),
+        PageElement(ref="s5", role="button", name="Pay now", tag="button", mark=""),
+        PageElement(ref="s7", role="button", name="Submit", tag="button", mark=""),
+        PageElement(ref="s8", role="textbox", name="Message", tag="input", mark="", value="", near=("s9",)),
+        PageElement(ref="s9", role="button", name="Send message", tag="button", mark=""),
+        PageElement(ref="s10", role="textbox", name="Password", tag="input", mark="password", value=""),
+    ),
+    more=0,
+    text="Order summary. Total $19.90",
+    text_chars=27,
+)
+
+
+def _safari() -> SafariDesk:
+    """The owner's Safari as a call is classified on it: the chat's tab, last read on the shop above."""
+    desk: SafariDesk = SafariDesk()
+    desk.keep_read("thr_table", TabPin(window=1, tab=1, url=SAFARI_SHOP.url), SAFARI_SHOP)
+    return desk
+
 
 class _Browser:
     """The browser as the classification of a call reads it: where it stands and what its last snapshot shows."""
@@ -309,6 +339,7 @@ class World:
             vault=_Missing("vault"),
             vault_items=_Items(),
             desktop=_Desk(),
+            safari=_safari(),
             terminals=_Terminals(),
             store=SimpleNamespace(get_schedule=_schedule),
             memory=SimpleNamespace(store=SimpleNamespace(get_memory=_memory)),
@@ -448,6 +479,24 @@ ROWS: tuple[Row, ...] = (
     _row("browser: switch tab", "browser_switch_tab", {"index": 1}, page=SHOP),
     _row("browser: close tab", "browser_close_tab", {}, page=SHOP),
     _row("browser: captcha", "browser_captcha", {}, page=SHOP),
+    # --- the owner's Safari (item 1959), classified as the browser's steps are
+    _row("safari: open", "safari_open", {"url": "https://example.com"}),
+    _row("safari: read", "safari_read", {}),
+    _row("safari: click", "safari_act", {"steps": [{"action": "click", "ref": "s1"}]}),
+    _row("safari: type", "safari_act", {"steps": [{"action": "fill", "ref": "s2", "text": "hello"}]}),
+    _row("safari: submit a form", "safari_act", {"steps": [{"action": "click", "ref": "s7"}]}),
+    _row(
+        "safari: submit a message with Enter",
+        "safari_act",
+        {"steps": [{"action": "fill", "ref": "s8", "text": "hi"}, {"action": "press", "ref": "s8", "key": "Enter"}]},
+        "message",
+    ),
+    _row("safari: click Send", "safari_act", {"steps": [{"action": "click", "ref": "s4"}]}, "message"),
+    _row("safari: click Post", "safari_act", {"steps": [{"action": "click", "ref": "s3"}]}, "post"),
+    _row("safari: click Pay now", "safari_act", {"steps": [{"action": "click", "ref": "s5"}]}, "payment"),
+    _row(
+        "safari: type into a password field", "safari_act", {"steps": [{"action": "fill", "ref": "s10", "text": "x"}]}
+    ),
     # --- desktop
     _row("desktop: click", "desktop_act", {"app": "Notes", "steps": [{"action": "click", "ref": "1"}]}),
     _row("desktop: type", "desktop_act", {"app": "Notes", "steps": [{"action": "type", "text": "hello"}]}),
@@ -588,6 +637,8 @@ ROWS: tuple[Row, ...] = (
     _row("meta: mark a plan step", "mark_plan_step", {"step": 1, "status": "done"}),
     _row("meta: turn a tool group on", "use_tools", {"group": "browser"}),
     _row("meta: show a page", "show_page", {"title": "A chart", "html": "<p>hi</p>"}),
+    _row("meta: draw a picture", "generate_image", {"path": "logo.png", "svg": "<svg viewBox='0 0 1 1'/>"}),
+    _row("meta: a photo from Google's picture model", "generate_image", {"path": "fox.png", "photo": "a red fox"}),
     _row("appearance: read the shared theme", "theme_read", {}),
     _row("appearance: use the device theme", "theme_apply", {"revision": 0, "theme": None}),
     _row("appearance: undo a theme change", "theme_undo", {"revision": 0}),

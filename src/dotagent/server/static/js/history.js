@@ -13,7 +13,8 @@ import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { sourcesRow } from "./sources.js";
-import { countKinds, flowIcon, flowWords, narrates, toolRow } from "./tools.js";
+import { countKinds, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, toolRow } from "./tools.js";
+import { narrationPhrase } from "./workstatus.js";
 
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read before the page is drawn (items 374 and 708), side by side: they stand right
@@ -216,6 +217,8 @@ function drawFlow(past, flow, asked, events, reactions) {
   // Dot's reaction (item 664) stands on the latest message of yours when it came: the turn's own, or a steer since.
   let reaction = null;
   let reactedTo = null;
+  // Whether the newest step wrote words, which tell its calls (item 1976).
+  let stepSaid = false;
   for (const event of events) {
     // A compaction is not a turn of the conversation: one short line, and its record under the details toggle.
     if (!visibleInConversation(event)) {
@@ -223,9 +226,19 @@ function drawFlow(past, flow, asked, events, reactions) {
       blocks.push({ internal: event });
       continue;
     }
+    if (event.kind === "narration") {
+      // A line of the run told as a conversation (item 1976), drawn with "Messages only" alone and none beside the step's
+      // own words; it ends no batch of steps, which stay as they were with the steps shown.
+      if (!stepSaid) {
+        blocks.push({ told: narrationPhrase(event.data.tool, event.data.args ?? {}) });
+      }
+      continue;
+    }
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
-      if (said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer)) {
+      // Only words drawn tell the step's calls: those the answer restates are not drawn here.
+      stepSaid = said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer);
+      if (stepSaid) {
         batch = null;
         blocks.push({ say: said, step: event.data.step, progress: narrates(event.data.tool_calls ?? []) });
       }
@@ -289,6 +302,13 @@ function drawFlow(past, flow, asked, events, reactions) {
         }
         open.delete(event.data.call_id);
       }
+      // A picture the run made stands where it came (item 1969), as on the run's own page.
+      if (event.data.ok && event.data.tool === GENERATED_PICTURE_TOOL) {
+        batch = null;
+        for (const name of event.data.images) {
+          blocks.push({ picture: name });
+        }
+      }
     }
   }
   for (const entry of open.values()) {
@@ -297,10 +317,14 @@ function drawFlow(past, flow, asked, events, reactions) {
     }
   }
   const nodes = blocks.map((block) =>
-    block.internal !== undefined
+    block.told !== undefined
+      ? el("div", { class: "turn-say say-narration", role: "article", "aria-label": t("outcome.update") }, prose(block.told))
+      : block.internal !== undefined
       ? internalRecord(block.internal)
       : block.page !== undefined
       ? pageCard(block.page.id, block.page.title)
+      : block.picture !== undefined
+      ? pictureCard(block.picture)
       : block.schedule !== undefined
       ? scheduleLine(block.schedule)
       : block.beside !== undefined

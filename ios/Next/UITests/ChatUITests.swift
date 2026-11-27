@@ -14,6 +14,68 @@ final class ChatUITests: XCTestCase {
         return app
     }
 
+    /// Swipe to quote (item 1972), on the fixtures: the owner's message pulled to the right puts its first line in the
+    /// composer as a chip with a cross; a short pull, or one that starts at the screen's edge, quotes nothing; the cross drops
+    /// the chip. At the largest accessibility size too.
+    @MainActor
+    func testASwipeOnAMessageQuotesItAndTheCrossDropsTheQuote() {
+        for extra in [[String](), ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge"]] {
+            // A scene with nothing writing: a chat whose rows move under the finger is no place to measure a swipe.
+            let app: XCUIApplication = launch("n2-failed", defaults: extra)
+            let message: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+            XCTAssertTrue(message.waitForExistence(timeout: 10))
+            let origin: XCUICoordinate = app.coordinate(withNormalizedOffset: .zero)
+            func drag(from x: CGFloat, by dx: CGFloat) {
+                let start: CGVector = CGVector(dx: x, dy: message.frame.midY)
+                origin.withOffset(start).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: x + dx, dy: start.dy)))
+            }
+            let chip: XCUIElement = app.descendants(matching: .any)["composer.quote"]
+            drag(from: message.frame.midX, by: 30)
+            XCTAssertFalse(chip.exists, "a short pull is no quote")
+            drag(from: 10, by: 160)
+            XCTAssertFalse(chip.exists, "a pull from the screen's edge is the back gesture's")
+            drag(from: message.frame.midX - 40, by: 160)
+            XCTAssertTrue(chip.waitForExistence(timeout: 10), "the swipe put the message in the composer as a quote")
+            XCTAssertTrue(chip.label.contains("Book me the dentist"), chip.label)
+            let remove: XCUIElement = app.buttons["composer.quote.remove"]
+            XCTAssertGreaterThanOrEqual(remove.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(remove.frame.width, 44)
+            let attachment: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = extra.isEmpty ? "quote-chip" : "quote-chip-ax3"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            remove.tap()
+            XCTAssertFalse(chip.exists, "the cross drops the quote")
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    func testThePlusMenuAttachesAVideoWithItsDurationAndCanRemoveIt() throws {
+        let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-failed", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge",
+        ]
+        app.launchEnvironment["DotNextTestVideo"] = try Data(contentsOf: clip).base64EncodedString()
+        app.launch()
+
+        let attach: XCUIElement = app.buttons["composer.attach"]
+        XCTAssertTrue(attach.waitForExistence(timeout: 10))
+        attach.tap()
+        let library: XCUIElement = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "Photos and videos")
+        ).firstMatch
+        XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
+        library.tap()
+        let duration: XCUIElement = app.staticTexts["composer.videoDuration"]
+        XCTAssertTrue(duration.waitForExistence(timeout: 15))
+        XCTAssertTrue(duration.label.hasPrefix("0:01"), duration.label)
+        app.buttons["Remove Sample.mp4"].tap()
+        XCTAssertFalse(duration.exists)
+    }
+
     /// The owner's report of 2026-11-25: the capsule's clock froze between events. The fixture's run gets no event at
     /// all, yet the clock goes on every second; and the capsule says what the run does (here: writing its words).
     func testTheCapsuleClockTicksWithNoEventsAndSaysWhatTheRunDoes() {
@@ -112,6 +174,65 @@ final class ChatUITests: XCTestCase {
         add(sheet)
     }
 
+    /// The owner, 2026-11-26: an answer's links and files show in its words, not listed under it. A GitHub pull
+    /// request reads `#1012` after the GitHub mark, a link keeps the words it was written with, a file is its name
+    /// after its kind's symbol; a tap on the file opens its preview sheet with Open on Mac.
+    func testAnAnswersLinksAndFilesShowInItsWordsAndOpenInPlace() {
+        let app: XCUIApplication = launch("n2-chat")
+        let file: XCUIElement = app.links["ci-notes.md"]
+        for _ in 0..<8 where !(file.exists && file.isHittable) {
+            app.swipeDown()
+        }
+        XCTAssertTrue(file.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.links["#1012"].exists, "the pull request by its number")
+        XCTAssertTrue(app.links["Node's release notes"].exists, "a written link keeps its words")
+        XCTAssertFalse(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "https://github.com/example")).firstMatch.exists, "no bare address in the words")
+        XCTAssertFalse(app.buttons["answer.sources"].exists || app.buttons["answer.file"].exists, "nothing listed under the answer")
+        let words: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        words.name = "answer-inline-references"
+        words.lifetime = .keepAlways
+        add(words)
+        file.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Node 22 is pinned on CI.")).firstMatch.waitForExistence(timeout: 5))
+        let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        sheet.name = "answer-file-sheet"
+        sheet.lifetime = .keepAlways
+        add(sheet)
+        app.buttons["file.openOnMac"].tap()
+        XCTAssertTrue(app.staticTexts["Opened on your Mac."].waitForExistence(timeout: 5))
+    }
+
+    /// The owner, 2026-11-26: a table's wrapped cells drew over the next row. Each row is as tall as its tallest
+    /// cell, the long column wraps so the table fits the reading column, and it does so at the largest text size too.
+    func testATablesLongCellsWrapInsideTheirRows() {
+        for size in ["UICTContentSizeCategoryL", "UICTContentSizeCategoryAccessibilityXXXL"] {
+            let app: XCUIApplication = launch("n2-chat", defaults: ["-UIPreferredContentSizeCategoryName", size])
+            let table: XCUIElement = app.descendants(matching: .any).matching(identifier: "answer.table").firstMatch
+            for _ in 0..<12 where !(table.exists && table.isHittable) {
+                app.swipeDown()
+            }
+            XCTAssertTrue(table.waitForExistence(timeout: 5), size)
+            let long: XCUIElement = table.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Checks a lost invention")).firstMatch
+            let next: XCUIElement = table.staticTexts["Story Scripter"]
+            let first: XCUIElement = table.staticTexts["Invention Scout"]
+            XCTAssertTrue(long.exists && next.exists && first.exists, size)
+            let measured: String = "\(size): table \(table.frame) long \(long.frame) first \(first.frame) next \(next.frame) window \(app.windows.firstMatch.frame)"
+            add(XCTAttachment(string: measured))
+            XCTAssertGreaterThan(long.frame.height, first.frame.height * 1.5, "the long cell wraps: \(measured)")
+            XCTAssertLessThanOrEqual(long.frame.maxY, next.frame.minY + 1, "no cell draws over the next row: \(measured)")
+            XCTAssertEqual(long.frame.minY, first.frame.minY, accuracy: 1, "a row's cells share its top: \(measured)")
+            if size == "UICTContentSizeCategoryL" {
+                XCTAssertLessThanOrEqual(table.frame.maxX, app.windows.firstMatch.frame.maxX - 15, "the table fits the column: \(measured)")
+            }
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "answer-table-\(size)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
     /// Item 1880: the helpers are no card in the stream; the capsule's people segment opens the Agents sheet, where a
     /// working helper's row says what it does in plain words beside its state, clock and model.
     func testTheHelpersLiveBehindTheCapsuleNotInTheStream() {
@@ -122,7 +243,9 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(people.label, "Helpers, 1 of 2 done")
         people.tap()
         XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
-        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+        // The sheet's row (it names the helper's model), not the helper's row in the work log under the sheet (item
+        // 1909), which no tap reaches.
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS[c] %@", "Check the dentist", "Opus")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertTrue(row.label.contains("Working"), row.label)
         XCTAssertFalse(row.label.contains("browser_open"), "no raw tool name: \(row.label)")
@@ -142,8 +265,9 @@ final class ChatUITests: XCTestCase {
         let line: XCUIElement = app.buttons["work.line"]
         XCTAssertTrue(line.waitForExistence(timeout: 10))
         XCTAssertEqual(line.label, "Waiting for you")
-        XCTAssertGreaterThanOrEqual(line.frame.height, 44, "the line is a button: a 44 pt tap target (the design bar)")
-        let step: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Browsed")).firstMatch
+        XCTAssertGreaterThanOrEqual(line.frame.height, 44 - 0.01, "the line is a button: a 44 pt tap target (the design bar; a frame comes out as 43.99999 on this simulator)")
+        // The run's calls, one line in plain words since item 1909 ("Started 1 helper and opened 1 page").
+        let step: XCUIElement = app.buttons["tools.group"].firstMatch
         XCTAssertFalse(step.exists, "the steps are hidden")
         line.tap()
         XCTAssertTrue(step.waitForExistence(timeout: 3), "a tap shows the steps")
@@ -188,11 +312,17 @@ final class ChatUITests: XCTestCase {
     /// is its own row (title, what it does, its time, a chevron), and while the run waits one quiet line says on what,
     /// with Details and no Stop of its own (the pill has it).
     func testTheWorkLogGroupsToolsShowsHelpersAndSaysWhatItWaitsOn() {
-        // The queue's fixture: its run waits in `wait_until` and writes nothing meanwhile.
+        // The queue's fixture: its run waits in `wait_until` and writes nothing meanwhile. It opens its queue's sheet:
+        // closed first, so the taps reach the chat.
         let app: XCUIApplication = launch("n2-queue")
+        if app.navigationBars["Queued"].waitForExistence(timeout: 5) { app.buttons["Close"].firstMatch.tap() }
+        // The helpers are one row (item 1957): its card lists each.
+        let helpers: XCUIElement = app.buttons["helpers.group"]
+        XCTAssertTrue(helpers.waitForExistence(timeout: 10), "the helpers are one row")
+        helpers.tap()
         let helper: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "helper.row", "Check the dentist")).firstMatch
-        XCTAssertTrue(helper.waitForExistence(timeout: 10), "a helper is its own row")
-        XCTAssertGreaterThanOrEqual(helper.frame.height, 44)
+        XCTAssertTrue(helper.waitForExistence(timeout: 5), "each helper a row of the card")
+        XCTAssertGreaterThanOrEqual(helper.frame.height.rounded(), 44)
         // The line stands at the end of the stream: scroll to it (the stream draws only what is near the screen).
         let waiting: XCUIElement = app.staticTexts["waiting.line"]
         for _ in 0..<4 where !waiting.exists { app.swipeUp() }
@@ -213,6 +343,126 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(group.label, "Read 2 files and ran 2 commands")
         let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         shot.name = "work-log"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Item 1957: the run's helpers are one row, "2 helpers" over "1 working · 1 done", with their time and a chevron; a
+    /// tap opens a card with a row per helper (its state and its engine in words), whose tap opens the helper's chat.
+    func testTheHelpersAreOneRowThatOpensACardOfEach() {
+        let app: XCUIApplication = launch("n2-chat")
+        let group: XCUIElement = app.buttons["helpers.group"]
+        for _ in 0..<4 where !group.exists { app.swipeUp() }
+        XCTAssertTrue(group.waitForExistence(timeout: 10))
+        XCTAssertEqual(group.label, "2 helpers, 1 working, 1 done")
+        XCTAssertEqual(group.value as? String, "Collapsed")
+        XCTAssertGreaterThanOrEqual(group.frame.height.rounded(), 44)
+        XCTAssertFalse(app.buttons["helper.row"].exists, "no row per helper while folded")
+        let folded: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        folded.name = "helpers-collapsed"
+        folded.lifetime = .keepAlways
+        add(folded)
+        group.tap()
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "helper.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertEqual(rows.count, 2)
+        let working: XCUIElement = rows.matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+        XCTAssertTrue(working.label.contains("Working"), working.label)
+        XCTAssertTrue(working.label.contains("Claude Code"), "the engine in words: \(working.label)")
+        let open: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        open.name = "helpers-expanded"
+        open.lifetime = .keepAlways
+        add(open)
+        working.tap()
+        XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5), "the helper's chat")
+    }
+
+    /// Item 1957: the open group at AX3 in Turkish and dark: the words wrap, nothing is cut but a title, every row keeps
+    /// its 44 pt.
+    func testTheHelpersGroupHoldsAtAX3InTurkishAndDark() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-chat", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-colorScheme", "dark",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
+        ]
+        app.launch()
+        let group: XCUIElement = app.buttons["helpers.group"]
+        // Brought to the middle of the screen by its frame, in short drags: `isHittable` of a row out of sight fails the
+        // test on GitHub's runner ("Activation point invalid"), and at AX sizes a row near an edge sits under the
+        // navigation bar or the composer, where a tap does not reach it.
+        let window: CGRect = app.windows.firstMatch.frame
+        let middle: ClosedRange<CGFloat> = (window.minY + window.height * 0.25)...(window.minY + window.height * 0.6)
+        let centre: XCUICoordinate = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        for _ in 0..<16 where !(group.exists && middle.contains(group.frame.midY)) {
+            let down: Bool = group.exists && group.frame.midY < middle.lowerBound
+            centre.press(forDuration: 0.05, thenDragTo: centre.withOffset(CGVector(dx: 0, dy: down ? 220 : -220)))
+        }
+        XCTAssertTrue(group.waitForExistence(timeout: 10))
+        XCTAssertTrue(group.label.hasPrefix("2 yardımcı"), group.label)
+        group.tap()
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "helper.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 3))
+        for index in 0..<rows.count { XCTAssertGreaterThanOrEqual(rows.element(boundBy: index).frame.height.rounded(), 44) }
+        app.swipeUp()
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "helpers-ax3-tr-dark"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Item 1915: "Show steps" off in the chat's This chat sheet leaves only the messages: the step rows go, and one live
+    /// line under the last text says what the run does.
+    func testShowStepsOffLeavesTheMessagesAndOneLiveLine() {
+        let app: XCUIApplication = XCUIApplication()
+        // The queue's fixture (its run waits in `wait_until`); its queue's sheet is closed first.
+        app.launchArguments = ["-DotNextScene", "n2-queue", "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", "{}"]
+        app.launch()
+        if app.navigationBars["Queued"].waitForExistence(timeout: 5) { app.buttons["Close"].firstMatch.tap() }
+        let thought: XCUIElement = app.buttons["thought.row"]
+        for _ in 0..<4 where !thought.exists { app.swipeUp() }
+        XCTAssertTrue(thought.waitForExistence(timeout: 10), "the steps show first")
+        app.buttons["Changes and files"].tap()
+        let toggle: XCUIElement = app.switches["inspector.showSteps"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "1")
+        toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "0")
+        app.buttons["Close"].firstMatch.tap()
+        // The run waits in `wait_until`: its one line is the waiting line (item 1909), the live line's place.
+        let line: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", ["work.line", "waiting.line"])).firstMatch
+        for _ in 0..<4 where !line.exists { app.swipeUp() }
+        XCTAssertTrue(line.waitForExistence(timeout: 5), "one live line says the work")
+        XCTAssertFalse(app.buttons["thought.row"].exists, "no step rows")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "messages-only"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Item 1932: the asks scene settles: once it stood still for a few seconds, the screen is not drawn again (its
+    /// scroll followed the lazy stack's own height estimates in a loop, at 100 % CPU).
+    func testTheAsksSceneSettles() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = ["-DotNextScene", "n2-asks", "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-DotNextRenderMeter", "1"]
+        app.launch()
+        let meter: XCUIElement = app.staticTexts["debug.renders"]
+        XCTAssertTrue(meter.waitForExistence(timeout: 15))
+        sleep(4)
+        let settled: String = meter.label
+        sleep(4)
+        XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
+    }
+
+    /// Item 1931: with no link, the pill says Offline in the status's place (after the second that keeps a blip from
+    /// flickering), and offers no Stop.
+    func testThePillSaysOfflineWithoutALink() {
+        let app: XCUIApplication = launch("n2-offline-saved")
+        let link: XCUIElement = app.buttons["capsule.link"]
+        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        XCTAssertEqual(link.label, "Offline")
+        XCTAssertFalse(app.buttons["capsule.stop"].exists, "nothing to stop over no link")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "pill-offline"
         shot.lifetime = .keepAlways
         add(shot)
     }

@@ -188,9 +188,10 @@ struct SettingsDestination: View {
         case .voice: VoicePage()
         case .models: ModelsPage()
         case .caps: CapsPage(triesRaise: start.triesRaise)
-        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, agentId: nil)
+        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, scope: .all)
         case .rules: RulesPage()
         case .memory: MemoryPage()
+        case .memoryTrash: MemoryTrashPage()
         case .agents: AgentsHome()
         case .system: SystemPage()
         case .usage: UsagePage()
@@ -276,8 +277,8 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "rules", String(localized: "Permissions", comment: "Settings row: the approval mode and the rules"), agents, "rules permissions approvals policy ask safety allow deny",
             String(localized: "permissions approvals policy ask safety", comment: "Settings search synonyms of Rules (space separated)"), .rules),
         entry(
-            "memory", String(localized: "Memory", comment: "Settings row"), agents, "notes remember lessons search proposals",
-            String(localized: "notes remember lessons proposals", comment: "Settings search synonyms of Memory (space separated)"), .memory),
+            "memory", String(localized: "Memory", comment: "Settings row"), agents, "notes remember lessons search proposals pin trash restore forget",
+            String(localized: "notes remember lessons proposals pin trash restore forget", comment: "Settings search synonyms of Memory (space separated)"), .memory),
         entry(
             "agents", String(localized: "Agents", comment: "Title of the agents list"), agents, "agent agents helpers chat",
             String(localized: "agent agents helpers chat", comment: "Settings search synonyms of Agents (space separated)"), .agents),
@@ -289,8 +290,8 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             String(localized: "usage tokens days", comment: "Settings search synonyms of Usage (space separated)"), .usage),
         entry(
             "maintenance", String(localized: "Maintenance", comment: "Settings row: updates and what happens after a restart"), system,
-            "updates versions resume restart continue claude opencode cli",
-            String(localized: "updates versions resume restart continue", comment: "Settings search synonyms of Maintenance (space separated)"), .maintenance),
+            "updates versions resume restart continue claude opencode cli performance battery hangs crashes data",
+            String(localized: "updates versions resume restart continue performance battery hangs crashes", comment: "Settings search synonyms of Maintenance (space separated)"), .maintenance),
         entry(
             "connect-apps", String(localized: "Connect apps", comment: "Title of the Connect apps sheet"), "", "connectors connect apps services mcp accounts google github slack notion plugins",
             String(localized: "connectors apps services accounts", comment: "Settings search synonyms of Connect apps (space separated)"), .connectApps),

@@ -85,6 +85,104 @@ final class OutboxTests: XCTestCase {
         XCTAssertTrue(onDisk().isEmpty, "what was sent leaves the file")
     }
 
+    func testVideoAndDocumentKeepTheirNamesTypesAndBytesAcrossAnOfflineRestart() async throws {
+        let link: LinkWatcher = LinkWatcher(initial: .down)
+        let first: Outbox = box(link, mayStartChat: { true })
+        let files: [OutgoingAttachment] = [
+            OutgoingAttachment(name: "Walk.mp4", mediaType: "video/mp4", data: Data([0, 0, 0, 20, 102, 116, 121, 112])),
+            OutgoingAttachment(name: "Notes.txt", mediaType: "text/plain", data: Data("walk notes".utf8)),
+        ]
+        try await first.enqueue(message("Two attachments"), id: newMessageKey(), attachments: files)
+        await first.suspend()
+        let next: Outbox = box(link, mayStartChat: { true })
+        link.report(.up)
+        await next.start()
+        try await items(next, "message delivered") { $0.isEmpty }
+
+        let uploads: [FakeDaemon.Seen] = daemon.requests.filter { $0.path == "/api/attachments" && $0.method == "POST" }
+        XCTAssertEqual(uploads.count, files.count)
+        for (request, file) in zip(uploads, files) {
+            let body: [String: String] = try JSONDecoder().decode([String: String].self, from: XCTUnwrap(request.body))
+            guard case .bytes(let data) = file.content else { return XCTFail("a document is held as bytes") }
+            XCTAssertEqual(body, ["name": file.name, "media_type": file.mediaType, "data_b64": data.base64EncodedString()])
+        }
+        let sent: FakeDaemon.Seen = try XCTUnwrap(daemon.requests.first { $0.path == "/api/threads/thr_1/queue" && $0.method == "POST" })
+        let message: QueueMessage = try JSONDecoder().decode(QueueMessage.self, from: XCTUnwrap(sent.body))
+        XCTAssertEqual(message.attachments, ["att_1", "att_2"])
+    }
+
+    func testAVideoFileIsKeptBesideItsRecordAndSentAsTheRawBodyOfTheStreamedUpload() async throws {
+        let link: LinkWatcher = LinkWatcher(initial: .down)
+        let first: Outbox = box(link, mayStartChat: { true })
+        let bytes: Data = Data((0..<300_000).map { UInt8($0 % 251) })
+        let source: URL = folder.appending(path: "source-movie.mp4")
+        try bytes.write(to: source)
+        let video: OutgoingAttachment = OutgoingAttachment(name: "Walk.mp4", mediaType: "video/mp4", file: source, byteCount: bytes.count)
+        let key: String = newMessageKey()
+        try await first.enqueue(message("A video"), id: key, attachments: [video])
+        // The composer's own file may go (its chip is removed, the system clears its temporary folder): the outbox kept a copy.
+        try FileManager.default.removeItem(at: source)
+        await first.suspend()
+        let kept: URL = folder.appending(path: "outbox-images/\(key)-0.media")
+        XCTAssertEqual(try Data(contentsOf: kept), bytes, "the video stays in the outbox's folder, not in its record")
+        let record: Data = try Data(contentsOf: folder.appending(path: "outbox-images/\(key)-0.attachment"))
+        XCTAssertLessThan(record.count, 2_000, "the record holds a name and no bytes")
+
+        let next: Outbox = box(link, mayStartChat: { true })
+        link.report(.up)
+        await next.start()
+        try await items(next, "message delivered") { $0.isEmpty }
+        let uploads: [FakeDaemon.Seen] = daemon.requests.filter { $0.path == "/api/attachments/stream" }
+        XCTAssertEqual(uploads.count, 1)
+        let upload: FakeDaemon.Seen = try XCTUnwrap(uploads.first)
+        XCTAssertEqual(upload.method, "PUT")
+        XCTAssertEqual(upload.query, ["name": "Walk.mp4", "media_type": "video/mp4"])
+        XCTAssertEqual(upload.body, bytes, "the file is the body as it is, not base64 in JSON")
+        XCTAssertTrue(daemon.requests.allSatisfy { $0.path != "/api/attachments" }, "nothing went as JSON")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: kept.path), "what was sent leaves the folder")
+    }
+
+    func testCancellingAVideoUploadKeepsItsFileForRetry() async throws {
+        daemon.holdUploads = true
+        let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { true })
+        let source: URL = folder.appending(path: "movie.mp4")
+        try Data(repeating: 7, count: 50_000).write(to: source)
+        let key: String = newMessageKey()
+        try await outbox.enqueue(message("A video"), id: key, attachments: [OutgoingAttachment(name: "Walk.mp4", mediaType: "video/mp4", file: source, byteCount: 50_000)])
+        try await items(outbox, "uploading") { $0.first?.attachmentUpload?.count == 1 }
+        await outbox.cancelUpload(key)
+        try await items(outbox, "cancelled") { $0.first?.phase == .failed }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appending(path: "outbox-images/\(key)-0.media").path))
+
+        daemon.holdUploads = false
+        await outbox.retry(key)
+        try await items(outbox, "delivered on retry") { $0.isEmpty }
+        XCTAssertEqual(daemon.acceptedTexts, ["A video"])
+        XCTAssertTrue(daemon.requests.contains { $0.path == "/api/attachments/stream" && $0.body?.count == 50_000 }, "the retry sent the kept file whole")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appending(path: "outbox-images/\(key)-0.media").path))
+    }
+
+    func testCancellingAnAttachmentStopsTheMessageAndKeepsItForRetry() async throws {
+        daemon.holdUploads = true
+        let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { true })
+        let key: String = newMessageKey()
+        let file: OutgoingAttachment = OutgoingAttachment(name: "Notes.txt", mediaType: "text/plain", data: Data("notes".utf8))
+        try await outbox.enqueue(message("Read these notes"), id: key, attachments: [file])
+        try await items(outbox, "uploading") { $0.first?.attachmentUpload?.count == 1 }
+        await outbox.cancelUpload(key)
+        try await items(outbox, "cancelled") { $0.first?.phase == .failed && $0.first?.attachmentUpload == nil }
+        XCTAssertEqual(onDisk().first?.failure, .uploadCancelled)
+        XCTAssertEqual(daemon.count("POST", "/queue"), 0)
+
+        daemon.holdUploads = false
+        await outbox.retry(key)
+        try await items(outbox, "delivered on retry") { $0.isEmpty }
+        XCTAssertEqual(daemon.acceptedTexts, ["Read these notes"])
+        let sent: FakeDaemon.Seen = try XCTUnwrap(daemon.requests.first { $0.path.hasSuffix("/queue") && $0.method == "POST" })
+        let queued: QueueMessage = try JSONDecoder().decode(QueueMessage.self, from: XCTUnwrap(sent.body))
+        XCTAssertEqual(queued.attachments.count, 1)
+    }
+
     func testAnAnswerLostAfterTheDaemonTookTheMessageDoesNotSendItTwice() async throws {
         daemon.loseNextAnswers(2)
         let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { true })
@@ -283,6 +381,41 @@ final class Flag: @unchecked Sendable {
 /// A delete the daemon refuses (a chat with a run or a helper at work, 409) is kept in the snapshot for the list to say
 /// (item 1800): the outbox drops a refused doing and would otherwise tell nobody.
 final class RefusedDeleteTests: XCTestCase {
+    /// The review of item 1964: the Mac answered the delete before its notice came on the list's stream (or with the
+    /// stream down): the chats stay out of the list, and a read of the list from before does not bring them back.
+    func testChatsTheMacDeletedStayOutOfTheListBeforeItsNotice() async throws {
+        let folder: URL = scratchFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store: SyncStore = SyncStore(cache: SyncCache(folder: folder), clock: ManualClock(at: 1_800_000_000))
+        let row: (String) -> ThreadRow = { id in
+            ThreadRow(
+                summary: ThreadSummary(
+                    id: id, title: id, source: "ui", createdAt: 1, updatedAt: 1, pinnedAt: nil, runCount: 1, latestRunId: "r",
+                    latestStatus: "done", latestCreatedAt: 1, unread: false, actorId: nil, lastMessage: "", lastRole: "user"),
+                revision: 4, asks: 0, helpers: 0, background: [])
+        }
+        let before: ListProjection = ListProjection.drawn(rows: [row("thr_a"), row("thr_b"), row("thr_c")])
+        let after: ListProjection = ListReducer.deletedHere(before, threads: ["thr_a", "thr_b"])
+        XCTAssertEqual(after.rows.map(\.summary.id), ["thr_c"])
+        let stale: ListProjection = ListReducer.loaded(
+            ListReducer.asked(after), view: ThreadsView(revision: 5, threads: [row("thr_a"), row("thr_b"), row("thr_c")]), connection: after.marks.connection).0
+        XCTAssertEqual(stale.rows.map(\.summary.id), ["thr_c"], "a read from before the deletion does not bring them back")
+        // The store's own list: the delete seen in the outbox, the outbox emptied before the outcome is handled.
+        let (connection, _): (Int, [ListEffect]) = await store.listOpening()
+        await store.listOpened(connection)
+        _ = await store.listAsked()
+        _ = await store.listLoaded(ThreadsView(revision: 5, threads: [row("thr_a"), row("thr_b"), row("thr_c")]), connection: connection)
+        let item: OutboxItem = OutboxItem(id: "k1", action: .deleteChats(threads: ["thr_a", "thr_b"]), createdAt: 1)
+        await store.outbox([item])
+        await store.outbox([])
+        let between: EngineSnapshot = await store.snapshot
+        XCTAssertEqual(between.shownList.rows.map(\.summary.id), ["thr_c"], "dropped from the outbox, not yet handled: still hidden")
+        await store.outcome(.done(item))
+        let answered: EngineSnapshot = await store.snapshot
+        XCTAssertEqual(answered.list.rows.map(\.summary.id), ["thr_c"], "the store's list holds them deleted")
+        XCTAssertTrue(answered.deletesAwaiting.isEmpty)
+    }
+
     func testARefusedDeleteIsKeptUntilTheListToldIt() async throws {
         let folder: URL = scratchFolder()
         defer { try? FileManager.default.removeItem(at: folder) }

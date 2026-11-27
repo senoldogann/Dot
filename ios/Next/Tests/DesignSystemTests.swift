@@ -20,7 +20,7 @@ final class PaletteContrastTests: XCTestCase {
         let inks: Set<String> = Set(pairs.map(\.ink))
         let surfaces: Set<String> = Set(pairs.map(\.surface))
         XCTAssertEqual(
-            inks, ["text", "secondary", "tertiary", "warn", "failure", "glyph", "action", "onAction", "ground"])
+            inks, ["text", "secondary", "tertiary", "warn", "failure", "live", "glyph", "action", "onAction", "ground"])
         XCTAssertEqual(surfaces, ["ground", "card", "nested", "sheet", "glassFallback", "action", "warnFill", "warn"])
     }
 
@@ -148,12 +148,16 @@ final class ComponentRuleTests: XCTestCase {
         XCTAssertEqual(ChatStatus.allCases.filter { $0.tone == .failure }, [.failed])
     }
 
-    func testTheComposerIsCompactAtRestAndSplitsWhenWritingOrFocused() {
-        XCTAssertEqual(ComposerLayout.of(text: "", isFocused: false), .compact)
-        XCTAssertEqual(ComposerLayout.of(text: "Short", isFocused: false), .compact)
-        XCTAssertEqual(ComposerLayout.of(text: "", isFocused: true), .expanded)
-        XCTAssertEqual(ComposerLayout.of(text: "two\nlines", isFocused: false), .expanded)
-        XCTAssertEqual(ComposerLayout.of(text: String(repeating: "a", count: 33), isFocused: false), .expanded)
+    func testTheComposerIsOneRowAtRestAndSplitsWhenWritingMoreThanALine() {
+        XCTAssertEqual(ComposerLayout.of(text: ""), .compact)
+        XCTAssertEqual(ComposerLayout.of(text: "Short"), .compact)
+        XCTAssertEqual(ComposerLayout.of(text: "two\nlines"), .expanded)
+        XCTAssertEqual(ComposerLayout.of(text: String(repeating: "a", count: 33)), .expanded)
+    }
+
+    func testAModelsProviderIsTheReferencesPrefixWhenTheListDoesNotHoldIt() {
+        XCTAssertEqual(providerOfModel("claude_code:opus", in: []), "claude_code")
+        XCTAssertEqual(providerOfModel("default", in: []), "")
     }
 
     func testAStreamTickFiresOnlyForFollowedVisibleLiveOutputAndAtMostEvery320ms() {

@@ -263,3 +263,36 @@ async def test_a_step_too_long_for_the_review_model_to_read_is_refused_with_how_
     async with asyncio.timeout(WAIT_S):
         done: Authorization = await gate.authorize_recorded(REPLY)
     assert done.decision.answered_by == "yolo"
+
+
+async def test_in_auto_a_step_whose_instructions_are_too_long_to_read_together_goes_to_the_owner_unread(
+    room: Room,
+) -> None:
+    """Item 1947: the review reads the owner's instructions whole, as many as fit; with one left out it does not ask
+    the model, which could approve a step the instruction it did not read forbids: the owner decides."""
+    gate: RunGate = RunGate(
+        room.store,
+        room.bus,
+        room.broker,
+        room.run.id,
+        "task",
+        "balanced",
+        NO_PACE,
+        {},
+        "auto",
+        _nobody,
+        (INSTRUCTION, "x" * 40_000, "y" * 40_000),
+        SiteLocks(),
+    )
+    asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(REPLY))
+    async with asyncio.timeout(WAIT_S):
+        while True:
+            pending: list[ApprovalRecord] = await room.store.list_approvals("pending", 10)
+            if pending:
+                break
+            await asyncio.sleep(0.05)
+    (card,) = pending
+    assert "too long for the review model to read" in card.summary
+    await room.broker.resolve(card.id, True, "test", "")
+    async with asyncio.timeout(WAIT_S):
+        assert (await asked).decision.answered_by == "user"

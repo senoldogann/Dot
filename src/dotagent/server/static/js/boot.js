@@ -37,7 +37,7 @@
     root.dataset.density = density;
   }
   var work = read("dot.work");
-  if (work === "steps" || work === "status") {
+  if (work === "steps" || work === "status" || work === "messages") {
     root.dataset.work = work;
   }
   // The theme of the scheme on screen (item 126): the pick for dark while the page is dark, else the pick for light.

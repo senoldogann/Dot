@@ -143,7 +143,7 @@ def _owner_with_a_tool_of_their_own(tmp_path: Path) -> tuple[Path, Path]:
 async def test_the_server_keeps_the_owners_own_opencode_setup_out(tmp_path: Path) -> None:
     owner, workspace = await asyncio.to_thread(_owner_with_a_tool_of_their_own, tmp_path)
     server: OpenCodeServer = OpenCodeServer(
-        OpenCodeConfig(command="opencode", start_timeout_s=60.0, idle_stop_s=600.0, models_ttl_s=60.0),
+        OpenCodeConfig(command="opencode", start_timeout_s=60.0, idle_stop_s=600.0, models_ttl_s=60.0, silence_s=600.0),
         {"PATH": os.environ.get("PATH", ""), "HOME": str(owner)},
     )
     try:
@@ -174,7 +174,7 @@ async def test_the_free_models_are_the_refreshed_catalogs_and_an_older_server_ma
     workspace: Path = tmp_path / "workspace"
     await asyncio.to_thread(workspace.mkdir)
     server: OpenCodeServer = OpenCodeServer(
-        OpenCodeConfig(command="opencode", start_timeout_s=60.0, idle_stop_s=600.0, models_ttl_s=60.0),
+        OpenCodeConfig(command="opencode", start_timeout_s=60.0, idle_stop_s=600.0, models_ttl_s=60.0, silence_s=600.0),
         {"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path)},
     )
     try:

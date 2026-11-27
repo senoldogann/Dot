@@ -31,7 +31,10 @@ struct HomeShell: View {
             HomeList(
                 selection: $selection, openSettings: { showsSettings = true }, newBot: { showsNewBot = true }, openApps: { showsApps = true })
         } detail: { route in
+            // One screen per route, as the phone's push makes it: a bot's held and chosen chats never carry to another
+            // bot on the iPad's detail column (item 1923's review).
             BotChatScreen(route: route, drawsBack: sizeClass != .regular, back: { selection = nil })
+                .id(route)
         } placeholder: {
             EmptyState(
                 title: String(localized: "No chat open", comment: "iPad detail column when no chat is selected"), systemImage: "bubble.left.and.bubble.right",
@@ -55,7 +58,8 @@ struct HomeShell: View {
         // Back on the home: the agents' home chats (outside the list's window) are read again, so a chat read stops
         // counting as unread.
         .onChange(of: selection == nil) { _, home in if home { Task { await model.loadAgents() } } }
-        .onChange(of: model.list.rows.count) { _, count in
+        // `initial`: the rows may be read before the home is first drawn, and the first chat opens then too.
+        .onChange(of: model.list.rows.count, initial: true) { _, count in
             if opensFirstChat, selection == nil, count > 0 { selection = BotRoute(bot: dotAgentId, thread: model.list.ordered.first?.summary.id) }
         }
     }
@@ -194,6 +198,7 @@ struct HomeList: View {
         Button { open(BotRoute(bot: dot.id, thread: nil)) } label: {
             VStack(spacing: Space.s) {
                 BotFace(id: dot.id, look: dot.record.look, size: 84)
+                    .overlay { BotStateRing(state: botState(dot), size: 96) }
                     .overlay(alignment: .bottomTrailing) {
                         if (dot.unread > 0 || dot.asks > 0), !model.mutedBots.contains(dot.id) {
                             Circle().fill(Tone.action).frame(width: 16, height: 16).overlay(Circle().stroke(Tone.ground, lineWidth: 3))
@@ -312,8 +317,8 @@ struct HomeList: View {
     }
 }
 
-/// One bot of the home: its face, its name, the last line of its latest chat (a waiting question marked), the day, the
-/// unread dot.
+/// One bot of the home: its face, its name, where it stands (item 1920: what waits on the owner, its work, what it
+/// waits on) or else the last line of its latest chat, the day or a live mark while it works, the unread dot.
 struct BotRowView: View {
     let bot: Bot
     let muted: Bool
@@ -331,14 +336,11 @@ struct BotRowView: View {
                     if muted { Image(systemName: "bell.slash").font(.system(.caption2, weight: .semibold)).foregroundStyle(Tone.tertiary) }
                     Spacer(minLength: Space.xs)
                     if let latest = bot.latest {
-                        Text(rowTime(latest.summary.updatedAt, now: now)).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers()
+                        RowTrailing(state: state, time: rowTime(latest.summary.updatedAt, now: now))
                     }
                 }
                 HStack(alignment: .center, spacing: Space.xs) {
-                    if bot.asks > 0 {
-                        Image(systemName: "checklist").font(.system(.footnote, weight: .medium)).foregroundStyle(Tone.secondary)
-                    }
-                    Text(preview).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                    RowStateLine(state: state, preview: preview, lineLimit: dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                     Spacer(minLength: Space.xs)
                     if (bot.unread > 0 || bot.asks > 0), !muted {
                         Circle().fill(Tone.action).frame(width: 9, height: 9).accessibilityHidden(true)
@@ -354,9 +356,11 @@ struct BotRowView: View {
         .accessibilityIdentifier("home.bot.\(bot.id)")
     }
 
+    private var state: RowState { botState(bot) }
+
     private var preview: String {
         if let latest = bot.latest, !latest.summary.lastMessage.isEmpty { return latest.summary.lastMessage }
-        if !bot.record.role.isEmpty { return bot.record.role }
+        if !bot.record.role.isEmpty { return shownRole(bot.record) }
         return String(localized: "No chat yet", comment: "Home: a bot that has no chat")
     }
 }
@@ -364,7 +368,7 @@ struct BotRowView: View {
 /// What VoiceOver reads for a bot: its name, what waits, its last line.
 func botLabel(_ bot: Bot) -> String {
     var parts: [String] = [bot.record.name]
-    if bot.asks > 0 { parts.append(ChatStatus.waitingOnYou.word) }
+    if let words = rowStateWords(botState(bot)) { parts.append(words) }
     if bot.unread > 0 { parts.append(String(localized: "Unread", comment: "VoiceOver: a bot has unread chats")) }
     if let latest = bot.latest, !latest.summary.lastMessage.isEmpty { parts.append(latest.summary.lastMessage) }
     return parts.joined(separator: ", ")

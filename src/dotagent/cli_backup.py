@@ -11,7 +11,16 @@ from dotagent.cli_commands import BackupListCommand, BackupNowCommand, Command
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import InvalidValueError, StoreError
 from dotagent.core.paths import db_path
-from dotagent.store.backup import Backup, backup_folder, list_backups, make_backup, partial_folder, thin_backups
+from dotagent.store.backup import (
+    Backup,
+    backup_folder,
+    ensure_backup_space,
+    list_backups,
+    make_backup,
+    partial_folder,
+    thin_backups,
+)
+from dotagent.store.space import floor_bytes
 
 _MIB: int = 1024 * 1024
 
@@ -28,6 +37,10 @@ def _age(made_at: float, now: float) -> str:
 async def cmd_backup_now() -> int:
     config: AppConfig = load_user_config()
     folder: Path = backup_folder(config.store)
+    # A disk nearly full refuses the copy before it begins (item 1938): Dot's error says so.
+    await asyncio.to_thread(
+        ensure_backup_space, db_path(), folder, partial_folder(), floor_bytes(config.store.min_free_gb)
+    )
     made: Backup = await asyncio.to_thread(make_backup, db_path(), folder, partial_folder(), time.time())
     gone: list[Backup] = await asyncio.to_thread(
         thin_backups, folder, config.store.backup_keep_hourly, config.store.backup_keep_days, time.time()

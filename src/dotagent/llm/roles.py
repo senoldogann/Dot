@@ -10,6 +10,7 @@ from typing import Literal
 
 from dotagent.config import HarnessConfig, ModelReference, ModelsConfig, TaskKind
 from dotagent.core.logs import get_logger
+from dotagent.llm.families import model_family
 
 log = get_logger(__name__)
 
@@ -30,6 +31,17 @@ def learning_of(harness: HarnessConfig) -> dict[LearningRole, str]:
     }
 
 
+def independent_model(worker: str, checker: str) -> str | None:
+    """Return the configured checker when both lineages are known and differ."""
+    if checker == "":
+        return None
+    worker_family: str | None = model_family(worker)
+    checker_family: str | None = model_family(checker)
+    if worker_family is None or checker_family is None or worker_family == checker_family:
+        return None
+    return checker
+
+
 class ModelRoles:
     """The models of Dot's own work, as the config file named them when the runtime was built or as the owner chose them
     since (:meth:`choose`). One per runtime, read as each call is made, so that a choice holds from the next call on."""
@@ -42,6 +54,7 @@ class ModelRoles:
         }
         self._standby: tuple[ModelReference, ...] = tuple(models.standby)
         self._kinds: dict[TaskKind, ModelReference] = dict(models.kinds)
+        self._alternate_check: str = models.check_other_family
         self._look: str = look
         self._learning: dict[LearningRole, str] = {role: learning[role] for role in LEARNING_ROLES}
 
@@ -70,6 +83,15 @@ class ModelRoles:
         else:
             self._kinds[kind] = model
         log.info("kind_model_set", kind=kind, model=model)
+
+    def alternate_check(self) -> str:
+        """The model explicitly configured for independent checks, or an empty string."""
+        return self._alternate_check
+
+    def choose_alternate_check(self, model: str) -> None:
+        """Use the owner's newly saved choice for subsequent runs."""
+        self._alternate_check = model
+        log.info("alternate_check_model_set", model=model)
 
     def look(self) -> str:
         """The model of the run that looks for work on Dot's own initiative (``[initiative] look_model``); "" is the
@@ -123,5 +145,6 @@ class ModelRoles:
                 "vision": self.vision(),
                 "standby": list(self._standby),
                 "kinds": dict(self._kinds),
+                "check_other_family": self.alternate_check(),
             }
         )

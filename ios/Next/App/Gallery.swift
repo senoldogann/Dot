@@ -217,7 +217,7 @@ private struct FeedbackGallery: View {
         GroupedSection(header: String(localized: "Empty", comment: "Component gallery (debug builds): a heading or sample text"), footer: nil) {
             EmptyState(
                 title: String(localized: "No chats yet", comment: "Component gallery (debug builds): a heading or sample text"), systemImage: "bubble.left.and.bubble.right",
-                detail: String(localized: "Ask Dot for anything: a task, a lesson, an errand on the Mac.", comment: "Component gallery (debug builds): a heading or sample text"), actionTitle: String(localized: "New chat", comment: "Component gallery (debug builds): a heading or sample text"),
+                detail: String(localized: "Ask Dot for anything: a task, a lesson, an errand on the Mac.", comment: "Dot's empty chat (and the component gallery): what to ask Dot"), actionTitle: String(localized: "New chat", comment: "Component gallery (debug builds): a heading or sample text"),
                 action: {})
         }
         GroupedSection(header: String(localized: "Loading", comment: "Component gallery (debug builds): a heading or sample text"), footer: nil) {
@@ -250,18 +250,18 @@ private struct ChromeGallery: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.groupedGutter) {
                 Text(String(localized: "Composer at rest", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
-                ComposerView(text: $empty, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !empty.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
+                ComposerView(text: $empty, attachments: .constant([]), quote: .constant(nil), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !empty.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
                 Text(String(localized: "Composer expanded", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
-                ComposerView(text: $long, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !long.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
+                ComposerView(text: $long, attachments: .constant([]), quote: .constant(nil), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !long.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
                 Text(String(localized: "Floating control", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .working, activity: nil, since: Date(timeIntervalSinceNow: -192), queued: 2, helpersDone: 1, helpersTotal: 3, plan: PlanProgress(done: 1, total: 5), canStop: true),
+                    summary: WorkingSummary(status: .working, activity: nil, since: Date(timeIntervalSinceNow: -192), queued: 2, helpersDone: 1, helpersTotal: 3, plan: PlanProgress(done: 1, total: 5), canStop: true, link: nil),
                     showsScrollToBottom: true, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: nil, queued: 0, helpersDone: 0, helpersTotal: 0, plan: nil, canStop: false),
+                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: nil, queued: 0, helpersDone: 0, helpersTotal: 0, plan: nil, canStop: false, link: nil),
                     showsScrollToBottom: false, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: nil, activity: nil, since: nil, queued: 0, helpersDone: 0, helpersTotal: 0, plan: nil, canStop: false),
+                    summary: WorkingSummary(status: nil, activity: nil, since: nil, queued: 0, helpersDone: 0, helpersTotal: 0, plan: nil, canStop: false, link: nil),
                     showsScrollToBottom: true, openStatus: {}, stop: {}, openPlan: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
             }
             .padding(.horizontal, Space.gutter)
@@ -368,11 +368,11 @@ struct SampleChatScreen: View {
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .trailing, spacing: Space.xs) {
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: Date(timeIntervalSinceNow: -180), queued: 2, helpersDone: 0, helpersTotal: 2, plan: nil, canStop: true),
+                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: Date(timeIntervalSinceNow: -180), queued: 2, helpersDone: 0, helpersTotal: 2, plan: nil, canStop: true, link: nil),
                     showsScrollToBottom: true, openStatus: { panel = .background }, stop: {}, openPlan: {}, openQueue: {}, openHelpers: { panel = .agents },
                     scrollToBottom: {})
                     .frame(maxWidth: .infinity, alignment: .center)
-                ComposerView(text: $draft, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), buttons: composerButtons(hasContent: !draft.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
+                ComposerView(text: $draft, attachments: .constant([]), quote: .constant(nil), placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), buttons: composerButtons(hasContent: !draft.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
             }
             .frame(maxWidth: proseWidth)
             .padding(.horizontal, Space.s)

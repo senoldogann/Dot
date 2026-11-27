@@ -380,12 +380,14 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     # every run was told that done is not verified (item 1145), and 45 000 until `watch_video` joined (item 1212), and
     # 47 000 until the pipeline tools and the parts of an objective's work joined (item 1227), and 49 000 until
     # `browser_captcha` joined and the owner asked that a captcha wait no longer than it takes (item 1288). The full
-    # surface now includes the shared appearance schema, so this fixture leaves it 3,000 more context tokens.
+    # surface now includes the shared appearance schema, so this fixture leaves it 3,000 more context tokens, and 2,000
+    # more since the tools of the owner's Safari joined the desktop group (item 1959: three tools, about 1,600 tokens in
+    # the full surface), whose last compactions came one step apart at 52,000.
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 52_000, turns)
+    small: Played = await _play(_config({}, 6), login_env, 54_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(52_000, None, 39_000, 39_000, 4875, True),)
+    assert small.scaffolds == (_scaffold(54_000, None, 40_500, 40_500, 5062, True),)
     assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -396,7 +398,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for page in [*small_pages, *roomy_pages]:
         assert "chars omitted" not in page
         assert page.endswith("to continue]")
-    assert max(len(page) for page in small_pages) <= 4875 < min(len(page) for page in roomy_pages)
+    assert max(len(page) for page in small_pages) <= 5062 < min(len(page) for page in roomy_pages)
 
     # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
@@ -408,8 +410,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for compaction in small.compactions:
         before, after = compaction["tokens_before"], compaction["tokens_after"]
         assert isinstance(before, int) and isinstance(after, int), compaction
-        assert after < before and after <= 39_000, compaction
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 39_000
+        assert after < before and after <= 40_500, compaction
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 40_500
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [

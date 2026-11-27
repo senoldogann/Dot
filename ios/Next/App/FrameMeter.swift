@@ -11,6 +11,8 @@ import SwiftUI
 @MainActor
 final class FrameMeter: NSObject {
     static let shared: FrameMeter = FrameMeter()
+    /// The meter of disclosure toggles (`ToggleMeter`), apart from the run's so that the two never share a count.
+    static let toggles: FrameMeter = FrameMeter()
     private var link: CADisplayLink?
     private var last: CFTimeInterval = 0
     private var started: CFTimeInterval = 0
@@ -29,6 +31,15 @@ final class FrameMeter: NSObject {
     static var enabled: Bool {
         #if DEBUG
             UserDefaults.standard.bool(forKey: "DotNextFrameMeter")
+        #else
+            false
+        #endif
+    }
+
+    /// Whether disclosure toggles are measured (`-DotNextToggleMeter 1`).
+    static var measuresToggles: Bool {
+        #if DEBUG
+            UserDefaults.standard.bool(forKey: "DotNextToggleMeter")
         #else
             false
         #endif
@@ -82,7 +93,18 @@ final class FrameMeter: NSObject {
         if seconds > 1.0 / 60.0 { blocked += seconds }
     }
 
-    func stop() {
+    /// Measures one disclosure toggle (a work-log row opening or closing): the meter runs for `seconds` and its line goes
+    /// out under `label` (debug builds with `-DotNextToggleMeter 1`; `scripts/jank.sh`).
+    func measureToggle(label: String, seconds: Double) {
+        guard link == nil else { return }
+        start()
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(seconds))
+            stop(label: label)
+        }
+    }
+
+    func stop(label: String) {
         guard let link else { return }
         link.invalidate()
         self.link = nil
@@ -90,8 +112,8 @@ final class FrameMeter: NSObject {
         probe = nil
         let seconds: Double = max(CACurrentMediaTime() - started, 0.001)
         let line: String = String(
-            format: "frames=%d hitches=%d over16ms=%d longest_ms=%.1f hitch_ms_per_s=%.1f | main_waits=%d over16ms=%d over50ms=%d longest_ms=%.1f blocked_ms_per_s=%.1f | seconds=%.1f\n",
-            frames, hitches, over16, longest * 1000, hitchTime * 1000 / seconds, waits, waitsOver16, waitsOver50, longestWait * 1000,
+            format: "%@ frames=%d hitches=%d over16ms=%d longest_ms=%.1f hitch_ms_per_s=%.1f | main_waits=%d over16ms=%d over50ms=%d longest_ms=%.1f blocked_ms_per_s=%.1f | seconds=%.1f\n",
+            label, frames, hitches, over16, longest * 1000, hitchTime * 1000 / seconds, waits, waitsOver16, waitsOver50, longestWait * 1000,
             blocked * 1000 / seconds, seconds)
         let file: URL = URL.cachesDirectory.appending(path: "dotnext-frames.txt")
         if let handle = try? FileHandle(forWritingTo: file) {
@@ -113,9 +135,25 @@ struct FrameMeterHook: ViewModifier {
         if FrameMeter.enabled {
             content
                 .onChange(of: running, initial: true) { _, now in
-                    if now { FrameMeter.shared.start() } else { FrameMeter.shared.stop() }
+                    if now { FrameMeter.shared.start() } else { FrameMeter.shared.stop(label: "run") }
                 }
-                .onDisappear { FrameMeter.shared.stop() }
+                .onDisappear { FrameMeter.shared.stop(label: "run") }
+        } else {
+            content
+        }
+    }
+}
+
+/// Debug builds with `-DotNextToggleMeter 1`: measures each opening and closing of a disclosure for one second and writes
+/// its line as "open" or "close" and the kind of row (`scripts/jank.sh`); nothing otherwise.
+struct ToggleMeter: ViewModifier {
+    let open: Bool
+    /// What the row holds ("long" or "short" output), so that the lines tell the two apart.
+    let kind: String
+
+    func body(content: Content) -> some View {
+        if FrameMeter.measuresToggles {
+            content.onChange(of: open) { _, now in FrameMeter.toggles.measureToggle(label: (now ? "open " : "close ") + kind, seconds: 1.0) }
         } else {
             content
         }

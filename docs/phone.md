@@ -106,9 +106,29 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
-   own header and menu, its profile, and one settings sheet from an avatar button) is a native SwiftUI app over the
+   own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
+   Routines, Model, Activity, and a Notifications switch that is the phone's own count of its unread chats and what waits
+   on the owner on the home: the Mac has no push setting per bot), and one settings sheet from an avatar button; a bot's unread mark counts the
+   chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push
+   hook's code reviews), which marks it only while it waits on the owner, and a tap on a bot opens its latest such chat,
+   item 1912, and holds it: a newer chat of the bot shows only in the list, Dot's own work in a section of its own at
+   the end, item 1923; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
+   item 1912; a new chat's half-written words are kept per bot, item 1914; each row, a bot's and a chat's, says where it
+   stands, strongest first: Needs you in the accent while an approval, a question or a secret waits, Working… shimmering
+   and a small live mark for its time while a run works, Waiting on N helpers while the run waits on them, Waiting ·
+   what works in the background (a helper let go, a background command, its loop), else its last line, with the unread
+   dot; Dot's face wears a ring while one of its chats works or waits on the owner; all from the list's rows, which carry
+   `helpers` and `background` and are read again when a chat's revision moves, item 1920; chats selected together are deleted
+   in one request and leave every screen at once, coming back if the Mac refuses, and the list refills with older chats
+   after a deletion, item 1964-1965; Settings › General › Language chooses English or Türkçe whatever the iPhone's,
+   item 1966) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
-   after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
+   after the last one, answers that stream in (a file an answer's words name is its name after its kind's symbol, in
+   the words, and opens a preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open
+   on Mac, Share and Save to Files; a link is its site's own icon before the words it was written with, a bare address
+   shortened to its site or, for a GitHub pull request, `#1012` after the GitHub mark, and opens in Safari's in-app
+   view, the icons asked of a site only once the answer is whole; nothing is listed under the answer, items 1935 and 1961; a
+   table's long cells wrap inside their rows, its columns fitting the screen, item 1961), the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
    or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of
@@ -125,8 +145,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    `PATCH /api/threads/{id}`, and sent with each message together with the chat's mode and its agent); older messages
    (reaching the top of a chat reads a page of older runs, `GET /api/runs?before=`, and keeps the reader's place); a
    tap on a step's line opens its arguments and result (clipped, and it says how much was left out); a hold on a
-   message offers Copy, Select text, the seven reactions on what Dot said, and Edit from here on your own message
-   (`POST /api/runs/{id}/rewind`, the files kept as they are; not while a run works); what is typed and not sent is kept
+   message offers Quote, Copy, Select text, the seven reactions on what Dot said, and Edit from here on your own message
+   (`POST /api/runs/{id}/rewind`, the files kept as they are; not while a run works); a swipe to the right on any message (from away from the screen's edge, which is the back gesture's) quotes it: a chip with its first line stands above the text, and the message sent starts with the quote as `> lines`, which Dot reads and the chat shows as a quote (item 1972; the web's Quote button in a message's foot does the same); what is typed and not sent is kept
    for each chat, and for a new chat, across launches; the composer's microphone dictates on the iPhone (Apple's Speech
    framework, `requiresOnDeviceRecognition`: no audio leaves the phone; it asks for the speech and the microphone
    permissions when first pressed, and ends in a line, with a way to the app's page in Settings when a permission is
@@ -602,6 +622,22 @@ for a lost link would hold what the owner sends.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
+## Attachments on Dot Next and the web
+
+In a new or existing Dot Next chat, tap **+** to open the photo library for photos and videos, take a photo or record a
+video with Camera, or choose a document with Files. The phone re-encodes video for a target size, not a preset
+(item 1933): H.264 at 1.8 Mbps with 80 kbps AAC sound, its longest side at most 1280 pixels, at most 30 frames a
+second, so a minute is about 14 MB and a quarter of an hour fits the limit. It shows the video's thumbnail, duration and
+upload size. A video or a sound goes to the daemon as the raw body of `PUT /api/attachments/stream` with the phone's
+key, read from a file as it is sent and written to the Mac's disk as it arrives, up to 200 MiB; a photo or a document
+goes as base64 in JSON (`POST /api/attachments`), up to 20 MiB. Only a video over 200 MiB (about 15 minutes) gets
+**Trim video** on its chip, to choose a shorter part. Files show their name, type and size. Up to 10 attachments go
+with a message.
+
+After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
+The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer
+or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
+
 ## The iPhone app's calls
 
 What the native iPhone app asks of the daemon, as a contract the app can be written to (`ios/`). Every path is under
@@ -642,6 +678,8 @@ paired`) and nothing is kept for it.
 | `POST /api/runs/{id}/input` | any token | 470, 1840 | 200, what the page took |
 | `POST /api/runs/{id}/handback` | any token | 1840 | 202, the run goes on |
 | `GET /api/threads/search?q=&limit=` | any token | 1882 | 200, finds in what the chats say |
+| `POST /api/phone/metrics` | the phone's key | 1926 | 204, the phone's performance record kept |
+| `GET /api/phone/metrics` | the phone's key | 1926 | 200, its summary of the last seven days |
 
 What changed in calls and replies that were there before: **every alert push carries `aps.badge`**, how many things
 wait on you (item 1422; [below](#what-the-daemon-pushes-to-the-app)); `GET /api/away` lists more runs and says each run's
@@ -749,6 +787,34 @@ switch moves at once, a second flip while a write is on its way waits and goes a
 a write the daemon does not keep (a refusal, or no answer) puts the switches back to what the daemon held and says so in a
 plain line. With no answer to the read the phone shows the switches as it last knew them (kept in `awareness.json` of the
 cache folder), dimmed, and they do not move: a switch that cannot be kept is no switch.
+
+### POST /api/phone/metrics and GET /api/phone/metrics
+
+The phone's own performance record (item 1926), which Dot Next shows in Settings › System › Maintenance under **This
+phone's performance**. The app sends what iOS's MetricKit measured of it (about once a day: CPU and GPU time, the time on
+screen and in the background, hang time, the median launch, the memory's peak, disk writes, cellular and Wi-Fi data, the
+scroll hitches; and with a diagnostics delivery the count of its crash, hang, CPU and disk-write reports, never their
+contents) and its own counters of each time it was open (the seconds, the bytes it read from and sent to the Mac, its
+requests, the streams it opened and those that broke, how often it redrew a chat). Only numbers come: no chat's words,
+no path, no stack. The reports wait on the phone and go when the app is open; nothing is sent from the background, and
+nothing goes anywhere but the paired Mac.
+
+`POST` takes `{"reports": [...]}`, 1 to 50 reports, each with `source` (`metrickit` or `app`), `begins_at` and `ends_at`
+(Unix seconds), `app_version` and `os_version` (at most 40 characters each) and the measures it has, each optional and
+not below zero: `foreground_s`, `background_s`, `cpu_s`, `gpu_s`, `hang_s`, `launch_ms`, `peak_memory_mb`,
+`disk_writes_mb`, `cellular_mb`, `wifi_mb`, `scroll_hitch_ms_per_s`, `crashes`, `hang_reports`, `cpu_exceptions`,
+`disk_write_exceptions`, `open_s`, `bytes_in`, `bytes_out`, `requests`, `stream_opens`, `stream_breaks`, `redraws`. The
+daemon keeps the newest 300 reports of the last 30 days for the phone whose key sent them and answers 204. Any other key,
+a value of another type or a report too many is a 422 and nothing of the request is kept.
+
+`GET` answers the last seven days summed: `days`, `reports`, `last_at`, `app_version` (the newest report's), from
+MetricKit's `foreground_min`, `cpu_s`, `hang_s`, `launch_ms` (the newest), `peak_memory_mb` (the highest),
+`disk_writes_mb`, `cellular_mb`, `wifi_mb`, `crashes`, `hang_reports`, `cpu_exceptions`, `disk_write_exceptions`, and from
+the app's own `open_min`, `dot_in_mb`, `dot_out_mb`, `requests`, `reconnects` (the streams that broke) and
+`redraws_per_min`. Before the first report `reports` is 0.
+
+Errors: 403 for the Mac's token (a record is a phone's own; one phone never reads another's); 404 for a phone removed
+while its `POST` was on its way. Removing a phone drops its record.
 
 ### GET /api/needs-you
 
@@ -1045,7 +1111,9 @@ then `synchronized` (`{revision, runs: {run id: newest event id sent}}`), and go
 the chat (its `run_queued` first) and every helper a followed run starts come on the same stream, which no run's end
 closes. Each frame is an event as `/api/runs/{id}/stream` sends it (`id:` for a stored one, `event:` its kind, `data:`
 the event); the words being written (`delta`) have id 0 and only add to the step being written, which a client that
-connected mid-step shows as being written until the step's stored event comes. `thread_changed` (`{thread_id,
+connected mid-step shows as being written until the step's stored event comes. The words go out at most about twelve
+times a second (item 1926): the tokens a model writes within 80 ms of each other, of the same run, step and kind, come
+joined in one `delta`, so a phone wakes for a few tokens at a time, not one; any other event sends the words held first. `thread_changed` (`{thread_id,
 revision, deleted}`, id 0) says the chat's revision moved: read the view again. `deleted: true` ends the stream.
 Cursors are per run because event ids are one order for all runs but not told in that order: a run of a `dotx` command
 reaches the daemon half a second late, and two runs stored at once may be told the other way round. A stream that falls
@@ -1067,7 +1135,7 @@ daemon tells a moved revision within half a second of the write (it reads the mo
 Dot Next shows the Mac's screen and a run's browser live, and lets the owner take a run's page over, with the routes the
 web uses:
 
-- **Watch the Mac** (Activity, and Dot's profile): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
+- **Watch the Mac** (Activity, and the Computer row of a bot's profile, which opens a run's live picture with Take over when one of its chats follows one): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
   `dotagent/desktop/live.py`, decoded by the phone's own H.264 decoder. `hd` is the page's (1920 pixels on the longest
   side, 60 frames a second, a key frame every 4 s); `light` (item 1837) is a capture of its own at 1280 pixels, 30
   frames a second, a fifth of the bit rate and a key frame every 2 s, for a weak link. The viewer's Automatic quality

@@ -22,6 +22,7 @@
         case scheduleEdit = "settings-schedule-edit"
         case rules = "settings-rules"
         case memory = "settings-memory"
+        case memoryTrash = "settings-memory-trash"
         case agents = "settings-agents"
         case campaigns = "settings-campaigns"
         case campaign = "settings-campaign"
@@ -69,6 +70,7 @@
             case .schedules, .scheduleEdit: .schedules
             case .rules: .rules
             case .memory: .memory
+            case .memoryTrash: .memoryTrash
             case .agents: .agents
             case .campaigns: .campaigns
             case .campaign: .campaign("cmp_fixture")
@@ -207,6 +209,7 @@
                 )
             case ("GET", "/api/policy/free"): return (200, #"{"free":false}"#)
             case ("GET", "/api/memories"): return (200, memories(now: now))
+            case ("GET", "/api/memories/trash"): return (200, trash(now: now))
             case ("GET", "/api/agents"): return (200, agents(now: now))
             case ("GET", _) where path.hasPrefix("/api/agents/"):
                 return (200, #"{"record":\#(agent("ag_scout", "Scout", "Finds leads and checks them", now: now)),"runs":[],"messages":[],"learned":{"lessons":[],"scores":{},"skills":[]},"usage":null,"work":null,"home":null}"#)
@@ -244,6 +247,19 @@
                     #"{"programs":[{"name":"Claude Code","command":"claude","path":"/opt/homebrew/bin/claude","version":"2.1.331","support":"supported","why":"measured with Dot (items 1580 to 1582)"},{"name":"OpenCode","command":"opencode","path":"/opt/homebrew/bin/opencode","version":"1.19.5","support":"unknown","why":"Dot keeps no list of the OpenCode versions it was measured on"}]}"#
                 )
             case ("PUT", "/api/agent/resume"): return (200, #"{"resume":"off","resume_within_s":3600}"#)
+            case ("GET", "/api/phone/metrics"):
+                return (
+                    200,
+                    #"{"days":7,"reports":9,"last_at":\#(now - 3600),"app_version":"1.0 (42)","foreground_min":96.5,"cpu_s":212.4,"hang_s":1.8,"launch_ms":412.0,"peak_memory_mb":184.2,"disk_writes_mb":38.0,"cellular_mb":21.3,"wifi_mb":64.0,"crashes":0,"hang_reports":2,"cpu_exceptions":0,"disk_write_exceptions":0,"open_min":88.0,"dot_in_mb":7.4,"dot_out_mb":1.2,"requests":412,"reconnects":3,"redraws_per_min":96.0}"#
+                )
+            case ("POST", "/api/phone/metrics"): return (204, "")
+            // A file an answer names (backlog LF1): its facts and text, and its open on the Mac.
+            case ("GET", "/api/files/preview"):
+                return (
+                    200,
+                    #"{"path":"/Users/owner/Desktop/ci-notes.md","name":"ci-notes.md","size":2150,"modified":\#(now - 600),"opens":true,"preview":{"kind":"text","text":"CI notes\n\nNode 22 is pinned on CI.\n","cut":false}}"#
+                )
+            case ("POST", "/api/files/open"): return (204, "")
             default: return CampaignFixture.answer(method: method, path: path) ?? (404, #"{"detail":"Not Found"}"#)
             }
         }
@@ -329,6 +345,17 @@
 
         private func note(_ id: String, _ content: String, _ tags: String, now: Double, used: Int) -> String {
             #"{"id":"\#(id)","content":"\#(content)","tags":\#(tags),"created_at":\#(now - 900000),"updated_at":\#(now - 90000),"source_run":null,"agent_id":null,"used_count":\#(used),"last_used_at":\#(now - 7200),"expires_at":null,"replaced_by":null,"tainted":false,"merged_into":null,"merged_from":[],"pinned_at":null,"rested_at":null,"edited_by":"owner","proposed":null}"#
+        }
+
+        private func trash(now: Double) -> String {
+            let one: (String, String, String, Double) -> String = { id, content, tags, ago in
+                #"{"record":\#(self.note(id, content, tags, now: now, used: 2)),"trashed_at":\#(now - ago),"purged_at":\#(now - ago + 30 * 86400)}"#
+            }
+            let items: [String] = [
+                one("mem_t1", "Oulu cafés list their hours on Facebook, not a site.", "[\"lesson\"]", 7200),
+                one("mem_t2", "The old invoice folder was ~/Documents/Invoices-2025.", "[\"work\"]", 3 * 86400),
+            ]
+            return #"{"items":[\#(items.joined(separator: ","))],"total":2,"trash_days":30}"#
         }
 
         private func memories(now: Double) -> String {

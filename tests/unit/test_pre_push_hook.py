@@ -82,7 +82,7 @@ def _run_hook_on(
         f'if [ "$1" = review ]; then cat "{tmp_path / "plan"}"; exit 0; fi\n'
         'model=""; previous=""\n'
         'for arg in "$@"; do [ "$previous" = --model ] && model=$arg; previous=$arg; done\n'
-        "cat > /dev/null\n"
+        f'mkdir -p "{tmp_path / "goals"}"; cat > "{tmp_path / "goals"}/$(echo "$model" | tr :/ __)"\n'
         f'echo "$model" >> "{asked}"\n'
         f'answer="{answers_dir}/$model"; [ -f "$answer" ] || answer="{answers_dir}/default"\n'
         'if [ "$(cat "$answer")" = SLEEP ]; then exec sleep 60; fi\n'
@@ -91,6 +91,19 @@ def _run_hook_on(
         encoding="utf-8",
     )
     stand_in.chmod(0o755)
+    # `uv run python scripts/prompt_surface.py --check` (item 1971): records that it ran, and when `uv_exit` is there
+    # fails with that exit status and what `uv_says` holds.
+    uv: Path = bin_dir / "uv"
+    uv.write_text(
+        "#!/bin/sh\n"
+        f'echo "$@" >> "{tmp_path / "uv_called"}"\n'
+        f'if [ -f "{tmp_path / "uv_exit"}" ]; then\n'
+        f'  cat "{tmp_path / "uv_says"}" >&2; exit "$(cat "{tmp_path / "uv_exit"}")"\n'
+        "fi\n"
+        'echo "prompt surface: up to date"\n',
+        encoding="utf-8",
+    )
+    uv.chmod(0o755)
     env = {key: value for key, value in os.environ.items() if key != "ANTHROPIC_API_KEY"}
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env.pop("DOTX", None)
@@ -105,6 +118,11 @@ def _run_hook_on(
         timeout=60,
     )
     return done, len(asked.read_text().splitlines()) if asked.exists() else 0
+
+
+def _goal_of(tmp_path: Path, model: str) -> str:
+    """The goal the stand-in was handed for ``model`` (what the review is asked)."""
+    return (tmp_path / "goals" / model.replace(":", "_").replace("/", "_")).read_text(encoding="utf-8")
 
 
 def _asked_models(tmp_path: Path) -> list[str]:
@@ -308,3 +326,170 @@ def test_a_plan_that_cannot_be_read_stops_the_push(repo: Path, tmp_path: Path) -
     )
     assert done.returncode == 1
     assert "could not be reviewed" in done.stderr and "max_minutes must be at least 1" in done.stderr
+
+
+def _review_dir(repo: Path) -> Path:
+    folder: Path = Path(_git(repo, "rev-parse", "--absolute-git-dir")) / "claude-review"
+    folder.mkdir(exist_ok=True)
+    return folder
+
+
+def test_a_push_after_a_blocked_review_reads_only_what_came_after_it_and_names_that_review(
+    repo: Path, tmp_path: Path
+) -> None:
+    """Item 1954: a first push that BLOCKs never reaches the remote, so each round was read again from where the branch
+    leaves main (29 reviews in one chat). The next round reads from the commit whose review BLOCKed, and the reviewer is
+    pointed at that review to check its findings are fixed."""
+    remote_tip: str = _git(repo, "rev-parse", "HEAD")
+    blocked: str = _commit(repo, "first_round.txt", "the first round\n", "round one")
+    (_review_dir(repo) / f"{blocked}.md").write_text("1 Important\n\nVERDICT: BLOCK\n", encoding="utf-8")
+    tip: str = _commit(repo, "second_round.txt", "the fix\n", "round two")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    diff: str = (_review_dir(repo) / f"{tip}.diff").read_text(encoding="utf-8")
+    assert "second_round.txt" in diff and "first_round.txt" not in diff
+    assert (_review_dir(repo) / f"{tip}.paths").read_text(encoding="utf-8").split() == ["second_round.txt"]
+    goal: str = _goal_of(tmp_path, "first:model")
+    assert f"{blocked}.md" in goal and "which BLOCKed" in goal
+    assert "Read only the files the change touches" in goal
+
+
+def test_a_commit_that_passed_here_but_never_reached_the_remote_is_not_read_again(repo: Path, tmp_path: Path) -> None:
+    remote_tip: str = _git(repo, "rev-parse", "HEAD")
+    passed: str = _commit(repo, "passed.txt", "passed\n", "passed here")
+    _passed(repo, passed)
+    tip: str = _commit(repo, "later.txt", "later\n", "later")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    diff: str = (_review_dir(repo) / f"{tip}.diff").read_text(encoding="utf-8")
+    assert "later.txt" in diff and "passed.txt" not in diff
+    assert "which BLOCKed" not in _goal_of(tmp_path, "first:model")
+
+
+def test_a_review_that_gave_no_verdict_is_not_taken_as_read(repo: Path, tmp_path: Path) -> None:
+    """A review that ended with no verdict (refused, stopped) read nothing for good: its commit is read again."""
+    remote_tip: str = _git(repo, "rev-parse", "HEAD")
+    unread: str = _commit(repo, "unread.txt", "unread\n", "no verdict")
+    (_review_dir(repo) / f"{unread}.md").write_text("API Error: refused\n", encoding="utf-8")
+    tip: str = _commit(repo, "later.txt", "later\n", "later")
+    done, _ = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert done.returncode == 0, done.stdout + done.stderr
+    diff: str = (_review_dir(repo) / f"{tip}.diff").read_text(encoding="utf-8")
+    assert "later.txt" in diff and "unread.txt" in diff
+
+
+def test_a_model_off_the_claude_plan_is_told_its_budget_and_one_on_it_is_not(repo: Path, tmp_path: Path) -> None:
+    """Item 1954: DeepSeek stopped at the time limit in 21 of 61 reviews with no verdict, having read the repository."""
+    refs: str = f"refs/heads/feature {_git(repo, 'rev-parse', 'HEAD')} refs/heads/feature {_ZERO}\n"
+    plan: str = "size full\nlimit 900\nroute security\ntry opencode_go:deepseek medium\ntry claude_code:opus high\n"
+    done, _ = _run_hook_on(repo, tmp_path, refs, plan=plan, answers={"opencode_go:deepseek": "API Error: refused"})
+    assert done.returncode == 0, done.stdout + done.stderr
+    deepseek: str = _goal_of(tmp_path, "opencode_go:deepseek")
+    assert "at most 40 tool calls and 12 minutes" in deepseek and "VERDICT line" in deepseek
+    assert "Your budget" not in _goal_of(tmp_path, "claude_code:opus")
+    assert "route security" in done.stdout
+
+
+def test_a_block_that_counts_no_important_finding_is_not_taken_as_read(repo: Path, tmp_path: Path) -> None:
+    """The review of item 1954: the prompt asks for BLOCK when the review could not read the change (or ran out of its
+    budget), which says nothing of the code: its commit is read again, and only a BLOCK that counts findings stands."""
+    remote_tip: str = _git(repo, "rev-parse", "HEAD")
+    unread: str = _commit(repo, "unread.txt", "unread\n", "could not review")
+    (_review_dir(repo) / f"{unread}.md").write_text(
+        "I could not read the change.\n\nVERDICT: BLOCK\n", encoding="utf-8"
+    )
+    tip: str = _commit(repo, "later.txt", "later\n", "later")
+    done, _ = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert done.returncode == 0, done.stdout + done.stderr
+    diff: str = (_review_dir(repo) / f"{tip}.diff").read_text(encoding="utf-8")
+    assert "later.txt" in diff and "unread.txt" in diff
+
+
+def _uv_fails(tmp_path: Path, status: int, says: str) -> None:
+    """Makes the stand-in `uv` fail with ``status`` and ``says``."""
+    (tmp_path / "uv_says").write_text(f"{says}\n", encoding="utf-8")
+    (tmp_path / "uv_exit").write_text(f"{status}\n", encoding="utf-8")
+
+
+def _with_surface_script(repo: Path) -> str:
+    """Puts the script the hook looks for into the branch, and returns the tip before the branch's next commit."""
+    (repo / "scripts").mkdir(exist_ok=True)
+    _commit(repo, "scripts/prompt_surface.py", "# stand-in\n", "the script")
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def test_a_change_under_src_dotagent_is_checked_against_the_prompt_surface_before_the_review(
+    repo: Path, tmp_path: Path
+) -> None:
+    """Item 1971: the prompt surface's test runs on macOS only, so a pull request never saw a stale fixture and main
+    went red twice in a day. A fresh fixture lets the review go on."""
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    assert (tmp_path / "uv_called").read_text().strip() == "run python scripts/prompt_surface.py --check"
+
+
+def test_a_stale_prompt_surface_stops_the_push_with_the_command_that_fixes_it_and_no_model_is_asked(
+    repo: Path, tmp_path: Path
+) -> None:
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    _uv_fails(tmp_path, 3, "prompt surface: stale (tools.json)")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "the prompt surface is stale" in done.stderr
+    assert "uv run python scripts/prompt_surface.py" in done.stderr and "tests/fixtures/prompt_surface" in done.stderr
+
+
+def test_a_change_outside_src_dotagent_does_not_run_the_prompt_surface_check(repo: Path, tmp_path: Path) -> None:
+    remote_tip: str = _with_surface_script(repo)
+    tip: str = _commit(repo, "docs.md", "words\n", "docs")
+    _uv_fails(tmp_path, 3, "stale")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    assert not (tmp_path / "uv_called").exists()
+
+
+def test_a_check_that_failed_to_run_is_not_reported_as_a_stale_surface(repo: Path, tmp_path: Path) -> None:
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    _uv_fails(tmp_path, 1, "ModuleNotFoundError: no module named dotagent")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "could not be checked (exit 1)" in done.stderr and "ModuleNotFoundError" in done.stderr
+    assert "is stale" not in done.stderr
+
+
+def test_uncommitted_changes_to_what_the_surface_is_made_of_stop_the_push_instead_of_a_check_of_another_tree(
+    repo: Path, tmp_path: Path
+) -> None:
+    """The review of item 1971: a fixture written and not committed passed the check while the pushed commit kept the
+    stale one."""
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    (repo / "tests" / "fixtures" / "prompt_surface").mkdir(parents=True)
+    (repo / "tests" / "fixtures" / "prompt_surface" / "tools.json").write_text("{}\n", encoding="utf-8")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "not committed" in done.stderr and "commit or stash" in done.stderr
+    assert not (tmp_path / "uv_called").exists()
+
+
+def test_a_branch_that_is_not_checked_out_is_not_checked_and_says_so(repo: Path, tmp_path: Path) -> None:
+    """The check reads the working tree, so a push of another branch goes on to its review with a note."""
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    _git(repo, "checkout", "-q", "main")
+    (repo / "scripts").mkdir(exist_ok=True)
+    (repo / "scripts" / "prompt_surface.py").write_text("# stand-in\n", encoding="utf-8")
+    _uv_fails(tmp_path, 3, "stale")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    assert "is not checked out, so its prompt surface is not checked here" in done.stderr
+    assert not (tmp_path / "uv_called").exists()

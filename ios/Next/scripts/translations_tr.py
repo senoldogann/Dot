@@ -1,12 +1,31 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
 extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",
+    "Not sent: an attachment could not be read on this phone": "Gönderilmedi: eklerden biri bu telefonda okunamadı",
+    "Upload cancelled": "Yükleme iptal edildi",
+    "Cancel upload": "Yüklemeyi iptal et",
+    "Uploading attachment %lld of %lld": "Ek yükleniyor (%1$lld / %2$lld)",
+    "See the attachments.": "Eklere bak.",
+    "OK": "Tamam",
+    "Photos and videos": "Fotoğraflar ve videolar",
+    "Trim video": "Videoyu kırp",
+    "Over the 200 MiB limit": "200 MiB sınırını aşıyor",
+    "Preparing attachments…": "Ekler hazırlanıyor…",
+    "Could not add attachment": "Ek eklenemedi",
+    "At most 10 attachments can go with a message.": "Bir mesajla en fazla 10 ek gönderebilirsiniz.",
+    "%@ is %@. The limit is 20 MiB per attachment.": "%@ boyutu %@. Ek başına sınır 20 MiB.",
+    "%@ is %@. The limit is 200 MiB for a video or a sound.": "%@ boyutu %@. Video veya ses için sınır 200 MiB.",
+    "Could not prepare %@ as a video.": "%@ video olarak hazırlanamadı.",
+    "Could not read %@. Choose a file.": "%@ okunamadı. Bir dosya seçin.",
+    "The image could not be read.": "Görüntü okunamadı.",
     "Not sent: a photo of it could not be read on this phone": "Gönderilmedi: fotoğraflarından biri bu telefonda okunamadı",
     "Accounts": "Hesaplar",
     "Ask a side question the run does not see": "Çalışmanın görmediği bir yan soru sor",
@@ -109,8 +128,6 @@ TR: dict[str, str] = {
     "Or write your own answer": "Ya da kendi yanıtını yaz",
     "Pair this phone again in Settings.": "Bu telefonu Ayarlar'dan yeniden eşleştir.",
     "Paste image": "Görseli yapıştır",
-    "Photo": "Fotoğraf",
-    "Photos": "Fotoğraflar",
     "Pin: Dot keeps a note of it": "İğnele: Dot bunu not eder",
     "Plan": "Plan",
     "Plan · %lld of %lld done": "Plan · %lld / %lld bitti",
@@ -123,7 +140,6 @@ TR: dict[str, str] = {
     "Read %@": "Okundu: %@",
     "Recommended": "Önerilen",
     "Remove reaction: %@": "Tepkiyi kaldır: %@",
-    "Remove the photo": "Fotoğrafı kaldır",
     "Resume now": "Şimdi sürdür",
     "Resume queue": "Sırayı sürdür",
     "Running %@": "Çalışıyor: %@",
@@ -344,7 +360,6 @@ TR: dict[str, str] = {
     "Looked at the screen": "Ekrana baktı",
     "Memory": "Bellek",
     "Message Dot": "Dot'a yaz",
-    "Model, %@": "Model, %@",
     "Models": "Modeller",
     "Mon": "Pzt",
     "Needs you": "Seni bekliyor",
@@ -458,7 +473,6 @@ TR: dict[str, str] = {
     'All tasks a day': 'Günde tüm görevler',
     "Allow it in iOS Settings, or type the Mac's address instead.": "iOS Ayarları'nda izin ver ya da Mac'in adresini elle yaz.",
     'Answers': 'Yanıtlar',
-    'App language': 'Uygulama dili',
     'Approvals': 'Onaylar',
     'Approvals and questions that wait on you': 'Seni bekleyen onaylar ve sorular',
     'As the default': 'Varsayılan gibi',
@@ -496,7 +510,6 @@ TR: dict[str, str] = {
     'Done or failed': 'Bitti ya da başarısız oldu',
     'Dot Next gets notifications once it replaces the old Dot app on this iPhone; until then the old app keeps them. These switches are kept on your Mac for this phone.': "Dot Next bildirimleri bu iPhone'daki eski Dot uygulamasının yerini aldığında alır; o zamana kadar bildirimler eski uygulamada kalır. Bu anahtarlar Mac'inde bu telefon için saklanır.",
     'Dot Next may not use the camera': 'Dot Next kamerayı kullanamıyor',
-    'Dot Next speaks the language iOS Settings sets for it.': "Dot Next, iOS Ayarları'nın onun için seçtiği dili konuşur.",
     'Dot Next version': 'Dot Next sürümü',
     'Dot answered with an error (HTTP %lld). Look at Dot on the Mac.': "Dot bir hatayla yanıt verdi (HTTP %lld). Mac'teki Dot'a bak.",
     'Dot follows its approval mode alone.': 'Dot yalnızca onay moduna göre davranır.',
@@ -716,6 +729,13 @@ TR: dict[str, str] = {
     'Your Mac answered with what this app cannot read (%@). Update Dot on the Mac or this app.': "Mac'in bu uygulamanın okuyamadığı bir yanıt verdi (%@). Mac'teki Dot'u ya da bu uygulamayı güncelle.",
     "Your Mac did not answer the check of this phone's key, so the key was not sent. Check again in a moment.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi; bu yüzden anahtar gönderilmedi. Biraz sonra yeniden denetle.",
     "Your Mac did not answer the check of this phone's key.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi.",
+    # Helper L1 (item 1966): the app's own language.
+    'Same as the iPhone': 'iPhone ile aynı',
+    'The chat was not deleted: %@': 'Sohbet silinmedi: %@',
+    'None of the %lld chats was deleted: %@': '%lld sohbetten hiçbiri silinmedi: %@',
+    'Your assistant': 'Asistanın',
+    "Dot Next speaks this language whatever the iPhone's, as the web's own choice does.": "Dot Next, iPhone'un dili ne olursa olsun bu dili konuşur; web'deki kendi seçimi gibi.",
+    'Dot Next opens in it the next time it starts.': 'Dot Next bir sonraki açılışta bu dille açılır.',
     # Helper L1 (item 1907): Settings › Models with every model setting of the Mac.
     'Add a fallback model': 'Yedek model ekle',
     'Billed to your plan as extra usage; without it the session runs at the standard speed.': 'Planına ek kullanım olarak yansır; kapalıyken oturum standart hızda çalışır.',
@@ -747,7 +767,6 @@ TR: dict[str, str] = {
     'The models could not be read: %@': 'Modeller okunamadı: %@',
     'Recently used': 'Son kullanılanlar',
     'Chats with a run at work or waiting on you are kept; stop or answer them first.': 'Çalışan ya da seni bekleyen sohbetler silinmez; önce durdur ya da yanıtla.',
-    'Some chats were not deleted: %@': 'Bazı sohbetler silinmedi: %@',
     '%lld selected': '%lld seçili',
     'A second AI answers for you; you are asked only what it is unsure about': 'İkinci bir yapay zekâ senin yerine yanıtlar; yalnızca emin olmadığı şeyler sana sorulur',
     'Add %@ to favourites': '%@ modelini favorilere ekle',
@@ -845,6 +864,7 @@ TR: dict[str, str] = {
     "Recent": "Son",
     "Search chats": "Sohbetlerde ara",
     "Start one with the pencil above.": "Yukarıdaki kalemle bir tane başlat.",
+    "updates versions resume restart continue performance battery hangs crashes": "güncellemeler sürümler sürdür yeniden başlat devam performans pil donma çökme",
     "updates versions resume restart continue": "güncellemeler sürümler sürdür yeniden başlat devam",
     # V1 (items 1838-1840): watch the Mac, follow a run live, take its page over. Words of the web's watch.* and
     # computer.js where they exist.
@@ -1167,6 +1187,20 @@ TR: dict[str, str] = {
     "Waiting · %@": "Bekliyor · %@",
     "Details": "Ayrıntılar",
 
+    # D2: messages only, Show steps (item 1915).
+    "Show steps": "Adımları göster",
+    "Each chat's This chat sheet can show or hide them for that chat alone.": "Her sohbetin Bu sohbet sayfası bunları yalnızca o sohbet için gösterebilir ya da gizleyebilir.",
+    "Off: only the messages, and one line that says what Dot is doing. A finished run's steps open from its Worked for line.": "Kapalı: yalnızca mesajlar ve Dot'un ne yaptığını söyleyen tek bir satır. Biten bir işin adımları süresini söyleyen satırdan açılır.",
+    "For this chat; Settings › Chat sets it for every chat.": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar.",
+    "Messages": "Mesajlar",
+
+    # D2: an owner's message not yet taken by the Mac (item 1927).
+    "Pending": "Bekliyor",
+
+    # D2: the link in the chat's pill (item 1931).
+    "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
+    "Syncing messages…": "Mesajlar eşitleniyor…",
+    "your Mac": "Mac",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
@@ -1194,6 +1228,19 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
+        "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
+        "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
+        "Deleted for good %@.": "Kalıcı olarak silinecek: %@.",
+        "Dot already had a note with these words.": "Dot'ta bu sözlerle bir not zaten vardı.",
+        "Forgotten %@": "Unutuldu: %@",
+        "It goes to the trash, where it can be restored for a while.": "Çöp kutusuna gider; orada bir süre geri getirilebilir.",
+        "New note": "Yeni not",
+        "Restore": "Geri getir",
+        "The trash is empty": "Çöp kutusu boş",
+        "Trash": "Çöp kutusu",
+        "What should Dot remember?": "Dot neyi hatırlasın?",
+        "notes remember lessons proposals pin trash restore forget": "notlar hatırla dersler öneriler sabitle çöp geri getir unut",
         "A helper of another task": "Başka bir işin yardımcısı",
         "A lesson": "Bir ders",
         "A line may come from content others can write: %@. Read it before you use it.": "Bir satır başkalarının yazabildiği içerikten gelmiş olabilir: %@. Kullanmadan önce oku.",
@@ -1367,7 +1414,6 @@ TR.update(
         "Optional, separated by commas.": "İsteğe bağlı, virgülle ayrılır.",
         "Forget": "Unut",
         "Forget this note?": "Bu not unutulsun mu?",
-        "It goes to the trash on your Mac, where it can be restored for a while.": "Mac'indeki çöp kutusuna gider; bir süre oradan geri getirilebilir.",
         "Ask Dot for a big job and it hands parts to them. New agents are made on your Mac.": "Dot'a büyük bir iş ver, parçalarını onlara dağıtsın. Yeni ajanlar Mac'inde oluşturulur.",
         "Leads every task": "Her görevi yönetir",
         "No role yet": "Henüz rolü yok",
@@ -1402,6 +1448,30 @@ EN_PLURALS.update(
         "%lld minutes before an event": ("%lld minute before an event", "%lld minutes before an event"),
         "%lld decisions made for you (%@)": ("%lld decision made for you (%@)", "%lld decisions made for you (%@)"),
         "%lld actions": ("%lld action", "%lld actions"),
+    }
+)
+# Item 1926: the phone's own performance record in Settings › Maintenance.
+TR.update(
+    {
+        "This phone's performance": "Bu telefonun performansı",
+        "Nothing measured yet. iOS hands its measures about once a day; they go to your Mac only.": "Henüz ölçüm yok. iOS ölçümlerini günde bir kez kadar verir; yalnızca Mac'ine gider.",
+        "The last %lld days, measured by iOS and by Dot on this phone. Kept on your Mac only.": "Son %lld gün; iOS ve bu telefondaki Dot ölçtü. Yalnızca Mac'inde saklanır.",
+        "Processor": "İşlemci",
+        "%@ s in %@ min open": "%2$@ dk açıkken %1$@ sn",
+        "Hangs": "Donmalar",
+        "None": "Yok",
+        "%lld reported · %@ s": "%lld rapor · %@ sn",
+        "Crashes": "Çökmeler",
+        "Launch": "Açılış",
+        "%@ ms": "%@ ms",
+        "Memory at most": "En yüksek bellek",
+        "%@ MB": "%@ MB",
+        "Data with your Mac": "Mac'inle veri",
+        "%@ MB in · %@ MB out": "%1$@ MB gelen · %2$@ MB giden",
+        "Reconnects": "Yeniden bağlanmalar",
+        "%lld in %@ min": "%2$@ dk'da %1$lld",
+        "Redraws": "Yeniden çizimler",
+        "%@ a minute": "dakikada %@",
     }
 )
 # G1(a): a new scheduled task and its history.
@@ -1474,3 +1544,89 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
+
+# The composer's model chip as the provider's mark (item 1924).
+TR.update({"Model: %@": "Model: %@"})
+
+# New chat as a pushed chat (item 1916).
+TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu telefona kaydedilemedi. Tekrar dene."})
+
+# Links and files under an answer (backlog LF1).
+TR.update(
+    {
+        "Share": "Paylaş",
+        "Loading the file": "Dosya yükleniyor",
+        "The file cannot be shown": "Dosya gösterilemiyor",
+        "Only the start of the file shows here; open it on the Mac for the rest.": "Burada dosyanın yalnızca başı görünüyor; gerisi için Mac'te aç.",
+        "Size": "Boyut",
+        "Changed": "Değişti",
+        "Where": "Konum",
+        "Open on Mac": "Mac'te aç",
+        "Save to Files": "Dosyalar'a kaydet",
+        "Opened on your Mac.": "Mac'inde açıldı.",
+        "The phone cannot draw this image.": "Telefon bu görseli çizemiyor.",
+        "The phone shows this kind of file by its facts; open it on the Mac to read it.": "Telefon bu tür dosyanın yalnızca bilgilerini gösterir; okumak için Mac'te aç.",
+        "The file is too large for the phone; open it on the Mac.": "Dosya telefon için çok büyük; Mac'te aç.",
+        "Not on your Mac": "Mac'inde yok",
+        "Not shown from this place": "Bu konumdan gösterilmiyor",
+        "the chat's file panel": "sohbetin dosya paneli",
+    }
+)
+
+# "This chat" sheet, plain (item 1922)
+TR.update({"Provider": "Sağlayıcı"})
+
+# Swipe to quote (item 1972)
+TR.update({"Quote": "Alıntıla", "Quote: %@": "Alıntı: %@", "Remove the quote": "Alıntıyı kaldır"})
+# Bot profile like Grok's and its edit pages (item 1963).
+TR.update(
+    {
+        "%lld on": "%lld açık",
+        "Amber": "Amber",
+        "Avatar": "Avatar",
+        "Blue": "Mavi",
+        "Brown": "Kahverengi",
+        "Capsule": "Kapsül",
+        "Circle": "Daire",
+        "Cloud": "Bulut",
+        "Colour": "Renk",
+        "Computer": "Bilgisayar",
+        "Configure the bot": "Botu yapılandır",
+        "Count this bot's unread chats and what waits for you on the home. Push alerts follow Settings › Notifications.": "Bu botun okunmamış sohbetleri ve seni bekleyenler ana ekranda sayılır. Anlık bildirimler Ayarlar › Bildirimler'e uyar.",
+        "Cream": "Krem",
+        "Droplet": "Damla",
+        "Edit bot": "Botu düzenle",
+        "Green": "Yeşil",
+        "Grey": "Gri",
+        "Hexagon": "Altıgen",
+        "Idle": "Boşta",
+        "Orange": "Turuncu",
+        "Pebble": "Çakıl",
+        "Pink": "Pembe",
+        "Red": "Kırmızı",
+        "Shape": "Şekil",
+        "Squircle": "Yuvarlak kare",
+        "Teal": "Camgöbeği",
+        "Triangle": "Üçgen",
+        "Violet": "Mor",
+    }
+)
+
+# The stream's helpers group (item 1957).
+TR.update(
+    {
+        "%lld stopping": "%lld durduruluyor",
+        "%lld waiting on you": "%lld seni bekliyor",
+        "Hides the helpers": "Yardımcıları gizler",
+        "Shows each helper": "Her yardımcıyı gösterir",
+    }
+)
+
+# The chat told as a conversation, "Show steps" off (item 1976).
+TR.update(
+    {
+        "%lld min": "%lld dk",
+        "%lld s": "%lld sn",
+        "Looking at %@": "%@ inceleniyor",
+    }
+)

@@ -14,7 +14,16 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from dotagent.agent.compact import drop_old_images
-from dotagent.agent.loop import AgentRun, RunOutcome, SendBack, _acts, _after_verdict, _follow_ups, _since_goal
+from dotagent.agent.loop import (
+    AgentRun,
+    RunOutcome,
+    SendBack,
+    _acts,
+    _after_limit_verdict,
+    _after_verdict,
+    _since_goal,
+    follow_ups_of,
+)
 from dotagent.agent.prompt import (
     PromptInputs,
     build_system_prompt,
@@ -74,7 +83,7 @@ def test_a_question_goes_where_the_mode_sends_it(
     assert route_for(Decision(verdict=verdict, source=source, reason="", rule_id=None), mode) == route
 
 
-def _verdict(decision: Literal["achieved", "continue", "blocked", "scheduled"], reason: str) -> GoalVerdict:
+def _verdict(decision: Literal["achieved", "improve", "continue", "blocked", "scheduled"], reason: str) -> GoalVerdict:
     return GoalVerdict(decision=decision, reason=reason, unproven_steps=())
 
 
@@ -113,6 +122,21 @@ def test_a_run_that_used_up_its_patience_fails_and_keeps_its_answer() -> None:
     assert "the second file is missing" in outcome.result
 
 
+def test_a_reached_goal_with_a_better_result_in_reach_is_sent_back_and_never_ends_failed() -> None:
+    """K3-04 of the code review of 2026-11-19 (item 1946): the checker said continue on a goal that was reached
+    because a better price existed, and after ``goal_patience`` rounds the run ended failed, "the goal is still not
+    reached". It says improve: the run is sent back to better it, and once its rounds run out it ends done."""
+    better: GoalVerdict = _verdict("improve", "a cheaper flight leaves an hour later")
+    for sent_back in range(PATIENCE):
+        outcome: RunOutcome | SendBack = _after_verdict(better, ENDED, sent_back, PATIENCE)
+        assert isinstance(outcome, SendBack), sent_back
+        assert "a cheaper flight leaves an hour later" in outcome.note
+        assert "finds the goal reached" in outcome.note
+        assert "never for anything else" in outcome.note
+    assert _after_verdict(better, ENDED, PATIENCE, PATIENCE) == ENDED
+    assert _after_limit_verdict(better, ENDED) == ENDED
+
+
 def test_a_goal_whose_rest_waits_on_a_scheduled_run_ends_the_run_as_done_with_the_check_under_it() -> None:
     """Item 675: an open-ended goal whose rest waits on replies, with a run scheduled in the chat to read them, ended
     as failed after four rounds; it is done, and says what waits."""
@@ -128,7 +152,7 @@ def test_a_goal_whose_rest_waits_on_a_scheduled_run_ends_the_run_as_done_with_th
 
 
 async def _run_in(store: Store, thread_id: str, source: str) -> AgentRun:
-    """A new run of ``source`` in the chat ``thread_id``, with only what :func:`_follow_ups` reads of the runtime."""
+    """A new run of ``source`` in the chat ``thread_id``, with only what :func:`follow_ups_of` reads of the runtime."""
     run: RunRecord = await store.create_run(
         thread_id, "a goal", "task", "ollama:x", None, source, "medium", "standard", None, "ask", True, None, None, None
     )
@@ -168,19 +192,21 @@ async def test_the_follow_ups_of_a_run_are_the_schedules_still_to_run_in_its_own
                 ("Gone by", time.time() - 60, here, chat, True),
             )
         ]
-        listed: list[str] = (await _follow_ups(await _run_in(store, chat, UI_SOURCE))).splitlines()
+        first: AgentRun = await _run_in(store, chat, UI_SOURCE)
+        listed: list[str] = (await follow_ups_of(first.runtime, first.run)).splitlines()
         # The schedule fired in the chat and its run asks: its own next firing is no follow-up.
         await store.link_schedule_thread(chat, made[0].id)
         fired: AgentRun = await _run_in(store, chat, SCHEDULE_SOURCE)
-        firing: str = await _follow_ups(fired)
+        firing: str = await follow_ups_of(fired.runtime, fired.run)
         # Cut by the daemon's end and resumed twice by the owner, it is still the firing.
         resumed: AgentRun = fired
         for _ in range(2):
             later_run: AgentRun = await _run_in(store, chat, RESUME_SOURCE)
             await store.add_event(later_run.run.id, RESUMED_EVENT, {"from_run_id": resumed.run.id})
             resumed = later_run
-        resumed_firing: str = await _follow_ups(resumed)
-        followed: list[str] = (await _follow_ups(await _run_in(store, chat, UI_SOURCE))).splitlines()
+        resumed_firing: str = await follow_ups_of(resumed.runtime, resumed.run)
+        reply: AgentRun = await _run_in(store, chat, UI_SOURCE)
+        followed: list[str] = (await follow_ups_of(reply.runtime, reply.run)).splitlines()
     finally:
         await store.close()
     assert len(listed) == 1, listed
@@ -414,6 +440,15 @@ def test_the_prompt_says_that_a_run_that_chooses_asks_without_wait_when_it_can_g
     assert going_on not in _asking("cli", "wait", [ASK_USER_TOOL])
     assert going_on not in _asking(UI_SOURCE, "leave", [ASK_USER_TOOL])
     assert going_on not in _asking(UI_SOURCE, "choose", [])
+
+
+def test_a_delegated_run_is_told_to_end_at_its_open_pull_request_and_not_to_wait_for_its_checks() -> None:
+    """Item 1953: coding helpers polled `gh pr checks` and slept inside their runs (382 calls, 9.3 of the 29 hours of
+    helpers' shell time in a week, in 37 of 76 helper runs), each poll reading their whole context again."""
+    told: str = "end your run as soon as it is pushed and open"
+    assert told in _asking(DELEGATE_SOURCE, "leave", [])
+    assert told not in _asking(UI_SOURCE, "choose", [ASK_USER_TOOL])
+    assert told not in _asking(SCHEDULE_SOURCE, "leave", [ASK_USER_TOOL])
 
 
 def test_the_prompt_says_that_questions_are_left_only_in_a_run_that_leaves_them() -> None:

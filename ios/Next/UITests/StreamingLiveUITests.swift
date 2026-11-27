@@ -69,6 +69,40 @@ final class StreamingLiveUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Chats"].waitForExistence(timeout: 5))
     }
 
+    /// Item 1919: the moment a message is sent, the stream moves (the starting line, then the run's own line), within
+    /// half a second, though the scripted model answers only after 8 s.
+    func testASentMessageMovesTheStreamAtOnce() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        let field: XCUIElement = app.textFields["composer.field"].exists ? app.textFields["composer.field"] : app.textViews["composer.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 15))
+        field.tap()
+        field.typeText("slow: take your time")
+        let moving: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", ["work.starting", "work.line"])).firstMatch
+        app.buttons["composer.send"].tap()
+        let sent: Date = Date()
+        XCTAssertTrue(moving.waitForExistence(timeout: 0.5), "motion within 0.5 s of the send")
+        add(XCTAttachment(string: "seen after \(Date().timeIntervalSince(sent)) s"))
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "starting-line"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Item 1927: a message the Mac has not taken yet says "Pending" under its bubble, and the word goes once the Mac
+    /// took it (the scripted daemon holds "hold:" for 3 s).
+    func testAMessageIsPendingUntilTheMacTakesIt() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        type(app, "hold: wait for it")
+        let pending: XCUIElement = app.staticTexts["Pending"]
+        XCTAssertTrue(pending.waitForExistence(timeout: 3), "pending under the bubble while the Mac holds it")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "pending"
+        shot.lifetime = .keepAlways
+        add(shot)
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: pending)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 20), .completed, "the word goes once the Mac took it")
+    }
+
     func testAStreamingRunIsMeasured() throws {
         let app: XCUIApplication = try launch(scene: "live-chat")
         type(app, "stream: where do we stand")
@@ -76,7 +110,50 @@ final class StreamingLiveUITests: XCTestCase {
         XCTAssertTrue(end.waitForExistence(timeout: 120), "the long answer streamed to its end")
         let done: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "placeholderValue == %@ OR value == %@", "Message Dot", "Message Dot")).firstMatch
         _ = done.waitForExistence(timeout: 30)
-        sleep(2)
         shot(app, "streamed")
+        // Leaving the chat closes the meter's "chat" stretch: the whole run, as the owner reading it sees it.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        sleep(1)
+    }
+
+    /// What a run costs while the owner does not look: once the run is at work, the chat open for 4 s, then the home
+    /// for 6 s, then the app in the background for 8 s (the long run, about 45 s, still at work), then the chat again to the
+    /// run's end, which it catches up with (the phase meter writes one line per stretch).
+    func testAStreamingRunCostsLittleUnseen() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        type(app, "stream long: what costs when nobody looks")
+        let working: XCUIElement = app.descendants(matching: .any).matching(identifier: "work.line").firstMatch
+        XCTAssertTrue(working.waitForExistence(timeout: 30), "the run is at work")
+        sleep(4)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        sleep(6)
+        XCUIDevice.shared.press(.home)
+        sleep(8)
+        app.activate()
+        // Dot's row on the home opens its latest chat, the one at work.
+        let dot: XCUIElement = app.descendants(matching: .any).matching(identifier: "home.bot.dot").firstMatch
+        XCTAssertTrue(dot.waitForExistence(timeout: 10), "Dot's row on the home")
+        dot.tap()
+        let end: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "the queue is empty")).firstMatch
+        XCTAssertTrue(end.waitForExistence(timeout: 120), "the chat caught up with the answer written while away")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        sleep(1)
+    }
+
+    /// Item 1957, on the real engine: a run that starts a helper (`delegate`) shows it as one group row, folded, whose
+    /// tap opens a card with the helper's row.
+    func testAHelperIsOneGroupRowWithACard() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        type(app, "helper: group")
+        let group: XCUIElement = app.buttons["helpers.group"]
+        XCTAssertTrue(group.waitForExistence(timeout: 60), "the helpers group in the stream")
+        XCTAssertTrue(group.label.hasPrefix("1 helper, "), group.label)
+        XCTAssertEqual(group.value as? String, "Collapsed")
+        shot(app, "helpers-live-collapsed")
+        group.tap()
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH[c] %@", "helper.row", "wait for the test")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "the card lists the helper")
+        XCTAssertEqual(group.value as? String, "Expanded")
+        shot(app, "helpers-live-expanded")
     }
 }

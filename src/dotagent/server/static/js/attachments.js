@@ -5,6 +5,7 @@ import { api, blobUrl } from "./api.js";
 import { clip, el, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { readsAsMarkdown } from "./markdown.js";
+import { quotedFilesMessage, splitQuote } from "./quotebutton.js";
 import { smallerPicture } from "./shrink.js";
 import { toast } from "./ui.js";
 
@@ -14,8 +15,14 @@ const FLIGHT_SHARE = 0.5;
 const FLIGHT_MAX_PX = 480;
 const FLIGHT_TOP_SHARE = 0.18;
 const FLIGHT_MS = 520;
-// The daemon's limits (agent/attachments.py).
+// The daemon's limits (agent/attachments.py): a document or a picture, and a video or a sound (item 1933).
 const MAX_BYTES = 20 * 1024 * 1024;
+const MAX_MEDIA_BYTES = 200 * 1024 * 1024;
+// A video or a sound by its name when its type is empty or generic, as the daemon tells one (`_MEDIA_SUFFIXES`).
+const MEDIA_SUFFIX = /\.(mov|mp4|m4v|3gp|webm|mkv|caf|m4a|mp3|aac|amr|wav)$/i;
+// A file above this size goes as the raw body of `PUT /attachments/stream`, written to disk as it arrives; a smaller
+// one as base64 in JSON, which every daemon takes.
+const STREAM_FROM_BYTES = 2 * 1024 * 1024;
 const MAX_FILES = 10;
 const NAME_CHARS = 40;
 // A pasted text this long, in characters or in lines, goes as a file rather than into the box (item 269).
@@ -42,6 +49,21 @@ function pastedFile(text, at) {
   const time = [at.getHours(), at.getMinutes(), at.getSeconds()].map((part) => String(part).padStart(2, "0")).join("");
   const markdown = readsAsMarkdown(text);
   return new File([text], `pasted-text-${time}.${markdown ? "md" : "txt"}`, { type: markdown ? "text/markdown" : "text/plain" });
+}
+
+/** Whether `file` is a video or a sound, as the daemon tells one: by its type, else by its name. */
+export function isMedia(file) {
+  return file.type.startsWith("video/") || file.type.startsWith("audio/") || MEDIA_SUFFIX.test(file.name);
+}
+
+/** The most bytes the daemon keeps of `file`: a video or a sound is kept as it came, up to 200 MiB. */
+export function limitOf(file) {
+  return isMedia(file) ? MAX_MEDIA_BYTES : MAX_BYTES;
+}
+
+/** Whether `file` goes as the raw body of the streamed upload: a video or a sound, or any file past a few megabytes. */
+export function goesStreamed(file) {
+  return isMedia(file) || file.size > STREAM_FROM_BYTES;
 }
 
 function readBase64(file) {
@@ -251,11 +273,12 @@ export function createAttachments({ dropTarget, input, onChange }) {
     try {
       // A large picture goes smaller (item 990): it is what made a phone's message wait.
       const sent = await smallerPicture(entry.file);
-      if (sent.size > MAX_BYTES) {
-        throw new Error(`larger than ${sizeLabel(MAX_BYTES)}`);
+      if (sent.size > limitOf(sent)) {
+        throw new Error(`larger than ${sizeLabel(limitOf(sent))}`);
       }
-      const data = await readBase64(sent);
-      const stored = await api.post("/attachments", { name: sent.name, media_type: sent.type, data_b64: data });
+      const stored = goesStreamed(sent)
+        ? await api.put(`/attachments/stream?${new URLSearchParams({ name: sent.name, media_type: sent.type })}`, sent)
+        : await api.post("/attachments", { name: sent.name, media_type: sent.type, data_b64: await readBase64(sent) });
       entry.id = stored.id;
       opens(entry);
       setState(entry, "ready", sizeLabel(stored.size));
@@ -497,8 +520,10 @@ function wordsForFiles(attachments) {
 /** The words a message goes with (item 445): what is in the box, else the line its files are worth, else nothing — an
  * empty send with nothing in it is no message at all. */
 export function messageText(text, attachments) {
-  const words = text.trim();
-  return words === "" && attachments.count() > 0 ? wordsForFiles(attachments) : words;
+  // A quote alone (item 1972) is no message: the words after it decide.
+  const words = splitQuote(text).words.trim() === "" ? "" : text.trim();
+  // Files alone go with their line, and with the quote they were sent under.
+  return words === "" && attachments.count() > 0 ? quotedFilesMessage(text, wordsForFiles(attachments)) : words;
 }
 
 /** Whether a message may go now; says why not when files are still uploading or failed. */

@@ -31,6 +31,9 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
+  on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
+  chat deleted (item 1962's review).
 - `tests/unit/test_css_tokens.py::test_the_ink_on_dots_warm_backdrop_reads_on_every_stop_of_it_in_both_looks_and_both_schemes` — the
   hint and the title on Dot's computer's amber backdrop took the page's ink, light in dark: 1.37:1 (item 1324's review).
 - `tests/unit/test_css_tokens.py::test_no_text_is_set_in_the_accent_which_is_a_fill_colour` — six rules still set text in
@@ -185,6 +188,18 @@ here points at a test that no longer exists.
 - `tests/unit/test_model_refusal.py::test_an_agent_a_campaign_and_a_queued_message_are_judged_by_the_model_they_would_run_on` — the
   first check covered `start_picked` and the queue's default model only, so a message to an agent, Keep going or a team, and an
   agent's own message in the queue, still started and failed with "missing API key" (item 1350's review).
+- `tests/unit/test_log_rotation.py::test_a_line_that_cannot_be_encoded_or_written_leaves_the_thread_writing_the_next_and_the_exit_returns` — the
+  log's writer thread ended on a line it could not encode (a lone surrogate), and every later line was lost and the exit
+  waited on a full queue (the pre-push review of item 1944).
+- `tests/unit/test_review_instructions.py::test_a_short_restriction_behind_a_long_newest_message_is_still_read` — a long
+  newest message, read whole, left a short "never email anyone" out of yolo's check of a tainted run, which asks nobody
+  (the security review of item 1947).
+- `tests/unit/test_safari_tools.py::test_an_open_never_loads_over_a_tab_of_the_owners_and_reuses_only_its_own_where_it_left_it` — `safari_open`
+  took the chat's tab by its place alone, so a first open, or one after a read of the owner's front tab, loaded over
+  the page the owner had there (item 1959's review).
+- `tests/unit/test_safari_tools.py::test_a_page_whose_answer_cannot_be_read_is_not_quoted_to_the_run` — an answer of
+  the page script that failed to validate, and an error a page made it throw, were put in the error, which reaches the
+  model unfenced and leaves the run trusted (item 1959's review, the class of item 1212).
 - `tests/unit/test_freedom_contract.py::test_no_call_of_any_kind_asks_the_owner_but_what_the_contract_names` — the owner's
   word of 2026-11-24 (yolo and free mode never break): a call of any kind of tool, prepared by its own tool, must go
   through unasked in a yolo or free run, but for the payment, the message or mail and the post the contract names, and a

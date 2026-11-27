@@ -17,7 +17,7 @@ final class BotsTests: XCTestCase {
             summary: ThreadSummary(
                 id: id, title: title, source: "ui", createdAt: updated, updatedAt: updated, pinnedAt: nil, runCount: 1, latestRunId: "r-\(id)",
                 latestStatus: "done", latestCreatedAt: updated, unread: unread, actorId: actor, lastMessage: last, lastRole: "assistant"),
-            revision: 1, asks: asks)
+            revision: 1, asks: asks, helpers: 0, background: [])
     }
 
     private var agents: [AgentSummary] {
@@ -38,7 +38,7 @@ final class BotsTests: XCTestCase {
     }
 
     func testAChatBelongsToItsAgentAndEveryOtherChatToDot() {
-        let built: [Bot] = bots(agents: agents, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0))
+        let built: [Bot] = bots(agents: agents, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         XCTAssertEqual(built.map(\.id), ["dot", "a1", "a2"], "Dot first, then the one that moved last, then one with no chat")
         XCTAssertEqual(built[0].chats.map(\.summary.id), ["t3", "t1"], "a campaign's chat is Dot's")
         XCTAssertEqual(built[1].chats.map(\.summary.id), ["t2", "t4"], "the chat that moved last first")
@@ -49,7 +49,7 @@ final class BotsTests: XCTestCase {
     }
 
     func testPinnedBotsComeFirstInTheirOrderAndDotWithoutARecordKeepsItsChats() {
-        let built: [Bot] = bots(agents: Array(agents.dropFirst()), rows: rows, pinned: ["a2"], fallbackDot: record("dot", "Dot", role: "", created: 0))
+        let built: [Bot] = bots(agents: Array(agents.dropFirst()), rows: rows, pinned: ["a2"], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         XCTAssertEqual(built.map(\.id), ["dot", "a2", "a1"])
         XCTAssertEqual(built[0].record.name, "Dot")
         XCTAssertEqual(built[0].chats.count, 2)
@@ -58,30 +58,65 @@ final class BotsTests: XCTestCase {
     func testABotWhoseChatsAreOutsideTheListsWindowOpensItsHomeChat() throws {
         let home: ThreadSummary = row("t9", actor: "a2", updated: 5, unread: true, asks: 0, title: "Writer", last: "Draft ready").summary
         let withHome: [AgentSummary] = [agents[0], agents[1], AgentSummary(record: agents[2].record, home: home)]
-        let built: [Bot] = bots(agents: withHome, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0))
+        let built: [Bot] = bots(agents: withHome, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         let writer: Bot = try XCTUnwrap(built.first { $0.id == "a2" })
         XCTAssertEqual(writer.latest?.summary.id, "t9", "the daemon's home chat, though the list's newest chats leave it out")
         XCTAssertEqual(writer.unread, 1)
         let again: [Bot] = bots(
             agents: [agents[0], AgentSummary(record: agents[1].record, home: rows[1].summary), agents[2]], rows: rows, pinned: [],
-            fallbackDot: record("dot", "Dot", role: "", created: 0))
+            fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         XCTAssertEqual(again.first { $0.id == "a1" }?.chats.map(\.summary.id), ["t2", "t4"], "a home already listed is not added twice")
         let seen: ThreadSummary = row("t9", actor: "a2", updated: 5, unread: false, asks: 0, title: "Writer", last: "Draft ready").summary
         let reread: [Bot] = bots(
             agents: [agents[0], agents[1], AgentSummary(record: agents[2].record, home: seen)], rows: rows, pinned: [],
-            fallbackDot: record("dot", "Dot", role: "", created: 0))
+            fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         XCTAssertEqual(reread.first { $0.id == "a2" }?.unread, 0, "the home read again once seen stops counting")
+        let deleted: [Bot] = bots(agents: withHome, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: ["t9"])
+        XCTAssertEqual(deleted.first { $0.id == "a2" }?.chats.count, 0, "item 1965: a home deleted or being deleted is not shown")
+    }
+
+    /// The owner's build 6 (item 1912): the pre-push hook writes a code review chat on every push, and Dot's schedules
+    /// one a day, all Dot's; its face wore the unread mark for ever and a tap on it opened the newest review.
+    func testDotsOwnWorkNeitherMarksItUnreadNorIsWhatATapOpens() {
+        func chat(_ id: String, source: String, updated: Double, unread: Bool, asks: Int) -> ThreadRow {
+            ThreadRow(
+                summary: ThreadSummary(
+                    id: id, title: id, source: source, createdAt: updated, updatedAt: updated, pinnedAt: nil, runCount: 1, latestRunId: "r-\(id)",
+                    latestStatus: "done", latestCreatedAt: updated, unread: unread, actorId: nil, lastMessage: "", lastRole: "assistant"),
+                revision: 1, asks: asks, helpers: 0, background: [])
+        }
+        let work: [ThreadRow] = [
+            chat("review", source: "review", updated: 900, unread: true, asks: 0),
+            chat("daily", source: "schedule", updated: 800, unread: true, asks: 0),
+            chat("idle", source: "initiative", updated: 700, unread: true, asks: 0),
+            chat("sent", source: "team", updated: 600, unread: true, asks: 0),
+        ]
+        let talk: ThreadRow = chat("talk", source: "phone", updated: 100, unread: false, asks: 0)
+        let dot: Bot = bots(agents: [agents[0]], rows: work + [talk], pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])[0]
+        XCTAssertEqual(dot.unread, 0, "Dot's own work is no unread conversation")
+        XCTAssertEqual(dot.latest?.summary.id, "talk", "a tap opens the owner's own chat, not the newest review")
+        XCTAssertEqual(dot.chats.count, 5, "the work stays among Dot's chats")
+
+        let asking: Bot = bots(
+            agents: [agents[0]], rows: [chat("daily", source: "schedule", updated: 800, unread: true, asks: 1)], pinned: [],
+            fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])[0]
+        XCTAssertEqual(asking.asks, 1, "work that waits on the owner still marks Dot")
+        XCTAssertEqual(asking.latest?.summary.id, "daily", "with no conversation, the newest chat opens")
+        let read: Bot = bots(
+            agents: [agents[0]], rows: [chat("talk", source: "ui", updated: 100, unread: true, asks: 0)], pinned: [],
+            fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])[0]
+        XCTAssertEqual(read.unread, 1, "an unread conversation still marks Dot")
     }
 
     func testTheUnreadCountLeavesOutTheCurrentBotAndTheMutedOnes() {
-        let built: [Bot] = bots(agents: agents, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0))
+        let built: [Bot] = bots(agents: agents, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         XCTAssertEqual(unreadBots(built, except: nil, muted: []), 2)
         XCTAssertEqual(unreadBots(built, except: "a1", muted: []), 1)
         XCTAssertEqual(unreadBots(built, except: nil, muted: ["dot"]), 1)
     }
 
     func testTheSearchFindsBotsChatsAndMessagesEachChatOnce() {
-        let built: [Bot] = bots(agents: agents, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0))
+        let built: [Bot] = bots(agents: agents, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         let hits: [ChatHit] = [
             ChatHit(threadId: "t2", seq: 3, kind: "m", ref: "user", snippet: "the [sources] list"),
             ChatHit(threadId: "t1", seq: 1, kind: "m", ref: "user", snippet: "no [sources] today"),

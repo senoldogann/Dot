@@ -23,10 +23,20 @@ read as words with Dot's mark. A new chat opens as soon as its first message is 
 key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
 while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
 once the words are laid out, so they are never left under the composer; a streamed word redraws the open chat alone
-(the app's model publishes the store's snapshot by part, at most 30 times a second; item 1848). A step's thinking is
+(the app's model publishes the store's snapshot by part, at most 15 times a second; items 1848 and 1926).
+
+What a run costs the phone (item 1926): the daemon sends a model's words joined, about twelve frames a second; the app
+draws at most 15 pictures a second; a running tool's shimmer draws 30 frames a second while its band moves and none while
+it rests; in the background nothing streams (the supervisor ends every stream and the outbox's sending) and back in front
+each stream opens again from its cursors, a chat catching up with one read of its view; Activity reads again when the
+list's stream tells a run, an ask or a draft moved, not on a timer, and Connect apps reads every five seconds only while
+a service waits on the Mac. A photo goes at most 1,600 px on its long side and a screenshot is decoded to that size
+(`Data/ImageSizing.swift`). The app's own performance record (`Data/PerfReporter.swift`: MetricKit's daily measures and
+diagnostics' counts, and the app's counters of each time it was open, `App/PerfCounters.swift`) goes to the paired Mac
+alone (`POST /api/phone/metrics`, sent when the app opens) and Settings › Maintenance shows its last seven days. A step's thinking is
 one folded line that a tap opens; the running work is one pill (plain words and clock | Stop | Plan 1/5 | queued |
 helpers done/total), whose plan and people segments open the plan's checklist and the Agents sheet; the stream keeps
-no plan or helper card (item 1880). The copy · reaction · time footer is on a run's final answer once it ended;
+no plan card (item 1880), and a run's helpers are one group row whose tap opens a card of each (item 1957). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave L1 (items 1800-1802): the chat list (`ChatListView`, `App/Live.swift`, self-contained so a bot's profile can show
@@ -54,8 +64,8 @@ changed from the phone too: item 1770, a §24 picker sheet; the providers added 
 the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
 switch on each row; edit, run now, delete; + makes a new one, item 1911, and a schedule's History lists its runs,
 each opening its chat), Rules (the approval mode tasks start in and what asks in it; free mode,
-switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every note to read, edit or
-forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
+switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, a new note, every note to read, edit, pin or
+forget, and the Trash to restore from), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
 Mark achieved as the daemon takes them), Health and version, Usage,
 Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on
 the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no Settings row opens
@@ -122,7 +132,8 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 ## Decisions taken in N0
 
 - **No hue.** The ink is the only accent (send, switches, links underlined, selection, the unread dot); amber only for
-  what waits on the owner, red only for a failure. No surface has a stroke.
+  what waits on the owner, red only for a failure, blue (`live`) only for a helper at work in the stream's helpers
+  group (item 1957). No surface has a stroke.
 - **The switch** is drawn (`InkSwitchStyle`): the system's white thumb disappears on a light ink track in the dark look.
 - **iPad**: no tab bar (PLAN §27); a compact width is the home with a bot's chat pushed, a regular width a split view
   (the home as the sidebar, the chat as the detail) with the same selection, so collapsing keeps the open chat. Grouped pages are at most
@@ -157,7 +168,8 @@ Next/scripts/check_strings.sh /tmp/dotnext-dd
 takes 16-27 minutes on the runner, so each has a part of its own), `e2e` (`scripts/e2e_settings.sh` against a
 throwaway daemon of the same commit), and `ios`, which passes only when all of them did.
 
-- A pull request runs none of it (item 1886: the five macOS runners were what pull requests waited on). The push to
+- A pull request that changes `ios/` or this workflow runs `build` alone (about ten minutes: the app and its tests compile, the String
+  Catalog is checked; item 1886 left pull requests no macOS job, and a compile error reached `main`). The push to
   `main` that merges one, when it changes `ios/**`, runs `engine`, `build` and `tests (chat)` (about 20 minutes); a
   failure there opens the issue "main is red on macOS" (`scripts/main_macos_green.py`).
 - The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs every night and when asked:
@@ -201,7 +213,10 @@ to `Library/Caches/dotnext-latency.txt`. `ios/Next/scripts/e2e_streaming.sh <udi
 runs `StreamingLiveUITests` on such a daemon: a new chat stays open when its first message is sent, and the
 `stream:` script (four steps that think aloud and read a file, then a long answer, about 40 words a second) is measured
 by the debug frame meter (`-DotNextFrameMeter 1`: frames, hitches, frames over 16.7 ms, hitch time per second, one line
-per run in `Library/Caches/dotnext-frames.txt`).
+per run in `Library/Caches/dotnext-frames.txt`), and by the phase meter (`App/PerfCounters.swift`): one line per stretch
+of the chat open, the home and the background (`StreamingLiveUITests.testAStreamingRunCostsLittleUnseen`) with the
+process's CPU milliseconds and wakeups a second (the kernel's `TASK_POWER_INFO`), the pictures published and the reveal's
+steps a second and the bytes read and sent a minute, in `Library/Caches/dotnext-phases.txt`.
 
 ## A chat's message actions and the inspector, end to end
 
@@ -225,7 +240,7 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
 `settings-general`, `settings-appearance`, `settings-chat`, `settings-voice`, `settings-models`, `settings-caps`, `settings-caps-refused`,
-`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`, `settings-campaigns`, `settings-campaign`,
+`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-memory-trash`, `settings-system`, `settings-campaigns`, `settings-campaign`,
 `settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`,
 `settings-connect-apps`, `settings-connect-apps-detail`, `settings-connect-apps-offline`, `pairing`, `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
 Settings and every control of each native page and fails on one after which nothing changed.

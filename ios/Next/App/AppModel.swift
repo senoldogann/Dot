@@ -34,8 +34,17 @@ final class AppModel {
     private(set) var startedChats: [String: String] = [:]
     /// The chats whose delete the daemon refused, with its words (item 1800).
     private(set) var refusedDeletes: [String: String] = [:]
+    /// The chats deleted here, on the Mac or on another phone, or on their way to be (`EngineSnapshot.goneChats`).
+    private(set) var goneChats: Set<String> = []
+    /// The deletions the list was told of at the last snapshot, so that only a new one reads the agents again.
+    /// `nil` until the first snapshot, whose deletions (the cache's) read nothing.
+    @ObservationIgnored private var deletedTold: Set<String>?
+    /// Whether a read of the agents asked for by deletions is under way, and whether another was asked for meanwhile.
+    @ObservationIgnored var agentsReread: (running: Bool, owed: Bool) = (false, false)
     /// The Mac's Dot was reset and the owner has not closed the notice yet.
     private(set) var reset: DaemonReset?
+    /// How many lifecycle events the list's stream told (`EngineSnapshot.heard`): what Activity reads again on.
+    private(set) var heard: Int = 0
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -74,7 +83,16 @@ final class AppModel {
 
     /// Takes the store's newest snapshot: each part is set only when it changed, so its readers alone are drawn again.
     private func show(_ next: EngineSnapshot) {
-        if next.list != list { list = next.list }
+        if next.list != list || next.chats != chats { PerfCounters.shared.published() }
+        // Every screen reads the list with the deletes on their way hidden (item 1964), and drops a chat that went (item 1965).
+        let shown: ListProjection = next.shownList
+        if shown != list { list = shown }
+        let gone: Set<String> = next.goneChats
+        if gone != goneChats { goneChats = gone }
+        // A chat the Mac says went may have been a bot's home chat: the agents are read again for the one that follows it.
+        let told: Set<String> = Set(next.list.deleted.keys)
+        if let before = deletedTold, !told.subtracting(before).isEmpty, engine != nil { rereadAgents() }
+        deletedTold = told
         if next.chats != chats { chats = next.chats }
         if next.outbox != outbox { outbox = next.outbox }
         if next.accepted != accepted { accepted = next.accepted }
@@ -85,11 +103,16 @@ final class AppModel {
         if next.startedChats != startedChats { startedChats = next.startedChats }
         if next.refusedDeletes != refusedDeletes { refusedDeletes = next.refusedDeletes }
         if next.reset != reset { reset = next.reset }
+        if next.heard != heard { heard = next.heard }
         if let fresh: DaemonReset = next.reset, !fresh.taken, UserDefaults.standard.double(forKey: Self.rescuedKey) != fresh.at { rescue(fresh) }
     }
 
     /// The draft of the new chat's composer, kept like a chat's (a chat's id is the daemon's `thr_…`, never this).
     static let newChatDraft: String = "new-chat"
+
+    /// The draft of a new chat with `agent` (`nil`: Dot), each bot its own (item 1914: one draft for every bot put the
+    /// words half-written to one bot in a new chat with another, sent to it).
+    static func newChatDraft(agent: String?) -> String { agent.map { "\(newChatDraft).\($0)" } ?? newChatDraft }
 
     /// The reset whose words were put in the new chat's draft (its `at`), kept with the draft so that a kill before the
     /// engine heard of it does not put them there twice.
@@ -101,7 +124,7 @@ final class AppModel {
         guard let engine else { return }
         let defaults: UserDefaults = UserDefaults.standard
         let newChatKey: String = "draft.\(Self.newChatDraft)"
-        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && $0 != newChatKey }.sorted()
+        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && !$0.hasPrefix(newChatKey) }.sorted()
         let oldDrafts: [String] = oldKeys.compactMap { defaults.string(forKey: $0) }
         keep(draft: DaemonRules.draft(keeping: draft(of: Self.newChatDraft), adding: fresh.words + oldDrafts), of: Self.newChatDraft)
         for key in oldKeys { defaults.removeObject(forKey: key) }
@@ -168,11 +191,17 @@ final class AppModel {
     func firstWords(of thread: String) -> String? {
         startedChats.first { $0.value == thread }.flatMap { startingChats[$0.key] }
     }
+    /// "Show steps" of a chat where its This chat sheet set it, over Settings › Chat's (item 1915), kept on the phone.
+    var stepsOverrides: [String: Bool] = (UserDefaults.standard.dictionary(forKey: "stepsOverrides") as? [String: Bool]) ?? [:] {
+        didSet { UserDefaults.standard.set(stepsOverrides, forKey: "stepsOverrides") }
+    }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
     }
     @ObservationIgnored let images: NSCache<NSString, UIImage> = NSCache()
+    /// The app's own performance record, sent to the paired Mac (item 1926).
+    @ObservationIgnored let perf: PerfReporter = PerfReporter(file: PerfReporter.defaultFile)
     /// Debug builds only: the time each probe message was sent, by its client key (`LatencyProbe`).
     @ObservationIgnored var probeSent: [String: Date] = [:]
     @ObservationIgnored let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "app")
@@ -226,12 +255,15 @@ final class AppModel {
             for await next in await engine.store.updates() {
                 guard let self else { return }
                 self.show(next)
-                // At most one picture a display frame at 30 Hz: the store's stream keeps only the newest, so the words
-                // that came meanwhile are drawn together, never dropped (item 1848).
-                try? await Task.sleep(for: .milliseconds(33))
+                // At most 15 pictures a second: the store's stream keeps only the newest, so the words that came
+                // meanwhile are drawn together, never dropped (item 1848); the answer's reveal paces them on screen.
+                try? await Task.sleep(for: .milliseconds(66))
             }
         }
         Task { await engine.supervisor.start() }
+        perf.start()
+        perf.appeared()
+        Task { await perf.send(with: api) }
     }
 
     /// A pairing the owner opened from a `dotnext://pair` link or a scanned code, waiting for their one tap.
@@ -299,8 +331,18 @@ final class AppModel {
     func scene(_ phase: ScenePhase) {
         guard let engine else { return }
         switch phase {
-        case .active: Task { await engine.supervisor.enterForeground() }
-        case .background: Task { await engine.supervisor.enterBackground() }
+        case .active:
+            PhaseMeter.resume()
+            perf.appeared()
+            Task {
+                await engine.supervisor.enterForeground()
+                // The record of the times away goes now, with the app open: nothing is sent from the background.
+                await perf.send(with: engine.api)
+            }
+        case .background:
+            PhaseMeter.enter("background")
+            perf.disappeared()
+            Task { await engine.supervisor.enterBackground() }
         default: break
         }
     }
@@ -319,13 +361,19 @@ final class AppModel {
 
     /// The owner's words for a chat: queued behind the run at work (D10 default) or, with `steer`, into it.
     @discardableResult
-    func send(_ text: String, thread: String, steerInto run: String?, photos: [Data], picks: MessagePicks) async -> String? {
+    func send(_ text: String, thread: String, steerInto run: String?, files: [OutgoingAttachment], picks: MessagePicks) async -> String? {
+        #if DEBUG
+            // A fixture draws without an engine or an outbox: what the owner sends there is taken as kept (its drafts too
+            // stay off the phone's storage, `draft(of:)`), so the composer's tests see a send clear the draft (item 1765). Since
+            // item 1930 a send that is not kept leaves the draft and says so, which no fixture send could pass.
+            if engine == nil, fixtureMac != nil { return "fixture-" + UUID().uuidString }
+        #endif
         guard let engine else { return nil }
         do {
-            if let run { return try await engine.steer(text, run: run, thread: thread, photos: photos) }
-            return try await engine.send(text, thread: thread, photos: photos, picks: picks)
+            if let run { return try await engine.steer(text, run: run, thread: thread, attachments: files) }
+            return try await engine.send(text, thread: thread, attachments: files, picks: picks)
         } catch {
-            // Only writing the message's photos beside the outbox can fail here.
+            // The message or its attachments could not be written to the outbox.
             logger.error("a message could not be kept thread=\(thread, privacy: .public) error=\(String(describing: error), privacy: .public)")
             return nil
         }
@@ -334,10 +382,10 @@ final class AppModel {
     /// Starts a new chat through the outbox, with what was picked in its settings (PLAN §24) and with Dot (`agent` `nil`) or
     /// one of the owner's agents: its key, which the chat opens at once (item 1849) and swaps for the chat's own id once
     /// the daemon names it; `nil` when the message could not be kept.
-    func startChat(_ text: String, photos: [Data], start: ChatStart, agent: String?) async -> String? {
+    func startChat(_ text: String, files: [OutgoingAttachment], start: ChatStart, agent: String?) async -> String? {
         guard let engine else { return nil }
         do {
-            let key: String = try await engine.startChat(text, photos: photos, start: start, agent: agent)
+            let key: String = try await engine.startChat(text, attachments: files, start: start, agent: agent)
             startingChats[key] = text
             return key
         } catch {
@@ -355,6 +403,11 @@ final class AppModel {
                 logger.error("a doing could not be kept error=\(String(describing: error), privacy: .public)")
             }
         }
+    }
+
+    func cancelUpload(_ key: String) {
+        guard let engine else { return }
+        Task { await engine.outbox.cancelUpload(key) }
     }
 
     func retry(_ key: String) {
@@ -476,7 +529,7 @@ extension AppModel {
         guard let engine else { return nil }
         do {
             let data: Data = try await engine.api.image(named: name)
-            guard let image: UIImage = UIImage(data: data) else { return nil }
+            guard let image: UIImage = ImageSizing.decoded(data, longest: ImageSizing.display) else { return nil }
             images.setObject(image, forKey: name as NSString)
             return image
         } catch {

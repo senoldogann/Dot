@@ -102,7 +102,8 @@ is told so. A run that did what the policy would have asked about can always be 
 - **One table of calls of every kind of tool**, each prepared by the tool's own `prepare`, so that it follows the tools'
   classification and not a hand-written action: shell (read, write and delete in and outside the workspace, `curl`, `git
   push`, a deploy, mail), files (write and edit anywhere, Dot's own files, a protected place), the browser (navigate,
-  click, type, submit a form, a post, a payment, an upload, a vault login), the desktop (click, type, open an app,
+  click, type, submit a form, a post, a payment, an upload, a vault login), the owner's Safari (the same steps,
+  judged as the browser's are, and a password field), the desktop (click, type, open an app,
   AppleScript), the web, MCP, schedules, memory, delegation and teams, the terminal, waits, drafts, the phone,
   `add_proof` and code mode's `code_run`. A proof check (item 1853) is a `shell` call Dot makes for the run, judged as
   that row of the table is, so it adds no ask. A real

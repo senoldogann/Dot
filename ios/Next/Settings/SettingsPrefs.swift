@@ -19,6 +19,8 @@ enum PrefKey {
     static let codeFontSize: String = "codeFontSize"
     /// Whether a long line of code wraps instead of scrolling sideways (item 1769).
     static let codeWordBreak: String = "codeWordBreak"
+    /// Whether a chat shows a run's steps (on, the default) or only the messages with one live line (item 1915).
+    static let showSteps: String = "showSteps"
 }
 
 /// Light, dark, or as the iPhone is.
@@ -189,4 +191,42 @@ struct AppearancePreferences: ViewModifier {
 
 extension View {
     func appearancePreferences() -> some View { modifier(AppearancePreferences()) }
+}
+
+/// The language Dot Next speaks (item 1966): the iPhone's, or English or Turkish whatever the iPhone's, as the web's
+/// Settings › General chooses its own. Kept where iOS keeps an app's own language (the app's `AppleLanguages`, which
+/// iOS Settings › Dot Next › Language writes too), so the strings of the catalog follow it from the next start.
+enum AppLanguage: String, CaseIterable, Sendable {
+    case iPhone
+    case english = "en"
+    case turkish = "tr"
+
+    var title: String {
+        switch self {
+        case .iPhone: String(localized: "Same as the iPhone", comment: "General › Language: follow the iPhone's language")
+        case .english: "English"
+        case .turkish: "Türkçe"
+        }
+    }
+
+    /// The choice kept in `defaults` (the app's own domain, not the global one), `.iPhone` when none is.
+    static func chosen(_ defaults: UserDefaults) -> AppLanguage {
+        chosen(kept: defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "")?["AppleLanguages"] as? [String] ?? [])
+    }
+
+    /// The choice the app's own `AppleLanguages` say (pure): its first language when the app speaks it, else the iPhone's.
+    static func chosen(kept: [String]) -> AppLanguage {
+        kept.first.flatMap { code in AppLanguage(rawValue: String(code.prefix(2))) } ?? .iPhone
+    }
+
+    /// Whether the app speaks the choice already (pure): the iPhone's always, another once the app started in it.
+    func isSpoken(running: String) -> Bool { self == .iPhone || rawValue == running }
+
+    /// Keeps the choice for the next start.
+    func keep(_ defaults: UserDefaults) {
+        switch self {
+        case .iPhone: defaults.removeObject(forKey: "AppleLanguages")
+        case .english, .turkish: defaults.set([rawValue], forKey: "AppleLanguages")
+        }
+    }
 }

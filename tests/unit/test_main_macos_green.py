@@ -65,3 +65,34 @@ def test_the_report_reads_its_own_unfinished_run_from_the_other_jobs() -> None:
     run = green.this_run("gate.yml", "u", jobs)
     assert (run.conclusion, run.failed_jobs) == ("failure", ("browser (pages)",))
     assert green.verdict([run]) == "red"
+
+
+def _listed(run_id: int, created: str, status: str, conclusion: str | None) -> dict[str, object]:
+    return {"id": run_id, "created_at": created, "status": status, "conclusion": conclusion}
+
+
+def test_the_browser_suite_speaks_by_its_newest_finished_run_that_was_not_cancelled() -> None:
+    """Item 1936: a red night counts for main until a later whole-suite run passes; one still going (hours, every night)
+    is not waited for, and one a newer run cancelled says nothing."""
+    assert "browser.yml" in green.WORKFLOWS
+    runs = [
+        _listed(4, "2026-11-27T01:44:00Z", "in_progress", None),
+        _listed(3, "2026-11-26T20:00:00Z", "completed", "cancelled"),
+        _listed(2, "2026-11-26T01:44:00Z", "completed", "failure"),
+        _listed(1, "2026-11-25T01:44:00Z", "completed", "success"),
+    ]
+    assert green.newest("browser.yml", runs, None) == runs[2]
+    # The night's own report job reads its own run, still going.
+    assert green.newest("browser.yml", runs, "4") == runs[0]
+    assert green.newest("browser.yml", [runs[0], runs[1]], None) is None
+    # The gate and ios.yml take their newest run, whatever its state.
+    assert green.newest("gate.yml", runs, None) == runs[0]
+    assert "head_sha=abc" in green.query("gate.yml", "abc")
+    assert "event=push" in green.query("ios.yml", "abc")
+    assert "head_sha" not in green.query("browser.yml", "abc") and "event" not in green.query("browser.yml", "abc")
+
+
+def test_a_red_night_keeps_main_red_though_its_gate_passed() -> None:
+    gate = _run("gate.yml", "completed", "success")
+    assert green.verdict([gate, _run("browser.yml", "completed", "failure", ("browser",))]) == "red"
+    assert green.verdict([gate, _run("browser.yml", "completed", "success")]) == "green"

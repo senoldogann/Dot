@@ -237,7 +237,7 @@ final class ReducerTests: XCTestCase {
                 summary: ThreadSummary(
                     id: id, title: id, source: "ui", createdAt: 1, updatedAt: 1, pinnedAt: nil, runCount: 1, latestRunId: "r",
                     latestStatus: "done", latestCreatedAt: 1, unread: false, actorId: nil, lastMessage: "", lastRole: "user"),
-                revision: revision, asks: 0)
+                revision: revision, asks: 0, helpers: 0, background: [])
         }
         var (list, _): (ListProjection, [ListEffect]) = ListReducer.opening(ListProjection())
         let connection: Int = list.marks.connection
@@ -246,7 +246,7 @@ final class ReducerTests: XCTestCase {
         XCTAssertEqual(list.freshness, .live)
         let (gone, none): (ListProjection, [ListEffect]) = ListReducer.frame(
             list, .threadChanged(ThreadChanged(threadId: "thr_a", revision: 11, deleted: true)), connection: connection)
-        XCTAssertEqual(none, [])
+        XCTAssertEqual(none, [.readList], "item 1965: a chat that went leaves room in the window for an older one, which a read brings")
         XCTAssertEqual(gone.rows.map(\.summary.id), ["thr_b"])
         let crossed: ListProjection = ListReducer.loaded(
             ListReducer.asked(gone), view: ThreadsView(revision: 11, threads: [row("thr_a", 4), row("thr_b", 10)]), connection: connection).0

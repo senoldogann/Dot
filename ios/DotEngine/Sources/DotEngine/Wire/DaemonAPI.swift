@@ -55,10 +55,15 @@ public struct DaemonAPI: Sendable {
     }
 
     func data(_ request: URLRequest, path: String) async throws(DaemonRequestError) -> Data {
+        try await data(request, path: path, delegate: nil)
+    }
+
+    func data(_ request: URLRequest, path: String, delegate: (any URLSessionTaskDelegate)?) async throws(DaemonRequestError) -> Data {
         let data: Data
         let response: URLResponse
+        Traffic.shared.requested(sending: request.httpBody?.count ?? 0)
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await session.data(for: request, delegate: delegate)
         } catch let error as URLError {
             throw .transport(path: path, underlying: error)
         } catch {
@@ -67,6 +72,7 @@ public struct DaemonAPI: Sendable {
         guard let http: HTTPURLResponse = response as? HTTPURLResponse else {
             throw .transport(path: path, underlying: URLError(.badServerResponse))
         }
+        Traffic.shared.received(data.count)
         guard (200..<300).contains(http.statusCode) else {
             throw .status(path: path, code: http.statusCode, body: String(decoding: data, as: UTF8.self))
         }
@@ -96,7 +102,10 @@ public struct DaemonAPI: Sendable {
 
     static func json(_ value: some Encodable) -> Data {
         do {
-            return try JSONEncoder().encode(value)
+            let encoder: JSONEncoder = JSONEncoder()
+            // In particular, base64 attachment bodies must fit the daemon's request limit without slash escapes.
+            encoder.outputFormatting = .withoutEscapingSlashes
+            return try encoder.encode(value)
         } catch {
             preconditionFailure("a request body of the engine's own types does not encode: \(error)")
         }
@@ -279,8 +288,52 @@ extension DaemonAPI {
     public func status() async throws(DaemonRequestError) -> DaemonStatus { try await get("/api/status", query: []) }
 
     public func uploadAttachment(name: String, jpeg: Data) async throws(DaemonRequestError) -> String {
-        let body: Data = Self.json(AttachmentUpload(name: name, mediaType: "image/jpeg", dataB64: jpeg.base64EncodedString()))
-        let stored: StoredAttachmentId = try await send("POST", "/api/attachments", body: body)
+        try await uploadAttachment(OutgoingAttachment(name: name, mediaType: "image/jpeg", data: jpeg), folder: FileManager.default.temporaryDirectory) { _ in }
+    }
+
+    /// Keeps a file for a message to come and answers its id. Bytes go as base64 in JSON (`POST /api/attachments`); a
+    /// file goes as the raw body of `PUT /api/attachments/stream`, read from the disk as it is sent and written to the
+    /// daemon's disk as it arrives (item 1933). ``folder`` is where a `kept` file is found.
+    public func uploadAttachment(_ attachment: OutgoingAttachment, folder: URL, progress: @escaping @Sendable (Int) -> Void) async throws(DaemonRequestError) -> String {
+        switch attachment.content {
+        case .bytes(let bytes):
+            let path: String = "/api/attachments"
+            let body: Data = Self.json(AttachmentUpload(name: attachment.name, mediaType: attachment.mediaType, dataB64: bytes.base64EncodedString()))
+            let request: URLRequest = request(method: "POST", path: path, query: [], body: body)
+            let reply: Data = try await data(request, path: path, delegate: AttachmentProgressDelegate(progress))
+            let stored: StoredAttachmentId = try decode(reply, path: path)
+            return stored.id
+        case .file(let url):
+            return try await streamAttachment(attachment, from: url, progress: progress)
+        case .kept(let name):
+            return try await streamAttachment(attachment, from: folder.appending(path: name), progress: progress)
+        }
+    }
+
+    private func streamAttachment(_ attachment: OutgoingAttachment, from file: URL, progress: @escaping @Sendable (Int) -> Void) async throws(DaemonRequestError) -> String {
+        let path: String = "/api/attachments/stream"
+        var request: URLRequest = request(
+            method: "PUT", path: path,
+            query: [URLQueryItem(name: "name", value: attachment.name), URLQueryItem(name: "media_type", value: attachment.mediaType)], body: nil)
+        request.setValue(attachment.mediaType.isEmpty ? "application/octet-stream" : attachment.mediaType, forHTTPHeaderField: "Content-Type")
+        // A silence of this long ends the transfer; the whole may take as long as the link needs (the stream session has no limit on it).
+        request.timeoutInterval = 120
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await streamSession.upload(for: request, fromFile: file, delegate: AttachmentProgressDelegate(progress))
+        } catch let error as URLError {
+            throw .transport(path: path, underlying: error)
+        } catch {
+            throw .transport(path: path, underlying: URLError(.unknown))
+        }
+        guard let http: HTTPURLResponse = response as? HTTPURLResponse else {
+            throw .transport(path: path, underlying: URLError(.badServerResponse))
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw .status(path: path, code: http.statusCode, body: String(decoding: data, as: UTF8.self))
+        }
+        let stored: StoredAttachmentId = try decode(data, path: path)
         return stored.id
     }
 
@@ -408,5 +461,21 @@ extension DaemonAPI {
         built.setValue(nil, forHTTPHeaderField: "Authorization")
         let paired: PairedKey = try api.decode(try await api.data(built, path: "/api/phone/pair"), path: "/api/phone/pair")
         return paired.token
+    }
+}
+
+private final class AttachmentProgressDelegate: NSObject, URLSessionTaskDelegate {
+    private let report: @Sendable (Int) -> Void
+
+    init(_ report: @escaping @Sendable (Int) -> Void) {
+        self.report = report
+    }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64, totalBytesExpectedToSend: Int64
+    ) {
+        guard totalBytesExpectedToSend > 0 else { return }
+        report(min(100, Int(Double(totalBytesSent) / Double(totalBytesExpectedToSend) * 100)))
     }
 }

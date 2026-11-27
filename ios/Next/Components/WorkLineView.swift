@@ -64,6 +64,31 @@ func callPhrase(_ step: HelperStep) -> String {
     }
 }
 
+/// A call the run told as one of Dot's short messages (a `narration`, item 1976): a page or a site by its name ("Looking at
+/// gistsmith.com"), any other call as the live line says it.
+func narrationWords(_ step: HelperStep) -> String {
+    let about: String = step.target.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard about.contains("://"), let host = URL(string: about)?.host() else { return callPhrase(step) }
+    let site: String = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    return String(localized: "Looking at \(middleCut(site, detailCharacters))", comment: "Chat message of Dot's: a page it looks at; the argument is its site")
+}
+
+/// How long a run has worked, as the live line says it beside its words ("12 s", "3 min").
+func workedFor(_ seconds: TimeInterval) -> String {
+    let whole: Int = max(0, Int(seconds))
+    return whole < 60
+        ? String(localized: "\(whole) s", comment: "Work line: how long the run has worked, in seconds")
+        : String(localized: "\(whole / 60) min", comment: "Work line: how long the run has worked, in whole minutes")
+}
+
+/// Who works and since when, for the live line of "Show steps" off (item 1976): the bot's face in the mark's place and
+/// the time beside the words ("· 3 min"), as a chat with a person shows them.
+struct WorkLineSpeaker: Equatable {
+    let id: String
+    let look: AgentLook?
+    let since: Date
+}
+
 /// The name a path ends with ("README.md" of "~/work/README.md").
 private func lastPart(_ path: String) -> String {
     let trimmed: String = path.hasSuffix("/") ? String(path.dropLast()) : path
@@ -84,11 +109,22 @@ func workLineSymbol(_ now: WorkNow) -> String? {
     }
 }
 
+/// Whether the line shimmers: only while the run works on its own; never while it waits on the owner or for its stop,
+/// which may last hours with the chat on screen (item 1932). Pure.
+func workLineMoves(_ now: WorkNow) -> Bool {
+    switch now {
+    case .waitingForYou, .stopping: false
+    default: true
+    }
+}
+
 /// The live line: the mark (or the three typing dots), the words shimmering with "…", a soft fade when the words change.
 /// It is a button: a tap shows the chat's steps, a second folds them back.
 struct WorkLineView: View {
     let now: WorkNow
     let stepsShown: Bool
+    /// The bot and the time of "Show steps" off (item 1976), `nil` beside the steps.
+    let speaker: WorkLineSpeaker?
     let toggle: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
 
@@ -97,16 +133,34 @@ struct WorkLineView: View {
             Button(action: toggle) {
                 HStack(spacing: Space.xs) {
                     Group {
-                        if let symbol = workLineSymbol(now) {
+                        if let speaker {
+                            BotFace(id: speaker.id, look: speaker.look, size: Metric.iconSlot)
+                        } else if let symbol = workLineSymbol(now) {
                             Symbol(name: symbol, context: .tool).foregroundStyle(Tone.tertiary)
                         } else {
                             TypingDots()
                         }
                     }
                     .frame(width: Metric.iconSlot)
-                    Text(words + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+                    Group {
+                        if workLineMoves(now) {
+                            Text(words + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+                        } else {
+                            // A state that waits on the owner or for a stop is still: no shimmer redrawing it forever
+                            // (item 1932: the asks scene held the phone at 100 % CPU on this line).
+                            Text(words).textRole(.footnote).lineLimit(1).foregroundStyle(Tone.secondary)
+                        }
+                    }
                         .id(words)
                         .transition(.opacity)
+                    if let speaker, workLineMoves(now) {
+                        // Once a second, the time only: the words keep their shimmer and fade.
+                        TimelineView(.periodic(from: speaker.since, by: 1)) { context in
+                            Text(verbatim: "· " + workedFor(context.date.timeIntervalSince(speaker.since)))
+                                .textRole(.footnote).monospacedDigit().foregroundStyle(Tone.tertiary).fixedSize()
+                        }
+                        .accessibilityHidden(true)
+                    }
                     Spacer(minLength: 0)
                 }
                 // A button alone on its line: the 44 pt tap target (the design bar), not a tool row's 28 pt pitch.
@@ -175,5 +229,21 @@ struct WaitingLine: View {
             Spacer(minLength: 0)
         }
         .frame(minHeight: Metric.hit)
+    }
+}
+
+/// The line under the owner's message from the moment it is sent until its run's first event (item 1919): the typing
+/// dots and "Starting…", shimmering, as the work line draws; it is replaced in place by the run's own line.
+struct StartingLine: View {
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            TypingDots().frame(width: Metric.iconSlot)
+            Text(ChatStatus.starting.word + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: Metric.hit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ChatStatus.starting.word)
+        .accessibilityIdentifier("work.starting")
     }
 }

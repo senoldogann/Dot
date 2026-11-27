@@ -2,25 +2,20 @@ import DotEngine
 import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import VisionKit
 
-/// The composer's two shapes (review S4): compact at rest (one row), split into the field and a toolbar once the
-/// owner writes more than a line, focuses it, adds a file or edits a queued message.
+/// The composer's two shapes (review S4): one capsule row at rest and while the owner types a short line (focus alone
+/// does not change it, item 1924), split into the field and a toolbar once the owner writes more than a line, adds a
+/// file or edits a queued message.
 enum ComposerLayout: Equatable, Sendable {
     case compact
     case expanded
 
-    static func of(text: String, isFocused: Bool) -> ComposerLayout {
-        if isFocused || text.contains("\n") || text.count > 32 { return .expanded }
+    static func of(text: String) -> ComposerLayout {
+        if text.contains("\n") || text.count > 32 { return .expanded }
         return .compact
     }
-}
-
-/// A photo the owner added to the message, as JPEG.
-struct ComposerAttachment: Identifiable, Equatable {
-    let id: UUID
-    let jpeg: Data
-    let preview: UIImage
 }
 
 /// What the model chip shows: the chat's model and level.
@@ -117,11 +112,14 @@ struct ComposerSuggestions: Sendable {
 /// The composer (plan §4.1, R-a §3): a glass pill radius 27; compact at rest with +, the field, the microphone and the
 /// button on one row; expanded with the field above and +, the model · effort chip, the microphone and the button
 /// beneath. Photos, the camera, files and a document scan go on the + menu; `/` offers commands and skills, `@` agents.
-/// The chip opens the chat's settings (PLAN §24); the microphone turns the pill into the recorder (`VoiceRecorderBar`),
+/// The model chip (the model's provider mark and a chevron, never its name) is in both shapes and opens the chat's
+/// settings (PLAN §24), the one grouped model picker; the microphone turns the pill into the recorder (`VoiceRecorderBar`),
 /// whose ✓ puts the words in the field.
 struct ComposerView: View {
     @Binding var text: String
     @Binding var attachments: [ComposerAttachment]
+    /// A message the owner quotes (item 1972), shown as a chip above the text; `nil` when none.
+    @Binding var quote: String?
     let placeholder: String
     let buttons: ComposerButtons
     let perform: (ComposerAction) -> Void
@@ -138,6 +136,14 @@ struct ComposerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
+    @State private var preparing: Task<Void, Never>?
+    @State private var mediaError: String?
+    @State private var trimming: ComposerAttachment?
+
+    private var blocksSending: Bool {
+        buttons.primary != .stop && (preparing != nil || attachments.contains { $0.outgoing == nil })
+    }
+
     enum Picker: String, Identifiable {
         case photos, camera, files, scan
         var id: String { rawValue }
@@ -146,7 +152,7 @@ struct ComposerView: View {
     var body: some View {
         // At the accessibility sizes the field takes its own line: one row would push the button off the edge.
         let layout: ComposerLayout =
-            attachments.isEmpty && !dynamicTypeSize.isAccessibilitySize ? ComposerLayout.of(text: text, isFocused: isFocused) : .expanded
+            attachments.isEmpty && !dynamicTypeSize.isAccessibilitySize ? ComposerLayout.of(text: text) : .expanded
         let compact: Bool = layout == .compact
         VStack(alignment: .leading, spacing: Space.xs) {
             suggestionList
@@ -167,9 +173,64 @@ struct ComposerView: View {
             }
         }
         .haptic(.medium, trigger: voice.phase == .recording)
+        .onChange(of: quote) { _, now in if now != nil { isFocused = true } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { voice.leftTheScreen() } }
         .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
-        .modifier(ComposerPickers(picking: $picking, photoItems: $photoItems, add: add))
+        .photosPicker(isPresented: shown(.photos), selection: $photoItems, maxSelectionCount: OutgoingAttachment.maximumCount, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
+        .onChange(of: photoItems) { _, items in
+            guard !items.isEmpty else { return }
+            photoItems = []
+            prepare(items, load: loadPhotoItem)
+        }
+        .fileImporter(isPresented: shown(.files), allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls): prepare(urls, load: ComposerAttachment.document)
+            case .failure(let error): mediaError = error.localizedDescription
+            }
+        }
+        .fullScreenCover(item: Binding(get: { picking == .camera || picking == .scan ? picking : nil }, set: { picking = $0 })) { which in
+            if which == .camera {
+                CameraPicker { result in
+                    picking = nil
+                    switch result {
+                    case .success(.photo(let image)): prepare([image], load: ComposerAttachment.photo)
+                    case .success(.movie(let file)): prepare([file], load: { try await ComposerAttachment.video($0, name: "Camera.mov") })
+                    case .success(nil): break
+                    case .failure(let error): mediaError = error.localizedDescription
+                    }
+                }
+                .ignoresSafeArea()
+            } else {
+                DocumentScanner { pages in
+                    picking = nil
+                    if !pages.isEmpty { prepare(pages, load: ComposerAttachment.photo) }
+                }
+                .ignoresSafeArea()
+            }
+        }
+        .fullScreenCover(item: $trimming) { attachment in
+            if case .needsTrim(let video, let name, let bytes) = attachment.content, let duration = attachment.duration {
+                let limit: Double = max(0.1, min(3600, duration * Double(OutgoingAttachment.maximumMediaBytes) / Double(bytes) * 0.9))
+                VideoTrimmer(file: video, maximumDuration: limit) { result in
+                    trimming = nil
+                    switch result {
+                    case .success(let file?):
+                        prepareReplacement(attachment.id, video: file, name: name)
+                    case .success(nil): break
+                    case .failure(let error): mediaError = error.localizedDescription
+                    }
+                }
+                .ignoresSafeArea()
+            }
+        }
+        .alert(String(localized: "Could not add attachment", comment: "Composer attachment error title"), isPresented: Binding(
+            get: { mediaError != nil }, set: { if !$0 { mediaError = nil } }
+        )) {
+            Button(String(localized: "OK", comment: "Button that dismisses an alert"), role: .cancel) {}
+        } message: {
+            if let mediaError { Text(mediaError) }
+        }
+        .onDisappear { preparing?.cancel() }
     }
 
     /// The line over the pill: why dictation cannot start, or why the last recording ended early.
@@ -180,7 +241,15 @@ struct ComposerView: View {
 
     private func fieldPill(compact: Bool) -> some View {
             VStack(alignment: .leading, spacing: 0) {
-                if !attachments.isEmpty { attachmentStrip }
+                if buttons.primary != .confirmEdit {
+                    if let quoted = quote { QuoteChip(quote: quoted, remove: { quote = nil }) }
+                    if !attachments.isEmpty { attachmentStrip }
+                    if preparing != nil {
+                        ProgressView(String(localized: "Preparing attachments…", comment: "Composer status while opening or exporting selected files"))
+                            .padding(.horizontal, Space.m)
+                            .padding(.top, Space.s)
+                    }
+                }
                 // One field in one place whatever the layout: a field made anew when the composer grows on focus would
                 // take the focus away again (found in the N1 end-to-end check).
                 HStack(alignment: .bottom, spacing: 0) {
@@ -194,17 +263,18 @@ struct ComposerView: View {
                         .padding(.horizontal, compact ? 0 : Space.m - Space.xxs)
                         .padding(.top, compact ? 0 : Space.m)
                     if compact {
+                        modelChip
                         micButton
-                        ComposerButton(buttons: buttons, perform: perform)
+                        ComposerButton(buttons: buttons, perform: perform).disabled(blocksSending)
                     }
                 }
                 if !compact {
                     HStack(spacing: 0) {
-                        plusMenu
+                        if buttons.primary != .confirmEdit { plusMenu }
                         Spacer(minLength: 0)
                         modelChip
                         micButton
-                        ComposerButton(buttons: buttons, perform: perform)
+                        ComposerButton(buttons: buttons, perform: perform).disabled(blocksSending)
                     }
                 }
             }
@@ -213,90 +283,113 @@ struct ComposerView: View {
     }
 }
 
-/// The + menu's pickers: photos, files, the camera and the scanner.
-private struct ComposerPickers: ViewModifier {
-    @Binding var picking: ComposerView.Picker?
-    @Binding var photoItems: [PhotosPickerItem]
-    let add: (UIImage) -> Void
+extension ComposerView {
+    private func shown(_ source: Picker) -> Binding<Bool> {
+        Binding(get: { picking == source }, set: { if !$0, picking == source { picking = nil } })
+    }
 
-    func body(content: Content) -> some View {
-        content
-        .photosPicker(isPresented: Binding(get: { picking == .photos }, set: { if !$0 { picking = nil } }), selection: $photoItems, maxSelectionCount: 6, matching: .images)
-        .onChange(of: photoItems) { _, items in
-            Task {
-                for item in items {
-                    if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) { add(image) }
-                }
-                photoItems = []
-            }
+    private func loadPhotoItem(_ item: PhotosPickerItem) async throws -> ComposerAttachment {
+        if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) || $0.conforms(to: .video) }) {
+            guard let movie = try await item.loadTransferable(type: MovieFile.self) else { throw ComposerMediaError.invalidVideo("Video") }
+            return try await ComposerAttachment.video(movie, name: movie.originalName)
         }
-        .fileImporter(isPresented: Binding(get: { picking == .files }, set: { if !$0 { picking = nil } }), allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
-            guard case .success(let urls) = result else { return }
-            for url in urls {
-                let opened: Bool = url.startAccessingSecurityScopedResource()
-                defer { if opened { url.stopAccessingSecurityScopedResource() } }
-                if let data = try? Data(contentsOf: url), let image = UIImage(data: data) { add(image) }
-            }
+        // Decoded at the upload size, never at a camera's 12 MP (item 1926).
+        guard let data = try await item.loadTransferable(type: Data.self), let image = ImageSizing.decoded(data, longest: ImageSizing.upload) else {
+            throw ComposerMediaError.invalidImage
         }
-        .fullScreenCover(item: Binding(get: { picking == .camera || picking == .scan ? picking : nil }, set: { picking = $0 })) { which in
-            if which == .camera {
-                CameraPicker { image in
-                    if let image { add(image) }
-                    picking = nil
+        return try ComposerAttachment.photo(image)
+    }
+
+    private func prepare<Item>(_ items: [Item], load: @escaping @MainActor (Item) async throws -> ComposerAttachment) {
+        preparing = Task {
+            defer { preparing = nil }
+            var errors: [String] = []
+            for item in items {
+                guard !Task.isCancelled else { return }
+                guard attachments.count < OutgoingAttachment.maximumCount else {
+                    errors.append(ComposerMediaError.tooMany.localizedDescription)
+                    break
                 }
-                .ignoresSafeArea()
-            } else {
-                DocumentScanner { pages in
-                    pages.forEach(add)
-                    picking = nil
+                do {
+                    let attachment: ComposerAttachment = try await load(item)
+                    try Task.checkCancellation()
+                    attachments.append(attachment)
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    errors.append(error.localizedDescription)
                 }
-                .ignoresSafeArea()
+            }
+            if !errors.isEmpty { mediaError = errors.joined(separator: "\n") }
+        }
+    }
+
+    private func prepareReplacement(_ id: UUID, video: MovieFile, name: String) {
+        preparing = Task {
+            defer { preparing = nil }
+            do {
+                let attachment: ComposerAttachment = try await ComposerAttachment.video(video, name: name)
+                try Task.checkCancellation()
+                if let index = attachments.firstIndex(where: { $0.id == id }) { attachments[index] = attachment }
+            } catch {
+                if !Task.isCancelled { mediaError = error.localizedDescription }
             }
         }
     }
-}
 
-extension ComposerView {
-    fileprivate func add(_ image: UIImage) {
-        guard let jpeg: Data = image.jpegData(compressionQuality: 0.8) else { return }
-        attachments.append(ComposerAttachment(id: UUID(), jpeg: jpeg, preview: image))
+    private func choosePhotos() {
+        #if DEBUG
+            // UI tests use their bundled movie but exercise the same export and chip as a picker selection.
+            if let encoded = ProcessInfo.processInfo.environment["DotNextTestVideo"], let data = Data(base64Encoded: encoded) {
+                prepare([data]) { bytes in
+                    let file: MovieFile = MovieFile(fileExtension: "mp4")
+                    try bytes.write(to: file.url)
+                    return try await ComposerAttachment.video(file, name: "Sample.mp4")
+                }
+                return
+            }
+        #endif
+        picking = .photos
     }
 
     private var plusMenu: some View {
         Menu {
-            Button(String(localized: "Photos", comment: "Composer + menu: picks photos"), systemImage: "photo.on.rectangle") { picking = .photos }
+            Button(String(localized: "Photos and videos", comment: "Composer + menu: opens the photo library"), systemImage: "photo.on.rectangle", action: choosePhotos)
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button(String(localized: "Camera", comment: "Composer + menu: takes a photo"), systemImage: "camera") { picking = .camera }
+                Button(String(localized: "Camera", comment: "Composer + menu: takes a photo or records a video"), systemImage: "camera") { picking = .camera }
             }
-            Button(String(localized: "Files", comment: "Composer + menu: picks image files"), systemImage: "folder") { picking = .files }
+            Button(String(localized: "Files", comment: "Composer + menu: picks documents or other files"), systemImage: "folder") { picking = .files }
             if VNDocumentCameraViewController.isSupported {
                 Button(String(localized: "Scan a document", comment: "Composer + menu: scans paper pages"), systemImage: "doc.viewfinder") { picking = .scan }
             }
             if UIPasteboard.general.hasImages {
                 Button(String(localized: "Paste image", comment: "Composer + menu: adds the image on the clipboard"), systemImage: "doc.on.clipboard") {
-                    UIPasteboard.general.images?.forEach(add)
+                    if let images = UIPasteboard.general.images { prepare(images, load: ComposerAttachment.photo) }
                 }
             }
         } label: {
             Symbol(name: "plus", context: .toolbar).foregroundStyle(Tone.secondary).frame(width: Metric.hit, height: Metric.hit).contentShape(Rectangle())
         }
+        .disabled(preparing != nil)
+        .accessibilityIdentifier("composer.attach")
         .accessibilityLabel(String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"))
     }
 
+    /// The model chip: the provider's mark and a chevron (the name is in the picker, and in VoiceOver's label). At the
+    /// accessibility sizes it is the mark alone.
     @ViewBuilder fileprivate var modelChip: some View {
         if let model, let openSettings {
             Button(action: openSettings) {
                 HStack(spacing: Space.xxs) {
-                    Text(model.label).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
-                    if let effort = model.effort { Text(effortTitle(effort)).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
-                    Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
+                    Image(providerMarkAsset(providerOfModel(model.ref, in: app.models))).resizable().renderingMode(.template).scaledToFit()
+                        .frame(width: 20, height: 20).foregroundStyle(Tone.text)
+                    if !dynamicTypeSize.isAccessibilitySize { Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph) }
                 }
                 .padding(.horizontal, Space.xs)
-                .frame(minHeight: Metric.hit)
+                .frame(minWidth: Metric.hit, minHeight: Metric.hit)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "Model, \(chipWords(model))", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
+            .accessibilityLabel(String(localized: "Model: \(chipWords(model))", comment: "VoiceOver: the composer's model button; the argument is the model and effort"))
             .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
             .accessibilityIdentifier("composer.model")
         }
@@ -324,17 +417,10 @@ extension ComposerView {
         ScrollView(.horizontal) {
             HStack(spacing: Space.xs) {
                 ForEach(attachments) { attachment in
-                    Image(uiImage: attachment.preview).resizable().scaledToFill().frame(width: 56, height: 56).clipShape(rounded(Radius.inner))
-                        .overlay(alignment: .topTrailing) {
-                            Button { attachments.removeAll { $0.id == attachment.id } } label: {
-                                Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(Tone.onAction, Tone.action)
-                                    .frame(width: Metric.hit, height: Metric.hit, alignment: .topTrailing)
-                            }
-                            .buttonStyle(.plain)
-                            .offset(x: 8, y: -8)
-                            .accessibilityLabel(String(localized: "Remove the photo", comment: "VoiceOver: removes a photo from the message"))
-                        }
-                        .accessibilityLabel(String(localized: "Photo", comment: "VoiceOver: a photo added to the message"))
+                    ComposerAttachmentChip(attachment: attachment, trim: { trimming = attachment }, remove: {
+                        attachments.removeAll { $0.id == attachment.id }
+                    })
+                    .disabled(preparing != nil)
                 }
             }
             .padding(.horizontal, Space.m)
@@ -403,13 +489,21 @@ struct EditingQueuedBar: View {
     }
 }
 
-/// The system camera.
+/// The system camera, with its own photo and video controls.
 struct CameraPicker: UIViewControllerRepresentable {
-    let done: (UIImage?) -> Void
+    enum Capture {
+        case photo(UIImage)
+        case movie(MovieFile)
+    }
+
+    let done: (Result<Capture?, Error>) -> Void
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker: UIImagePickerController = UIImagePickerController()
         picker.sourceType = .camera
+        picker.mediaTypes = UIImagePickerController.availableMediaTypes(for: .camera)?
+            .filter { $0 == UTType.image.identifier || $0 == UTType.movie.identifier } ?? [UTType.image.identifier]
+        picker.videoQuality = .typeHigh
         picker.delegate = context.coordinator
         return picker
     }
@@ -418,12 +512,20 @@ struct CameraPicker: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(done: done) }
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let done: (UIImage?) -> Void
-        init(done: @escaping (UIImage?) -> Void) { self.done = done }
+        let done: (Result<Capture?, Error>) -> Void
+        init(done: @escaping (Result<Capture?, Error>) -> Void) { self.done = done }
+
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            done(info[.originalImage] as? UIImage)
+            if let url = info[.mediaURL] as? URL {
+                done(Result { .movie(try MovieFile.copy(url)) })
+            } else if let image = info[.originalImage] as? UIImage {
+                done(.success(.photo(image)))
+            } else {
+                done(.failure(ComposerMediaError.invalidImage))
+            }
         }
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { done(nil) }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { done(.success(nil)) }
     }
 }
 
@@ -451,6 +553,24 @@ struct DocumentScanner: UIViewControllerRepresentable {
     }
 }
 
+/// How the link to the Mac stands in the pill while the chat is not live (item 1931, after another coding agent's app).
+enum LinkLine: Equatable, Sendable {
+    /// The link broke and is being opened again, to the paired Mac by its name.
+    case reconnecting(mac: String)
+    /// The link is up and the chat is being brought up to date.
+    case syncing
+    /// The phone has no link.
+    case offline
+
+    var words: String {
+        switch self {
+        case .reconnecting(let mac): String(localized: "Reconnecting to \(mac)…", comment: "Chat pill: the link to the Mac broke and is being opened again; the argument is the Mac's name")
+        case .syncing: String(localized: "Syncing messages…", comment: "Chat pill: the chat is being brought up to date")
+        case .offline: String(localized: "Offline", comment: "Chat subtitle: the phone has no link")
+        }
+    }
+}
+
 /// What the floating capsule says about the chat's work; a segment exists only while it has something to say.
 struct WorkingSummary: Equatable, Sendable {
     /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
@@ -470,8 +590,13 @@ struct WorkingSummary: Equatable, Sendable {
     let plan: PlanProgress?
     /// The run can be stopped from the capsule.
     let canStop: Bool
+    /// How the link to the Mac stands while it is not live, in the status's place (item 1931); `nil` while the chat is
+    /// live.
+    let link: LinkLine?
 
-    var isEmpty: Bool { status == nil && queued == 0 && helpersTotal == 0 && plan == nil }
+    /// The pill opens with the link's words or the status.
+    var leads: Bool { status != nil || link != nil }
+    var isEmpty: Bool { !leads && queued == 0 && helpersTotal == 0 && plan == nil }
 }
 
 /// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
@@ -529,7 +654,21 @@ struct FloatingWorkingControl: View {
         let inset: CGFloat = glyphs ? Space.xs : Space.s
         let layout: AnyLayout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
-            if let status = summary.status {
+            if let link = summary.link {
+                // The link's state in the status's place while it is not live (item 1931): the spinner while it comes
+                // back, a quiet glyph while there is none.
+                segment(action: openStatus, label: link.words, inset: inset) {
+                    HStack(spacing: Space.xxs + 1) {
+                        if link == .offline {
+                            Image(systemName: "wifi.slash").textRole(.label).foregroundStyle(Tone.tertiary)
+                        } else {
+                            ProgressView().controlSize(.mini).tint(Tone.secondary)
+                        }
+                        Text(link.words).textRole(.label).fontWeight(.medium).foregroundStyle(Tone.secondary).lineLimit(1)
+                    }
+                }
+                .accessibilityIdentifier("capsule.link")
+            } else if let status = summary.status {
                 // The status and its clock are drawn every second, whether events come or not: a clock drawn with
                 // the screen froze between events and jumped when they came (the owner's report of 2026-11-25). The
                 // ticks are counted from the run's start, never from `.now`: a schedule from `.now` began again at
@@ -554,7 +693,7 @@ struct FloatingWorkingControl: View {
                 }
             }
             if summary.canStop {
-                if summary.status != nil { divider }
+                if summary.leads { divider }
                 segment(action: stop, label: String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), inset: inset) {
                     if glyphs {
                         Image(systemName: "stop.fill").textRole(.label).foregroundStyle(Tone.text)
@@ -566,7 +705,7 @@ struct FloatingWorkingControl: View {
                 .accessibilityIdentifier("capsule.stop")
             }
             if let plan = summary.plan {
-                if summary.status != nil || summary.canStop { divider }
+                if summary.leads || summary.canStop { divider }
                 segment(
                     action: openPlan,
                     label: String(localized: "Plan, \(plan.done) of \(plan.total) steps done", comment: "VoiceOver: the plan chip beside the working capsule; the arguments are the steps done and all steps"),
@@ -584,7 +723,7 @@ struct FloatingWorkingControl: View {
                 .accessibilityIdentifier("capsule.plan")
             }
             if summary.queued > 0 {
-                if summary.status != nil || summary.canStop || summary.plan != nil { divider }
+                if summary.leads || summary.canStop || summary.plan != nil { divider }
                 segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count"), inset: inset) {
                     Label { Text(verbatim: "\(summary.queued)").lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
                         .tabularNumbers().foregroundStyle(Tone.secondary)
@@ -592,7 +731,7 @@ struct FloatingWorkingControl: View {
                 .accessibilityIdentifier("capsule.queue")
             }
             if summary.helpersTotal > 0 {
-                if summary.status != nil || summary.canStop || summary.plan != nil || summary.queued > 0 { divider }
+                if summary.leads || summary.canStop || summary.plan != nil || summary.queued > 0 { divider }
                 segment(
                     action: openHelpers,
                     label: String(localized: "Helpers, \(summary.helpersDone) of \(summary.helpersTotal) done", comment: "VoiceOver: the capsule segment of the run's helpers; the arguments are the helpers that ended and all of them"),

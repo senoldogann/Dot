@@ -131,8 +131,16 @@ _HARNESS_ATTEMPTS: int = 3
 _FIX_CHARS: int = 600
 # How a provider ends a reply its model declined to give: Anthropic's stop reason, OpenAI's finish reason.
 _DECLINED_FINISHES: frozenset[str] = frozenset({"refusal", "content_filter"})
-_MAX_INSTRUCTIONS: int = 12
-_INSTRUCTION_CHARS: int = 1500
+# The owner's words the review reads with a step (item 1947; K3-05 of the code review of 2026-11-19): each one whole,
+# never cut in its middle, where a "never mail the client, only draft" in a long pasted brief was lost and a send was
+# approved. The newest is read whatever its length; the first and then the others, newest first, as they fit here.
+_INSTRUCTIONS_CHARS: int = 60_000
+# One that does not fit is still shown, cut to this from its middle, the newest twelve of them, as every instruction was
+# before item 1947: the review never reads less of the owner's words than it did (the security review of item 1947:
+# yolo's check of a tainted run, which asks nobody, lost a short "never email anyone" behind a long newest message).
+_CUT_INSTRUCTIONS: int = 12
+_CUT_INSTRUCTION_CHARS: int = 1500
+_CUT_MARK: str = "[cut]"
 _FIELD_CHARS: int = 1500
 # What an action acts on is read whole up to here (item 242): a command of a few hundred lines, a long path or address.
 _TARGET_CHARS: int = 12_000
@@ -194,6 +202,8 @@ _GOAL_SYSTEM: str = (
     "- continue: the goal can still be reached but is not reached yet: something that was asked for is missing, was "
     "never checked, or the answer only describes what could be done. Say precisely what is missing, as an instruction "
     "to the agent.\n"
+    "- improve: the goal is reached and the digest shows it, as for achieved, and there is a clear path to a superior "
+    "result. Say precisely how the result can be made better, as an instruction to the agent.\n"
     "- blocked: the goal cannot be reached from here (it needs the user, a credential or something that does not "
     "exist) and the agent has tried the sensible ways. Say what blocks it.\n"
     "- scheduled: the agent has done every part of the goal it can do now, the digest shows it, and what is left "
@@ -223,7 +233,9 @@ _GOAL_SYSTEM: str = (
     "targets that ask for less than the goal's words do not make the goal reached.\n"
     "- Outcome Maximization: if the goal is reached but there is a clear path to a superior result (e.g., finding a "
     "better price, adding a missing but valuable detail, or improving the quality of the answer based on additional "
-    "research), say continue and precisely describe how the result can be maximized.\n"
+    "research), say improve, never continue, and precisely describe how the result can be maximized. A goal that is "
+    "reached is never continue: the agent's rounds are counted, and a run whose last verdict is continue ends as "
+    "failed.\n"
     "- The evidence of a plan step is the agent's claim about that step, not a fact: it holds when the digest or the "
     "facts show what it names (the call that read the file, the output with the count, the page that was opened). A "
     "step marked done whose evidence nothing in the digest or the facts bears out is not done: list its number in "
@@ -611,16 +623,20 @@ class GoalRequest(FrozenModel):
 
 
 class GoalVerdict(FrozenModel):
-    decision: Literal["achieved", "continue", "blocked", "scheduled", "inspect"] = Field(
+    decision: Literal["achieved", "improve", "continue", "blocked", "scheduled", "inspect"] = Field(
         description=(
-            "achieved: the goal is reached. continue: it is not reached yet. blocked: it cannot be reached. "
+            "achieved: the goal is reached. improve: it is reached, and a clearly better result is in reach. "
+            "continue: it is not reached yet. blocked: it cannot be reached. "
             "scheduled: all that can be done now is done, and what is left waits on time and a listed follow-up. "
             "inspect: you cannot tell yet, and the lines of a file the run wrote would decide it; name them in reads "
             "and you are asked again with them, once."
         )
     )
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(
-        description="One or two sentences. For continue: what is missing, as an instruction to the agent."
+        description=(
+            "One or two sentences. For continue: what is missing, as an instruction to the agent. For improve: how the "
+            "result can be made better, as an instruction to the agent."
+        )
     )
     unproven_steps: tuple[int, ...] = Field(
         description=(
@@ -1367,15 +1383,54 @@ def _fenced(name: str, nonce: str, body: str) -> str:
     return f"<<{name} {nonce}>>\n{body}\n<<end {name} {nonce}>>"
 
 
+def _read_instructions(instructions: tuple[str, ...]) -> tuple[int, ...]:
+    """The places of the ``instructions`` (oldest first) the review reads, in order: the newest, whatever its length,
+    then the first and then the others, newest first, each whole while the ones taken fit in
+    :data:`_INSTRUCTIONS_CHARS`; one that does not fit is left out, never cut."""
+    if not instructions:
+        return ()
+    newest: int = len(instructions) - 1
+    taken: set[int] = {newest}
+    room: int = _INSTRUCTIONS_CHARS - len(instructions[newest])
+    for place in (0, *range(newest - 1, 0, -1)) if newest else ():
+        if len(instructions[place]) <= room:
+            taken.add(place)
+            room -= len(instructions[place])
+    return tuple(sorted(taken))
+
+
+def review_reads_instructions(instructions: tuple[str, ...]) -> bool:
+    """Whether the review reads every one of the owner's ``instructions`` whole (:func:`render_instructions`)."""
+    return len(_read_instructions(instructions)) == len(instructions)
+
+
 def render_instructions(instructions: tuple[str, ...]) -> str:
-    """The user's instructions as a numbered list, the newest ones when there are many."""
-    kept: tuple[str, ...] = instructions[-_MAX_INSTRUCTIONS:]
-    omitted: int = len(instructions) - len(kept)
+    """The user's instructions as a numbered list: those :func:`_read_instructions` takes whole, and the newest twelve
+    of the others, each cut from its middle when it is longer than :data:`_CUT_INSTRUCTION_CHARS`, marked so; the
+    numbers of any still left out are named."""
+    read: tuple[int, ...] = _read_instructions(instructions)
+    others: list[int] = [place for place in range(len(instructions)) if place not in read]
+    shown: list[int] = others[-_CUT_INSTRUCTIONS:]
+    left_out: list[str] = [str(place + 1) for place in others[: len(others) - len(shown)]]
+    cut: set[int] = {place for place in shown if len(instructions[place]) > _CUT_INSTRUCTION_CHARS}
+    named: str = (
+        f"Instructions {', '.join(left_out)} are" if len(left_out) > 1 else f"Instruction {''.join(left_out)} is"
+    )
+    notes: tuple[str, ...] = (
+        *(
+            (f"(Instructions too long to read whole with the others are cut from their middle, marked {_CUT_MARK}.)",)
+            if cut
+            else ()
+        ),
+        *((f"({named} left out: too long to read with the others.)",) if left_out else ()),
+    )
     lines: list[str] = [
-        f"{number}. {truncate_middle(text, _INSTRUCTION_CHARS)}" for number, text in enumerate(kept, start=omitted + 1)
+        f"{place + 1}. {_CUT_MARK} {truncate_middle(instructions[place], _CUT_INSTRUCTION_CHARS)}"
+        if place in cut
+        else f"{place + 1}. {instructions[place]}"
+        for place in sorted((*read, *shown))
     ]
-    header: str = f"({omitted} earlier instructions are left out.)\n" if omitted else ""
-    return header + "\n".join(lines)
+    return "\n".join((*notes, *lines))
 
 
 def _part_count(text: str) -> int:

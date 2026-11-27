@@ -113,8 +113,8 @@ class Spawner(Protocol):
         wait: bool = True,
         plan_step: int | None = None,
     ) -> DelegateOutcome:
-        """Run ``goal`` as a run of its own on ``model`` (``None``: the parent's model), as a run of the agent
-        ``agent_id`` names when one is (item 87: its instructions, its tools and its bounds), wait until it ends and
+        """Run ``goal`` on ``model`` or, for ``None``, the task-kind model or parent's current model. If ``agent_id``
+        names an agent, use its instructions, tools and bounds (item 87). Wait until the run ends and
         report how it ended. ``opening`` is the first message its model reads in place of the goal, when it is more
         than the goal (item 831: a group chat's conversation); the goal stays what its row and its page name.
 

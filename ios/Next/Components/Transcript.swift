@@ -169,7 +169,9 @@ struct ToolCall: Identifiable, Equatable, Sendable {
     let detail: String?
 }
 
-/// A sweep of light across running work (R-a §3): 1.35 s across, 1.45 s still; none under Reduce Motion.
+/// A sweep of light across running work (R-a §3): 1.35 s across, 1.45 s still; none under Reduce Motion. Drawn at
+/// 30 frames a second while the band moves and not at all while it is still (`ShimmerSchedule`), so a running tool
+/// costs the display about a fifth of what a free-running animation did.
 struct Shimmer: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     static let sweep: Double = 1.35
@@ -183,7 +185,8 @@ struct Shimmer: ViewModifier {
             content
                 .foregroundStyle(Tone.tertiary)
                 .overlay {
-                    TimelineView(.animation) { timeline in
+                    // At most 30 drawings a second, and none between sweeps (items 1926 and 1932).
+                    TimelineView(ShimmerSchedule(sweep: Self.sweep, pause: Self.pause, rate: 30)) { timeline in
                         GeometryReader { proxy in
                             let phase: Double = shimmerPhase(
                                 at: timeline.date.timeIntervalSinceReferenceDate, sweep: Self.sweep, pause: Self.pause)
@@ -201,6 +204,33 @@ struct Shimmer: ViewModifier {
                 }
         }
     }
+}
+
+/// The shimmer's frames: `rate` a second while the band sweeps, one at the sweep's end (the band past the text), then
+/// none until the next sweep starts.
+struct ShimmerSchedule: TimelineSchedule {
+    let sweep: Double
+    let pause: Double
+    let rate: Double
+
+    func entries(from startDate: Date, mode: TimelineScheduleMode) -> UnfoldSequence<Date, Double> {
+        sequence(state: startDate.timeIntervalSinceReferenceDate) { time in
+            let now: Double = time
+            time = shimmerNextFrame(after: now, sweep: sweep, pause: pause, rate: mode == .lowFrequency ? 1 : rate)
+            return Date(timeIntervalSinceReferenceDate: now)
+        }
+    }
+}
+
+/// When the shimmer's next frame is due after one at `time`: a frame interval on while the band sweeps (the last one
+/// just past the sweep's end), else the next sweep's start. Pure.
+func shimmerNextFrame(after time: Double, sweep: Double, pause: Double, rate: Double) -> Double {
+    let cycle: Double = sweep + pause
+    let index: Double = (time / cycle).rounded(.down)
+    let position: Double = time - index * cycle
+    if position < sweep { return time + max(0.001, min(1 / rate, sweep - position + 0.001)) }
+    // A millisecond on at least: rounding must never give a frame at the same moment, again and again.
+    return max(time + 0.001, (index + 1) * cycle)
 }
 
 /// Where the shimmer's band is, 0 (before the start) to 1 (past the end), for a time in seconds.

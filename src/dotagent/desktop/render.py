@@ -348,6 +348,14 @@ def _step_line(report: StepReport) -> str:
     return render_step(report, _clip(report.detail, _DETAIL_CHARS))
 
 
+# What a batch's result says of the view it carries: the window as the steps left it, so no look is needed to see it.
+AFTER_THE_STEPS: str = (
+    "The view below is the window after the steps (what changed; the rest is as it was): it is your look, so decide "
+    "from it, with no desktop_snapshot or desktop_screenshot, unless a step is uncertain or failed, or one not "
+    "checked left no change in it."
+)
+
+
 def render_act_outcome(outcome: ActOutcome, source: str, nonce: str) -> str:
     counts: Counter[str] = Counter(report.outcome for report in outcome.steps)
     # Done says that a step went through; what was checked of it stands beside it (item 1146).
@@ -361,7 +369,9 @@ def render_act_outcome(outcome: ActOutcome, source: str, nonce: str) -> str:
     header: str = summary
     if outcome.view is not None:
         inner.extend(snapshot_block(outcome.view))
-        header = f"{summary} · {snapshot_header(outcome.view)}"
+        # The view is the window after the steps (item 1960): a run that looked again after nearly every act spent a
+        # model round trip on a look that showed what this one does.
+        header = f"{summary} · {snapshot_header(outcome.view)}\n{AFTER_THE_STEPS}"
     elif outcome.view_note is not None:
         inner.append(f"no view: {_clip(outcome.view_note, _DETAIL_CHARS)}")
     return "\n".join((header, fence_screen(source, "\n".join(inner), nonce)))

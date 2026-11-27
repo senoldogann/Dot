@@ -28,7 +28,13 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   question; the run waits for your answer to what the policy raises, on a card that shows what the action acts on whole
   (a long command wraps and scrolls within the box of code every command of a chat is in, whose copy takes it whole).
 - `auto` (Auto, a shield): the review model (`[models] review`) does. It is given your instructions (the goal and every
-  message you sent to the run: the only authority it recognises), the action (what it acts on and what it runs, a
+  message you sent to the run: the only authority it recognises), whole or not at all (item 1947): the newest whatever
+  its length, then the first and the others, newest first, while together they fit in 60,000 characters. When one does
+  not fit, the step comes to you without asking the model, as what it did not read could forbid it: once your messages
+  to a run pass 60,000 characters together (a long pasted brief and a few more), every step the review model would have
+  answered comes to you for the rest of the run. Only yolo's check of a run that read outside content, which asks
+  nobody, is shown the rest too, the newest twelve of them cut to 1,500 characters from their middle, as every
+  instruction was before. It is given the action (what it acts on and what it runs, a
   page's script, the whole arguments of an MCP call and the whole goal of a schedule: up to 12,000 characters in one
   question, a longer one in overlapping parts of that size, each its own question, of which the strictest answer
   decides, and one longer than eight parts comes to you without asking the model; items 680, 985 and 1251), why
@@ -133,13 +139,25 @@ and addresses the answer names that the run never touched (paths that do not exi
 facts and the answer disagree, the checker goes by the facts. Its verdict is one of:
 
 - `achieved`: the run ends as done.
+- `improve` (item 1946): the goal is reached, and a clearly better result is in reach (a better price, a valuable
+  detail the answer lacks, research that would improve it, item 809). The run is sent back with how, and the same
+  `goal_patience` bounds it; a run whose rounds run out this way ends as done with its answer, since its goal is
+  reached. The checker's words are no instruction of yours: what the run does then is decided by the gate as every
+  step.
 - `continue`: the goal is not reached yet, so the run is sent back to work with the instruction of the checker. A run is
-  sent back at most `goal_patience` times; after that it ends as failed and keeps its answer. The checker also says
-  continue when the goal is reached but a clearly better result is in reach (a better price, a valuable detail the
-  answer lacks, research that would improve it), saying how (item 809); the same `goal_patience` bounds it, and its
-  words are no instruction of yours: what the run does then is decided by the gate as every step.
+  sent back at most `goal_patience` times; after that it ends as failed and keeps its answer.
 - `blocked`: the goal cannot be reached from here (it needs you, a credential or something that does not exist). The run
-  ends as failed with its answer and the reason.
+  ends as failed with its answer and the reason. A **schedule's firing** whose own finish said what it needs from you
+  (`needs_from_user`) ends as **done** instead (item 1952), the check's words under its answer saying the goal waits on
+  you, and what it needs shown under it: you are asked once, by the notice of its end, and the schedule's row counts no
+  failure. The firings after it start with a note that this part is on hold (what the run asked of you, quoted, and not
+  to try it again or look for a way round it): they do the rest of the task, and when nothing else is left end at once
+  with a line, no second ask and `nothing_new`, so that a login wall you have to clear (Fiverr, TikTok: 17 failed runs and
+  some 148 M tokens in a week) is not met again by every run. A firing begun under the note whose check says `blocked`
+  ends done too. The note stands until you write in the chat of that run (a run of yours, not the schedule's, after it,
+  however many firings came since), or for seven days from when that run began, after which the part is tried again, as you may have cleared it without saying so; a firing you
+  start by hand has none. It is read from the schedule's runs, nothing is stored for it, it makes no question to you, and
+  a run of any other kind, or a firing that asked nothing of you, fails as before.
 - `scheduled` (item 675): all the run can do now is done, and what is left waits on something only time brings (a reply
   to what it sent, a payment, a site's review, a moment the goal names), which a run scheduled in the same chat picks
   up. The run ends as done, with the check's words under its answer. The checker is shown the chat's schedules that are
@@ -343,7 +361,10 @@ count toward its parent's, which sees them when the delegation returns. Delegate
 limits; an eval run is cut by its task's own (300 s, 600000 tokens), whatever yours are. A run on a Zen model of
 OpenCode (item 552) has them too, read between the agent's steps: the first step that ends past a limit while the agent
 goes on tells it to stop and answer, and an agent that still goes on two steps after that is stopped and the run ends
-failed, with the same words and the timeline's line.
+failed, with the same words and the timeline's line. The time limit is kept by the clock too (item 1940): a session
+that hangs mid-step is told when the limit passes and stopped five minutes later, the run failed the same way; and a
+session that says nothing for `[providers.opencode] silence_s` (600 s) while no tool works for it and no permission
+waits on you fails the run, as Claude Code's does.
 
 **The progress watchdog.** After every step in which a run used tools, Dot compares what it called and what came back
 (screenshots included) with the steps before. By default it looks for the same step `stall_limit` times in a row: the
@@ -368,8 +389,9 @@ the run is still on track: on track, or when it cannot tell, nothing happens (a 
 well); off track, it says why and gives one to three steps back to the goal, which the run is given as a note, and the
 watchdog climbs a rung of its ladder as for a pattern, so a run judged off track again and again is stopped with what it
 tried. The side panel's Set up lists the check as a progress alert (`drift`) with the diagnosis and the steps. A
-checkpoint the review model cannot answer is skipped and logged (`checkpoint_failed`): a run is never stopped for a
-judge that failed.
+checkpoint the review model cannot answer, or that cannot call it (its key is missing, item 1939), is skipped and logged
+(`checkpoint_failed`): a run is never stopped for a judge that failed; the consult rung in that case stops the run as
+stalled and says why.
 A run that ever read content others can author is marked again when the judge's note (or the consult rung's) comes,
 as the judge read what the run read, even after your steer cleared the mark.
 This is the Watchdog of DeepSeek Harness's Super-agent design (2026-11-01), which judges whether each worker makes
@@ -422,7 +444,7 @@ restarted while this task worked.") and Continue.
 
 **Lessons.** With `lessons = "auto"` (the default) or `"propose"` in `[agent]`, a task or research run of its own that
 reached its goal after something went wrong on the way (a call failed, whether the run found its way around it or not;
-the progress watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist; or
+the progress watchdog raised an alert; the goal check sent it back as not reached, not to better a reached goal; its answer named paths that did not exist; or
 it is the follow-up of your 👎 or 🔁 on an earlier run of the chat, whose work you disliked, item 654: such a
 follow-up is asked for its lessons even when it is a chat) is
 followed, once it has ended, by one call of the review model (`[models] review`). It reads a digest of the run, what
