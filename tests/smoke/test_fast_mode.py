@@ -41,7 +41,11 @@ HAIKU: str = "anthropic:claude-haiku-5-5"
 _BETAS: str = "thinking-binding-controls-2026-08-01"
 _FAST_BETA: str = "fast-mode-2026-02-01"
 _RUN_WAIT_S: float = 30.0
-_SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
+_SHOTS: tuple[tuple[int, int, Literal["light", "dark"]], ...] = (
+    (1440, 900, "light"),
+    (1440, 900, "dark"),
+    (390, 844, "light"),
+)
 # A reply of Anthropic's Messages API, streamed: one line of text, at the speed the request asked.
 _EVENTS: tuple[tuple[str, JsonObject], ...] = (
     (
@@ -254,9 +258,9 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            for index, (width, scheme) in enumerate(_SHOTS):
+            for index, (width, height, scheme) in enumerate(_SHOTS):
                 page: Page = await browser.new_page(
-                    viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
+                    viewport={"width": width, "height": height}, color_scheme=scheme, reduced_motion="reduce"
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{first.id}")
@@ -266,6 +270,13 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                     await page.locator(".dock textarea").click()
                 pill: Locator = page.locator(f".dock .composer-pill[data-pill='{held}']")
                 await expect(pill).to_be_visible()
+                # The model pill (item 1991, as the iPhone's chip): the provider's mark and the model's name, never
+                # the provider's name in front of it.
+                model_pill: Locator = page.locator(".dock .composer-pill[data-pill='model']")
+                await expect(model_pill).to_be_visible()
+                await expect(model_pill.locator("svg, img").first).to_be_visible()
+                name: str = (await model_pill.inner_text()).lower()
+                assert "opus" in name and "anthropic" not in name, name
                 await pill.click()
                 # A phone's chat settings (item 1202) hold the reasoning in a row that opens in place.
                 menu: Locator = (

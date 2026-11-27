@@ -1549,7 +1549,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     jump.hidden = true;
     dockBar.setEnd(false, jump.title);
     paintBar();
-    if (answerNode !== null) {
+    if (answerBelow()) {
       answerNode.scrollIntoView({ block: "start", behavior: "smooth" });
       return;
     }
@@ -1583,14 +1583,23 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     return box.clientHeight + box.scrollTop >= box.scrollHeight - NEAR_BOTTOM_PX;
   }
 
-  /** The button leads to the answer once there is one that is still below the window, else to the end of a live run. */
+  /** Whether the answer's start is still below the window. */
+  function answerBelow() {
+    return answerNode !== null && answerNode.getBoundingClientRect().top > seenEnd();
+  }
+
+  /**
+   * The button leads to the answer while its start is below the window, else to the end of the conversation. It shows
+   * whenever the end is away from the window (item 1991, as on the phone): a reader who scrolled up in a chat that is over,
+   * or past the start of a long answer, is offered the way back too; a live run's is the follow the reader left.
+   */
   function paintJump() {
-    const below = answerNode !== null ? answerNode.getBoundingClientRect().top > seenEnd() : active && !following;
+    const below = answerNode === null && active ? !following : answerBelow() || !nearBottom();
     // The arrow shows while the end, or the answer, is below the window and the answer is not on its way into view.
     const show = below && !landing;
     jumpVisible = show;
     jump.hidden = !show;
-    const words = answerNode !== null ? t("run.jumpAnswer") : t("run.jumpLatest");
+    const words = answerBelow() ? t("run.jumpAnswer") : t("run.jumpLatest");
     jump.title = words;
     jump.setAttribute("aria-label", words);
     dockBar.setEnd(show, words);

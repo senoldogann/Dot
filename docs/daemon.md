@@ -804,7 +804,9 @@ panel**; it follows the plan while it is open, and Escape, a click outside it or
 part closes it. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for subagents, the bar, the queue, the loops and the commands at
-work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
+work are one capsule of glass, a single row just above the box with a round way down beside it (item 1991: it comes whenever
+the end of the conversation is away from the window, as on the iPhone, also in a chat that is over and past the start of
+its long answer; it leads to the answer while the answer's start is below the window, else to the end and follows again), whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36 s**, **Waiting for you**,
 **Reconnecting…**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it

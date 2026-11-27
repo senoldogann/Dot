@@ -10,7 +10,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -136,6 +136,7 @@ _FACTS: str = """() => {
     glass: style(document.querySelector('.composer'))?.backdropFilter,
     threadPaddingBottom: thread ? Math.round(parseFloat(getComputedStyle(thread).paddingBottom)) : 0,
     dockHeight: box ? Math.round(box.height) : 0,
+    composerTop: Math.round(document.querySelector('.composer')?.getBoundingClientRect().top ?? 0),
     answerBottom: Math.round(document.querySelector('.answer')?.getBoundingClientRect().bottom ?? 0),
   };
 }"""
@@ -189,13 +190,16 @@ async def test_the_composer_stands_at_the_foot_of_what_is_seen_while_the_convers
             await phone.wait_for_timeout(300)
             scrolled = await phone.evaluate(_FACTS)
             assert scrolled["threadScrollTop"] > 0
-            assert scrolled["dockTop"] == facts["dockTop"], "the dock stays at the foot while the conversation scrolls"
+            # The way down (item 1991) may come over the box meanwhile, the dock taller upwards; the box stays.
+            assert scrolled["composerTop"] == facts["composerTop"], (
+                "the box stays at the foot while the conversation scrolls"
+            )
             await phone.screenshot(path=str(tmp_path / "phone-scrolled.png"))
             await phone.evaluate(
                 "const thread = document.querySelector('.run-thread'); thread.scrollTop = thread.scrollHeight"
             )
             await phone.wait_for_timeout(300)
-            assert (await phone.evaluate(_FACTS))["dockTop"] == facts["dockTop"]
+            assert (await phone.evaluate(_FACTS))["composerTop"] == facts["composerTop"]
             await phone.screenshot(path=str(tmp_path / "phone-bottom.png"))
             # A draft of several lines makes the dock taller: the conversation's end still clears it.
             await phone.locator(".dock textarea").fill(
@@ -358,5 +362,65 @@ async def test_a_chat_that_is_over_opens_drawn_whole(served: tuple[RunManager, s
             await page.wait_for_selector(".timeline .answer", timeout=15000)
             assert await page.evaluate("window.dotDrawnWhole") is True
             await page.context.close()
+        finally:
+            await browser.close()
+
+
+async def test_the_way_down_comes_when_the_reader_scrolls_up_in_a_chat_that_is_over_and_a_press_leads_to_its_end(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
+) -> None:
+    """Item 1991, as the iPhone: a chat that is over opens at its foot with no arrow; scrolled up a little, past the
+    start of its long answer, the arrow comes (it used to wait for the answer's start to be below the window); a press
+    leads to the end and the arrow goes. The computer's arrow in the bar, 1440 by 900 in the light and the dark, and
+    the phone's round one beside the capsule, 390 by 844."""
+    manager, address = served
+    run: RunRecord = await manager.start(
+        _GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        assert (await manager.wait(run.id)).status == "done"
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            shots: tuple[tuple[int, int, Literal["light", "dark"]], ...] = (
+                (1440, 900, "light"),
+                (1440, 900, "dark"),
+                (390, 844, "light"),
+            )
+            for width, height, scheme in shots:
+                context: BrowserContext = await browser.new_context(
+                    viewport={"width": width, "height": height}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                page: Page = await context.new_page()
+                errors: list[str] = []
+                page.on("pageerror", lambda error, found=errors: found.append(str(error)))
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"{address}/#/runs/{run.id}")
+                await page.wait_for_selector(".run-main", timeout=15000)
+                await page.wait_for_timeout(1200)
+                phone: bool = width < 720
+                arrow: Locator = page.locator(".dock-end" if phone else ".status-bar .jump")
+                await expect(arrow).to_be_hidden()
+                where = await page.evaluate(_AT_THE_FOOT)
+                assert where["max"] - where["top"] <= 2, (width, where)
+                # The finger's scroll up, a few lines: the answer's start is still far above the window.
+                await page.evaluate(
+                    "document.querySelector('.run-thread').scrollTop -= 400" if phone else "window.scrollBy(0, -400)"
+                )
+                await expect(arrow).to_be_visible(timeout=4000)
+                box = await arrow.bounding_box()
+                assert box is not None
+                if phone:
+                    assert box["width"] == box["height"] == 44, box
+                await page.screenshot(path=str(tmp_path / f"way-down-{width}-{scheme}.png"), animations="disabled")
+                await arrow.click()
+                await page.wait_for_timeout(1200)
+                where = await page.evaluate(_AT_THE_FOOT)
+                assert where["max"] - where["top"] <= 2, ("a press leads to the end", width, where)
+                await expect(arrow).to_be_hidden()
+                assert errors == []
+                await context.close()
         finally:
             await browser.close()
