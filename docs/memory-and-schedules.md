@@ -509,10 +509,10 @@ Taught task, its bot), one line of when it runs, when next and how the last went
 start, its goal and its history. The loops of chats (item 281) are a section of their own (**Loops**), and
 `#/settings/schedules?thread=<chat>` shows the loops of that one chat alone. The rows are the page's own, however many (item
 634's box that scrolled inside past the third is gone); painted again, as a switch or the end of a run paints it, the page
-keeps where it was scrolled to. **New schedule** and a schedule's **Edit** open a page of their own, `#/settings/schedules/new`
+keeps where it was scrolled to. **New routine** and a schedule's **Edit** open a page of their own, `#/settings/schedules/new`
 and `#/settings/schedules/<id>` (item 615 had a dialog), in the settings' rows and cards (Task, When, How its tasks run,
 What its tasks leave), with the schedule's name in the breadcrumb, **Run now** and **Delete** at the head of an existing one
-and **Cancel** and **Add schedule** or **Save changes** at the foot; saved, it goes back to the list. A schedule is
+and **Cancel** and **Add routine** or **Save changes** at the foot; saved, it goes back to the list. A schedule is
 created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task or research: a chat that only talks
 schedules tasks), model, reasoning
@@ -647,7 +647,7 @@ earlier runs.
   going, a paused bot's, the emergency stop's and a late one (a firing that waits for its chat is none), as the loop
   that merges pull requests was skipped 27 times in a day with no trace but its last status. The first task that starts (a firing's, or one you start
   with Run now) or firing that fails to start ends the count, and switching the schedule on again or changing it starts
-  it afresh. From two on, and while the last status is a skip, its row on the Schedules page and its line in a chat's
+  it afresh. From two on, and while the last status is a skip, its row on the Routines page and its line in a chat's
   Automations say "Skipped 5 in a row" beside the last status, and `dotx schedule list` and the model's `schedule_list`
   add "(5 skipped in a row)" to its last result; one skip is the last status's to say.
 - How the end of a schedule's run is told on your phone and desktop (item 461): **Notifications** in its form, else
