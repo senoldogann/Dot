@@ -2015,4 +2015,7 @@ export const EN_APP = {
   // Added by hand, for sentences that need their own word order.
   "layout.messagesOnly": "Messages only",
   "layout.dotTellsWhatItTurns": "Dot tells what it turns to in short messages, as a person would, with one line of what it does now and for how long; press the line for the steps.",
+  // Added by hand, for sentences that need their own word order.
+  "errors.refusedShort": "Stopped: the model declined the task",
+  "errors.refusedNext": "The model declined this task and held to it. Choose another model to restart it on.",
 };

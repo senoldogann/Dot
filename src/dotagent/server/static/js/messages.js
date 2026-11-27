@@ -4,7 +4,7 @@ import { dateTimeFull, duration, el, messageTime } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { copyButton } from "./copybutton.js";
-import { runFailure, STOPPED_RESULT } from "./errors.js";
+import { isStoppedResult, runFailure } from "./errors.js";
 import { faceStateAtEnd } from "./face.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
@@ -240,7 +240,7 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
   // A run the owner stopped has the harness's own words for a result ("The run was stopped."): they say nothing the note
   // under the words it had streamed does not, so those words stay and the note says it (item 23 of the 2026-11-26 review).
   const stopped = status === "cancelled";
-  const bare = stopped && text.trim() === STOPPED_RESULT;
+  const bare = stopped && isStoppedResult(text);
   const words = bare ? stoppedWords : text;
   const written = words.trim() !== "";
   // A run its model service stopped says so in words of its own, not the service's line (item 1136 left its sentence,

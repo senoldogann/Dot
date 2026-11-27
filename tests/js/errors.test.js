@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { explain, refusedModel, runFailure, serviceFailure, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
+import { explain, isStoppedResult, refusedModel, runFailure, serviceFailure, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
 
 class ApiError extends Error {
   constructor(status, message, context = {}) {
@@ -129,4 +129,11 @@ test("words that begin in lower case are a line of a log, and a run whose end ca
 test("an agent's own report of what it could not do is its answer, and is not rewritten", () => {
   assert.equal(runFailure("I could not sign in: the site wants a code from your phone.", false), null);
   assert.equal(runFailure("", false), null);
+});
+
+test("the daemon's two results of a stopped run, and a model's refusal, are told in plain words (item 1980, 1981)", () => {
+  assert.equal(isStoppedResult("The run was stopped."), true);
+  assert.equal(isStoppedResult("Emergency stop: every active run was stopped."), true);
+  assert.equal(isStoppedResult("I stopped early."), false);
+  assert.equal(runFailure("The model declined this task (it refuses).", false)?.short, "Stopped: the model declined the task");
 });

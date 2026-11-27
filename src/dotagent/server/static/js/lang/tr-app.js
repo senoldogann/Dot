@@ -2016,4 +2016,7 @@ export const TR_APP = {
   // Added by hand, for sentences that need their own word order.
   "layout.messagesOnly": "Yalnızca mesajlar",
   "layout.dotTellsWhatItTurns": "Dot neye yöneldiğini bir insan gibi kısa mesajlarla anlatır; altında şimdi ne yaptığını ve ne kadardır sürdüğünü söyleyen tek satır olur; adımlar için satıra basın.",
+  // Added by hand, for sentences that need their own word order.
+  "errors.refusedShort": "Durdu: model görevi reddetti",
+  "errors.refusedNext": "Model bu görevi reddetti ve ısrar etti. Yeniden başlatmak için başka bir model seçin.",
 };

@@ -155,6 +155,19 @@ export function serviceFailure(line) {
 // What the daemon writes as the result of a run the owner stopped (`RESULT_STOPPED` in store/endings.py): a screen says
 // it in the owner's language and does not show these words.
 export const STOPPED_RESULT = "The run was stopped.";
+// What the daemon writes as the result of runs the emergency stop ended (`RESULT_EMERGENCY_STOPPED`, `PREFIX_EMERGENCY_STOP`).
+const EMERGENCY_PREFIX = "Emergency stop: ";
+
+/**
+ * Whether `text` is a result the daemon writes for a run that was stopped (by the owner or by the emergency stop): its
+ * words are the daemon's, and a screen says it in the owner's language.
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isStoppedResult(text) {
+  const words = text.trim();
+  return words === STOPPED_RESULT || words.startsWith(EMERGENCY_PREFIX);
+}
 
 // What the harness writes as a failed run's last words when the run ended for a reason of its own (`store/endings.py`),
 // each with the sentence that says what to do (item 25 of the 2026-11-26 review): a chat that ended so says it plainly,
@@ -168,6 +181,7 @@ const HARNESS_ENDINGS = [
   [/^Stopped: the run reached its limit/, "errors.limitShort", "errors.limitNext"],
   [/^(?:daemon stopped while the run was active|The daemon was shut down while this run was active\.|The dotx command that drove this run )/, "errors.cutOffShort", "errors.cutOffNext"],
   [/^The run could not be started\./, "errors.notStartedShort", "errors.notStartedNext"],
+  [/^The model declined this task/, "errors.refusedShort", "errors.refusedNext"],
 ];
 
 /**

@@ -36,9 +36,10 @@ test("every line of tests/js/i18n-exempt.json still stands in the code", () => {
       .flatMap((name) => hardcodedWords(sourceOf(name)).map(({ text }) => text)),
   );
   // An exempt line stands as a literal that would be flagged, or as one the scan does not look at (a comparison, a
-  // property of the program): both are fine while the text is in some module.
+  // property of the program): both are fine while that exact literal is in some module.
   const everything = modulesOf(STATIC_ROOT).map((name) => sourceOf(name)).join("\n");
-  const gone = Object.keys(EXEMPT).filter((text) => !written.has(text) && !everything.includes(text.replace(/\n/g, "\\n").replace(/"/g, '\\"')) && !everything.includes(text.split("\n")[0]));
+  const standsInCode = (text) => [JSON.stringify(text), `'${text}'`, `\`${text}\``].some((written) => everything.includes(written));
+  const gone = Object.keys(EXEMPT).filter((text) => !written.has(text) && !standsInCode(text));
   assert.deepEqual(gone, [], "These exempt lines are no longer in any module: delete them from tests/js/i18n-exempt.json.");
 });
 
