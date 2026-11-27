@@ -65,6 +65,7 @@ from dotagent.core.paths import (
     web_research_dir,
     workspace_dir,
 )
+from dotagent.desktop.cua import starter_of
 from dotagent.desktop.pointer import PointerOverlay
 from dotagent.desktop.presence import mac_presence
 from dotagent.dot_app import app_path, build_path, runtime_path
@@ -672,6 +673,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
                 browsers.chrome_pids,
                 PointerOverlay(config.desktop.show_pointer),
                 mac_presence(config.desktop.away_after_s),
+                starter_of(config.desktop),
             ),
             safari=SafariDesk(),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),

@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2007](2007.md) | built | 2026-11-27 | A background driver for the desktop's steps, a trial: cua-driver sends them to the window, the Mac's pointer left alone |
 | [1997](1997.md) | done | 2026-11-27 | The pre-push hook measures the first step's budget when the prompt surface changes |
 | [1990](1990.md) | done | 2026-11-27 | A terminal session whose program ended leaves room for another |
 | [1988](1988.md) | done | 2026-11-27 | A search pattern ripgrep cannot read is told as the call's own error, with the syntax it reads |
