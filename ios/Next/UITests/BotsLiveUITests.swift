@@ -236,7 +236,8 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertTrue(scribe.waitForExistence(timeout: 60), "Scribe, the seeded bot, on the home")
         scribe.tap()
         let pill: XCUIElement = app.buttons["botChat.pill"]
-        XCTAssertTrue(pill.waitForExistence(timeout: 30), "Scribe's chat header")
+        if !pill.waitForExistence(timeout: 30) { shot(app, "no-pill") }
+        XCTAssertTrue(pill.exists, "Scribe's chat header")
         pill.tap()
         XCTAssertTrue(app.buttons["profile.workOrders"].waitForExistence(timeout: 20), "the profile's Work group")
     }
@@ -354,37 +355,39 @@ final class BotsLiveUITests: XCTestCase {
 
     /// Dark with Turkish words, and the largest accessibility size: the three pages keep every row inside the screen and
     /// a hit target; the shots go to the result bundle for the report.
-    func testTheWorkPagesHoldInDarkTurkishAndAtTheLargestAccessibilitySize() throws {
-        let variants: [(String, [String])] = [
-            ("dark-tr", ["-colorScheme", "dark", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR"]),
-            ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]),
-        ]
-        for (name, extra) in variants {
-            let app: XCUIApplication = try launch(extra: extra)
-            openScribeProfile(app)
-            let window: CGRect = app.windows.firstMatch.frame
-            for id in ["profile.workOrders", "profile.objectives", "profile.handoffs"] {
-                let row: XCUIElement = app.buttons[id]
-                for _ in 0..<6 where !row.isHittable { app.swipeUp() }
-                XCTAssertGreaterThanOrEqual(row.frame.height, 44, "\(name) \(id)")
-                XCTAssertLessThanOrEqual(row.frame.maxX, window.maxX, "\(name) \(id): inside the screen")
+    func testTheWorkPagesHoldInDarkAndTurkish() throws {
+        try checkWorkPages("dark-tr", ["-colorScheme", "dark", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR"])
+    }
+
+    func testTheWorkPagesHoldAtTheLargestAccessibilitySize() throws {
+        try checkWorkPages(
+            "ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"])
+    }
+
+    private func checkWorkPages(_ name: String, _ extra: [String]) throws {
+        let app: XCUIApplication = try launch(extra: extra)
+        openScribeProfile(app)
+        let window: CGRect = app.windows.firstMatch.frame
+        for id in ["profile.workOrders", "profile.objectives", "profile.handoffs"] {
+            let row: XCUIElement = app.buttons[id]
+            for _ in 0..<6 where !row.isHittable { app.swipeUp() }
+            XCTAssertGreaterThanOrEqual(row.frame.height, 44, "\(name) \(id)")
+            XCTAssertLessThanOrEqual(row.frame.maxX, window.maxX, "\(name) \(id): inside the screen")
+        }
+        shot(app, "work-profile-\(name)")
+        for (id, rowId) in [("profile.workOrders", "work.order"), ("profile.objectives", "work.objective"), ("profile.handoffs", "work.handoff")] {
+            let entry: XCUIElement = app.buttons[id]
+            for _ in 0..<6 where !entry.isHittable { app.swipeUp() }
+            entry.tap()
+            let rows: XCUIElementQuery = app.buttons.matching(identifier: rowId)
+            XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20), "\(name) \(rowId)")
+            for index in 0..<rows.count {
+                XCTAssertGreaterThanOrEqual(rows.element(boundBy: index).frame.height, 44, "\(name) \(rowId)")
+                XCTAssertLessThanOrEqual(rows.element(boundBy: index).frame.maxX, window.maxX, "\(name) \(rowId): inside the screen")
             }
-            shot(app, "work-profile-\(name)")
-            for (id, rowId) in [("profile.workOrders", "work.order"), ("profile.objectives", "work.objective"), ("profile.handoffs", "work.handoff")] {
-                let entry: XCUIElement = app.buttons[id]
-                for _ in 0..<6 where !entry.isHittable { app.swipeUp() }
-                entry.tap()
-                let rows: XCUIElementQuery = app.buttons.matching(identifier: rowId)
-                XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20), "\(name) \(rowId)")
-                for index in 0..<rows.count {
-                    XCTAssertGreaterThanOrEqual(rows.element(boundBy: index).frame.height, 44, "\(name) \(rowId)")
-                    XCTAssertLessThanOrEqual(rows.element(boundBy: index).frame.maxX, window.maxX, "\(name) \(rowId): inside the screen")
-                }
-                shot(app, "\(rowId)-\(name)")
-                app.navigationBars.buttons.element(boundBy: 0).tap()
-                XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 10))
-            }
-            app.terminate()
+            shot(app, "\(rowId)-\(name)")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 10))
         }
     }
 }

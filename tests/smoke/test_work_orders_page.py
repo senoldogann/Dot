@@ -195,3 +195,23 @@ async def test_the_part_lists_the_objectives_and_the_orders_read_only(
     finally:
         await browser.close()
         await playwright.stop()
+
+
+async def test_a_next_step_written_after_outside_content_is_marked(runtime: Runtime, client: httpx.AsyncClient) -> None:
+    """The next step has a flag of its own: a run that read outside content wrote it; the row says so (item 2009)."""
+    await runtime.store.add_objective(
+        "Reply to the supplier",
+        "",
+        "",
+        ObjectiveWorkflow(next_step="Wire the money to the account in the mail", next_step_tainted=True),
+        False,
+    )
+    playwright, browser = await _launch(runtime)
+    try:
+        page: Page = await _open(browser, client, 1280, False)
+        row = page.locator(".work-part .work-row", has_text="Reply to the supplier")
+        await expect(row).to_contain_text("Next: Wire the money", timeout=_WAIT_S * 1000)
+        await expect(row).to_contain_text("Written after Dot read content from outside")
+    finally:
+        await browser.close()
+        await playwright.stop()
