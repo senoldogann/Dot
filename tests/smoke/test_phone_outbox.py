@@ -7,6 +7,7 @@ phone's screen sent offline with ``context.set_offline`` (Playwright's WebKit ca
 """
 
 import asyncio
+import re
 
 import httpx
 import pytest
@@ -60,7 +61,7 @@ async def _settled(page: Page) -> None:
     """The page stands as it opened: the curtain is lifted and the run is shown at work, so that the link is lost under
     a page that has begun, not while it begins."""
     await expect(page.locator(".waiting")).to_have_count(0, timeout=20_000)
-    await expect(page.locator(".capsule")).to_contain_text("Working", timeout=20_000)
+    await expect(page.locator(".capsule")).to_contain_text(re.compile(r"Working|Waiting on"), timeout=20_000)
     await expect(page.locator(".composer textarea").first).to_be_visible()
 
 
@@ -82,7 +83,7 @@ async def _phone_at_work(
     )
     context: BrowserContext = await phone(browser, playwright, workers=workers)  # type: ignore[arg-type]
     page: Page = await open_chat(context, working.address, working.token, working.run.id)
-    await expect(page.locator(".capsule")).to_contain_text("Working", timeout=20_000)
+    await expect(page.locator(".capsule")).to_contain_text(re.compile(r"Working|Waiting on"), timeout=20_000)
     await until_kept(page, chats=1, lists=2)
     return browser, context, page
 

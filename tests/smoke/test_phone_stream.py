@@ -4,6 +4,8 @@ sees the daemon's keepalive, so a connection that stays open and passes nothing 
 A real daemon in a throw-away home, a TCP stand-in for the phone's network that leaves connections open and silent, and
 the page's clock moved on in WebKit as the owner's iPhone draws it."""
 
+import re
+
 import pytest
 import pytest_asyncio
 from dock_scenario import read_login, scene
@@ -41,7 +43,7 @@ async def test_a_connection_left_open_and_silent_is_dropped_after_35_seconds_and
             )
             await page.goto(ui_url("127.0.0.1", network.port, working.token))
             await page.goto(f"{network.address}/#/runs/{working.run.id}")
-            await expect(page.locator(".capsule")).to_contain_text("Working", timeout=20_000)
+            await expect(page.locator(".capsule")).to_contain_text(re.compile(r"Working|Waiting on"), timeout=20_000)
             await page.wait_for_timeout(1500)
             # The run's own stream is open after the events the page read; it is made one that passes nothing, as a
             # connection does that a phone's network left behind.

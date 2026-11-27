@@ -8,6 +8,7 @@ what can be pressed in it is 44 px tall. Where ``DOT_PWA_SHOTS`` names a folder,
 
 import asyncio
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -111,7 +112,10 @@ async def test_the_line_says_how_the_link_stands_and_covers_nothing(login_env: d
                     tag: str = f"{width}x{height}-{scheme}"
                     context: BrowserContext = await phone(chromium, playwright, width, height, scheme)
                     page: Page = await open_chat(context, working.address, working.token, working.run.id)
-                    await expect(page.locator(".capsule")).to_contain_text("Working", timeout=20_000)
+                    # The scene's run waits on its helpers: its capsule says so rather than Working (item 2023).
+                    await expect(page.locator(".capsule")).to_contain_text(
+                        re.compile(r"Working|Waiting on"), timeout=20_000
+                    )
                     await until_kept(page, chats=1, lists=2)
                     # With the link well the line is not there.
                     assert await page.locator(".link-line:not([hidden])").count() == 0
