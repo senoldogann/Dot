@@ -1914,6 +1914,21 @@ export const TR_APP = {
   "approvals.riskLabel": "Risk: {level}",
   "approvals.whyPolicy": "Politikanın sözleri: {reason}",
   // Added by hand, for sentences that need their own word order.
+  "errors.taskStopped": "Görev durdu",
+  "errors.internalShort": "Durdu: Dot bir sorunla karşılaştı",
+  "errors.internalNext": "Dot'un içinde bir şey bozuldu. Devam etmek için buraya bir mesaj yazın ya da Devam et'e basın; yine olursa Ayarlar › Kendini onarma bakabilir.",
+  "errors.emptyShort": "Durdu: model yanıt vermedi",
+  "errors.emptyNext": "Model boş yanıtlar gönderdi ve bitiremedi. Devam etmek için buraya bir mesaj yazın ya da aşağıdan başka bir model seçin.",
+  "errors.cutShortShort": "Durdu: modelin yanıtları yarıda kesildi",
+  "errors.cutShortNext": "Modelin hizmeti yanıtlarını tamamlanmadan bitirdi. Devam etmek için buraya bir mesaj yazın ya da aşağıdan başka bir model seçin.",
+  "errors.stalledShort": "Durdu: görev ilerlemiyordu",
+  "errors.stalledNext": "Dot, aynı şeyi denemeyi sürdürdüğü için görevi durdurdu. Devam etmek için buraya neyin değişeceğini yazın.",
+  "errors.limitShort": "Durdu: görev sınırına ulaştı",
+  "errors.limitNext": "Görev kendisine tanınan süreyi ya da token'ı harcadı. Devam etmek için buraya bir mesaj yazın.",
+  "errors.cutOffShort": "Durdu: Dot yeniden başlatıldı",
+  "errors.cutOffNext": "Görev çalışırken Dot kapatıldı ya da yeniden başlatıldı. Kaldığı yerden sürdürmek için Devam et'e basın.",
+  "errors.notStartedShort": "Durdu: görev başlatılamadı",
+  "errors.notStartedNext": "Görev başlatılamadı. Mesajı yeniden gönderin.",
   // Added by hand, for sentences that need their own word order.
   "outcome.stoppedNote": "Durduruldu",
   // Added by hand, for sentences that need their own word order.
@@ -1996,4 +2011,6 @@ export const TR_APP = {
   "vaultitems.updatedThePasswordOfPart": "Kasada zaten bulunan {part} parolası güncellendi{value}. Her birinin önceki parolası, dosyadakinin eski olması ihtimaline karşı notlarında saklanır.",
   "vaultitems.leftOutSkippedOfRows": "{rows} satırdan {skipped} tanesi dışarıda bırakıldı: {join}.",
   // Added by hand, for sentences that need their own word order.
+  "errors.faultShort": "Durdu: Dot bitiremedi",
+  "errors.faultNext": "Dot bu görevi bitiremedi. Yapılanlar kalır. Devam etmek için buraya bir mesaj yazın ya da Devam et'e basın.",
 };

@@ -4,7 +4,7 @@ import { dateTimeFull, duration, el, messageTime } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { copyButton } from "./copybutton.js";
-import { serviceFailure, STOPPED_RESULT } from "./errors.js";
+import { runFailure, STOPPED_RESULT } from "./errors.js";
 import { faceStateAtEnd } from "./face.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
@@ -52,11 +52,11 @@ function outcomeAlert(status) {
   return null;
 }
 
-/** The words of a run its model service stopped (`serviceFailure`): what stopped, that what was done stays, what the
+/** The words of a run its model service stopped or the harness ended (`runFailure`): what stopped, that what was done stays, what the
  * owner can do, and the service's own words, a link of theirs among them, under a closed Details. */
 function serviceStopped(failure) {
   return [
-    el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, t("errors.serviceStopped"))),
+    el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, failure.title)),
     el("div", { class: "prose answer-service" }, el("p", null, failure.next), el("p", { class: "muted" }, t("errors.serviceKept"))),
     el("details", { class: "error-details answer-service-details" }, el("summary", null, t("errors.details")), prose(failure.details)),
   ];
@@ -233,8 +233,9 @@ export function showMessagePicks(message, picks) {
  * the start of the run is not known; `href` leads to the run itself (null when the reader is there). `readNow` says the
  * answer has just come in, to be read aloud as it appears when Settings › General says so. `stoppedWords` are the words a
  * run the owner stopped had streamed and not finished: they stay as its answer, with a note that it was stopped.
+ * `errored` says the run's end carried an error of the daemon's, whose words then stand under Details.
  */
-export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null, stoppedWords = "" }) {
+export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null, stoppedWords = "", errored = false }) {
   const outcome = OUTCOMES[status] ?? null;
   // A run the owner stopped has the harness's own words for a result ("The run was stopped."): they say nothing the note
   // under the words it had streamed does not, so those words stay and the note says it (item 23 of the 2026-11-26 review).
@@ -244,7 +245,7 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
   const written = words.trim() !== "";
   // A run its model service stopped says so in words of its own, not the service's line (item 1136 left its sentence,
   // a billing link and all, as the answer); the line itself stands under Details.
-  const failure = status === "failed" ? serviceFailure(text) : null;
+  const failure = status === "failed" ? runFailure(text, errored) : null;
   // A run that ended well needs no word for it, as a message that arrived needs none (item 832); a failure and a stop
   // say so.
   const label = outcome === null ? status : t(outcome.label);

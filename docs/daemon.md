@@ -25,7 +25,7 @@ face or creature stands in a row): the **badge** of its agent (a 20 px square on
 Reviewer" is CR and "Dot" is DO) and its name, with the run's age at the right; the chat's title under them, in the heavier
 weight, on one line cut by an ellipsis; and a last line that holds the marks of its loop and its campaign, the team it is
 with, what it delegated and its last words (the answer of its latest run in plain words, or your message after "You:" while
-the run works; for a run its model's service stopped, a few words of what stopped it) and the dot of an unread chat. A chat is
+the run works; for a run its model's service stopped or that ended for a fault of Dot's, a few words of what stopped it (item 1981: "Stopped: Dot ran into a problem"); "Stopped" for a run you stopped, item 1980; and, for a chat that waits for you, the step that waits without the policy's reason for asking, item 1979) and the dot of an unread chat. A chat is
 the team's when it leads it, else the agent's of its latest run, else Dot's. The mark of a chat's loop (item 580) is a small
 line icon of two arrows: a chat that asks again by itself, with a loop of `/loop` or a schedule a run of it made that goes
 on in it, wears it, and its tooltip and the row's name for a screen reader say how often and when next ("Loops every 30
@@ -500,6 +500,14 @@ and for one nobody answered "Nobody answered in time, so the step did not run.",
 asks again. A card whose run is gone (the daemon restarted, or the `dotx` command that drove it died) settles as
 expired too, live and when the chat opens again (item 1049); and a run that asked two things at once, in a step of
 read-only calls, stays waiting until both are answered (item 1050).
+A run you stop keeps the words it had streamed, in its answer's place, with a quiet **Stopped** note under them instead
+of the daemon's sentence "The run was stopped." (item 1980; the words are the page's own while it is open, so a page that
+reads the run again later shows the note alone). A run that ended for a fault of Dot's (an internal error, empty
+replies, replies cut short, a stall, a limit, a restart, a start that failed, or an end that carried an error of the
+daemon's, whose words begin in lower case as a line of a log does) says in a sentence what happened and what to do, with
+the program's own words under a closed **Details** (item 1981), as a run its model's service stopped already did; the
+agent's own report of what it could not do is its answer and is not rewritten. Where the page has no error object (a
+chat's row in the sidebar, a run read again), the line is told apart by its shape alone.
 A waiting card says each thing once (item 872, after OpenMausBot's quiet approvals): the command or
 what the step acts on in its box alone, not in the words above it again, which keep what the step does ("Runs vercel;
 vercel puts a project's change live"); why Dot asks once: the line under the box says it for a chat of Dot's own

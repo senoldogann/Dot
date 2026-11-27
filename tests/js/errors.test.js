@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { explain, refusedModel, serviceFailure, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
+import { explain, refusedModel, runFailure, serviceFailure, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
 
 class ApiError extends Error {
   constructor(status, message, context = {}) {
@@ -110,4 +110,23 @@ test("a message refused for its model names the model and the default model it m
   assert.equal(refusedModel(new ApiError(500, "x", { model: "a:b", problem: "p" })), null);
   assert.equal(refusedModel(new Error("x")), null);
   assert.equal(refusedModel(null), null);
+});
+
+test("a run that ended for a fault of the harness's says what happened, and its own words are the details (item 25)", () => {
+  const internal = runFailure("Internal error: RuntimeError: boom", false);
+  assert.equal(internal?.title, "The task stopped");
+  assert.equal(internal?.short, "Stopped: Dot ran into a problem");
+  assert.equal(internal?.details, "Internal error: RuntimeError: boom");
+  assert.equal(runFailure("The model returned empty replies and did not finish.", false)?.short, "Stopped: the model gave no answer");
+  assert.equal(runFailure("provider answered HTTP 402: no credit", false)?.title, "The AI service stopped this task");
+});
+
+test("words that begin in lower case are a line of a log, and a run whose end carried an error is one too", () => {
+  assert.equal(runFailure("the scripted model failed on purpose", false)?.short, "Stopped: Dot could not finish");
+  assert.equal(runFailure("The login page asked for a code.", true)?.short, "Stopped: Dot could not finish");
+});
+
+test("an agent's own report of what it could not do is its answer, and is not rewritten", () => {
+  assert.equal(runFailure("I could not sign in: the site wants a code from your phone.", false), null);
+  assert.equal(runFailure("", false), null);
 });

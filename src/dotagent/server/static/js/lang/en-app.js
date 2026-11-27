@@ -1913,6 +1913,21 @@ export const EN_APP = {
   "approvals.riskLabel": "Risk: {level}",
   "approvals.whyPolicy": "The policy's words: {reason}",
   // Added by hand, for sentences that need their own word order.
+  "errors.taskStopped": "The task stopped",
+  "errors.internalShort": "Stopped: Dot ran into a problem",
+  "errors.internalNext": "Something broke inside Dot. Send a message here to go on, or press Continue; if it happens again, Settings › Self-repair can look into it.",
+  "errors.emptyShort": "Stopped: the model gave no answer",
+  "errors.emptyNext": "The model sent empty replies and could not finish. Send a message here to go on, or choose another model below.",
+  "errors.cutShortShort": "Stopped: the model's replies were cut short",
+  "errors.cutShortNext": "The model's service ended its replies before they were complete. Send a message here to go on, or choose another model below.",
+  "errors.stalledShort": "Stopped: the task was not making progress",
+  "errors.stalledNext": "Dot stopped the task because it kept trying the same thing. Say what to change in a message here to go on.",
+  "errors.limitShort": "Stopped: the task reached its limit",
+  "errors.limitNext": "The task used up the time or tokens it was allowed. Send a message here to go on.",
+  "errors.cutOffShort": "Stopped: Dot was restarted",
+  "errors.cutOffNext": "Dot was closed or restarted while the task worked. Press Continue to pick it up where it stopped.",
+  "errors.notStartedShort": "Stopped: the task could not start",
+  "errors.notStartedNext": "The task could not be started. Send the message again.",
   // Added by hand, for sentences that need their own word order.
   "outcome.stoppedNote": "Stopped",
   // Added by hand, for sentences that need their own word order.
@@ -1995,4 +2010,6 @@ export const EN_APP = {
   "vaultitems.updatedThePasswordOfPart": "Updated the password of {part} already in the vault{value}. The password each had before is kept in its notes, in case the file's was the older one.",
   "vaultitems.leftOutSkippedOfRows": "Left out {skipped} of {rows} rows: {join}.",
   // Added by hand, for sentences that need their own word order.
+  "errors.faultShort": "Stopped: Dot could not finish",
+  "errors.faultNext": "Dot could not finish this task. What was done stays. Send a message here to go on, or press Continue.",
 };

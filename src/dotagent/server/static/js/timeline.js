@@ -1154,6 +1154,7 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         reactions: isRoot ? reactions : null,
         runId: scope.runId,
         stoppedWords,
+        errored: typeof record.data.error === "object" && record.data.error !== null,
       });
       showSources(answer, scope.reads);
       place(scope, answer, record.ts);

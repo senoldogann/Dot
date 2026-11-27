@@ -156,6 +156,54 @@ export function serviceFailure(line) {
 // it in the owner's language and does not show these words.
 export const STOPPED_RESULT = "The run was stopped.";
 
+// What the harness writes as a failed run's last words when the run ended for a reason of its own (`store/endings.py`),
+// each with the sentence that says what to do (item 25 of the 2026-11-26 review): a chat that ended so says it plainly,
+// and the words the program used stand under Details.
+/** @type {[RegExp, import("./i18n.js").WordKey, import("./i18n.js").WordKey][]} */
+const HARNESS_ENDINGS = [
+  [/^Internal error: /, "errors.internalShort", "errors.internalNext"],
+  [/^The model returned empty replies and did not finish\./, "errors.emptyShort", "errors.emptyNext"],
+  [/^The model's replies were cut short/, "errors.cutShortShort", "errors.cutShortNext"],
+  [/^Stopped: the agent (?:kept repeating the same failing actions|was not making progress)/, "errors.stalledShort", "errors.stalledNext"],
+  [/^Stopped: the run reached its limit/, "errors.limitShort", "errors.limitNext"],
+  [/^(?:daemon stopped while the run was active|The daemon was shut down while this run was active\.|The dotx command that drove this run )/, "errors.cutOffShort", "errors.cutOffNext"],
+  [/^The run could not be started\./, "errors.notStartedShort", "errors.notStartedNext"],
+];
+
+/**
+ * A run's last words read as an ending the harness wrote (a fault inside Dot, empty replies, a stall, a limit, a restart),
+ * or null for any other words (the agent's own report). `recorded` says the run's end carried an error of the daemon's
+ * (the `error` of its `run_finished`); without it, words that begin in lower case are a line of a log, which an agent's
+ * own report, a sentence, never is. `title` says what happened in a few words, `short` the same for a chat's line in the
+ * sidebar, `next` what the owner can do, and `details` the words as they were recorded.
+ * @param {string} line
+ * @param {boolean} recorded
+ * @returns {{ title: string, short: string, next: string, details: string } | null}
+ */
+function harnessFailure(line, recorded) {
+  const text = line.trim();
+  const found = HARNESS_ENDINGS.find(([pattern]) => pattern.test(text));
+  if (found !== undefined) {
+    return { title: t("errors.taskStopped"), short: t(found[1]), next: t(found[2]), details: text };
+  }
+  if (text !== "" && (recorded || /^[a-z]/.test(text))) {
+    return { title: t("errors.taskStopped"), short: t("errors.faultShort"), next: t("errors.faultNext"), details: text };
+  }
+  return null;
+}
+
+/**
+ * A failed run's last words as a failure the owner reads plainly: a model service's (`serviceFailure`) or one the harness
+ * wrote (`harnessFailure`); null for the agent's own report, which is its answer and stays as it is.
+ * @param {string} line
+ * @param {boolean} recorded whether the run's end carried an error of the daemon's
+ * @returns {{ title: string, short: string, next: string, details: string } | null}
+ */
+export function runFailure(line, recorded) {
+  const service = serviceFailure(line);
+  return service === null ? harnessFailure(line, recorded) : { title: t("errors.serviceStopped"), short: service.short, next: service.next, details: service.details };
+}
+
 /**
  * The model a refused message named and the one the daemon offers instead (null when none can answer), or null when
  * `error` is no such refusal.
