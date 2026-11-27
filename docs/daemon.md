@@ -817,10 +817,13 @@ parts has something to say and goes when none has. The plan's part opens the pla
 composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side
 panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
 part closes it. It does not say what the run does now, which the conversation shows, nor count
-the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
+the commands at work in the chat, which stand right under it. An interrupted chat stream is reported in the capsule
+while Dot is reachable. During a daemon outage the shared line under the bar shows *Mac asleep or unreachable
+since HH:MM*. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
+**Waiting on 2 helpers** (only while the run has stopped for them), **Chat updates interrupted**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 **Waiting on 2 helpers** while the run has stopped for them, **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
@@ -1359,15 +1362,25 @@ tells of.
 
 Ctrl-C stops the daemon: the runs that are going on are cancelled, and the browser and the other services are closed.
 
-While a run of its own, a run of a `dotx` command it relays, a schedule's run or a meeting works, the daemon keeps the
-Mac from idle sleep (item 1671, `[daemon] keep_awake`, on by default): it holds `caffeinate -i -w <its pid>` from the
-first work on until `[daemon] keep_awake_after_s` (60) seconds after the last one ended, which bridges a run and the
-next one its queue or a schedule starts, and looks every 2 s. It is a child `caffeinate` rather than a power assertion
-made in the daemon's own process: `-w` lets it go when the daemon ends however it ends, a crash too, and `pmset -g
-assertions` names it. It holds on power and on battery; the display still sleeps, and a closed lid still puts a MacBook
-to sleep. `GET /api/health` and `GET /api/status` say `awake`: `holding`, `idle` or `off`, and `dotx service status`
-says it in a line. The phone's `[server] keep_awake` (`caffeinate -s` while the Mac charges, item 271) is a hold of its
-own.
+Dot holds a temporary macOS idle-sleep assertion while a task or meeting is active, while a watcher is checking,
+and within three minutes of an enabled routine or watcher coming due. `[daemon] keep_awake` is on by default.
+Dot checks every two seconds and releases the assertion `[daemon] keep_awake_after_s` seconds after it last
+needed it (60 by default). Frequent checks can keep the assertion active across intervals.
+
+While the hold is active, run `pmset -g assertions`. In a macOS check on 2026-11-27, Dot's
+`caffeinate -i -w <pid>` adapter produced this entry. The PID after *Created for PID* identified the process
+holding it through Dot.
+
+```text
+pid 44382(caffeinate): [0x000c3b4300018de4] 00:00:00 PreventUserIdleSystemSleep named: "caffeinate command-line tool"
+    Created for PID: 44359.
+```
+
+`dotx service status`, `GET /api/health` and `GET /api/status` report whether the assertion is holding, idle or off.
+It works on battery and mains power and the display can still sleep. A Mac already asleep stays asleep.
+Closing a MacBook lid on battery, putting the Mac to sleep manually or powering it off still stops work.
+Dot changes no macOS power settings. The assertion ends with the daemon, including on a crash. The phone's
+`[server] keep_awake` option uses a separate `caffeinate -s` assertion while the Mac charges.
 
 The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any other address: `[server] host` is
 `127.0.0.1`, `localhost` or `::1`, written so (another spelling of a loopback address, such as `127.0.0.2` or `::1` in

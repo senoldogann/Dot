@@ -622,6 +622,20 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// Item 2018: Dot's first words stand under the owner's message as one of its short messages, with the steps shown and
+    /// with Show steps off.
+    func testTheFirstWordsStandUnderTheOwnersMessageWithAndWithoutTheSteps() {
+        for defaults in [["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", "{}"], ["-showSteps", "NO", "-stepsOverrides", "{}"]] {
+            let app: XCUIApplication = launch("n2-chat", defaults: defaults)
+            let words: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Looking at next week's calendar first.")).firstMatch
+            // The chat opens at its newest words; the first words stand near the run's start, above them.
+            for _ in 0..<6 where !words.waitForExistence(timeout: 2) { app.swipeDown() }
+            for _ in 0..<6 where !words.exists { app.swipeUp() }
+            XCTAssertTrue(words.waitForExistence(timeout: 15), "\(defaults): the first words")
+            app.terminate()
+        }
+    }
+
     /// Item 1932: the asks scene settles: once it stood still for a few seconds, the screen is not drawn again (its
     /// scroll followed the lazy stack's own height estimates in a loop, at 100 % CPU).
     func testTheAsksSceneSettles() {
@@ -636,14 +650,13 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
-    /// Item 1931 and the owner's report of 2026-11-27: with no link, the capsule says Offline in the status's place once
-    /// it lasted a few seconds, and offers no Stop; the header keeps the bot's face and name, no link words.
-    func testThePillSaysOfflineWithoutALink() {
+    /// A lasting outage shows the last contact in the capsule without adding link text to the header.
+    func testThePillShowsTheLastContactWithoutALink() {
         let app: XCUIApplication = launch("n2-offline-saved")
         let link: XCUIElement = app.buttons["capsule.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
-        XCTAssertEqual(link.label, "Offline")
-        for words in ["Syncing", "Reconnecting", "Offline ·"] {
+        XCTAssertEqual(link.label, "Mac asleep or unreachable since 14:05")
+        for words in ["Syncing", "Reconnecting", "Mac asleep or unreachable"] {
             XCTAssertFalse(
                 app.navigationBars.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", words)).firstMatch.exists, "no link words in the header: \(words)")
         }
@@ -652,6 +665,12 @@ final class ChatUITests: XCTestCase {
         shot.name = "pill-offline"
         shot.lifetime = .keepAlways
         add(shot)
+
+        app.terminate()
+        let list: XCUIApplication = launch("n2-offline-list")
+        let listLink: XCUIElement = list.staticTexts["chats.link"]
+        XCTAssertTrue(listLink.waitForExistence(timeout: 15))
+        XCTAssertEqual(listLink.label, "Mac asleep or unreachable since 14:05")
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {

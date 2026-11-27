@@ -389,7 +389,7 @@ from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.search_chats import SEARCH_CHATS_TOOL
 from dotagent.tools.skill import skill_instructions
 from dotagent.tools.team import CREATE_AGENT_TOOL, CREATE_TEAM_TOOL, MESSAGE_AGENT_TOOL
-from dotagent.tools.terminal import chatless_specs, tells_no_chat
+from dotagent.tools.terminal import terminal_specs_for_run
 from dotagent.tools.work_orders import ASSIGN_WORK_TOOL, WORK_ORDER_TOOLS
 from dotagent.vault.onepassword import kept_token
 
@@ -3046,9 +3046,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name not in NOT_FOR_DELEGATED_RUNS)
     if run.campaign_id is None:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
-    # No chat is told of the end of a command in the background of a delegated run or a campaign's session (item 1760).
-    if tells_no_chat(run):
-        specs = chatless_specs(specs)
+    specs = terminal_specs_for_run(specs, run)
     # The agent the run belongs to (item 86) bounds its tools: the ones it names, the core tools in any case, and the
     # MCP servers the owner opened to it (item 415): the ones picked for its message or an earlier one of its chat.
     agent_record: AgentRecord | None = reads.agent_record

@@ -26,6 +26,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     # A reply, a summary, a stream, a record of a step, the tail of a log, the errors of a server: the model's own words
     # and what was done, masked where they are made.
     "agent/aside.py:answer_aside": (True,),
+    # Dot's first words in a chat (item 2018): the fast model's line, which may repeat a key the owner's message holds.
+    "agent/first_words.py:_spoken_line": (True,),
     # The events of a call, then what its tool returned (item 857: before the run reads it).
     "agent/executor.py:_execute_one": (True, True),
     "agent/executor.py:_record_yolo": (True,),

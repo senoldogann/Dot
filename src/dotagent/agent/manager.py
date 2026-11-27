@@ -37,6 +37,7 @@ from dotagent.agent.campaign import (
     render_brief,
     sessions_without_progress,
 )
+from dotagent.agent.first_words import tell_first_words, tells_first_words
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.held_notes import dismiss_held_note, save_held_note
 from dotagent.agent.helper_check import check_helper_result
@@ -5290,6 +5291,7 @@ class RunManager:
         lessons: LessonCase | None = None
         restated: tuple[int, ...] = ()
         goal_blocked: bool = False
+        first_words: asyncio.Task[None] | None = None
         try:
             async with self._place_for(run):
                 if not await runtime.store.set_run_status(run.id, "running"):
@@ -5298,6 +5300,9 @@ class RunManager:
                 await runtime.bus.emit(
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
+                # The owner hears Dot at once, while the run gets ready and takes its first step (item 2018).
+                if tells_first_words(run.source, run.parent_run_id, runtime.config.agent.first_words, UI_SOURCE):
+                    first_words = asyncio.create_task(tell_first_words(runtime, run))
                 agent: AgentRun = AgentRun(runtime, run, gate, cancel, inbox, self, opening)
                 # The other runs know it from now on, and what it holds (item 301).
                 runtime.peers.begin(run.id, run.thread_id, run.goal)
@@ -5338,6 +5343,8 @@ class RunManager:
             status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)
         finally:
+            if first_words is not None:
+                first_words.cancel()
             runtime.peers.end(run.id)
             inbox.shutdown()
             if status != "done" and any(one.parent_run_id == run.id for one in self._detached.values()):

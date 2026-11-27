@@ -1241,7 +1241,6 @@ export const EN_APP = {
   "shell.release": "Release",
   "shell.dotWasUpdatedSinceThis": "Dot was updated since this page was loaded. Load it again to use the new version.",
   "shell.loadAgain": "Load again",
-  "shell.connectionToDotValue": "Connection to Dot: {value}",
   "shell.back": "Back",
   "shell.showSidebar": "Show sidebar",
   "shell.colourSchemeLabel": "Colour scheme: {label}",

@@ -176,9 +176,7 @@ struct HomeList: View {
         if let dot = bots.first {
             featured(dot).id(dot.id)
         }
-        if let line = freshnessLine(
-            freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
-        {
+        if let line = listStatus(model) {
             Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).padding(.bottom, Space.s)
         }
         // A new chat still in the outbox (not yet taken by the Mac) shows at once, with where it stands.

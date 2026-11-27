@@ -447,7 +447,7 @@ async def test_what_dot_asks_is_its_own_card_over_the_capsule_which_says_the_run
             await browser.close()
 
 
-async def test_a_chat_at_rest_has_no_capsule_and_a_lost_stream_is_said_in_it(login_env: dict[str, str]) -> None:
+async def test_a_chat_at_rest_has_no_capsule_and_a_daemon_outage_is_said_once(login_env: dict[str, str]) -> None:
     async with scene(login_env, "rest") as sc, async_playwright() as playwright:
         browser: Browser = await playwright.webkit.launch(headless=True)
         try:
@@ -462,11 +462,12 @@ async def test_a_chat_at_rest_has_no_capsule_and_a_lost_stream_is_said_in_it(log
         try:
             page = await _page(browser, sc, 390, 844, "light")
             await expect(_segment(page, "status")).to_contain_text("Waiting on 2 helpers")
-            # The daemon goes away: the page lost its stream and says so once, in the capsule.
+            # A daemon-wide outage is shown once, even when the run stream also drops.
             sc.stop_serving()
-            await expect(_segment(page, "status")).to_have_text("Can't reach Dot", use_inner_text=True, timeout=30000)
-            await expect(_segment(page, "status")).to_have_attribute("data-tone", "warn")
-            # The note under the top bar is not drawn on a phone, and the Stop stays.
+            await expect(page.locator(".link-line:not([hidden])")).to_have_text(
+                re.compile(r"^Mac asleep or unreachable since \d{2}:\d{2}$"), timeout=30_000
+            )
+            await expect(_segment(page, "status")).not_to_contain_text("Chat updates interrupted")
             await expect(page.locator(".connection-slot .note")).to_be_hidden()
             await expect(_segment(page, "stop")).to_be_visible()
         finally:

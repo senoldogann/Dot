@@ -70,6 +70,13 @@ export function callPhrase(tool, args) {
   return t(PHRASES[kind] ?? PHRASES.other);
 }
 
+/** Dot's first words in a chat (a `first_words` event, item 2018): the fast model's line, or the words said at once
+ * when it has none ("Looking into it…"). */
+export function firstWordsPhrase(text) {
+  const line = text.trim();
+  return line === "" ? t("work.firstWords") : line;
+}
+
 /** How long a run has worked, as the line says it beside its words ("12 s", "3 min"). */
 export function workedFor(seconds) {
   const whole = Math.max(0, Math.floor(seconds));

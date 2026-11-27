@@ -136,12 +136,13 @@ final class ChatWordsTests: XCTestCase {
     /// Item 1931 and the owner's report of 2026-11-27: only a lasting problem is told, never a reconnection that mends or
     /// a chat being brought up to date.
     func testTheCapsulesLinkLineIsALastingProblemOnly() {
-        XCTAssertEqual(linkLine(transport: .offline, mac: "MacBook Air"), .offline)
-        XCTAssertEqual(linkLine(transport: .reconnecting(attempt: 2), mac: "MacBook Air"), .unreachable(mac: "MacBook Air"))
-        XCTAssertNil(linkLine(transport: .up, mac: "MacBook Air"), "a healthy stream says nothing, whatever the chat's sync")
-        XCTAssertNil(linkLine(transport: .connecting, mac: "MacBook Air"), "the first connection says nothing")
-        XCTAssertNil(linkLine(transport: .keyRefused, mac: "MacBook Air"), "a refused key is the chat's notice")
-        XCTAssertTrue(LinkLine.unreachable(mac: "MacBook Air").words.contains("MacBook Air"), "the paired Mac by its name, in the phone's language")
+        let known: LinkLine = LinkLine(lastContact: 1_700_000_000)
+        XCTAssertEqual(linkLine(transport: .offline, lastContact: known.lastContact), known)
+        XCTAssertEqual(linkLine(transport: .reconnecting(attempt: 2), lastContact: known.lastContact), known)
+        XCTAssertNil(linkLine(transport: .up, lastContact: known.lastContact))
+        XCTAssertNil(linkLine(transport: .connecting, lastContact: known.lastContact))
+        XCTAssertNil(linkLine(transport: .keyRefused, lastContact: known.lastContact))
+        XCTAssertEqual(linkLine(transport: .offline, lastContact: nil), LinkLine(lastContact: nil))
         XCTAssertEqual(linkLineDelay, .seconds(5), "a problem shows once it lasted a few seconds")
     }
 

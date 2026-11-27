@@ -1242,7 +1242,6 @@ export const TR_APP = {
   "shell.release": "Serbest bırak",
   "shell.dotWasUpdatedSinceThis": "Bu sayfa yüklendikten sonra Dot güncellendi. Yeni sürümü kullanmak için yeniden yükleyin.",
   "shell.loadAgain": "Yeniden yükle",
-  "shell.connectionToDotValue": "Dot ile bağlantı: {value}",
   "shell.back": "Geri",
   "shell.showSidebar": "Kenar çubuğunu göster",
   "shell.colourSchemeLabel": "Renk düzeni: {label}",

@@ -29,7 +29,7 @@ import { blockNode, prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { callKind, describeArguments, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, shortPaths, toolRow, toolWords } from "./tools.js";
 import { detailsFold } from "./ui.js";
-import { callPhrase } from "./workstatus.js";
+import { callPhrase, firstWordsPhrase } from "./workstatus.js";
 
 const GOAL_CHARS = 160;
 const LATEST_CHARS = 140;
@@ -186,12 +186,13 @@ function sayKind(node, progress, live) {
 
 // What stands between two of the agent's lines without anyone else speaking: its steps, thoughts and notes, and what
 // it asks or shows on the way (a card, a hand-off to an agent, a page, a restart).
-const NOT_SPEAKING = "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart";
+// Dot's first words (item 2018) come before the run's own and leave its first message its speaker's name.
+const NOT_SPEAKING = "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart, .say-first";
 
 /** Whether a line of the agent's put at the end of `container` is the first since someone else spoke. */
 function speaksFirst(container) {
   for (let at = container.lastElementChild; at !== null; at = at.previousElementSibling) {
-    if (at.matches(".bubble.say")) {
+    if (at.matches(".bubble.say:not(.say-first)")) {
       return false;
     }
     if (!at.matches(NOT_SPEAKING)) {
@@ -1332,6 +1333,22 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         scope.panel.helper.calls += 1;
       }
       showCall(scope, { id: data.call_id, tool: data.tool, args: data.args });
+    },
+
+    // Dot's first words (item 2018): said at once as the run starts, then the fast model's line of what it looks at first
+    // in their place, while the run had said nothing. They are Dot's words, not a step: drawn in every way of showing
+    // the work.
+    first_words(scope, record) {
+      if (scope.runId !== rootRunId) {
+        return;
+      }
+      const words = el("div", null, prose(firstWordsPhrase(record.data.text ?? "")));
+      const shown = scope.container.querySelector(":scope > .say-first");
+      if (shown !== null) {
+        shown.replaceChildren(words);
+        return;
+      }
+      scope.container.append(el("div", { class: "bubble say say-first", role: "article", "aria-label": t("outcome.update") }, words));
     },
 
     tool_result(scope, record) {

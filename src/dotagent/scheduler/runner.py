@@ -374,6 +374,24 @@ class Scheduler:
         """Whether a reflection is under way."""
         return self._reflecting is not None and not self._reflecting.done()
 
+    async def routine_due_near(self, now: float, window_s: float) -> bool:
+        """Whether a firing is starting, or an enabled routine is due around now.
+
+        A little time after the due time lets the next tick pick it up. A paused or long-overdue routine should not
+        hold an idle Mac awake indefinitely.
+        """
+        if self._starting:
+            return True
+        for record in await self._runtime.store.due_schedules(now + window_s):
+            if (
+                record.next_run_at is not None
+                and record.next_run_at >= now - window_s
+                and await self._paused_agent(record) is None
+                and not await self._waits_after_failure(record, now + window_s)
+            ):
+                return True
+        return False
+
     async def tick(self, now: float) -> None:
         """Fire every switched-on schedule that is due at ``now``, start the next session of every active campaign
         that is, and start the reflection when its time has come. A campaign's session is never skipped as overdue:
