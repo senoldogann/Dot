@@ -45,6 +45,9 @@
         case helpersWait = "n2-helpers"
         /// The first run a schedule fired (owner 2026-11-27): its message is the routine's compact row, not a bubble.
         case routine = "n2-routine"
+        /// A long finished chat: 24 turns, each with tool rows, Dot's words between them and an answer of headings,
+        /// lists, a table, a code block and links, the scroll check's chat (`UITests/ChatScrollUITests.swift`).
+        case long = "n2-long"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -67,6 +70,12 @@
             snapshot.online = linked
             if self == .offlineSaved { snapshot.savedAt[Self.thread] = now - 240 }
             let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : self == .offlineSaved ? .cached : .live
+            if self == .long {
+                snapshot.chats[Self.thread] = ChatProjection.drawn(
+                    view: decode(LongChat.viewJSON(now: now)), events: decode(LongChat.eventsJSON(now: now)), freshness: freshness)
+                snapshot.list = ListProjection.drawn(rows: decode(rowsJSON(now: now)))
+                return snapshot
+            }
             if self != .offline {
                 let view: ThreadView = decode(viewJSON(now: now))
                 var chat: ChatProjection = ChatProjection.drawn(view: view, events: decode(eventsJSON(now: now)), freshness: freshness)
@@ -263,6 +272,78 @@
             """
             [{"summary":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"pinned_at":null,"run_count":2,"latest_run_id":"run_b","latest_status":"running","latest_created_at":\(now - 2475),"unread":false,"actor_id":null,"last_message":"Book me the dentist","last_role":"user"},"revision":7,"asks":\(self == .asks || self == .question ? 2 : 0)}]
             """
+        }
+    }
+
+    /// The long chat of `ChatFixture.long`: turns of a working week, each an owner's message, tool rows, Dot's words and
+    /// a markdown answer with every kind of block the answer draws.
+    enum LongChat {
+        static let turns: Int = 24
+
+        static func viewJSON(now: Double) -> String {
+            let runs: String = (0..<turns).map { turn in
+                let start: Double = now - Double(turns - turn) * 600
+                return #"{"id":"run_l\#(turn)","thread_id":"thr_fixture","goal":"\#(goal(turn))","mode":"task","model":"claude_code:opus","status":"done","created_at":\#(start),"finished_at":\#(start + 300),"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":48210,"output_tokens":3120,"approvals":"auto"}"#
+            }.joined(separator: ",")
+            return """
+                {"revision":7,
+                 "thread":{"id":"thr_fixture","title":"The website's week","source":"phone","created_at":\(now - 86400),"updated_at":\(now),"agent_id":null},
+                 "summary":null,"runs":[\(runs)],
+                 "older":false,"newest":null,"newest_events":[],"newest_events_cut":false,
+                 "queue":{"held":false,"messages":[],"beside_run_id":null,"beside_thread_id":null},
+                 "asks":[],
+                 "helpers":[
+                   {"run_id":"run_lh1","parent_run_id":"run_l\(turns - 1)","thread_id":"thr_h1","agent_id":null,"title":"Check the links of every page","status":"done","started_at":\(now - 500),"finished_at":\(now - 400),"provider":"claude_code","model":"sonnet","effort":"low","step":null,"blocking":false,"stop":"/api/runs/run_lh1/cancel"},
+                   {"run_id":"run_lh2","parent_run_id":"run_l\(turns - 1)","thread_id":"thr_h2","agent_id":null,"title":"Measure the pages' load times","status":"done","started_at":\(now - 500),"finished_at":\(now - 380),"provider":"claude_code","model":"sonnet","effort":"low","step":null,"blocking":false,"stop":"/api/runs/run_lh2/cancel"}
+                 ],
+                 "background":[],"reactions":[],"drafts":[]}
+                """
+        }
+
+        static func eventsJSON(now: Double) -> String {
+            var events: [String] = []
+            var id: Int = 1
+            func add(_ run: String, _ ts: Double, _ kind: String, _ data: String) {
+                events.append(#"{"id":\#(id),"run_id":"\#(run)","ts":\#(ts),"kind":"\#(kind)","data":\#(data)}"#)
+                id += 1
+            }
+            for turn in 0..<turns {
+                let run: String = "run_l\(turn)"
+                let start: Double = now - Double(turns - turn) * 600
+                add(run, start + 1, "tool_call", #"{"call_id":"c\#(turn)a","tool":"read_file","args":{"path":"~/Projects/site/src/page\#(turn).tsx"}}"#)
+                add(run, start + 3, "tool_result", #"{"call_id":"c\#(turn)a","ok":true,"text":"export default function Page() { return null }"}"#)
+                add(run, start + 4, "assistant", #"{"text":"Read the page; running its tests next.","thinking":"The page renders nothing; check the tests first.","step":2}"#)
+                add(run, start + 5, "tool_call", #"{"call_id":"c\#(turn)b","tool":"shell","args":{"command":"pnpm vitest run src/page\#(turn).test.tsx"}}"#)
+                add(run, start + 40, "tool_result", #"{"call_id":"c\#(turn)b","ok":true,"text":"12 passed"}"#)
+                add(run, start + 41, "tool_call", #"{"call_id":"c\#(turn)c","tool":"browser_open","args":{"url":"https://example.com/page\#(turn)"}}"#)
+                add(run, start + 45, "tool_result", #"{"call_id":"c\#(turn)c","ok":true,"text":"opened"}"#)
+                if turn == turns - 1 {
+                    add(run, start + 46, "tool_call", #"{"call_id":"c\#(turn)d","tool":"delegate","args":{"goal":"Check the links of every page"}}"#)
+                    add(run, start + 47, "tool_result", #"{"call_id":"c\#(turn)d","ok":true,"text":"started"}"#)
+                }
+                add(run, start + 300, "run_finished", #"{"status":"done","result":"\#(answer(turn))"}"#)
+            }
+            return "[" + events.joined(separator: ",") + "]"
+        }
+
+        private static func goal(_ turn: Int) -> String {
+            ["Why does page \(turn) load slowly on the phone?", "Fix the layout of page \(turn) and show me what changed", "Compare the two builds of page \(turn)"][turn % 3]
+        }
+
+        /// An answer with a heading, a paragraph with inline code, bold and links, a list, a table, a code block and a
+        /// quote, as a JSON string (escaped newlines, no quote or backslash in the words).
+        private static func answer(_ turn: Int) -> String {
+            let rows: String = (1...6).map { "| /page\(turn)/part\($0) | \($0 * 37) ms | \($0 * 120) KB | `cache-control: max-age=\($0 * 60)` |" }.joined(separator: "\\n")
+            let code: String = (1...14).map { "  const part\($0) = await load(`/page\(turn)/part\($0)`, { retries: \($0 % 3), timeout: 30_000 });" }.joined(separator: "\\n")
+            return [
+                "## Page \(turn): what was slow",
+                "The page waited on **\(turn % 5 + 2) requests** in a row before it drew anything; `load()` now runs them together. See [the change](https://github.com/example/site/pull/\(1000 + turn)) and https://example.com/page\(turn) for the result.",
+                "- The first paint moved from 2.4 s to 0.9 s on a mid-range phone\\n- The images are served at the size they are shown\\n- The fonts load once, from the same origin\\n1. Merge the change\\n2. Watch the field data for a week",
+                "| Part | Time | Size | Header |\\n|---|---|---|---|\\n" + rows,
+                "```ts\\nexport async function page\(turn)() {\\n" + code + "\\n}\\n```",
+                "> The slow part was never the server: it answered in 40 ms. It was the order of the requests.",
+                "The notes are in `~/Desktop/notes/page\(turn).md`.",
+            ].joined(separator: "\\n\\n")
         }
     }
 #endif

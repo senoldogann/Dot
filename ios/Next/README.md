@@ -224,6 +224,17 @@ of the chat open, the home and the background (`StreamingLiveUITests.testAStream
 process's CPU milliseconds and wakeups a second (the kernel's `TASK_POWER_INFO`), the pictures published and the reveal's
 steps a second and the bytes read and sent a minute, in `Library/Caches/dotnext-phases.txt`.
 
+The scroll of a long chat is measured on the fixture `n2-long` (24 turns of tool rows and answers with a heading, a
+list, a table, a code block, a quote and links). `ios/Next/scripts/scroll.sh <simulator or iPhone id> <derived data>`
+builds Debug optimized like Release (`SWIFT_OPTIMIZATION_LEVEL=-O`) and runs `ChatScrollUITests`: 16 flicks up and down
+in each tool mode, with the frame meter's line per flick (`-DotNextScrollMeter 1`: from the touch until the list stands
+still) and the render meter's count of the chat screen's drawings, which must stay at most 2 (a scroll moves rows, it
+does not build the chat again), and XCTest's scroll metric (`testScrollHitchesOfALongChat`; its hitch ratio only on a
+device). An iPhone whose UI automation is off (Settings › Developer) is measured by `ios/Next/scripts/autoscroll.sh
+<iPhone id> <derived data> [mode]`: `-DotNextAutoScroll 1` glides the transcript to its top and back twice at 3000 points a
+second and the frame meter writes each pass. Attach Time Profiler (`xcrun xctrace record --template 'Time Profiler'
+--attach <pid>`) to an autoscroll to see what the main thread does while rows come into sight.
+
 ## A chat's message actions and the inspector, end to end
 
 `scripts/e2e_chat_actions.sh <udid> <derived data> <shots folder>` (inside the Xcode lock) makes six chats on a

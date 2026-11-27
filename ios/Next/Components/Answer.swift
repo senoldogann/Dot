@@ -1,5 +1,6 @@
 import DotEngine
 import SwiftUI
+import Synchronization
 
 /// Dot's answer as plain markdown (plan §4.1): headings, paragraphs, lists, tables that scroll sideways, quotes, rules
 /// and code blocks with a header row; links in the ink and underlined. Selectable; a long press offers Copy.
@@ -148,10 +149,19 @@ struct TableBlock: View {
     let header: [AttributedString]
     let rows: [[AttributedString]]
     @State private var width: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+    @Environment(\.legibilityWeight) private var legibilityWeight: LegibilityWeight?
 
     var body: some View {
+        let cells: [AttributedString] = header + rows.flatMap { $0 }
+        let measures: TableMeasureKey = TableMeasureKey(
+            cells: tableSignature(header: header, rows: rows), type: dynamicTypeSize, bold: legibilityWeight == .bold,
+            siteIcons: SiteIconBook.shared.drawnIcons(of: siteMarks(cells), side: referenceSide(role: .footnote, type: dynamicTypeSize)))
         ScrollView(.horizontal) {
-            TableGrid(columns: header.count, fit: max(0, width - Space.s * 2), spacing: Space.m, rowSpacing: Space.xs) {
+            TableGrid(
+                columns: header.count, fit: max(0, width - Space.s * 2), spacing: Space.m, rowSpacing: Space.xs,
+                measures: measures
+            ) {
                 ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
                     ReferenceText(text: cell, role: .footnote).fontWeight(.semibold).foregroundStyle(Tone.text)
                 }
@@ -173,31 +183,105 @@ struct TableBlock: View {
     }
 }
 
+/// What a table's cells measure by: the cells as drawn (`tableSignature`), the text size, Bold Text, and how many of the
+/// cells' sites already have their icon at the size the cells draw it (an icon that arrives takes the place of a globe
+/// of another width). Made once per drawing of the table, so a layout's lookup hashes one string.
+struct TableMeasureKey: Hashable, Sendable {
+    let cells: String
+    let type: DynamicTypeSize
+    let bold: Bool
+    let siteIcons: Int
+}
+
+/// The cells of a table as they are drawn: each run's words with what decides their width (bold, italic, code and
+/// strikethrough, a link's underline, the mark of a reference), so two tables of the same characters in other styles
+/// never share their sizes; the header's cells first. Pure.
+func tableSignature(header: [AttributedString], rows: [[AttributedString]]) -> String {
+    ([header] + rows).map { row in
+        row.map { cell in
+            cell.runs.map { run in
+                let words: String = String(cell[run.range].characters)
+                let intent: UInt = run.inlinePresentationIntent?.rawValue ?? 0
+                let mark: String = run.referenceMark.map { "\($0)" } ?? ""
+                return "\(words)\u{1F}\(intent)\u{1F}\(run.link != nil)\u{1F}\(mark)"
+            }.joined(separator: "\u{1E}")
+        }.joined(separator: "\u{1D}")
+    }.joined(separator: "\u{1C}")
+}
+
+/// The sites whose icons the cells draw before their links. Pure.
+func siteMarks(_ cells: [AttributedString]) -> [URL] {
+    cells.flatMap { cell in
+        cell.runs.compactMap { run -> URL? in
+            if case .site(let url)? = run.referenceMark { return url }
+            return nil
+        }
+    }
+}
+
+/// The sizes of answers' tables, kept while the app runs (owner 2026-11-27: scrolling a long chat stuttered; each table
+/// that came into sight measured every cell on one line and again at its column's width, for each of its two layouts,
+/// before and after it knew its width: 47 % of the main thread's layout work while the chat scrolled). The one-line sizes
+/// are kept by the table's `TableMeasureKey`, the plans by that and the room; a table seen again measures nothing. Layout
+/// runs outside the main actor's isolation, so the book is behind a lock; at most 200 tables' sizes and 400 plans (a
+/// table's before and after it knows its width) are kept, the oldest forgotten all at once.
+enum TableMeasures {
+    struct PlanKey: Hashable, Sendable {
+        let measures: TableMeasureKey
+        let fit: CGFloat
+    }
+
+    struct Book {
+        var natural: [TableMeasureKey: [[CGSize]]]
+        var plans: [PlanKey: TableGrid.Plan]
+    }
+
+    static let book: Mutex<Book> = Mutex(Book(natural: [:], plans: [:]))
+    static let kept: Int = 200
+
+    static func natural(_ measures: TableMeasureKey) -> [[CGSize]]? { book.withLock { $0.natural[measures] } }
+
+    static func plan(_ key: PlanKey) -> TableGrid.Plan? { book.withLock { $0.plans[key] } }
+
+    static func keep(natural: [[CGSize]], measures: TableMeasureKey, plan: TableGrid.Plan, key: PlanKey) {
+        book.withLock { book in
+            if book.natural.count >= kept { book.natural = [:] }
+            if book.plans.count >= kept * 2 { book.plans = [:] }
+            book.natural[measures] = natural
+            book.plans[key] = plan
+        }
+    }
+}
+
 /// The grid of an answer's table: the header's cells, a rule, then the rows' cells, `columns` to a row. The columns'
 /// widths come from `tableColumnWidths` (their widest cell on one line, the widest wrapping first to fit `fit`); each
-/// row is as tall as its tallest cell at those widths, so a wrapped cell never draws over the next row.
+/// row is as tall as its tallest cell at those widths, so a wrapped cell never draws over the next row. The sizes are
+/// kept by `measures` (`TableMeasures`): a cell is measured on one line once, and only a cell its column wraps is
+/// measured again at that column's width.
 struct TableGrid: Layout {
     let columns: Int
     let fit: CGFloat
     let spacing: CGFloat
     let rowSpacing: CGFloat
+    /// What the cells measure by (`TableMeasureKey`).
+    let measures: TableMeasureKey
 
     /// The narrowest a column wraps to, and the widest a column's ideal is taken as before the table knows its width.
     static let minimumColumn: Double = 96
     static let unmeasuredColumn: CGFloat = 260
 
-    struct Plan {
+    struct Plan: Sendable {
         var widths: [CGFloat]
         var heights: [CGFloat]
         var size: CGSize
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        plan(subviews).size
+        planned(subviews).size
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let plan: Plan = plan(subviews)
+        let plan: Plan = planned(subviews)
         var y: CGFloat = bounds.minY
         for (row, cells) in rowsOf(subviews).enumerated() {
             var x: CGFloat = bounds.minX
@@ -213,16 +297,33 @@ struct TableGrid: Layout {
         }
     }
 
-    private func plan(_ subviews: Subviews) -> Plan {
+    /// The kept plan of these cells in this room, else one made from their kept one-line sizes (measured the first time).
+    private func planned(_ subviews: Subviews) -> Plan {
+        let key: TableMeasures.PlanKey = TableMeasures.PlanKey(measures: measures, fit: fit)
+        if let kept: Plan = TableMeasures.plan(key) { return kept }
         let rows: [[LayoutSubview]] = rowsOf(subviews)
+        let natural: [[CGSize]] =
+            TableMeasures.natural(measures).flatMap { $0.map(\.count) == rows.map(\.count) ? $0 : nil }
+            ?? rows.map { cells in cells.map { $0.sizeThatFits(.unspecified) } }
+        let made: Plan = plan(rows, natural: natural)
+        TableMeasures.keep(natural: natural, measures: measures, plan: made, key: key)
+        return made
+    }
+
+    /// The columns' widths from the cells' one-line widths; each row as tall as its tallest cell, a cell whose column
+    /// holds its line keeping that line's height and a wrapped one measured at its column's width.
+    private func plan(_ rows: [[LayoutSubview]], natural: [[CGSize]]) -> Plan {
         guard columns > 0, !rows.isEmpty else { return Plan(widths: [], heights: [], size: .zero) }
         let ideal: [Double] = (0..<columns).map { column in
-            Double(rows.compactMap { $0.count > column ? $0[column].sizeThatFits(.unspecified).width.rounded(.up) : nil }.max() ?? 0)
+            Double(natural.compactMap { $0.count > column ? $0[column].width.rounded(.up) : nil }.max() ?? 0)
         }
         let room: Double = fit > 0 ? Double(fit - spacing * CGFloat(columns - 1)) : Double(Self.unmeasuredColumn) * Double(columns)
         let widths: [CGFloat] = tableColumnWidths(ideal: ideal, fit: room, minimum: Self.minimumColumn).map { CGFloat($0) }
-        let heights: [CGFloat] = rows.map { cells in
-            cells.enumerated().map { column, cell in cell.sizeThatFits(ProposedViewSize(width: widths[column], height: nil)).height }.max() ?? 0
+        let heights: [CGFloat] = zip(rows, natural).map { cells, sizes in
+            zip(cells, sizes).enumerated().map { column, cell in
+                widths[column] >= cell.1.width.rounded(.up)
+                    ? cell.1.height : cell.0.sizeThatFits(ProposedViewSize(width: widths[column], height: nil)).height
+            }.max() ?? 0
         }
         let width: CGFloat = widths.reduce(0, +) + spacing * CGFloat(columns - 1)
         let height: CGFloat = heights.reduce(0, +) + rowSpacing * CGFloat(rows.count - 1) + 1 + rowSpacing

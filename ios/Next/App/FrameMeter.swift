@@ -1,5 +1,6 @@
 import QuartzCore
 import SwiftUI
+import UIKit
 
 /// Debug builds: measures the chat's frames while a run works (`-DotNextFrameMeter 1`), the record of the streaming
 /// check (`scripts/e2e_streaming.sh`). A display link counts every frame from the run's start to its end; a frame later
@@ -159,3 +160,80 @@ struct ToggleMeter: ViewModifier {
         }
     }
 }
+
+/// Debug builds with `-DotNextScrollMeter 1`: measures each scroll of a list, from the finger's touch until the list
+/// stands still, and writes its line as "scroll <list>" (`scripts/scroll.sh`); nothing otherwise.
+@MainActor
+enum ScrollMeter {
+    static let meter: FrameMeter = FrameMeter()
+
+    static var enabled: Bool {
+        #if DEBUG
+            UserDefaults.standard.bool(forKey: "DotNextScrollMeter")
+        #else
+            false
+        #endif
+    }
+
+    static func phase(from old: ScrollPhase, to now: ScrollPhase, list: String) {
+        guard enabled else { return }
+        if old == .idle, now != .idle { meter.start() }
+        if now == .idle { meter.stop(label: "scroll " + list) }
+    }
+}
+
+#if DEBUG
+    /// Debug builds with `-DotNextAutoScroll 1`: the chat scrolls itself, for a device whose UI automation is off
+    /// (`scripts/scroll.sh` on an iPhone). Two seconds after the chat shows, its transcript (the window's tallest
+    /// vertical scroll view) glides to its top and back to its end twice at 3000 points a second, the speed of a firm
+    /// flick, while the frame meter measures each pass ("autoscroll up", "autoscroll down"). The rows a pass brings into
+    /// sight are made as a finger's scroll makes them; only the scroll's phases (touch, glide) are not reported.
+    @MainActor
+    enum AutoScroller {
+        static var enabled: Bool { UserDefaults.standard.bool(forKey: "DotNextAutoScroll") }
+        private static var started: Bool = false
+
+        static func start() {
+            guard enabled, !started else { return }
+            started = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                guard let scroll = transcript() else { return }
+                for _ in 0..<2 {
+                    await glide(scroll, toTop: true)
+                    await glide(scroll, toTop: false)
+                }
+            }
+        }
+
+        private static func transcript() -> UIScrollView? {
+            let windows: [UIWindow] = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+            var found: [UIScrollView] = []
+            func walk(_ view: UIView) {
+                if let scroll = view as? UIScrollView, scroll.contentSize.height > scroll.bounds.height * 2 { found.append(scroll) }
+                view.subviews.forEach(walk)
+            }
+            windows.forEach(walk)
+            return found.max { $0.contentSize.height < $1.contentSize.height }
+        }
+
+        private static func glide(_ scroll: UIScrollView, toTop: Bool) async {
+            let meter: FrameMeter = ScrollMeter.meter
+            meter.start()
+            var last: CFTimeInterval = CACurrentMediaTime()
+            while true {
+                try? await Task.sleep(for: .milliseconds(4))
+                let now: CFTimeInterval = CACurrentMediaTime()
+                let step: CGFloat = CGFloat(now - last) * 3000
+                last = now
+                let top: CGFloat = -scroll.adjustedContentInset.top
+                let end: CGFloat = max(top, scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height)
+                let next: CGFloat = toTop ? max(top, scroll.contentOffset.y - step) : min(end, scroll.contentOffset.y + step)
+                scroll.contentOffset.y = next
+                if next == (toTop ? top : end) { break }
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            meter.stop(label: toTop ? "autoscroll up" : "autoscroll down")
+        }
+    }
+#endif

@@ -133,6 +133,13 @@ private func attributedRange(_ range: Range<String.Index>, in words: String, run
     return lower..<upper
 }
 
+/// The size in points that words of `role` are drawn at, at the text size `type` (the environment's, which Settings ›
+/// Appearance may pin), as `TypeRoleModifier` reads it: the size of a reference's mark before them.
+func referenceSide(role: TypeRole, type: DynamicTypeSize) -> CGFloat {
+    let traits: UITraitCollection = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(type))
+    return UIFontMetrics(forTextStyle: role.uiTextStyle).scaledValue(for: role.points.size, compatibleWith: traits)
+}
+
 /// The words of an answer as one `Text`, each reference's mark drawn before it at the size of the words; a site's icon
 /// shows once fetched (`SiteIconBook`), a globe until then.
 struct ReferenceText: View {
@@ -167,10 +174,7 @@ struct ReferenceText: View {
 
     /// The words' size in points at the app's own text size (the environment's, which Settings › Appearance may pin),
     /// as `TypeRoleModifier` reads it.
-    private var side: CGFloat {
-        let traits: UITraitCollection = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
-        return UIFontMetrics(forTextStyle: role.uiTextStyle).scaledValue(for: role.points.size, compatibleWith: traits)
-    }
+    private var side: CGFloat { referenceSide(role: role, type: dynamicTypeSize) }
 
     /// A reference's mark, decorative to VoiceOver (the words after it say what it is).
     private func markText(_ mark: ReferenceMark) -> Text {
@@ -236,9 +240,17 @@ func markStarts(_ text: AttributedString) -> [ReferenceMark?] {
     private var drawn: [String: UIImage] = [:]
     @ObservationIgnored private var asked: Set<String> = []
 
+    /// How many of `sites` have their icon drawn at `side`, the size their words draw them at: a table's cells measure
+    /// by it (`TableMeasureKey`), as an icon takes a globe's place.
+    func drawnIcons(of sites: [URL], side: CGFloat) -> Int {
+        sites.filter { site in bareSite(site).map { drawn[iconKey(site: $0, side: side)] != nil } ?? false }.count
+    }
+
+    private func iconKey(site: String, side: CGFloat) -> String { "\(site)@\(Int(side.rounded()))" }
+
     func icon(for url: URL, side: CGFloat, fetches: Bool) -> UIImage? {
         guard let site: String = bareSite(url) else { return nil }
-        let key: String = "\(site)@\(Int(side.rounded()))"
+        let key: String = iconKey(site: site, side: side)
         if let held: UIImage = drawn[key] { return held }
         if fetches, !asked.contains(key), asked.count < Self.siteIconsAsked {
             asked.insert(key)
