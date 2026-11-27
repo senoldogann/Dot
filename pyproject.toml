@@ -166,5 +166,6 @@ markers = [
     "internet: sends read-only requests to public sites (a search page, a documentation page, and each MCP server and package registry of the plugins' catalogue)",
     "desktop: moves the real pointer and keyboard of this Mac against a local AppKit fixture window",
     "macos: needs macOS itself (its kernel's paths, AppKit or Quartz): left out where PyObjC is not, as on a cloud agent's Linux",
+    "first_words: a run of the owner's chat says its first words, which ask the fast model (a scripted one in these tests); every other test runs with none (tests/conftest.py)",
     "hosted: sends a few tiny requests to the real OpenAI, OpenCode Go, Anthropic and Ollama search services with your own keys, and to Zen's free models through the opencode program",
 ]

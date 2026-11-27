@@ -30,6 +30,7 @@ const CORE = {
   "work.showSteps": "Show the steps",
   "work.hideSteps": "Hide the steps",
   // A line of the run told as a conversation (item 1976): a page it looks at, and how long the run has worked.
+  "work.firstWords": "Looking into it…",
   "work.forSeconds": "{count} s",
   "work.forMinutes": "{count} min",
   // The line over the composer while a task works (capsule.js).
