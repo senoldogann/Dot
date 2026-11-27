@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2027](2027.md) | built | 2026-11-27 | What Dot resumes on its own is marked by the run its chain began with: the asks of items 850 and 860 hold |
 | [2026](2026.md) | built | 2026-11-27 | Dot's own tools keep the seal of a run nobody started: no daemon-side read or write of what its sandbox seals |
 | [2024](2024.md) | done | 2026-11-27 | The chat header keeps the bot's face and name; only a lasting link problem shows, in the capsule |
 | [2023](2023.md) | done | 2026-11-27 | Chat settings as native inset groups, and a capsule that says "Waiting on N helpers" only while the run waits, with no spinner |

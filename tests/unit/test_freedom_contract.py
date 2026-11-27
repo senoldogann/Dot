@@ -709,6 +709,9 @@ class Way:
     tainted: bool = False
     # A run nobody started (item 2016): its processes keep the sandbox, and it asks what such a run asked before.
     unattended: bool = False
+    # Whether the owner is there to answer (item 860's mark, which item 2027 reads from the run's origin for what Dot
+    # resumes on its own): a run nobody watches or started has nobody there.
+    owner_there: bool = True
 
     @property
     def asks(self) -> frozenset[str]:
@@ -729,10 +732,17 @@ WAYS: tuple[Way, ...] = (
     Way("yolo, in the owner's chat", "yolo", False, owners_chat=True),
     Way("yolo, in the owner's chat, after outside content", "yolo", False, owners_chat=True, tainted=True),
     Way("yolo, in a chat of Dot's own", "yolo", False, owners_word=True),
-    Way("yolo, in a run nobody watches", "yolo", False),
-    Way("yolo and free, in a run nobody started", "yolo", True, unattended=True),
-    Way("yolo, in a run nobody started", "yolo", False, unattended=True),
-    Way("yolo, in a run nobody started, in a chat of Dot's own", "yolo", False, owners_word=True, unattended=True),
+    Way("yolo, in a run nobody watches", "yolo", False, owner_there=False),
+    Way("yolo and free, in a run nobody started", "yolo", True, unattended=True, owner_there=False),
+    Way("yolo, in a run nobody started", "yolo", False, unattended=True, owner_there=False),
+    Way(
+        "yolo, in a run nobody started, in a chat of Dot's own",
+        "yolo",
+        False,
+        owners_word=True,
+        unattended=True,
+        owner_there=False,
+    ),
 )
 
 
@@ -843,7 +853,7 @@ def _gate(
         taint_check=taint_check,
         owners_word=way.owners_word,
         owners_chat=way.owners_chat,
-        owner_there=True,
+        owner_there=way.owner_there,
         unattended=way.unattended,
         # A run nobody started keeps from Dot's own tools what its sandbox seals (item 2026): Dot's own folder.
         seal=_seal(room.world) if way.unattended else None,
