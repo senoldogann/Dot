@@ -1138,7 +1138,7 @@ restarts), or when a call that pays, sends or posts for you was cut while it ran
 chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the
 work again rather than taking it as a failed part. A helper the run still waited for when the daemon stopped ends with
 that run, whose own resume note names the cut `delegate` call. The line over the
-composer says "Waiting on N subagents" only while the run is blocked on them, "N subagents keep working in the
+composer says "Waiting on N helpers" only while the run is blocked on them, "N helpers keep working in the
 background" once it was released, and nothing when none work; on a phone (item 1383) the same words are the first line
 of the sheet that the capsule's **N helpers** segment opens, which also names what each helper does now and has
 **Details** and **Stop**. Calls of `fan_out`, `message_agent` and the work orders

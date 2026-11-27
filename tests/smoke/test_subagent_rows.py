@@ -1,9 +1,9 @@
 """The subagents of a task as a developer tool shows them (item 1331), in a daemon in Chrome and in WebKit at a phone's
 width. A run hands two parts to two subagents that work in a shell command each. In the conversation they are one
-card: "2 subagents" with the faces and "2 working" and the time, a line that says how they work (side by side, the chat
+card: "2 helpers" with the faces and "2 working" and the time, a line that says how they work (side by side, the chat
 waits, the answers come back), and a row for each: the job as the title, what it does now ("Running sleep 300") as its
 line, its state in a word beside the time that counts on ("Running 8 s"), and a chevron that opens its steps. Over the
-composer one line says "Waiting on 2 subagents" with the first one's step, Details (which opens the Agents tab) and
+composer one line says "Waiting on 2 helpers" with the first one's step, Details (which opens the Agents tab) and
 Stop (which stops the task and with it the subagents). When a subagent ends its row says it in a word and its answer
 is the row's line. No network and no model service is used: the scripted model plays the run and its subagents.
 """
@@ -168,7 +168,7 @@ async def test_the_subagents_are_one_card_with_a_row_each_and_the_task_says_it_w
                     page: Page = await _open(browser, address, parent.id, width, scheme, engine == "webkit")
                     group: Locator = page.locator(".helpers")
                     head: Locator = group.locator("summary.helpers-head")
-                    await expect(head.locator(".helpers-title")).to_have_text("2 subagents")
+                    await expect(head.locator(".helpers-title")).to_have_text("2 helpers")
                     await expect(head.locator(".helpers-state")).to_have_text("2 working")
                     await expect(head.locator(".helpers-time")).to_be_visible()
                     # How the group works is said while they work.
@@ -182,14 +182,14 @@ async def test_the_subagents_are_one_card_with_a_row_each_and_the_task_says_it_w
                     await expect(rows.locator(".child-time").first).to_have_text(re.compile(r"^\d"))
                     # Over the composer the task says it waits, and what the first of them does.
                     wait: Locator = page.locator(".wait-line")
-                    await expect(wait.locator(".wait-line-text")).to_have_text("Waiting on 2 subagents")
+                    await expect(wait.locator(".wait-line-text")).to_have_text("Waiting on 2 helpers")
                     await expect(wait.locator(".wait-line-now")).to_contain_text("Running sleep 300")
                     if width <= 720:
                         # A phone does not stack the line over its composer (item 1383): the capsule has a segment
                         # for the helpers, whose sheet says the same and has the same buttons.
                         await expect(wait).to_be_hidden()
                         await expect(page.locator('[data-segment="helpers"]')).to_have_attribute(
-                            "aria-label", "2 helpers. Waiting on 2 subagents"
+                            "aria-label", "2 helpers. Waiting on 2 helpers"
                         )
                     # The line is a pane on a ground of its own, in the dock and not in the conversation (item 1347):
                     # the history goes by under it and shows nothing through it.

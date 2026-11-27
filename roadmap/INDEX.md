@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [2014](2014.md) | done | 2026-11-27 | The small window's compaction fixture takes the cards tool, and the tool's schema is shorter |
+| [2011](2011.md) | done | 2026-11-27 | The web says "helper" ("yardımcı") where it said "subagent" ("alt ajan"), as the iPhone app does |
 | [2010](2010.md) | done | 2026-11-27 | A chat's row says when its run waits on its helpers, and what works for it while it rests, as DotNext's rows do |
 | [2000](2000.md) | done | 2026-11-27 | The capsule's clock says whole seconds, as DotNext's pill does |
 | [1999](1999.md) | done | 2026-11-27 | A message sent in a chat is in it at once, with a quiet "Pending" and "Starting…", as DotNext does it |

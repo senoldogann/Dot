@@ -597,25 +597,25 @@ its **Open on X** link. Recording that result from a card's Share action require
 iMessage drafts are sent through their own cards.
 
 A delegated run
-is a row, drawn as a developer tool draws its subagents (item 1331): a small face with its state at the corner (turning
+is a row, drawn as a developer tool draws its helpers (item 1331): a small face with its state at the corner (turning
 while it works, amber while it waits for you, a check in the text's ink when it is done, item 839, red when it
-failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Subagent
+failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Helper
 1" for a screen reader only; the goal's paths are cut to their last two parts, "…/housestory/brief.md", item 669), under
 it in one quiet line what it does now in the words of the line over the composer ("Running swift test", "Reading
 README.md", "List folder: shelf-3"; item 1331) and, once it ended, the start of its answer as the result (item 245),
 its state in a word beside the time it has taken ("Running 8m 15s": the word in blue while it works, amber while it
 waits, red when it failed; the time counts on every second), the way to its own page (under the pointer, where there
 is one; on a touch screen, on an open row, item 1281) and a chevron that opens its steps. In a group the rows share one
-card with a hairline between them; one subagent alone is a card of its own. Rows that follow each other gather in one
-group: its head shows their faces, how many they are ("3 subagents"), how they stand ("2 working", in blue while one
+card with a hairline between them; one helper alone is a card of its own. Rows that follow each other gather in one
+group: its head shows their faces, how many they are ("3 helpers"), how they stand ("2 working", in blue while one
 works; "2 done · 1 stopped" after) and the time from the first one's start to the last one's end, counting on while
 one works, and a chevron that folds the rows away; while one works a quiet line in the card says how they work: side by
 side while the chat waits, their answers coming back to it. Over the composer, while the task waits for them, a line
-says **Waiting on 2 subagents** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
-and the subagents with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 subagents keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
+says **Waiting on 2 helpers** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
+and the helpers with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 helpers keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
 and hairline in the dock, and the dock is not the conversation: it stands where it is while the chat is scrolled, a phone's
 included, and nothing of the history shows through it (item 1347). A phone does not draw the line (item 1383): its words
-are the first line of the sheet that the capsule's **2 helpers** segment opens, with what each subagent does now,
+are the first line of the sheet that the capsule's **2 helpers** segment opens, with what each helper does now,
 **Details** and **Stop**. An approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
 again. Its steps are put in the page the first time it opens, by you or by an approval, and stay (item 767): until then
@@ -808,14 +808,14 @@ send's way (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
 box (items 352 and 360, drawn since item 1335 as a plain bar on a hairline, no glass and no shadow) says in a few quiet words how long the run has worked, that it waits to start, that it waits
 for you or that it stops (once Stop was pressed, until it has),
-how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its subagents stand
+how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
 composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side
 panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
 part closes it. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
-stacked over the box (item 1383): the line that waits for subagents, the bar, the queue, the loops and the commands at
+stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Reconnecting…**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
@@ -866,11 +866,11 @@ hairline with its title, what sums it up (a count) and its buttons on one line, 
 while its section is in sight and gives way to the next one's; the rows are tight, on the 8 px scale. Beside the
 conversation it is a column at the window's right; on a narrower window a drawer, and on a phone a sheet from the foot,
 nine tenths of what is seen. The Agents tab opens on the **Lineage** (item 1332), titled "Lineage · 2 running": the task that leads and, under
-it, its subagents that work, each a mark, its title, how long it has worked ("8m") and a dot for how it stands (blue
+it, its helpers that work, each a mark, its title, how long it has worked ("8m") and a dot for how it stands (blue
 while it works, amber waiting for you, green done, red failed; the row is the way to its page, and what it does now
 is its tooltip), and a **Previous agents** row with how many failed ("1 failed") and how many there are, which folds
 open the rows of those that ended. The Task tab holds the same Lineage, compact, whenever the chat has handed work to
-a subagent, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
+a helper, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
 `/loop`, a schedule a run made in the chat, a schedule that fires into it), each a calendar-clock mark with a green dot
 while it is on, its title over how it repeats or when it runs and how it stands ("Every 6 hours · paused", "Once,
 Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00") and, under that, how its last run ended and when (item 1355: "Last run done · 09:00",
