@@ -260,7 +260,10 @@ dotx memory reindex      # embed every note again, for example after changing [m
   `embed_enabled = false` searches by words only. An answer of Ollama that says its model runner broke off is asked
   again, as a broken connection is; when the embedding service still fails at the start of a run, the run recalls its
   notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Task tab, under Set
-  up, say so in a warning line (`embedding_failed`, items 256 and 365). A save, a rewrite and a search go on the same
+  up, say so in a warning line (`embedding_failed`, items 256 and 365). The start waits for its notes by meaning
+  `[memory] start_recall_s` (15 s) at most (item 2004), and as long again for its skills, then takes them by their
+  words the same way: a local
+  Ollama that serves a chat model at the same time held a start for 304 s. A save, a rewrite and a search go on the same
   way when the service fails after those retries (item 1254): the note is kept with no vector, the search returns what
   the words found, and the failure is logged (`memory_embedding_failed`). A search or a save embeds at most one batch
   (32 notes) of those that have no vector, then answers from the vectors already stored and from the words (item 1263).

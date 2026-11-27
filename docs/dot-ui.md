@@ -69,6 +69,7 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | Snapshots | `snapshots.js` | Both Command keys together capture the window in front (a double tap, once on). |
 | System | `system.js` | Daemon health, the emergency stop, health checks and provider models. |
 | Diagnostics | `diagnostics.js` | The daemon's process and the children it started. |
+| Speed | `speed.js` | Where the seconds of the runs went, stage by stage, with p50, p95, p99 and the count over 3 s. |
 | Open source licences | `licences.js` | The licences of what Dot uses. |
 | Controls | `controls.js` | Every control on one page, for checking a look in light and dark. |
 | Theme editor | `themeEditor.js` | A theme of one's own: a name and a palette for each scheme. |

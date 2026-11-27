@@ -150,6 +150,7 @@ from dotagent.store.models import (
     WorkOrderRecord,
     WorkOrderStatus,
 )
+from dotagent.store.perf import PerfTable, PerfWindow, read_perf
 from dotagent.store.provenance import note_origin
 from dotagent.store.revisions import COUNTER_KEY as REVISION_COUNTER_KEY
 from dotagent.store.revisions import DELETED_END, DELETED_PREFIX, bump_statements, revision_statements
@@ -3532,20 +3533,64 @@ class Store:
         now: float = time.time()
 
         async def statements() -> None:
-            await self._db.execute(
-                "INSERT INTO message_archive(thread_id, version, seq, body)"
-                " SELECT m.thread_id, t.history_version, m.seq, m.body FROM messages AS m JOIN threads AS t"
-                " ON t.id = m.thread_id WHERE m.thread_id = ? AND m.seq < (SELECT MAX(history_seq) FROM runs"
-                " WHERE thread_id = ? AND history_version = t.history_version AND rewound_at IS NULL)",
-                (thread_id, thread_id),
+            await self._write_anew(thread_id, bodies, now)
+
+        await self._unit(statements)
+
+    async def _write_anew(self, thread_id: str, bodies: Sequence[str], now: float) -> None:
+        """The statements of :meth:`replace_messages`, inside the caller's unit."""
+        await self._db.execute(
+            "INSERT INTO message_archive(thread_id, version, seq, body)"
+            " SELECT m.thread_id, t.history_version, m.seq, m.body FROM messages AS m JOIN threads AS t"
+            " ON t.id = m.thread_id WHERE m.thread_id = ? AND m.seq < (SELECT MAX(history_seq) FROM runs"
+            " WHERE thread_id = ? AND history_version = t.history_version AND rewound_at IS NULL)",
+            (thread_id, thread_id),
+        )
+        await self._db.execute("UPDATE threads SET history_version = history_version + 1 WHERE id = ?", (thread_id,))
+        await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
+        await self._db.executemany(
+            "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
+            [(thread_id, index, body) for index, body in enumerate(bodies)],
+        )
+        await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
+
+    async def rewrite_messages(self, thread_id: str, before: Sequence[Message], after: Sequence[Message]) -> None:
+        """Store ``after`` as the thread's history, ``before`` being the history as it is stored, writing only the
+        messages that changed (item 2005): a run's context past 60 % of its budget shortens one old tool result
+        a step, and writing the whole history anew for it took seconds a step on a long chat (every message deleted,
+        put back and indexed for the chat search again, the part before the run copied aside), holding every other
+        run's writes meanwhile. A rewind keeps the messages before the place it goes back to as they are stored in
+        the history's version, so a message is changed in place only at or after the place the newest run of that
+        version started; a change before it, or a history of another length, writes the history anew
+        (:meth:`replace_messages`), which keeps the old one aside for the rewind."""
+        changed: list[int] = (
+            [index for index, (old, new) in enumerate(zip(before, after, strict=True)) if old != new]
+            if len(before) == len(after)
+            else []
+        )
+        if len(before) == len(after) and not changed:
+            return
+        encoded: list[str] = await asyncio.to_thread(self._encoded, [after[index] for index in changed])
+        now: float = time.time()
+
+        async def statements() -> None:
+            row: aiosqlite.Row | None = await self._one(
+                "SELECT MAX(runs.history_seq) AS floor FROM runs JOIN threads ON threads.id = runs.thread_id"
+                " WHERE runs.thread_id = ? AND runs.history_version = threads.history_version"
+                " AND runs.rewound_at IS NULL",
+                (thread_id,),
             )
-            await self._db.execute(
-                "UPDATE threads SET history_version = history_version + 1 WHERE id = ?", (thread_id,)
+            floor: int = 0 if row is None or row["floor"] is None else int(row["floor"])
+            if len(before) != len(after) or min(changed) < floor:
+                await self._write_anew(thread_id, await asyncio.to_thread(self._encoded, after), now)
+                return
+            # Deleted and inserted, not updated: the chat search's index follows a message by those two triggers.
+            await self._db.executemany(
+                "DELETE FROM messages WHERE thread_id = ? AND seq = ?", [(thread_id, index) for index in changed]
             )
-            await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
             await self._db.executemany(
                 "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
-                [(thread_id, index, body) for index, body in enumerate(bodies)],
+                [(thread_id, index, body) for index, body in zip(changed, encoded, strict=True)],
             )
             await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
 
@@ -4935,6 +4980,11 @@ class Store:
         }
         self._run_counts[model] = {run_id: (events[run_id], one) for run_id, one in counts.items()}
         return profile_of(model, recent, counts)
+
+    async def perf(self, window: PerfWindow) -> PerfTable:
+        """Where the runs' seconds went in the last ``window``, stage by stage (item 2003), read on a read-only
+        connection."""
+        return await asyncio.to_thread(read_perf, self._database, window, time.time())
 
     async def context_evidence(self, model: str, days: int) -> ContextEvidence:
         """What the runs of ``model`` created in the last ``days`` days say about its context size (item 250), read on a

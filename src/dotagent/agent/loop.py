@@ -340,6 +340,7 @@ from dotagent.store.models import (
     TeamRecord,
     ThreadRecord,
 )
+from dotagent.store.perf import START_READS_EVENT
 from dotagent.store.stats import ACT_TOOLS, ModelProfile
 from dotagent.terminal.session import TerminalSession, ended_notices
 from dotagent.tools.browser import withheld_vault_tools
@@ -1003,7 +1004,8 @@ async def _fit_context(
                 agent.run.id, "compacted", _compaction_event(compaction, len(head), ledger, before, estimated), True
             )
     if current != history:
-        await agent.runtime.store.replace_messages(agent.run.thread_id, current)
+        # Only what changed is written when the history kept its length (item 2005): an old result shortened.
+        await agent.runtime.store.rewrite_messages(agent.run.thread_id, history, current)
     return current, estimated, ledger
 
 
@@ -1079,15 +1081,33 @@ async def notes_to_hand(
     return HandedNotes(fresh=tuple(fresh), forgotten=tuple(forgotten), stood_in=tuple(stood_in))
 
 
+def _too_slow(what: str, deadline: float) -> ProviderTransportError:
+    """The error a start reports when the embedding service did not find its ``what`` within ``deadline`` seconds: it
+    is slow to answer (a local server loading its model, or serving a chat model at the same time, held a start for
+    minutes, item 2004), and the run does not wait for it any longer."""
+    return ProviderTransportError(
+        f"the {what} were not found by meaning within {deadline:g} s", {"deadline_s": deadline}
+    )
+
+
 async def start_notes(runtime: Runtime, run: RunRecord, query: str, budget: int) -> Remembered:
-    """The notes ``run`` starts with: by meaning and words, or by words alone when the embedding service fails. A code
+    """The notes ``run`` starts with: by meaning and words, or by words alone when the embedding service fails or does
+    not answer within ``[memory] start_recall_s`` (item 2004). A code
     review (the pre-push review, ``source`` review) starts with the notes about code alone (:func:`review_memories`),
     on Dot's own loop and on the Claude plan alike."""
+    deadline: float = runtime.config.memory.start_recall_s
+    limit: asyncio.Timeout = asyncio.timeout(deadline)
     try:
-        return await _recall_start(runtime.memory, run, query, budget)
+        async with limit:
+            return await _recall_start(runtime.memory, run, query, budget)
     except ProviderError as error:
         await _embedding_failed(runtime, run, "notes", error)
-        return await _recall_start(words_only(runtime.memory), run, query, budget)
+    except TimeoutError:
+        # Only the deadline's own: a timeout raised inside the recall for another reason is that reason's.
+        if not limit.expired():
+            raise
+        await _embedding_failed(runtime, run, "notes", _too_slow("notes", deadline))
+    return await _recall_start(words_only(runtime.memory), run, query, budget)
 
 
 async def _recall_start(index: MemoryIndex, run: RunRecord, query: str, budget: int) -> Remembered:
@@ -1103,14 +1123,17 @@ async def _recall_start(index: MemoryIndex, run: RunRecord, query: str, budget: 
 
 async def _close_skills(runtime: Runtime, run: RunRecord, needs: Sequence[str], texts: list[str]) -> list[list[int]]:
     """For each of ``needs``, the places of the skills ``texts`` close to it in meaning, the closest first; none when
-    embeddings are off, or when the embedding service fails (the skills are then listed by their words, and the run
-    says so, once)."""
+    embeddings are off, or when the embedding service fails or does not answer within ``[memory] start_recall_s``
+    (item 2004; the skills are then listed by their words, and the run says so, once)."""
     if runtime.help_vectors is None:
         return [[] for _ in needs]
     found: list[list[int]] = []
+    deadline: float = runtime.config.memory.start_recall_s
+    limit: asyncio.Timeout = asyncio.timeout(deadline)
     try:
-        for need in needs:
-            found.append(await runtime.help_vectors.closest(need, texts))
+        async with limit:
+            for need in needs:
+                found.append(await runtime.help_vectors.closest(need, texts))
     except HelpVectorsCold as cold:
         # The skills' embeddings are being made in the background (the daemon's first run, or new skills; item 404):
         # by their words this once, without a word of failure.
@@ -1118,6 +1141,10 @@ async def _close_skills(runtime: Runtime, run: RunRecord, needs: Sequence[str], 
     except (ProviderError, StoreError) as error:
         # The service failed, or answered in another dimension than the texts kept: another model.
         await _embedding_failed(runtime, run, "skills", error)
+    except TimeoutError:
+        if not limit.expired():
+            raise
+        await _embedding_failed(runtime, run, "skills", _too_slow("skills", deadline))
     return [*found, *([] for _ in range(len(needs) - len(found)))]
 
 
@@ -2737,6 +2764,15 @@ class StartReads:
     last_called: float | None
     held: tuple[str, ...]
     harness: GivenText
+    # How long each read took (item 2004), by its name: what the run's first model call waited for.
+    seconds: dict[str, float]
+
+
+async def _timed[T](work: Awaitable[T]) -> tuple[T, float]:
+    """What ``work`` gives, and how many seconds it took."""
+    began: float = time.monotonic()
+    value: T = await work
+    return value, time.monotonic() - began
 
 
 async def _query_and_notes(runtime: Runtime, run: RunRecord, budget: int) -> tuple[str, Remembered]:
@@ -2757,32 +2793,48 @@ async def start_reads(runtime: Runtime, run: RunRecord, model: str, notes_budget
     took seconds before the run's first model call (the model's profile over its newest runs' events, the skills'
     files, the notes' recall with its embedding), and none of them needs another. The first that fails stops the
     others and is raised as it was."""
-    profile: asyncio.Task[ModelProfile] = asyncio.ensure_future(runtime.store.model_profile(model, PROFILE_RUNS))
-    agent_record: asyncio.Task[AgentRecord | None] = asyncio.ensure_future(
-        _no_agent() if run.agent_id is None else runtime.store.get_agent(run.agent_id)
+    profile: asyncio.Task[tuple[ModelProfile, float]] = asyncio.ensure_future(
+        _timed(runtime.store.model_profile(model, PROFILE_RUNS))
     )
-    agents: asyncio.Task[list[AgentRecord]] = asyncio.ensure_future(runtime.store.list_agents())
-    signed_in: asyncio.Task[list[Account]] = asyncio.ensure_future(runtime.accounts.accounts())
-    skills: asyncio.Task[SkillCatalog] = asyncio.ensure_future(run_skills(runtime, run))
-    notes: asyncio.Task[tuple[str, Remembered]] = asyncio.ensure_future(_query_and_notes(runtime, run, notes_budget))
-    last_called: asyncio.Task[float | None] = asyncio.ensure_future(
-        runtime.store.thread_last_call_at(run.thread_id, run.id)
+    agent_record: asyncio.Task[tuple[AgentRecord | None, float]] = asyncio.ensure_future(
+        _timed(_no_agent() if run.agent_id is None else runtime.store.get_agent(run.agent_id))
     )
-    harness: asyncio.Task[tuple[tuple[str, ...], GivenText]] = asyncio.ensure_future(_held_and_harness(runtime, run))
+    agents: asyncio.Task[tuple[list[AgentRecord], float]] = asyncio.ensure_future(_timed(runtime.store.list_agents()))
+    signed_in: asyncio.Task[tuple[list[Account], float]] = asyncio.ensure_future(_timed(runtime.accounts.accounts()))
+    skills: asyncio.Task[tuple[SkillCatalog, float]] = asyncio.ensure_future(_timed(run_skills(runtime, run)))
+    notes: asyncio.Task[tuple[tuple[str, Remembered], float]] = asyncio.ensure_future(
+        _timed(_query_and_notes(runtime, run, notes_budget))
+    )
+    last_called: asyncio.Task[tuple[float | None, float]] = asyncio.ensure_future(
+        _timed(runtime.store.thread_last_call_at(run.thread_id, run.id))
+    )
+    harness: asyncio.Task[tuple[tuple[tuple[str, ...], GivenText], float]] = asyncio.ensure_future(
+        _timed(_held_and_harness(runtime, run))
+    )
     await await_together([profile, agent_record, agents, signed_in, skills, notes, last_called, harness])
-    query, recalled = notes.result()
-    held, harness_text = harness.result()
+    (query, recalled), notes_s = notes.result()
+    (held, harness_text), harness_s = harness.result()
     return StartReads(
-        profile=profile.result(),
-        agent_record=agent_record.result(),
-        agents=tuple(agents.result()),
-        signed_in=tuple(signed_in.result()),
-        skills=skills.result(),
+        profile=profile.result()[0],
+        agent_record=agent_record.result()[0],
+        agents=tuple(agents.result()[0]),
+        signed_in=tuple(signed_in.result()[0]),
+        skills=skills.result()[0],
         query=query,
         recalled=recalled,
-        last_called=last_called.result(),
+        last_called=last_called.result()[0],
         held=held,
         harness=harness_text,
+        seconds={
+            "profile": profile.result()[1],
+            "agent": agent_record.result()[1],
+            "agents": agents.result()[1],
+            "accounts": signed_in.result()[1],
+            "skills": skills.result()[1],
+            "notes": notes_s,
+            "last call": last_called.result()[1],
+            "secrets and harness": harness_s,
+        },
     )
 
 
@@ -2995,6 +3047,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     memory_seen_at: float = time.time()
     # What the start reads that needs nothing else, read at once (item 1918).
     reads: StartReads = await start_reads(runtime, run, ref.label, notes_budget)
+    await runtime.bus.emit(
+        run.id, START_READS_EVENT, {"seconds": {name: round(s, 3) for name, s in reads.seconds.items()}}, True
+    )
     scaffold: Scaffold = scaffold_for(config, info, reads.profile, runtime.context_sizes.of(ref.label))
     surface, surface_reason = surface_for(config, scaffold)
     specs: tuple[ToolSpec, ...] = specs_for_mode(runtime.registry, run.mode) if info.tools else ()

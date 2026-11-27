@@ -536,6 +536,13 @@ class StatsCommand(FrozenModel):
     run: str | None
 
 
+class PerfCommand(FrozenModel):
+    """`dotx perf` (item 2003): where the runs' seconds went in the last ``window``, stage by stage."""
+
+    name: Literal["perf"]
+    window: Literal["24h", "7d"]
+
+
 class UndoCommand(FrozenModel):
     name: Literal["undo"]
     run_id: str
@@ -667,6 +674,7 @@ type Command = Annotated[
     | EvalSpeedCommand
     | EvalReportCommand
     | StatsCommand
+    | PerfCommand
     | DaemonCommand
     | OpenCommand
     | UrlCommand
