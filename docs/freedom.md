@@ -38,7 +38,7 @@ What still waits for the owner's yes. Nothing else does.
 | --- | --- | --- |
 | Yolo, a chat the owner opened (item 860) | a payment (handed to them, never answered by a model), a message or mail sent for them, a public post | `owners_guard`, `OWNERS_REASON` and `_OWNERS_FLAGS` (`financial`, `message_send`, `public_post`) in `policy/engine.py`; `held` in `RunGate._decide_spent` |
 | A chat Dot opened on its own initiative, in every mode but free (item 850) | a message, a post, a release | `initiative_guard`, `_INITIATIVE_REASON` and `_INITIATIVE_FLAGS` in `policy/engine.py` |
-| Yolo, a schedule's run in the owner's chat (nobody is there) | a message or a post is judged by the review model, and what it cannot tell goes to the owner; a payment is always theirs | `RunGate._decide_spent` (`judged`) |
+| Yolo, a schedule's run in the owner's chat (nobody is there), and one Dot resumes on its own (item 2027) | a message or a post is judged by the review model, and what it cannot tell goes to the owner; a payment is always theirs | `RunGate._decide_spent` (`judged`) |
 
 Free mode keeps neither of the first two. What it keeps is below, as known asks: they are not decisions of the gate.
 
