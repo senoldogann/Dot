@@ -656,6 +656,31 @@ After Send, uploads show their progress and can be cancelled. If the link drops,
 The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer
 or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
 
+## DotNext push and Live Activities
+
+DotNext registers APNs and Live Activity tokens using its paired key and the existing phone routes. Its lock-screen
+card shows running tasks, each task's live line and its elapsed time. Tapping it opens the task's chat. The daemon
+updates the card and ends it when the last run ends. A long task on the Mac can start a card by push, with the silent
+announcement Apple requires for remote starts.
+
+DotNext shows task alerts for a question or approval, a stored successful or failed end, and an end the goal check
+found blocked. The app opens the chat so the owner can read an ask before answering. The phone's language selects the
+English or Turkish task notice. The web uses Settings › General's language for the same task notices. The alert
+contains fixed copy and the chat's route. Task content stays in the chat.
+
+The daemon's `[apns].topic` selects one application. Use `dev.dotagent.phone.next` for DotNext or
+`dev.dotagent.phone` for the older app. Restart the daemon after changing the topic, then pair and open the selected
+app to register its tokens. The apps can install
+side by side, and a daemon sends native pushes to the configured app's topic. Remove unused phone registrations in
+Settings › Phone when switching topics.
+
+DotNext signs for team `79DZ4AA4DW` and embeds `dev.dotagent.phone.next.liveactivity`. If signing reports that the
+profile lacks `aps-environment`, enable **Push Notifications** on App ID `dev.dotagent.phone.next` in Apple Developer
+› Certificates, Identifiers & Profiles and refresh or regenerate the app's provisioning profile. Automatic signing
+also needs an App ID and profile for the widget extension. A topic-restricted APNs key must allow
+`dev.dotagent.phone.next`. The build's `APS_ENVIRONMENT` must match its profile, `development` for an Xcode install
+and `production` for distribution.
+
 ## The iPhone app's calls
 
 What the native iPhone app asks of the daemon, as a contract the app can be written to (`ios/`). Every path is under

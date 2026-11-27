@@ -3,7 +3,8 @@
 The native app that replaces `ios/Dot` wave by wave (the plan lives in the owner's workspace,
 `ios-rewrite-2026-11-24/PLAN.md`). It installs beside the old app: bundle id `dev.dotagent.phone.next`, app group
 `group.dev.dotagent.phone.next`, its own Keychain access group, URL scheme `dotnext://`, display name "Dot Next". iOS 26
-and later, iPhone and iPad. No push and no Live Activity until the swap (owner's decision): the old app keeps them.
+and later, iPhone and iPad. DotNext has its own APNs topic and Live Activity extension (item 2042).
+[Phone setup](../../docs/phone.md#dotnext-push-and-live-activities) describes signing and selecting that topic.
 
 Wave N0 gave the design system, the components and the gallery; wave N1-client the engine (`ios/DotEngine`, below)
 and the screens wired to it: pairing, the chat list, a chat, the helpers and background sheets, settings. Wave N2 made

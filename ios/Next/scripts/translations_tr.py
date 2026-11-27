@@ -1735,3 +1735,20 @@ TR.update(
         "Shows the whole message": "Mesajın tamamını gösterir",
     }
 )
+
+TR['Starting the chat…'] = 'Sohbet başlatılıyor…'
+
+# PN1: remote task alerts and the Live Activity.
+TR.update({
+    "A task is done": "Bir görev bitti",
+    "A task failed": "Bir görev başarısız oldu",
+    "A task is blocked": "Bir görev ilerleyemedi",
+    "Dot asks for approval": "Dot onay istiyor",
+    "Dot has a question": "Dot'un bir sorusu var",
+    "Dot needs your help": "Dot'un yardımınıza ihtiyacı var",
+    "Open Dot to see it.": "Görmek için Dot'u açın.",
+    "Dot is working": "Dot çalışıyor",
+    "Starting…": "Başlıyor…",
+    "Your Mac remembers which task notifications to send to this phone.": "Mac’iniz bu telefona hangi görev bildirimlerini göndereceğini hatırlar.",
+    "Done, failed or blocked": "Bitti, başarısız oldu veya ilerleyemedi",
+})

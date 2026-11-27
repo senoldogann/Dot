@@ -38,12 +38,14 @@ curl -fsS -X PUT -H "$main" -H "Content-Type: application/json" -d '{"free":true
 curl -fsS -X POST -H "$main" -H "Content-Type: application/json" \
     -d '{"name":"E2E Scout","role":"Finds leads","instructions":"","model":"","effort":null,"approvals":null}' "$base/api/agents" >/dev/null
 
+notification_run=$(curl -fsS -H "$phone" "$base/api/runs?limit=1" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
+
 # The UI test's own assertions (what each page shows) count as much as the daemon's side below: its status is kept.
 fail=0
-if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
+if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" TEST_RUNNER_DOTNEXT_NOTIFICATION_RUN="$notification_run" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
     -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
     -only-testing:DotNextUITests/SettingsLiveUITests -only-testing:DotNextUITests/SettingsMaintenanceLiveUITests \
-    -only-testing:DotNextUITests/ConnectAppsLiveUITests >"$t/xcodebuild.log" 2>&1; then
+    -only-testing:DotNextUITests/ConnectAppsLiveUITests -only-testing:DotNextUITests/PushLinkLiveUITests >"$t/xcodebuild.log" 2>&1; then
     echo "FAIL  SettingsLiveUITests, SettingsMaintenanceLiveUITests or ConnectAppsLiveUITests (xcodebuild test failed; its log: $t/xcodebuild.log)" >&2
     fail=1
 fi
@@ -52,7 +54,7 @@ grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" "$t/xcodebuild.log" | 
 check() {
     if python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($2) else 1)"; then echo "ok    $1"; else echo "FAIL  $1" >&2; fail=1; fi
 }
-curl -fsS -H "$phone" "$base/api/phone/push-settings" | check "Notifications: Done or failed is off" 'd["done"] is False and d["needs_you"] is True'
+curl -fsS -H "$phone" "$base/api/phone/push-settings" | check "Notifications: Done, failed or blocked is off" 'd["done"] is False and d["needs_you"] is True'
 curl -fsS -H "$main" "$base/api/assistant" | check "General: Dot's name is Nokta" 'd["name"] == "Nokta"'
 curl -fsS -H "$main" "$base/api/reactions/settings" | check "Chat: reactions start no follow-up" 'd["follow_ups"] is False'
 curl -fsS -H "$main" "$base/api/schedules" | check "Scheduled tasks: paused and renamed, its rhythm kept" \
