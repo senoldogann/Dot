@@ -33,8 +33,8 @@ test("a chat with nothing to say has no capsule", () => {
 test("a run at work says how long it has worked, with its Stop", () => {
   const segments = dockSegments(state({ status: "running", took: 36 }));
   assert.deepEqual(ids(segments), ["status", "stop"]);
-  assert.equal(segments[0].label, "Working · 36 s");
-  assert.equal(segments[0].short, "36 s");
+  assert.equal(segments[0].label, "Working · 36s");
+  assert.equal(segments[0].short, "36s");
   assert.equal(segments[0].tone, "work");
   assert.equal(segments[1].label, "Stop");
   assert.equal(segments[1].name, "Stop the task");

@@ -2,7 +2,7 @@
 // each, from what the page knows of the run. A segment is there only when it has something to say, and with none the
 // capsule is not drawn. Pure, so that it runs under Node without a page.
 
-import { duration } from "./dom.js";
+import { elapsed } from "./dom.js";
 import { t, tCount } from "./i18n.js";
 
 // A loop's rhythm of more words than this ("on Mon, Wed and Fri at 18:30") is left to its sheet: the segment says how
@@ -58,7 +58,7 @@ function statusSegment(state) {
     const label = t("work.waitingForYou");
     return { id: "status", label, short: label, name: label, tone: "waiting", sheet: false };
   }
-  const took = duration(Math.max(state.took, 0));
+  const took = elapsed(state.took);
   const label = t("dock.working", { took });
   return { id: "status", label, short: took, name: label, tone: "work", sheet: false };
 }
