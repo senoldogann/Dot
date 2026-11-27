@@ -417,6 +417,19 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   message's level or one with picks, it waits as below. `[agent] busy_parallel = false` queues every message. This is
   the router of DeepSeek Harness's Super-agent design (2026-11-01): with one session that does the work itself, a new
   request waits; in its measure, a model left to decide whether to hand work out did so in none of five runs.
+- Several tasks in one chat (item 1984, slice 1 of [item 1982](../roadmap/1982.md)'s design): with `[agent]
+  chat_tasks` above 1 (1 by default, since the pages do not show lanes yet), a request of its own sent while the chat
+  works starts in a **lane** of the chat rather than a chat of its own: a thread of its own (`threads.lane_of` names
+  the chat) that the chat list does not show, whose first run is given what the chat said so far (the owner's words
+  and Dot's reply of the chat's newest runs and its lanes', not their steps), in front of the owner's words, which
+  stay its goal. A lane keeps everything a chat keeps per thread: one run at a time, its own queue, history, browser
+  tabs, resume and taint. At most `chat_tasks` tasks of a chat work at once, the chat's own run included, counted in
+  one write of the store so that two requests at once cannot both pass; a request past that waits in the chat's queue
+  as before. The answer to a question card a run left goes to that task: when another run works on its thread then,
+  it waits in the thread's queue (it cannot be steered into the run at work) and starts the asker's continuation once
+  that run has ended. `POST /api/threads/{id}/stop` stops every task of the chat (a lane names its chat), each as its
+  own Stop would, so each holds its queue, and a request the fast model was still being asked about starts nothing.
+  Deleting a chat deletes its lanes. With `chat_tasks = 1` all of this is as before.
 - A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
