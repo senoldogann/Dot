@@ -557,6 +557,12 @@ default), `DOT_DESKTOP_BANK_K` the attempts of each task.
 
 How well Dot finishes work is measured, not guessed, in two ways.
 
+**`dotx perf [--window 24h|7d]`** (item 2003) is where the runs' seconds went, stage by stage, the table of
+Settings › Maintenance › Speed ([The daemon](daemon.md)): a run's start to its first model call and each read of that
+start, the time between two steps and Dot's own part of it, the model calls by model and purpose, the first word of a
+step's reply and each tool, each row with n, p50, p95, p99, the longest and how many took over 3 s. It reads the store
+read-only (`dotagent/store/perf.py`).
+
 **`dotx stats [--days N]`** counts the runs that really happened (the last 30 days by default), those of deleted chats
 too as the run ledger keeps them (item 1323; their numbers, endings, tool calls, stalls and compactions count, their times,
 sites and causes of failure are gone with their events), per model: how they

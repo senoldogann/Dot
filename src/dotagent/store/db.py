@@ -149,6 +149,7 @@ from dotagent.store.models import (
     WorkOrderRecord,
     WorkOrderStatus,
 )
+from dotagent.store.perf import PerfTable, PerfWindow, read_perf
 from dotagent.store.provenance import note_origin
 from dotagent.store.revisions import COUNTER_KEY as REVISION_COUNTER_KEY
 from dotagent.store.revisions import DELETED_END, DELETED_PREFIX, bump_statements, revision_statements
@@ -4893,6 +4894,11 @@ class Store:
         }
         self._run_counts[model] = {run_id: (events[run_id], one) for run_id, one in counts.items()}
         return profile_of(model, recent, counts)
+
+    async def perf(self, window: PerfWindow) -> PerfTable:
+        """Where the runs' seconds went in the last ``window``, stage by stage (item 2003), read on a read-only
+        connection."""
+        return await asyncio.to_thread(read_perf, self._database, window, time.time())
 
     async def context_evidence(self, model: str, days: int) -> ContextEvidence:
         """What the runs of ``model`` created in the last ``days`` days say about its context size (item 250), read on a

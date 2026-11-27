@@ -1024,7 +1024,7 @@ sheet), and at its foot **Back to chats**, to the chat last open (item 852). Eve
 **General**, **Appearance**, **Rules**, **Memory**, **Vault** and **Snapshots**; under **Agents**
 Agents, Models, Browser, Web search, **Scheduled tasks** (item 1337: what was the Schedules page), Campaigns and
 Self-improvement; under **Connections** Connectors, Plugins, Skills, AI services, Phone and Channels; under
-**Maintenance** System, Self-repair and Diagnostics; under **About** Open source licences. A row is a small mark and its
+**Maintenance** System, Self-repair, Diagnostics and Speed; under **About** Open source licences. A row is a small mark and its
 name, with what it holds at its right (how many notes Dot keeps, how many items the vault holds, how many schedules are
 on, a dot when a phone reaches Dot; no model's name, item 852), and the rows scroll on their own in a short window;
 whether the daemon answers and the emergency stop are the page's, as on every page. The page is the open page alone, in a
@@ -1154,7 +1154,16 @@ programs Dot starts, Claude Code and OpenCode, are read with their versions for 
 where each is on the owner's PATH (or that it is not), the version its `--version` says, and how Dot fares on it, by
 the versions Claude Code was measured on (item 1673: `supported`, `graceful`, `broken`, `unknown`) and `unknown` for
 OpenCode, of which Dot keeps no such list (`GET /api/diagnostics/programs`: `programs` with `name`, `command`, `path`,
-`version`, `support`, `why`). **Open source
+`version`, `support`, `why`). **Speed** (`#/settings/speed`, item 2003) is the table `dotx perf` prints, for the last
+24 hours or 7 days, read from what the runs recorded: per stage, each row's count (n), its 50th, 95th and 99th
+percentiles, its longest and how many took over 3 s. The stages: a run's start to its first model call; each read of that
+start (`start_reads`: the model's profile, the agent, the agents, the accounts, the skills, the notes, the last call of
+the chat, the secrets and the harness's texts); between two steps (a step's last tool result to the next step's model
+call), and Dot's own part of it, less the model calls the loop makes there (a compaction, a goal check, a checkpoint),
+which have their own rows; the model calls by model and purpose; the first word of a step's reply by model; and each
+tool's running time (`ran_s`, without a wait at the gate). A gap in which you held the run with a ✋, and a call your
+stop cut off, are left out; the API's own routes are not timed (`GET /api/diagnostics/speed?window=24h|7d`: `window`,
+`since`, `until`, `runs`, `rows` with `stage`, `name`, `n`, `p50`, `p95`, `p99`, `max`, `over_3s`). **Open source
 licences** (`#/licences`,
 item 371) shows the notices that come with the pages (the fonts, the icons, and the code taken from other projects,
 whose copyright Dot keeps), the Python packages installed beside the daemon with the licence each one's metadata names

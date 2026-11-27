@@ -49,6 +49,7 @@ _ROWS: list[str] = [
     "System",
     "Self-repair",
     "Diagnostics",
+    "Speed",
     "Open source licences",
 ]
 

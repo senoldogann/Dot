@@ -322,7 +322,7 @@ On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-
 of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General,
 Appearance, Rules, Memory, Vault and Snapshots, then the groups Agents (Agents, Models, Browser, Web search, Scheduled tasks,
 Campaigns, Self-improvement; the sidebar has no Schedules icon, so its page is a row here), Connections (Connectors, Plugins,
-Skills, AI services, Phone, Channels), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
+Skills, AI services, Phone, Channels), Maintenance (System, Self-repair, Diagnostics, Speed) and About (Open source licences), and under them the first
 steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its

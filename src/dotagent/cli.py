@@ -132,6 +132,7 @@ _FAMILIES: dict[str, str] = {
     "eval-memory": "dotagent.cli_eval",
     "eval-speed": "dotagent.cli_eval",
     "stats": "dotagent.cli_stats",
+    "perf": "dotagent.cli_perf",
     "daemon": "dotagent.cli_daemon",
     "open": "dotagent.cli_daemon",
     "url": "dotagent.cli_daemon",
@@ -704,6 +705,12 @@ def build_parser() -> argparse.ArgumentParser:
     stats.add_argument(
         "--run", metavar="ID", default=None, help="the numbers of one run instead: what it cost and where"
     )
+
+    perf = commands.add_parser(
+        "perf",
+        help="where the runs' seconds went, stage by stage: n, p50, p95, p99, the longest and how many took over 3 s",
+    )
+    perf.add_argument("--window", choices=["24h", "7d"], default="24h", help="the last 24 hours (default) or 7 days")
 
     commands.add_parser("daemon", help="run Dot in this terminal: the API, the web UI, the agent and the schedules")
     commands.add_parser("open", help="open the web UI of the running daemon in your default browser, signed in")
