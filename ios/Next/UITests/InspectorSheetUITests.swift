@@ -76,6 +76,11 @@ final class InspectorSheetUITests: XCTestCase {
             shot(app, name + "-large")
             measure(app, detent: "large", into: &report)
         }
+        // No plan in the sheet (item 1996): the plan is the pill's Plan n/m and its sheet. The rest stays.
+        app.swipeUp()
+        XCTAssertFalse(app.staticTexts["Read next week's calendar"].exists, "no plan section")
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Plan")).firstMatch.exists, "no plan header")
+        XCTAssertTrue(row(app, "State,").exists || app.switches["inspector.showSteps"].exists, "the other sections stay")
         let attachment: XCTAttachment = XCTAttachment(string: report.joined(separator: "\n"))
         attachment.name = name + "-measures"
         attachment.lifetime = .keepAlways

@@ -50,7 +50,9 @@ struct LiveRunFacts: Equatable {
     let active: Bool
     let hold: RunHold
     let action: LiveAction?
-    /// The capsule's words between steps (thinking, writing, the step that runs).
+    /// The call at work that is not the page's (a command, a file), as the chat's work log names it (item 1996).
+    let workCall: HelperStep?
+    /// The words between calls: thinking, writing.
     let workWords: String?
 }
 
@@ -61,15 +63,15 @@ func liveRunFacts(_ chat: ChatProjection?) -> LiveRunFacts? {
     let events: [EventRecord] = chat.runs[run.id]?.events ?? []
     guard let surface: RunSurface = runSurface(events) else { return nil }
     var words: String?
+    var call: HelperStep?
     switch activity(of: chat, run: run.id) {
     case .thinking: words = String(localized: "Thinking", comment: "Capsule: the run's model is thinking")
     case .writing: words = String(localized: "Writing", comment: "Capsule: the run's model is writing its words")
-    case .tool(let step):
-        words = toolLine(
-            ToolEntry(id: "", tool: step.tool, kind: ToolKind.of(step.tool), target: step.target, args: "", output: "", state: .running, images: [], startedAt: step.at, endedAt: nil))
+    case .tool(let step): call = step
     case nil: words = nil
     }
-    return LiveRunFacts(run: run.id, surface: surface, active: true, hold: runHold(events), action: liveAction(events), workWords: words)
+    return LiveRunFacts(
+        run: run.id, surface: surface, active: true, hold: runHold(events), action: liveAction(events), workCall: call, workWords: words)
 }
 
 /// Adds the live follow to a chat: the floating mini player, the header's Watch live, and the full screen.
@@ -132,7 +134,7 @@ struct LiveFollowModifier: ViewModifier {
             facts = now
         } else if let last = facts, last.active {
             // Ended: the full screen, if open, keeps its last frame and offers nothing to take over.
-            facts = LiveRunFacts(run: last.run, surface: last.surface, active: false, hold: .free, action: nil, workWords: nil)
+            facts = LiveRunFacts(run: last.run, surface: last.surface, active: false, hold: .free, action: nil, workCall: nil, workWords: nil)
         }
         if let now, follow?.run != now.run || follow?.surface != now.surface {
             follow?.stop()
@@ -241,7 +243,7 @@ struct LiveMiniPlayer: View {
             // A shade under the caption only, so the page keeps its own colours.
             LinearGradient(colors: [.clear, .black.opacity(0.5)], startPoint: UnitPoint(x: 0.5, y: 0.62), endPoint: .bottom)
                 .allowsHitTesting(false)
-            ActionCaption(action: facts?.action, fallback: facts?.workWords, compact: true)
+            ActionCaption(call: facts?.action?.call ?? facts?.workCall, fallback: facts?.workWords, compact: true)
                 .padding(6)
         }
         .frame(width: width, height: min(max(height, 80), width * 1.4))
@@ -364,7 +366,7 @@ struct RunLiveScreen: View {
                 Notice(tone: .warn, message: refusal, dismiss: { follow.control.clearRefusal() })
             }
             if !follow.control.controlling, facts?.active ?? false {
-                ActionCaption(action: facts?.action, fallback: facts?.workWords, compact: false)
+                ActionCaption(call: facts?.action?.call ?? facts?.workCall, fallback: facts?.workWords, compact: false)
             }
             if let note = follow.control.note, follow.control.controlling {
                 Text(note).textRole(.caption).fontWeight(.medium).foregroundStyle(.white)
