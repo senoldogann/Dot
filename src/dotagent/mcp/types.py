@@ -1,4 +1,4 @@
-"""What Dot knows about the tools of an MCP server."""
+"""What Dot knows about the tools, resources and prompts of an MCP server."""
 
 from dotagent.core.types import FrozenModel, JsonObject
 
@@ -22,6 +22,33 @@ class McpTool(FrozenModel):
     hints: ToolHints
     startup_timeout_s: float
     call_timeout_s: float
+
+
+RESOURCE_TOOL: str = "mcp_resource"
+
+
+class McpResource(FrozenModel):
+    name: str
+    uri: str
+
+
+class McpPromptArgument(FrozenModel):
+    name: str
+    description: str | None
+    required: bool
+
+
+class McpPrompt(FrozenModel):
+    name: str
+    description: str | None
+    arguments: tuple[McpPromptArgument, ...]
+
+
+class McpCatalogue(FrozenModel):
+    """The resource and prompt metadata a server advertised when it connected."""
+
+    resources: tuple[McpResource, ...] = ()
+    prompts: tuple[McpPrompt, ...] = ()
 
 
 class McpPurpose(FrozenModel):

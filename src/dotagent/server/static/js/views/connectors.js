@@ -14,7 +14,7 @@
 import { accountsCard } from "../accounts.js";
 import { createCatalogue, MCP_STATE_TONES, MCP_STATE_WORDS, pluginMark, serviceWords, STATE_WORDS, STEP_LABELS, WAY_NAMES, CONNECTED_STATES } from "../catalogue.js";
 import { customizeHead } from "../customizehead.js";
-import { el, foldSearch, } from "../dom.js";
+import { el, foldSearch } from "../dom.js";
 import { icon } from "../icons.js";
 import { markContent, markTile } from "../marks.js";
 import { emptyPanel, errorPanel, field, loadingPanel, segmented, switchToggle } from "../panels.js";
@@ -45,6 +45,21 @@ const MCP_ORIGIN_WORDS = {
 };
 // A server's tile names this many of its tools.
 const SHOWN_TOOLS = 6;
+
+/** A server's resource and prompt catalogues are read-only in Settings. */
+function catalogueLines(server) {
+  return [
+    [server.resources ?? [], "views.connectors.resourceOne", "views.connectors.resourceMany"],
+    [server.prompts ?? [], "views.connectors.promptOne", "views.connectors.promptMany"],
+  ].map(([entries, one, many]) =>
+    el(
+      "details",
+      { class: "plugin-does" },
+      el("summary", null, tCount(entries.length, one, many)),
+      el("ul", { class: "plugin-list" }, entries.map((item) => el("li", null, item.name))),
+    ),
+  );
+}
 
 /** The tools a server offers to runs, the first few by name. */
 function toolLine(tools) {
@@ -275,6 +290,9 @@ function serviceParts(catalogue, plugin) {
     does.length < 2 ? null : card("does", t("views.connectors.whatDotDoesWithIt"), "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
     card("ways", t("views.connectors.howItConnects"), "link", plugin.ways.map((way) => wayRow(catalogue, way))),
     tools.length === 0 ? null : card("tools", t("views.connectors.actions"), "bolt", el("ul", { class: "plugin-list plugin-tools mono" }, tools.map((name) => el("li", null, name)))),
+    ...mcpServers.filter((server) => server.state === "ready").map((server) =>
+      card("mcp-catalogue", server.name, "link", catalogueLines(server)),
+    ),
     leftOut.length === 0
       ? null
       : card(
@@ -371,6 +389,7 @@ export function mount(root, ctx) {
         el("span", { class: "plugin-name" }, server.name),
         el("div", { class: "mono plugin-address" }, server.address),
         server.tools.length === 0 ? null : el("div", { class: "plugin-does" }, toolLine(server.tools)),
+        ...(server.state === "ready" ? catalogueLines(server) : []),
         server.origin in MCP_ORIGIN_WORDS
           ? el("div", { class: "plugin-does", title: server.origin === "config" ? t("views.connectors.itIsSetUpIn") : null }, MCP_ORIGIN_WORDS[server.origin])
           : null,

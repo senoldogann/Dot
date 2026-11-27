@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx2
-from mcp.types import CallToolResult
+from mcp.types import CallToolResult, GetPromptResult, ReadResourceResult
 from pydantic import JsonValue
 
 from dotagent.config import McpServerConfig
@@ -23,7 +23,7 @@ from dotagent.mcp.masking import masked_context
 from dotagent.mcp.naming import PREFIX, require_distinct_names
 from dotagent.mcp.purpose import READ_CHARS, purpose_of
 from dotagent.mcp.signin import kept_sign_in
-from dotagent.mcp.types import LeftOutTool, McpFailure, McpPurpose, McpTool
+from dotagent.mcp.types import LeftOutTool, McpCatalogue, McpFailure, McpPrompt, McpPurpose, McpTool
 from dotagent.secrets import known_secrets
 from dotagent.tools.schema import flatten_json_schema
 
@@ -161,6 +161,16 @@ async def _connect_server(
         omitted: list[LeftOutTool] = []
         tools: tuple[McpTool, ...] = usable_tools(config, select_tools(config, listed), omitted)
         require_distinct_names(tools)
+        try:
+            await connection.discover_catalogue()
+        except McpError as error:
+            # Resources and prompts are an optional extra: a server that cannot list them keeps the tools it served.
+            log.warning(
+                "mcp_catalogue_unavailable",
+                server=config.name,
+                error=error.message,
+                context=masked_context(error.context),
+            )
         instructions: str = (connection.instructions() or "")[:READ_CHARS]
         cleanup.pop_all()
     log.info("mcp_server_ready", server=config.name, tools=len(tools), offered=len(listed))
@@ -219,6 +229,52 @@ class McpHub:
     def connected(self) -> tuple[str, ...]:
         """The names of the servers connected now."""
         return tuple(self._connections)
+
+    def catalogue(self, server: str) -> McpCatalogue:
+        """The lists kept from the server's connection, with no request to the server."""
+        connection: McpConnection | None = self._connections.get(server)
+        return McpCatalogue() if connection is None else connection.catalogue
+
+    def resource_catalogues(self) -> tuple[tuple[str, McpCatalogue], ...]:
+        return tuple(
+            (server, connection.catalogue)
+            for server, connection in self._connections.items()
+            if connection.catalogue.resources
+        )
+
+    def resource_timeout(self) -> float:
+        """Time for the slowest resource server to reconnect and answer a read."""
+        return max(
+            self._configs[server].startup_timeout_s + self._configs[server].call_timeout_s
+            for server in self.connected()
+            if self.catalogue(server).resources
+        )
+
+    async def read_resource(self, server: str, uri: str) -> ReadResourceResult:
+        connection: McpConnection | None = self._connections.get(server)
+        if connection is None or not any(resource.uri == uri for resource in connection.catalogue.resources):
+            raise McpError("the MCP server has not listed this resource", {"server": server})
+        return await connection.read_resource(uri)
+
+    async def get_prompt(self, server: str, name: str, arguments: dict[str, str]) -> GetPromptResult:
+        connection: McpConnection | None = self._connections.get(server)
+        if connection is None:
+            raise McpError("the MCP server is not connected", {"server": server})
+        prompt: McpPrompt | None = next((item for item in connection.catalogue.prompts if item.name == name), None)
+        if prompt is None:
+            raise McpError("the MCP server has not listed this prompt", {"server": server, "prompt": name})
+        missing: list[JsonValue] = [
+            argument.name for argument in prompt.arguments if argument.required and not arguments.get(argument.name)
+        ]
+        extra: list[JsonValue] = [
+            key for key in sorted(set(arguments).difference(arg.name for arg in prompt.arguments))
+        ]
+        if missing or extra:
+            raise McpError(
+                "the arguments do not match the MCP prompt",
+                {"server": server, "prompt": name, "missing": missing, "extra": extra},
+            )
+        return await connection.get_prompt(name, arguments)
 
     def configs(self) -> dict[str, McpServerConfig]:
         """Every enabled server the hub has, connected or left out, by name."""

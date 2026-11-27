@@ -82,6 +82,11 @@ const CORE = {
   "composer.teachHint": "Bir görevi Mac'te Dot'a bir kez gösterin, yapmayı öğrensin",
   "composer.modelOptions": "Model ve seçenekler",
   "composer.boxTitle": "Uygulamalar için @, beceriler ve komutlar için / yazın",
+  "slash.mcpPrompts": "MCP istemleri",
+  "composer.starterDescription": "Alanları doldurun, sonra göndermeden önce taslaktaki başlangıç metnini inceleyin.",
+  "composer.starterRequired": "Zorunlu",
+  "composer.starterOptional": "İsteğe bağlı",
+  "composer.insertStarterDraft": "Taslağa ekle",
   "composer.paletteFailed": "Beceriler ve bağlı uygulamalar yüklenemedi: {problem}",
   // The Options menu: approvals, goal mode, keep going, plan first, and the picks of a message (runmodes.js,
   // picks.js).

@@ -12,6 +12,7 @@
 // pointer: files, and teaching Dot a task, and "Teach a task" is /teach in the slash menu too, so that no way in needs a
 // long press. The choices are always in sight (item 1330): the box has no resting state that puts them away.
 
+import { api } from "./api.js";
 import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { composerShape } from "./composershape.js";
@@ -24,12 +25,14 @@ import { openMenu, openOnHold } from "./menu.js";
 import { createMicrophone } from "./microphone.js";
 import { markdownMirror } from "./mirror.js";
 import { loadPalette } from "./palette.js";
+import { field } from "./panels.js";
 import { arePicks, createPicks } from "./picks.js";
 import { readPref, removePref, writePref } from "./prefs.js";
 import { QUOTE_EVENT, quoteInto, splitQuote } from "./quotebutton.js";
 import { takesSnapshots } from "./snapshots.js";
 import { filterGroups, menuSections, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
 import { openTeachPanel } from "./teach.js";
+import { formDialog } from "./ui.js";
 
 const DRAFT_PREFIX = "dot.draft.";
 // The draft key of a new chat's composer.
@@ -184,16 +187,44 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
     }
   }
 
-  function pick(item) {
-    const { start } = range;
-    const caret = textarea.selectionStart;
-    const replaced = replaceMenuWord(textarea.value, start, caret, item.insert ?? "");
+  function put(start, caret, insert) {
+    const replaced = replaceMenuWord(textarea.value, start, caret, insert);
     textarea.value = replaced.text;
     textarea.setSelectionRange(replaced.caret, replaced.caret);
     close();
     autosize();
     edited();
     textarea.focus();
+  }
+
+  function pick(item) {
+    const { start } = range;
+    const caret = textarea.selectionStart;
+    if (item.starter !== undefined) {
+      const { server, prompt } = item.starter;
+      close();
+      const fields = prompt.arguments.map((argument) => ({
+        argument,
+        input: el("input", { class: "input", type: "text", required: argument.required, autocomplete: "off" }),
+      }));
+      void formDialog({
+        title: item.label,
+        description: t("composer.starterDescription"),
+        body: fields.map(({ argument, input }) =>
+          field(argument.name, input, argument.description ?? (t(argument.required ? "composer.starterRequired" : "composer.starterOptional"))),
+        ),
+        submitLabel: t("composer.insertStarterDraft"),
+        valid: () => fields.every(({ argument, input }) => !argument.required || input.value.trim() !== ""),
+        onSubmit: async () => {
+          const args = Object.fromEntries(fields.filter(({ input }) => input.value !== "").map(({ argument, input }) => [argument.name, input.value]));
+          const { text } = await api.post("/mcp/prompts/expand", { server, name: prompt.name, arguments: args });
+          put(start, caret, text);
+        },
+        returnFocus: textarea,
+      });
+      return;
+    }
+    put(start, caret, item.insert ?? "");
     if (typeof item.run === "function") {
       item.run();
     }

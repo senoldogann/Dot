@@ -102,6 +102,9 @@ class _Hub:
         _mcp_tool("send_message", None),
     )
 
+    def resource_catalogues(self) -> tuple[()]:
+        return ()
+
 
 # The registry's tools, and the tools of that server, which a registry holds only while a server is connected.
 TOOLS: dict[str, RegisteredTool] = {

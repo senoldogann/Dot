@@ -156,6 +156,7 @@ from dotagent.server.views import (
     LearningModels,
     MainModelRequest,
     ModelOption,
+    PalettePrompt,
     PaletteView,
     PaneRequest,
     PermissionsView,
@@ -855,9 +856,15 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
             name: mark_of_service(service) if (service := service_of(server)) is not None else None
             for name, server in ctx.runtime.mcp.configs().items()
         }
-        return palette_view(
+        view: PaletteView = palette_view(
             catalog.skills, imported, ctx.runtime.mcp.tools, marks, await ctx.runtime.accounts.accounts()
         )
+        prompts: tuple[PalettePrompt, ...] = tuple(
+            PalettePrompt(server=server, prompt=prompt)
+            for server in sorted(ctx.runtime.mcp.connected())
+            for prompt in ctx.runtime.mcp.catalogue(server).prompts
+        )
+        return view.model_copy(update={"prompts": prompts})
 
     @router.get("/doctor")
     async def doctor() -> list[CheckResult]:

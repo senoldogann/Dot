@@ -224,7 +224,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full` offers all of them at every step. `grouped`, the default
   since item 1280, starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
-  `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, `waits`, `recon`, `skills`, and `mcp__<server>` for
+  `terminal`, `memory_admin`, `drafts`, `mcp_resources`, `accounts`, `team`, `pages`, `waits`, `recon`, `skills`, and `mcp__<server>` for
   each MCP server) are
   listed in the system prompt with what they are for and
   their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. A

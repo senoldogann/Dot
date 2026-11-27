@@ -447,10 +447,11 @@ on its way back (the page says the sending failed and keeps the message) is done
 the box of a run: the page sends each new message with a key of its own, and the daemon answers the same message sent
 again with what its first sending made. `/` at the start of a word opens the slash menu over the box: the commands of
 the composer (`/auto`, `/task`, `/chat`, `/research` and `/loop` here; `/btw`, the modes and `/loop` in the box of a
-run), the skills by name with their description, and each MCP server with its tools, read from the daemon as a run reads
+run), the skills by name with their description, and each MCP server with its tools and the prompts it offers (a prompt picked asks for its arguments and puts its
+text in the box as a draft, nothing sent, `POST /api/mcp/prompts/expand`), read from the daemon as a run reads
 them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape closes. The menu stands in
 sections with a hairline between them and no title on the page (a screen reader hears each by name: Commands, Skills,
-Actions of connected apps): a row is a line icon, the name and under it its words, cut by an ellipsis rather than wrapped (item 537,
+Actions of connected apps, MCP prompts): a row is a line icon, the name and under it its words, cut by an ellipsis rather than wrapped (item 537,
 after Qoder's menu: a terminal in a box for a command, the arrows of a loop for `/loop`, a puzzle piece for a skill),
 and under the list stands what the keys do (a touch screen has none, so it has no such line). An MCP tool is named in
 words, its server's first, as the row of a call to it is ("Web Research · Web crawl results", not `web-research /
@@ -513,7 +514,7 @@ tooltip says so: "Add files or teach a task". On a phone a
 finger's tap of the **+** opens the file picker at once, so the phone's own menu of the photos, the camera, a scan and
 the files comes up with no second tap, and a finger's hold opens the menu (item 1089); **/teach** in the slash menu
 teaches a task too, on every pointer, so that no way in needs the hold. The slash menu picks **Plugins** (the MCP servers with tools) and
-**Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
+**Skills**, as `GET /api/palette` lists them (it lists the MCP servers' prompts too); the at menu picks the plugins and the Google and Microsoft accounts signed
 in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
 model; one that is no longer signed in is refused). The model is told first what the chips of the message are, each
 account by its provider (the Google account …), and that the message's words mean them when they say "these" or speak

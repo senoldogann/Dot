@@ -7,6 +7,7 @@ phone."""
 
 import asyncio
 import re
+import sys
 import time
 from base64 import b64decode
 from collections.abc import AsyncIterator, Callable
@@ -22,7 +23,7 @@ from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, 
 import dotagent.skills as skills_pkg
 from dotagent.agent.attachments import ATTACHMENTS_EVENT
 from dotagent.agent.manager import RunManager
-from dotagent.config import load_config
+from dotagent.config import McpServerConfig, load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -33,6 +34,7 @@ from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.tools.meta import FINISH_TOOL
 
+_MCP_STARTER_FIXTURE: Path = Path(__file__).resolve().parents[1] / "fixtures" / "mcp_catalogue_server.py"
 _VIDEO_SAMPLE: Path = Path(__file__).resolve().parents[2] / "ios/Next/UITests/attachment-sample.mp4"
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -868,3 +870,48 @@ async def test_the_words_have_their_own_line_and_the_runs_choices_stand_in_the_b
             await _phone_box_has_its_line(browser, host, port)
         finally:
             await browser.close()
+
+
+async def test_an_mcp_prompt_inserts_a_draft_and_connectors_list_the_catalogue(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    await runtime.mcp.connect(
+        McpServerConfig(name="starter-notes", command=sys.executable, args=[str(_MCP_STARTER_FIXTURE)])
+    )
+    port: int | None = client.base_url.port
+    assert port is not None
+    address: str = ui_url(client.base_url.host, port, TOKEN)
+    try:
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width in (1280, 390):
+                    page: Page = await browser.new_page(viewport={"width": width, "height": 900})
+                    try:
+                        await page.goto(address)
+                        goal: Locator = page.locator(GOAL)
+                        await goal.press_sequentially("/summarize")
+                        await expect(
+                            page.get_by_role("option", name=re.compile("starter-notes · summarize"))
+                        ).to_be_visible()
+                        await goal.press("Enter")
+                        dialog: Locator = page.get_by_role("dialog", name="starter-notes · summarize")
+                        insert: Locator = dialog.get_by_role("button", name="Insert draft")
+                        await expect(insert).to_be_disabled()
+                        await dialog.get_by_role("textbox", name=re.compile("topic")).fill("weekly notes")
+                        await insert.click()
+                        await expect(goal).to_have_value("Summarize weekly notes.")
+                        await expect(page).to_have_url(f"http://{client.base_url.host}:{port}/#/runs")
+                        await page.goto(f"http://{client.base_url.host}:{port}/#/customize/connectors")
+                        await page.get_by_role("searchbox", name="Search connectors").fill("starter-notes")
+                        server: Locator = page.locator("[data-server='starter-notes']")
+                        await server.get_by_text("2 resources", exact=True).click()
+                        await expect(server.get_by_text("Weekly notes", exact=True)).to_be_visible()
+                        await server.get_by_text("2 prompts", exact=True).click()
+                        await expect(server.get_by_text("summarize", exact=True)).to_be_visible()
+                    finally:
+                        await page.close()
+            finally:
+                await browser.close()
+    finally:
+        await runtime.mcp.disconnect("starter-notes")
