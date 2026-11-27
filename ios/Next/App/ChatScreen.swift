@@ -36,6 +36,12 @@ struct ChatEnd: Equatable {
     let run: String?
 }
 
+/// Whether a chat has a stream to open: not while it is a new chat's outbox key the daemon has not named yet (item 2025),
+/// which it would answer 404, and the chat would read as deleted. Pure.
+func chatHasStream(_ thread: String, starting: [String: String]) -> Bool {
+    starting[thread] == nil
+}
+
 /// The row of a chat that came into sight last, kept by reference: writing it draws nothing again (item 1848).
 @MainActor
 final class ReadingMark {
@@ -186,7 +192,9 @@ struct ChatScreen: View {
             .toastHost($toast, seconds: 4) { _ in }
             .onAppear {
                 PhaseMeter.enter("chat")
-                model.open(thread)
+                // A chat the daemon has not named yet has no stream (item 2025): its outbox key is not opened, which the
+                // daemon would answer 404 and the chat would read as deleted; the named thread opens at the swap below.
+                if chatHasStream(thread, starting: model.startingChats) { model.open(thread) }
                 draft = model.draft(of: thread)
                 if let initialPanel { panel = initialPanel }
                 if editsFirstQueued, let first = view?.queue.messages.first {
@@ -196,14 +204,14 @@ struct ChatScreen: View {
             }
             .onDisappear {
                 PhaseMeter.enter("list")
-                model.close(thread)
+                if chatHasStream(thread, starting: model.startingChats) { model.close(thread) }
                 if edit == nil { model.keep(draft: draft, of: thread) }
                 if let topVisible = reading.topVisible { ChatScrollMemory.anchors[thread] = topVisible }
             }
             // A new chat keeps this screen when the daemon names it (item 2025): the outbox key's opening is closed and the
             // named thread opened, so its stream and its answer reach the screen; the words typed meanwhile go with it.
             .onChange(of: thread) { old, new in
-                model.close(old)
+                if chatHasStream(old, starting: model.startingChats) { model.close(old) }
                 model.open(new)
                 if edit == nil { model.keep(draft: draft, of: new) }
             }

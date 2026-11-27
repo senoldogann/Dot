@@ -155,4 +155,12 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(toolSymbol(captionEntry(call).kind), toolSymbol(row.kind))
         XCTAssertEqual(toolSymbol(captionEntry(HelperStep(tool: "desktop_act", target: "", line: "", at: 0)).kind), "cursorarrow.click")
     }
+
+    /// Item 2025: a new chat's outbox key is never opened as a stream (the daemon would answer 404 and the chat read as
+    /// deleted before it is named); the thread the daemon names is.
+    func testANewChatsKeyOpensNoStream() {
+        let starting: [String: String] = ["key-1": "Say hello"]
+        XCTAssertFalse(chatHasStream("key-1", starting: starting))
+        XCTAssertTrue(chatHasStream("thr_named", starting: starting))
+    }
 }
