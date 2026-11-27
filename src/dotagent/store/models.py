@@ -7,6 +7,7 @@ from pydantic import Field, StringConstraints, model_validator
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode
+from dotagent.store.kinds import KindBy, MemoryKind
 from dotagent.vault.cards import Brand
 
 # Which Chrome the browser tools work in: Dot's own, or the one the user has open (attached over its debugging port).
@@ -810,6 +811,10 @@ class MemoryRecord(FrozenModel):
     # Where the note came from (item 1864), set by the store from the run that saved it. ``None`` when that is not
     # known: a note stored before the column whose run is gone, or one saved under an id no run has.
     origin: MemoryOrigin | None = None
+    # What the note is (item 1975, :mod:`dotagent.store.kinds`) and who told it: the rules, the fast model, the run
+    # that saved it or the owner. ``None`` for both while neither the rules nor the fast model's pass has told it.
+    kind: MemoryKind | None = None
+    kind_by: KindBy | None = None
 
 
 class MemoryRewrite(FrozenModel):

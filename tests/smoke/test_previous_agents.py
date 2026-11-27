@@ -245,7 +245,7 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
             await expect(agents_tab).to_have_text("Agents")
             shown = panel.locator(".inspector-panel:not([hidden])")
             await expect(shown.locator(".hint")).to_have_text(
-                "When Dot hands part of the work to a subagent, it shows here."
+                "When Dot hands part of the work to a helper, it shows here."
             )
             await expect(shown.locator(".agent-row")).to_have_count(0)
             await page.close()

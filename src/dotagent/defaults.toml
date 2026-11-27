@@ -913,6 +913,15 @@ show_pointer = true
 input_only_when_away = true
 away_after_s = 600
 away_wait_s = 14400
+# A trial, off by default (item 2007): "cua" sends the clicks, typing, keys and scrolls of desktop_act to the
+# application's own window in the background through cua-driver (https://github.com/trycua/cua), which Dot starts as its
+# own child: the Mac's pointer, keyboard and front window stay yours, so these steps go while you are at the Mac. Hover,
+# drag, a click with a key held and bringing an application to the front still use the Mac's own pointer and wait for
+# you to step away. Everything else is as before: each step is judged and recorded as it is now. It relies on private
+# macOS interfaces that an update can break; Dot uses only cua-driver 0.28.2 signed by Cua AI and never installs it
+# (dotx doctor says the command). A step it cannot send fails and says why; it does not fall back to your pointer.
+background_driver = "off"
+background_driver_path = "/Applications/CuaDriver.app/Contents/MacOS/cua-driver"
 launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0
@@ -1015,6 +1024,11 @@ every_steps = 8
 embed_provider = "ollama"
 embed_model = "bge-m3"
 embed_enabled = true
+# How long a run's start waits for its notes, and then for its skills, to be found by meaning, in seconds each (item
+# 2004): past it, the run starts with them found by their words, as when the embedding service fails, and says so. The
+# local server answers in well under a second, and loads its model in about 13 s after keep_alive; a local chat model it
+# serves at the same time held a start for 304 s.
+start_recall_s = 15.0
 # Every run starts with the standing notes (a note tagged "core" you wrote or pinned, newest first; a run's "core" note
 # stands once you pin it), the notes you wrote yourself in Settings › Memory or with `dotx memory` (the ones that fit
 # the goal first) and the agent's notes that fit the goal (by fit and score), in that order, as many as fit a budget of

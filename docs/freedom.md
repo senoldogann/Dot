@@ -26,7 +26,9 @@ theirs), and a call's `tool_result` event keeps `waited_s`, the time it spent at
 that path breaks the contract as an ask does. Outside the gate, a desktop step that would take the Mac's own pointer or
 keyboard while the owner is at the Mac waits for them to step away (item 1890, the owner's own rule of 2026-11-25,
 `[desktop] input_only_when_away`): it asks nothing, in every mode, and is in
-[Browser and computer use](browser-and-computer-use.md).
+[Browser and computer use](browser-and-computer-use.md). The background driver of `[desktop] background_driver` (item
+2007) changes how such a step is sent, not what the gate answers about it (`test_freedom_contract.py` classifies
+every desktop row alike with it on).
 
 ## The exceptions, with the code that makes each
 

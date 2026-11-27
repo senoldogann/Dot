@@ -20,6 +20,7 @@ import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, besideLine, chatNoteLine, needsAside, outcomeOf, scheduleLine, userMessage } from "./messages.js";
+import { chatCardRenderer, POST_DRAFT_SETTLED } from "./chatcards.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { readsPages } from "./sourcelist.js";
@@ -1111,6 +1112,7 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
     return entry;
   }
 
+  const richCards = chatCardRenderer();
   const handlers = {
     run_started(scope, record) {
       if (scope.runId === rootRunId) {
@@ -1560,6 +1562,17 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         return;
       }
       place(scope, sentPicks(record.data), record.ts);
+    },
+
+    [POST_DRAFT_SETTLED](_scope, record) {
+      richCards.settle(record);
+    },
+
+    cards_shown(scope, record) {
+      const node = richCards.show(record);
+      if (node !== null) {
+        place(scope, node, record.ts);
+      }
     },
 
     // A page the run showed (`show_page`, item 193), in its frame.

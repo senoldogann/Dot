@@ -27,6 +27,7 @@ from dotagent.server.diagnostics import (
     read_tail,
 )
 from dotagent.server.licences import LicencesView, read_licences
+from dotagent.store.perf import PerfTable, PerfWindow
 
 
 class StallsView(FrozenModel):
@@ -119,6 +120,12 @@ def about_router(ctx: ServerContext) -> APIRouter:
         """The times the daemon's loop stopped answering for more than ``stall_s`` seconds, newest first, each with
         where it was (item 1672)."""
         return StallsView(stall_s=STALL_S, stalls=ctx.loop_watch.stalls())
+
+    @router.get("/diagnostics/speed")
+    async def speed(window: Annotated[PerfWindow, Query()]) -> PerfTable:
+        """Where the runs' seconds went in the last ``window`` (24h or 7d), stage by stage: each row's count, p50, p95,
+        p99, longest and how many took over 3 s (item 2003). Settings › Maintenance › Speed."""
+        return await ctx.runtime.store.perf(window)
 
     @router.get("/diagnostics/programs")
     async def programs() -> ProgramsView:

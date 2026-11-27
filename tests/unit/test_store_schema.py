@@ -24,7 +24,8 @@ _PINNED: dict[int, str] = {
     1: "e58f68b5c41098388860efc1c0f8813a1d73f665f61d9377d4f54d15a217115c",
     2: "f4541a5d75d0ecad92930e7e8e7927faad4393c2932e327ef693ccd26e02b5e2",
     3: "34e5b2b5ed4e94713a3be3b69d0474f77f1ff58d129517dbf5ab20f0adf8865d",
-    4: "a7170861415c0e01162667b49429aaee3906e485409e66319b5719329ceb9b6f",
+    4: "52e3aafe7aafd714a93384054fb11e7b352a331fe913298c9aa02914bcadae32",
+    5: "cd1496b34580264921b38cede687a7399f4cff40a3920b5d22bc5f6fe80d2547",
 }
 
 
@@ -110,6 +111,52 @@ async def test_a_database_from_before_versions_is_copied_then_brought_to_the_ver
     again: Store = await Store.open(database, tmp_path / "images")
     await again.close()
     assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))) == 1
+
+
+async def test_a_version_4_databases_notes_take_the_kind_the_rules_tell_in_the_step_to_version_5(
+    tmp_path: Path,
+) -> None:
+    """Version 5 (item 1975) gives the notes of a database without kinds the kind the fixed rules tell, recorded as the
+    rules', after a copy that keeps them as they were; a note the rules cannot tell keeps none, for the fast model."""
+    database: Path = tmp_path / "dot.sqlite3"
+    first: Store = await Store.open(database, tmp_path / "images")
+    await first.close()
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        old.execute("ALTER TABLE memories DROP COLUMN kind")
+        old.execute("ALTER TABLE memories DROP COLUMN kind_by")
+        for memory_id, content, tags in (
+            ("mem_lesson", "Read the whole diff before citing a line.", "lesson"),
+            ("mem_rule", "Müşteriye fiyat (Senol'un kararı): listeden sorulur.", "core,business"),
+            ("mem_unknown", "The printer is on the second floor.", ""),
+        ):
+            old.execute(
+                "INSERT INTO memories (id, content, tags, created_at, updated_at) VALUES (?, ?, ?, 1.0, 1.0)",
+                (memory_id, content, tags),
+            )
+        old.execute("PRAGMA user_version = 4")
+        old.commit()
+    finally:
+        old.close()
+    store: Store = await Store.open(database, tmp_path / "images")
+    try:
+        told = {note.id: (note.kind, note.kind_by) for note in await store.get_memories(["mem_lesson", "mem_rule"])}
+        assert told == {"mem_lesson": ("lesson", "rule"), "mem_rule": ("rule", "rule")}
+        assert [note.id for note in await store.memories_without_kind(5)] == ["mem_unknown"]
+    finally:
+        await store.close()
+    assert _version(database) == SCHEMA_VERSION
+    assert _tables_digest(database) == _PINNED[SCHEMA_VERSION]
+    copies: list[Path] = sorted((tmp_path / BEFORE_UPGRADE_DIR / "v4").glob("dot-*.sqlite3.gz"))
+    assert len(copies) == 1
+    restored: Path = await asyncio.to_thread(_unpacked, copies[0], tmp_path / "restored.sqlite3")
+    connection: sqlite3.Connection = sqlite3.connect(restored)
+    try:
+        columns: set[str] = {row[1] for row in connection.execute("PRAGMA table_info(memories)").fetchall()}
+        assert "kind" not in columns
+        assert connection.execute("SELECT count(*) FROM memories").fetchone() == (3,)
+    finally:
+        connection.close()
 
 
 async def test_a_version_3_database_has_its_chats_and_answers_indexed_in_the_step_to_version_4(tmp_path: Path) -> None:

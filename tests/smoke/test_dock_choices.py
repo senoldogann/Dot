@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from chat_settings import menu, open_for
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -166,7 +167,11 @@ def _pill(page: Page, name: str) -> Locator:
 
 
 def _menu(page: Page, label: str) -> Locator:
-    return page.locator(f".dock .composer-popover[aria-label='{label}']")
+    """The choices a menu named `label` held: the agent's still in its menu, the others in the chat's settings (item
+    2015)."""
+    if label == "Agent":
+        return page.locator(f".dock .composer-popover[aria-label='{label}']")
+    return menu(page, label)
 
 
 async def _follow_up_of(runtime: Runtime, run: RunRecord) -> RunRecord:
@@ -206,15 +211,15 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
 
             # Another model, a level of its reasoning and other approvals, for the follow-up; Keep going is a new
             # chat's.
-            await _pill(page, "model").click()
+            await open_for(page.locator(".dock"), page, "model")
             await _menu(page, "Model").get_by_role("option").filter(has_text="thinker").click()
             await expect(_pill(page, "model")).to_contain_text("thinker")
             await expect(_pill(page, "reasoning")).to_contain_text("Medium")
-            await _pill(page, "reasoning").click()
+            await open_for(page.locator(".dock"), page, "reasoning")
             await _menu(page, "Reasoning").get_by_role("option", name="High").click()
             await expect(_pill(page, "reasoning")).to_contain_text("High")
             # Goal mode and Plan first are switches of the Options menu.
-            await _pill(page, "options").click()
+            await open_for(page.locator(".dock"), page, "options")
             options: Locator = _menu(page, "Options")
             await expect(options.get_by_role("switch", name="Goal mode")).to_be_visible()
             await expect(options.get_by_role("switch", name="Plan first")).to_be_visible()
@@ -229,12 +234,12 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             await page.locator(".dock textarea").type("/chat")
             await page.locator(".dock textarea").press("Tab")
             await expect(_pill(page, "mode")).to_contain_text("Chat")
-            await _pill(page, "options").click()
+            await open_for(page.locator(".dock"), page, "options")
             await expect(options.get_by_role("switch", name="Goal mode")).to_be_hidden()
             await expect(options.get_by_role("switch", name="Plan first")).to_be_hidden()
             await page.keyboard.press("Escape")
             await expect(options).to_be_hidden()
-            await _pill(page, "mode").click()
+            await open_for(page.locator(".dock"), page, "mode")
             await _menu(page, "Mode").get_by_role("option").filter(has_text="Task").click()
             await expect(_pill(page, "mode")).to_contain_text("Task")
             await page.screenshot(path=str(tmp_path / "dock-choices-1280-light.png"), animations="disabled")
@@ -316,7 +321,7 @@ async def test_a_reasoning_level_is_not_carried_to_a_model_without_levels(
 
             # The daemon refuses a level that the model does not offer: on a model with none to choose, the pill goes
             # and the follow-up leaves the level to the daemon.
-            await _pill(page, "model").click()
+            await open_for(page.locator(".dock"), page, "model")
             rows: Locator = _menu(page, "Model").get_by_role("option")
             await rows.filter(has_text="scripted").filter(has_not_text="Default").click()
             await expect(_pill(page, "model")).to_contain_text("scripted")

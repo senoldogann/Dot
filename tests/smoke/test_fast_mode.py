@@ -260,21 +260,13 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{first.id}")
-                # A phone's box holds the reasoning in the model's menu, once the box is used (items 1120 and 1121).
-                held: str = "model" if width < 720 else "reasoning"
-                if width < 720:
-                    await page.locator(".dock textarea").click()
-                pill: Locator = page.locator(f".dock .composer-pill[data-pill='{held}']")
+                # The model's pill opens the chat's settings on every width (items 1202 and 2015), whose Reasoning row
+                # holds the speed.
+                pill: Locator = page.locator(".dock .composer-pill[data-pill='model']")
                 await expect(pill).to_be_visible()
                 await pill.click()
-                # A phone's chat settings (item 1202) hold the reasoning in a row that opens in place.
-                menu: Locator = (
-                    page.get_by_role("dialog", name="Chat settings")
-                    if width < 720
-                    else page.locator(".composer-popover[aria-label='Reasoning']")
-                )
-                if width < 720:
-                    await menu.locator("summary", has_text="Reasoning").click()
+                menu: Locator = page.get_by_role("dialog", name="Chat settings")
+                await menu.locator("summary", has_text="Reasoning").click()
                 speed: Locator = menu.get_by_role("listbox", name="Speed")
                 await expect(speed.get_by_role("option")).to_have_count(2)
                 fast: Locator = speed.get_by_role("option", name="Fast")
@@ -287,7 +279,6 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                     await expect(pill).to_contain_text("Fast")
                     # The page tells the daemon, which keeps it with the chat's choices.
                     await _kept_fast(runtime, first.thread_id)
-                    await pill.click()
                 await expect(fast).to_have_attribute("aria-selected", "true")
                 await page.screenshot(path=str(tmp_path / f"fast-{width}-{scheme}.png"), animations="disabled")
                 await page.keyboard.press("Escape")

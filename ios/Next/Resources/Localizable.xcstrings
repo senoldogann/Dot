@@ -122,6 +122,17 @@
         }
       }
     },
+    "%@ is working on it": {
+      "comment": "Hand-off: the bot asked has not answered yet; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ üzerinde çalışıyor"
+          }
+        }
+      }
+    },
     "%@ late": {
       "comment": "Work order: how late it is; the argument is a span such as 2 h",
       "localizations": {
@@ -6598,6 +6609,17 @@
         }
       }
     },
+    "Judged by: %@": {
+      "comment": "Objective: how progress is judged; the argument is the measure",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ölçüt: %@"
+          }
+        }
+      }
+    },
     "Keep the file changes": {
       "comment": "Edit from here: rewinds the chat and leaves the files as they are",
       "localizations": {
@@ -11762,6 +11784,17 @@
         }
       }
     },
+    "Show cards": {
+      "comment": "Tool row of Dot's own tool: cards shown in the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kart göster"
+          }
+        }
+      }
+    },
     "Show page": {
       "comment": "Tool row of Dot's own tool: a page shown in the chat",
       "localizations": {
@@ -14546,17 +14579,6 @@
         }
       }
     },
-    "Waiting for a reply": {
-      "comment": "Hand-off: the bot asked has not answered yet",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yanıt bekleniyor"
-          }
-        }
-      }
-    },
     "Waiting for the link": {
       "comment": "Under an owner's message: it is kept and goes when the phone is online",
       "localizations": {
@@ -15389,13 +15411,13 @@
         }
       }
     },
-    "Written after Dot read content from outside.": {
+    "Written after Dot read content from outside": {
       "comment": "Work order and objective: written by a run that read pages or mail others can write",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dot dışarıdan içerik okuduktan sonra yazıldı."
+            "value": "Dot dışarıdan içerik okuduktan sonra yazıldı"
           }
         }
       }
@@ -16019,6 +16041,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "zemin"
+          }
+        }
+      }
+    },
+    "handed out %@": {
+      "comment": "Work order: when it was handed out; the argument is a span such as 2 hours ago",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ verildi"
           }
         }
       }

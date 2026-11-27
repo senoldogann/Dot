@@ -56,6 +56,7 @@ import { PAGE_ANSWER_EVENT } from "../pageframe.js";
 import { planBubble, planContent, planStep, planTargets } from "../planbubble.js";
 import { createReactions, REACTION_EVENTS } from "../reactions.js";
 import { approvalLabel, heldChoice } from "../runmodes.js";
+import { emptyBoxWords } from "../composershape.js";
 import { messageKeys } from "../sending.js";
 import { changesSection } from "../changes.js";
 import { runChangesCard } from "../runchanges.js";
@@ -1425,7 +1426,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         ? narrowOr(t("intent.steerPlaceholderShort"), t("intent.steerPlaceholder"))
         : narrowOr(t("intent.queuePlaceholderShort"), t("intent.queuePlaceholder"));
     // A messaging app's few words (item 833); what the at sign and the slash open is the box's tooltip.
-    input.placeholder = active ? working : t("composer.followUp");
+    input.placeholder = active ? working : emptyBoxWords(agent !== null ? agent.name : dotName(), agent !== null);
     keepLook();
     // The send says which way it sends: the same name on the button, in its tooltip and to a screen reader.
     const sendWord = active ? (holding ? t("intent.sendToTask") : steers(false) ? t("intent.steer") : t("intent.queue")) : t("composer.followUp");
@@ -2235,13 +2236,19 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   paintQuestions(detail.questions);
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
-  // A choice tapped in a page of the conversation (item 658) is written into the box, for the user to send.
+  // A choice tapped in a page or a card of the conversation (items 658 and 1967) is written into the box, for the user to
+  // send: what a run wrote never goes out as the owner's word on a tap.
   // A delegated run has no box (syncControls): the page is told so rather than filling one nobody sees.
   const onPageAnswer = (/** @type {Event} */ event) => {
     if (frame.element.hidden) {
       return;
     }
-    frame.fill(/** @type {CustomEvent} */ (event).detail.text);
+    const { text, preserveDraft } = /** @type {CustomEvent<{ text: string, preserveDraft?: boolean }>} */ (event).detail;
+    if (preserveDraft === true && input.value.trim() !== "") {
+      toast("error", t("cards.finishMessage"));
+    } else {
+      frame.fill(text);
+    }
     event.preventDefault();
   };
   window.addEventListener(PAGE_ANSWER_EVENT, onPageAnswer);

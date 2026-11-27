@@ -626,7 +626,9 @@ on from, since what a stranger wrote set it off: its goal is your own words and 
 a fence. So does every firing of a schedule a run made after it had read outside content (`schedule_create`, item
 899): its goal may hold those words; a change of yours in its form keeps the mark, and a schedule you make is yours.
 `recall` of such a schedule gives its name and goal in a fence and marks the run that reads them, and `schedule_list`
-marks the run when it lists one and names it (item 978). A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
+marks the run when it lists one and names it (item 978). A message you send starts a run unmarked, and
+a choice a run shows, in a page or a card, only writes its words into your message box: what a run wrote never goes out as
+your word on a tap (item 1967). A note a run saved while it was marked keeps that origin (`tainted`),
 as does one it saved after your message cleared its mark, since your words clear the run's mark, not the page's
 words a note may quote (item 899; a thing for later, `todo_add`, the same):
 it is never among the notes a run starts with, is handed while it works or in a site's note to a run (item 384), nor
@@ -1429,7 +1431,8 @@ event and approval.
   cancelled, as at the daemon's stop, and the harness's probe ends with the commands it started, item 683); nor does the
   nightly look for plugins (one under way ends at its next plugin and stores nothing, and Look now answers 409, items
   711 and 712), nor the repair night (one under way is cancelled with its session of Claude Code and what it started,
-  and its problem is left as it was; [Self-repair](repair.md), item 921)
+  and its problem is left as it was; [Self-repair](repair.md), item 921), nor the fast model's hourly pass over the
+  notes without a kind (one under way is cancelled, and what it recorded stays; item 1975)
 - while the `STOP` file exists, no watcher looks (a stop engaged while one looks keeps the next from looking and the
   one at work from starting a run, item 683), and **a message on a channel** (iMessage, [Channels](channels.md),
   item 611) starts no run and is not queued either: a message queued starts its run when the one at work ends, stop or

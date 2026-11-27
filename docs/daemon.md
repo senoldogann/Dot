@@ -40,7 +40,7 @@ step that needs your answer is not folded out of sight. Its fold is kept in that
 kept from before item 836 is not read as it. At the right of a chat at work the age gives way to **Working** and how long
 since the run was asked for ("12s", "4m", "1h 5m", read again every second). What a chat delegated (item 507), the runs at
 work and those that ended, is one quiet count in its last line (the users mark and how many), and its name for a screen reader
-says how many there are. Nothing hangs under the row: a click on it opens the chat,
+says how many there are. A chat whose run waits on its helpers says **Waiting on 2 helpers…** in its last line, in place of its last words, shimmering as the work line does, and a chat at rest with something still working for it (a helper let go, a command in the background, its loop) says **Waiting · ** and the first of them, quiet (item 2010, as the iPhone app's rows do; read from `GET /api/threads/view` beside the list, so a phone with no link shows what the list alone tells). Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
 (which works in a thread of its own). A run another run delegated stands under the chat its work came from, never as a
 row of its own, also once the run that delegated it has ended (item 1074: a work order's try outlives the lead's turn
@@ -240,67 +240,52 @@ about; two rows a section (a run without the runs it delegated), then **Show N m
 in place (item 364), and the page scrolls to what does not fit. A section folds on a click of
 its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
-and `due`. The composer is one rounded box (item 1330, after the reference app's): its corner is the token's (`--radius-composer`, one
-radius whatever the words), its edge a hairline that grows stronger under the pointer and in focus, with no shadow and no
-halo, on the page's own surface, a phone's too. The words stand on top, across the box ("Message Miro",
-the name you call Dot by; "Follow up" in the box of a run; the box's tooltip says that @ opens the apps and / the
-skills and commands), and under them one bar: the **+** at the left; at the right the model's pill with the reasoning's
-beside it, which read as one control (the provider's mark, the model's name and, for a model that offers a choice of
-reasoning, its level as four bars, as many filled as the level is high among those the model offers; the level's words are
-the tooltip's and a screen reader's), the microphone and the round send. The mode (when one is named) and the context meter
-are quiet pills of the same bar. The files attached and the picks stand above it (item 1249: a long message wrapped a few
-words a line between the **+** and the send). A file uploads as it
-is attached; a picture past a megabyte and 2048 pixels on its longer side goes as a JPEG of 2048 (its clear parts
-white), as a model reads it at about that size (one the browser cannot read fails on its chip, with the browser's
-words); a send pressed while files upload says to wait, once however often it is pressed, as the same toast is never
-shown twice at a time (item 990). On that line the microphone and the round send stand side by side from the start (the microphone stays where the browser can
-listen), the send quiet while the box is empty, and a Stop is always in sight. The run's choices are always in sight: the button
-beside the **+** that showed and hid them, the box's resting state (item 833; a phone's, item 1120) and the browser's memory of
-that choice are gone (item 1330). The approvals, the **Options** pill, stand under the box at its right, quiet words on no
-ground, as the reference app's "Full access" does; on a phone the model's sheet holds them (item 1202) and the open lock of
-**Ask only to pay or send** alone stays in the bar, since the run then asks next to nothing (item 860: a payment, a message or
-a post) and the box must say so, and so does the size of the chat once it is near full. On a phone the model's pill says the
-mode and the reasoning, not the approvals (item 1163; [Phone](phone.md)). The bar of the choices never wraps: the **+** and the mode at
-the left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
-reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir
-şeyi değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work", "operate",
-"run", "go" or "keep things read-only" where a sentence or a clause starts (after a comma, a semicolon, a colon, a dash,
-a bracket, "and", "then" or "but"), and "keep it read-only" opening the message, none of them followed by a noun; but "make config.toml read-only", "copy prod.db.
-Keep it read-only", "run read-only checks", "the DB must stay read-only" and "dosyayı salt okunur yap" name a thing and
-are a task, item 691), and a task otherwise, which ends at once when it answers without a tool, as a chat does
-(`agent/mode_words.py`). A mode named with `/task`, `/chat` or `/research` brings the pill (Task, Chat or Research; its
-menu says what each does and leads back to Auto); `POST /api/runs` takes `mode: "auto"`; at the right the agent with its face and name once an agent
-exists (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's
-default or one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser
-per model) and **Options** (the approval mode, which the pill always shows by its icon and a short name: a lock for
-Supervised, a pencil and "Edits" for Auto-accept edits, a shield for Auto, an open lock and "Pay or send" for **Ask
-only to pay or send** (stored as `yolo`; it was named YOLO, which said nothing of what it still asks), on no fill; its
-menu lists the four modes with what each does, the last in the warning ink while it is chosen, item 398, see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)) and the round send, quiet while the box is
-empty. The files under the box stand in one row that wraps only when the frame runs out of width: a photo shows itself
-at a thumbnail's size, its name its tooltip and its × at its corner, where another file keeps its icon, its name and its
-size. Each pill is an icon and its value, on no ground until the
-pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
-and the model's name gives way with an ellipsis, while the reasoning keeps its bars (its words are out of sight), so on a phone
-the bar is still one line. A phone's box is this box (item 1330): the words take
-their own line, and the **+**, the model (which opens the chat's settings, a sheet from the foot of the screen with the models, the
-reasoning, the mode, the approvals and How Dot works, item 1202), the context meter, the microphone and the send stand
-on the line under them ([Phone](phone.md), items 1121, 1202 and 1330). On a phone the bar's buttons are 36 px and answer a
-finger's 44 px around them (item
-787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
-least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
-311). While Keep going is on, one line under the frame says so. On a wider window each pill opens its menu above it, and a pick or
-Escape or a click outside closes it; a phone's chat settings stay open after a pick, until Done, Close, Escape, a tap on
-the dim or a drag of the sheet's head down. The model's menu (item 208) has a rail on its left, a star for the
-favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the models
-of the view shown (item 395), as its placeholder and its label say, which keeps its words when the rail shows another
-view, has the keys as the menu opens and reads names, providers and "free"; and on each model a star
-that keeps it among the favourites in that browser, where the menu opens once there are any. The arrows and Enter pick a
-model, ⌘1 to ⌘9 the rows that show those keys, and ⌘D stars the row the keys are on. The default's row, the first of
-every view, has **Change** (item 209): the list then chooses the model new chats start on, a bar under the search says
-so and the default has the tick, and the model picked (by a click, Enter or ⌘1 to ⌘9) becomes the default, as in
-Settings › Models; the menu goes back to the chat's model and stays open. A chat that has a model of its own keeps it,
-and one that follows the default moves with it. Escape or Cancel goes back without a change. What you typed and attached
+and `due`. The composer works as the iPhone app's does, on every width (item 2015). It is one rounded box (item 1330): its corner
+is the token's (`--radius-composer`), its edge a hairline that grows stronger under the pointer and in focus, on the
+page's own surface. While the words are short (32 characters at most, on one line, with no file or pick) it is one row:
+the **+**, the words, the model as its provider's mark and a chevron, the size of the chat (a ring, once a run has one),
+the microphone and the round send, on one centre line. Longer words, a line break or a file open it: the words on top,
+and under them the **+**, the model's mark with its name and, in grey, the mode when one is named, the reasoning's level
+and **Fast** (fast mode), the chevron, the ring, the microphone and the send. The empty box says **Message Dot** (by the
+name you call Dot), **Ask Scout** in an agent's chat, **Queue a message** or **Tell the running task** while a task works,
+as Settings › General says a message goes then (the box's tooltip says that @ opens the apps and / the skills and
+commands, /btw among them). The files attached and the picks stand above the line. A file uploads as it is attached; a
+picture past a megabyte and 2048 pixels on its longer side goes as a JPEG of 2048 (its clear parts white), as a model
+reads it at about that size (one the browser cannot read fails on its chip, with the browser's words); a send pressed
+while files upload says to wait, once however often it is pressed (item 990). A photo shows itself at a thumbnail's
+size, its name its tooltip and its × at its corner, where another file keeps its icon, its name and its size. The
+send is quiet while the box is empty, and a Stop while a task works and the box is empty.
+
+The model's pill is the one choice in the bar: it opens **Chat settings**, a sheet from the foot of a phone's screen and
+over the middle of a wider window (item 1202): the default's row with **Change** (item 209: the list then chooses the
+model new chats start on, a bar says so, and the model picked becomes the default, as in Settings › Models; a chat that
+has a model of its own keeps it, and one that follows the default moves with it; Cancel goes back without a change), the
+favourites, a section per provider (the chosen model's open, the others saying how many they hold), a tick and a star
+per model (the star keeps it among the favourites in this browser), and a search at the foot that makes one list across
+the providers; then the Options as rows that say their value and open in place: **Reasoning** (the level, kept in the
+browser per model, the choices for one message, and fast mode where the model has it), **Mode** and **Approvals**; and
+**How Dot works** with its switches (Keep going, goal mode, Plan first). A pick keeps the sheet open; Done, Close,
+Escape, a tap on the dim or a drag of a phone's sheet head down puts it away. The mode, the reasoning and the approvals
+have no pill in the bar; the open lock of **Ask only to pay or send** alone stays there, since the run then asks next
+to nothing (item 860: a payment, a message or a post) and the box must say so. The agent's pill (its face and name,
+once an agent exists) stays at the left of the model, with its menu of the agents and their roles.
+
+A message is on **Auto** (item 495), which names no mode: its words settle its mode, research, which only reads, when
+they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir şeyi
+değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work",
+"operate", "run", "go" or "keep things read-only" where a sentence or a clause starts (after a comma, a semicolon, a
+colon, a dash, a bracket, "and", "then" or "but"), and "keep it read-only" opening the message, none of them followed by
+a noun; but "make config.toml read-only", "copy prod.db. Keep it read-only", "run read-only checks", "the DB must stay
+read-only" and "dosyayı salt okunur yap" name a thing and are a task, item 691), and a task otherwise, which ends at
+once when it answers without a tool, as a chat does (`agent/mode_words.py`). A mode named with `/task`, `/chat` or
+`/research`, or picked in the Mode row, is said in grey after the model's name (Task, Chat or Research);
+`POST /api/runs` takes `mode: "auto"`. The approval modes are Supervised, Auto-accept edits, Auto and **Ask only to pay
+or send** (stored as `yolo`; it was named YOLO, which said nothing of what it still asks), each with what it does, the
+last in the warning ink while it is chosen (item 398, see
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). On a phone the bar's buttons are 36 px and
+answer a finger's 44 px around them (item 787), and the box's text is the size chosen for it, at least 16 px on a touch
+screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item 311). While Keep going
+is on, one line under the frame says so. What you typed and attached
 and did not send is kept in this browser and is there again when you come back (so is the box of each run), and so are
 the mode, the model, the agent, Keep going and a choice for one message picked for it (item 397), until a message goes:
 a new chat after that starts on Auto, the default model, Dot and Keep going off. Dot's face
@@ -519,8 +504,7 @@ logo, the icon or the letters, in the chip's colour on no tile, item 946), Dot's
 server until the daemon's palette has named it (a draft kept, a message sent; the plug before item 581); the chip of an
 account names its provider with the provider's mark (Google, Microsoft; item 946), its address in its title, once the
 palette names it, and its address with the mail icon until then and for an account signed out since; Plan first is a
-chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **Options** menu's
-**How Dot works** group, under the approvals (item 353). The picks go with the message (`plugins`, `skills`, `accounts` and
+chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **How Dot works** group of the Chat settings, under the Options rows (items 353 and 2015). The picks go with the message (`plugins`, `skills`, `accounts` and
 `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is sent they stand at the head of its text as
 words in their colours, with no border, as a skill stands in a line of text (the run's `picks` event; item 858); a message added to the run under way leaves them for the next one, which a note over the box says before the send (with **Send after this task instead**), and a toast after a send the other way with ⌘⇧Enter,
 and a queued message with picks is not steered into the run at work: it stays queued to start a run of its own. A run
@@ -584,26 +568,38 @@ whose turn read pages on the web (`web_fetch`, `web_extract`) has a quiet line b
 1184): the first letter of a few of the sites and how many pages ("3 sources"); opened, each page's title over its site,
 a link that opens it in the browser. A page is counted from the address the run asked for (or the one a redirect ended
 at), never from what a page says; its title is the page's own, shown as text and cut at a line. A turn lists 12 pages
-at most and counts the rest; a fetch that failed and a search read none. A delegated run
-is a row, drawn as a developer tool draws its subagents (item 1331): a small face with its state at the corner (turning
+at most and counts the rest; a fetch that failed and a search read none.
+
+Dot can place cards in the conversation with `show_cards`. The web UI displays charts with a data table, ordinary
+tables, image galleries and choices, whose tap writes the chosen words into the message box for you to send, as a page's
+choice does; while a message is half-written the tap is refused ("Finish the message in the composer first"), so your
+draft is never lost. A channel's step line for the call says "showed cards in the web view": the channel draws none. Post drafts show the platform, account and text together, and related drafts scroll sideways. You can copy,
+edit or cancel a draft in the current view. Cancelled drafts stay visible in muted colours. **Prepare to publish** puts
+a text-only draft in the composer for you to review and send as a request. The resulting run goes through the existing
+post policy. The renderer can show a confirmed X result as a collapsed **Shared** row that opens to the post text and
+its **Open on X** link. Recording that result from a card's Share action requires the planned publisher. Mail and
+iMessage drafts are sent through their own cards.
+
+A delegated run
+is a row, drawn as a developer tool draws its helpers (item 1331): a small face with its state at the corner (turning
 while it works, amber while it waits for you, a check in the text's ink when it is done, item 839, red when it
-failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Subagent
+failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Helper
 1" for a screen reader only; the goal's paths are cut to their last two parts, "…/housestory/brief.md", item 669), under
 it in one quiet line what it does now in the words of the line over the composer ("Running swift test", "Reading
 README.md", "List folder: shelf-3"; item 1331) and, once it ended, the start of its answer as the result (item 245),
 its state in a word beside the time it has taken ("Running 8m 15s": the word in blue while it works, amber while it
 waits, red when it failed; the time counts on every second), the way to its own page (under the pointer, where there
 is one; on a touch screen, on an open row, item 1281) and a chevron that opens its steps. In a group the rows share one
-card with a hairline between them; one subagent alone is a card of its own. Rows that follow each other gather in one
-group: its head shows their faces, how many they are ("3 subagents"), how they stand ("2 working", in blue while one
+card with a hairline between them; one helper alone is a card of its own. Rows that follow each other gather in one
+group: its head shows their faces, how many they are ("3 helpers"), how they stand ("2 working", in blue while one
 works; "2 done · 1 stopped" after) and the time from the first one's start to the last one's end, counting on while
 one works, and a chevron that folds the rows away; while one works a quiet line in the card says how they work: side by
 side while the chat waits, their answers coming back to it. Over the composer, while the task waits for them, a line
-says **Waiting on 2 subagents** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
-and the subagents with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 subagents keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
+says **Waiting on 2 helpers** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
+and the helpers with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 helpers keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
 and hairline in the dock, and the dock is not the conversation: it stands where it is while the chat is scrolled, a phone's
 included, and nothing of the history shows through it (item 1347). A phone does not draw the line (item 1383): its words
-are the first line of the sheet that the capsule's **2 helpers** segment opens, with what each subagent does now,
+are the first line of the sheet that the capsule's **2 helpers** segment opens, with what each helper does now,
 **Details** and **Stop**. An approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
 again. Its steps are put in the page the first time it opens, by you or by an approval, and stay (item 767): until then
@@ -796,14 +792,14 @@ send's way (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
 box (items 352 and 360, drawn since item 1335 as a plain bar on a hairline, no glass and no shadow) says in a few quiet words how long the run has worked, that it waits to start, that it waits
 for you or that it stops (once Stop was pressed, until it has),
-how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its subagents stand
+how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
 composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side
 panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
 part closes it. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
-stacked over the box (item 1383): the line that waits for subagents, the bar, the queue, the loops and the commands at
+stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Reconnecting…**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
@@ -825,14 +821,11 @@ once, as the screen it was sent from does: when the run is queued, once the page
 a phone's page that the browser loads again opens; what was typed there and not sent goes with it. A page of an earlier
 run of the chat (opened from the sidebar's Activity, a link or its address) stays where it is, and so does a page while
 a question its run left is open on it, until none is (item 451). In a campaign's chat the message steers the
-session. The box wears the home's pills too: the mode (none on Auto, which a chat keeps for its next messages,
-each settled by its own words), the model with its reasoning and the Options (approvals and goal mode) of the chat,
-and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
+session. The box holds the home's choices too, in its Chat settings (item 2015): the mode (Auto, which a chat keeps for its next messages, each settled by its own words), the model with its reasoning, and the approvals and goal mode of the chat, and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
 for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a
 chat from before has the open run's until its next run starts; a Task kept before Auto, item 495, reads as Auto, which
 settles a task unless a message's words ask only to look). They are not kept in the browser as the home's are, and
-Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
-next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
+Keep going stays a new chat's choice. The run under way keeps its own: while it works, the model's pill steps back and says that the choices wait for the next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
 window up to 200 000, items 396 and 732); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows
 the figures, the point past which Dot summarizes the older part of the run, the model's window, and why the budget is
@@ -854,11 +847,11 @@ hairline with its title, what sums it up (a count) and its buttons on one line, 
 while its section is in sight and gives way to the next one's; the rows are tight, on the 8 px scale. Beside the
 conversation it is a column at the window's right; on a narrower window a drawer, and on a phone a sheet from the foot,
 nine tenths of what is seen. The Agents tab opens on the **Lineage** (item 1332), titled "Lineage · 2 running": the task that leads and, under
-it, its subagents that work, each a mark, its title, how long it has worked ("8m") and a dot for how it stands (blue
+it, its helpers that work, each a mark, its title, how long it has worked ("8m") and a dot for how it stands (blue
 while it works, amber waiting for you, green done, red failed; the row is the way to its page, and what it does now
 is its tooltip), and a **Previous agents** row with how many failed ("1 failed") and how many there are, which folds
 open the rows of those that ended. The Task tab holds the same Lineage, compact, whenever the chat has handed work to
-a subagent, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
+a helper, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
 `/loop`, a schedule a run made in the chat, a schedule that fires into it), each a calendar-clock mark with a green dot
 while it is on, its title over how it repeats or when it runs and how it stands ("Every 6 hours · paused", "Once,
 Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00") and, under that, how its last run ended and when (item 1355: "Last run done · 09:00",
@@ -987,7 +980,7 @@ draws no line either way (items 346, 362 and 500, kept in this browser), and **S
 **Appearance** (the look
 of this browser, below), **Models** (the **Default model** first, a menu of the models that can call tools: the runs
 that name no model, a new chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models]
-main`, as when it is changed from the composer's model menu; the **Roles** card holds the fast, review and vision
+main`, as when it is changed from the composer's Chat settings (Change); the **Roles** card holds the fast, review and vision
 models too, each with its provider in its box (on a phone the model's name has the whole box, item 787), and
 **Fallbacks** the models a run moves to; then **Every model, by
 service**, a search over one fold per service, with the reasoning levels of each model and a menu to choose one, and
@@ -1024,7 +1017,7 @@ sheet), and at its foot **Back to chats**, to the chat last open (item 852). Eve
 **General**, **Appearance**, **Rules**, **Memory**, **Vault** and **Snapshots**; under **Agents**
 Agents, Models, Browser, Web search, **Scheduled tasks** (item 1337: what was the Schedules page), Campaigns and
 Self-improvement; under **Connections** Connectors, Plugins, Skills, AI services, Phone, Channels and Hooks; under
-**Maintenance** System, Self-repair and Diagnostics; under **About** Open source licences. A row is a small mark and its
+**Maintenance** System, Self-repair, Diagnostics and Speed; under **About** Open source licences. A row is a small mark and its
 name, with what it holds at its right (how many notes Dot keeps, how many items the vault holds, how many schedules are
 on, a dot when a phone reaches Dot; no model's name, item 852), and the rows scroll on their own in a short window;
 whether the daemon answers and the emergency stop are the page's, as on every page. The page is the open page alone, in a
@@ -1154,7 +1147,16 @@ programs Dot starts, Claude Code and OpenCode, are read with their versions for 
 where each is on the owner's PATH (or that it is not), the version its `--version` says, and how Dot fares on it, by
 the versions Claude Code was measured on (item 1673: `supported`, `graceful`, `broken`, `unknown`) and `unknown` for
 OpenCode, of which Dot keeps no such list (`GET /api/diagnostics/programs`: `programs` with `name`, `command`, `path`,
-`version`, `support`, `why`). **Open source
+`version`, `support`, `why`). **Speed** (`#/settings/speed`, item 2003) is the table `dotx perf` prints, for the last
+24 hours or 7 days, read from what the runs recorded: per stage, each row's count (n), its 50th, 95th and 99th
+percentiles, its longest and how many took over 3 s. The stages: a run's start to its first model call; each read of that
+start (`start_reads`: the model's profile, the agent, the agents, the accounts, the skills, the notes, the last call of
+the chat, the secrets and the harness's texts); between two steps (a step's last tool result to the next step's model
+call), and Dot's own part of it, less the model calls the loop makes there (a compaction, a goal check, a checkpoint),
+which have their own rows; the model calls by model and purpose; the first word of a step's reply by model; and each
+tool's running time (`ran_s`, without a wait at the gate). A gap in which you held the run with a ✋, and a call your
+stop cut off, are left out; the API's own routes are not timed (`GET /api/diagnostics/speed?window=24h|7d`: `window`,
+`since`, `until`, `runs`, `rows` with `stage`, `name`, `n`, `p50`, `p95`, `p99`, `max`, `over_3s`). **Open source
 licences** (`#/licences`,
 item 371) shows the notices that come with the pages (the fonts, the icons, and the code taken from other projects,
 whose copyright Dot keeps), the Python packages installed beside the daemon with the licence each one's metadata names
@@ -1548,7 +1550,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (`"review"` for `dotx run --review`, kept under Code reviews; a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170); `/events?tail=N` (1 to 2000) reads a run's newest N events instead of the ones after `after`, oldest first, and says it knew `tail` with the header `X-Dot-Events-Tail: N` (item 1370: a client that was away through a long run reads the end of it; one that finds no header is talking to a daemon that ignores `tail`) |
-| `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs (`stored=true`: only those stored so far, item 734); lifecycle of all runs |
+| `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs. A stored read (`stored=true`, item 734) includes any draft outcomes recorded after the run ended. The global stream follows the lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `GET\|POST /runs/{id}/messages/{message}/reactions`, `DELETE /runs/{id}/messages/{message}/reactions/{reaction}` | the reactions on a message of Dot's (item 586; `message` is `answer` or `step-<n>`, `n` written as the number it is, from 1: `step-01` and `step-0` are 422, so that a message has one key; item 612): list them; put one on (`{"reaction": "good"}`, one of `good`, `love`, `wrong`, `again`, `remember`, `explain`, `hold`) and do what it says, 201, or 200 when it was there (the reply has `reactions`, `effect`, `said` and `run_id`; 404 for no run or a step it did not say, 422 for a message with no words, for the answer of a run that works, or for a 📌 on a message that holds a secret); take one back |
