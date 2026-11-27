@@ -159,6 +159,7 @@ struct MemoryPage: View {
     }
 
     private func load() async {
+        notice = nil
         proposals = await model.read { api throws(DaemonRequestError) in try await api.proposedNotes() }
         await loadNotes(count: max(notes.value?.items.count ?? pageSize, pageSize))
         if hits != nil { await search() }
