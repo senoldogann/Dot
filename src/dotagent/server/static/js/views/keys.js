@@ -202,7 +202,7 @@ function modelsOf(provider) {
 function keyLine(view) {
   // A custom provider of a server on this Mac takes no key at all (item 1949).
   if (view.name === "") {
-    return "No key needed";
+    return t("views.keys.noKeyNeeded");
   }
   // A key in use may be the daemon's own (its environment or the Keychain): `source` says so while `saved` is false.
   if (view.source === null) {
@@ -221,21 +221,21 @@ function customSection(own, host) {
   const facts = el(
     "dl",
     { class: "custom-facts" },
-    el("dt", null, "Base URL"),
+    el("dt", null, t("views.customProvider.baseUrl")),
     el("dd", { class: "mono" }, own.config.base_url),
-    el("dt", null, "Protocol"),
+    el("dt", null, t("views.customProvider.protocol")),
     el("dd", null, PROTOCOLS[own.config.protocol]),
-    el("dt", null, "Models"),
-    el("dd", null, `${own.config.models.length} named${own.config.list_models ? ", and those it lists" : ""}`),
+    el("dt", null, t("views.customProvider.models")),
+    el("dd", null, t(own.config.list_models ? "views.keys.modelsNamedAndListed" : "views.keys.modelsNamed", { count: own.config.models.length })),
   );
-  const change = el("button", { class: "btn", type: "button", "aria-haspopup": "dialog" }, icon("pencil"), "Change");
+  const change = el("button", { class: "btn", type: "button", "aria-haspopup": "dialog" }, icon("pencil"), t("views.keys.changeProvider"));
   change.addEventListener("click", () => openProviderForm({ existing: own, returnFocus: change, done: () => host.reload(own.name) }));
-  const remove = el("button", { class: "btn ghost", type: "button", onclick: () => attempt(() => host.remove(own)) }, icon("trash"), "Remove provider");
+  const remove = el("button", { class: "btn ghost", type: "button", onclick: () => attempt(() => host.remove(own)) }, icon("trash"), t("views.keys.removeProvider"));
   return el(
     "section",
     { class: "provider-section" },
-    el("div", { class: "provider-section-head" }, el("h3", { class: "provider-section-title" }, "Provider")),
-    el("p", { class: "provider-use" }, "A provider you added. Dot speaks its protocol and nothing of the service beyond it."),
+    el("div", { class: "provider-section-head" }, el("h3", { class: "provider-section-title" }, t("views.keys.providerSection"))),
+    el("p", { class: "provider-use" }, t("views.keys.customUse")),
     facts,
     el("div", { class: "provider-actions" }, change, remove),
   );
@@ -473,7 +473,11 @@ function buildProvider(initial, isDisposed, host) {
     const set = view.source !== null;
     const using = about.needed ? rolesOn(view.provider) : [];
     element.dataset.state = set ? "set" : "unset";
-    line.replaceChildren(keyLine(view));
+    // Drawn again only when its words change: a repaint that says the same keeps the nodes a reader may hold.
+    const said = keyLine(view);
+    if (line.textContent !== (typeof said === "string" ? said : said.textContent)) {
+      line.replaceChildren(said);
+    }
     stateLine.dataset.tone = set ? "ok" : "off";
     stateLine.replaceChildren(
       ...(set ? [icon("check"), about.needed ? t("views.keys.connectedUse", { use: shortUse(about.use) }) : t("views.keys.connectedOptional")] : [about.needed ? t("views.keys.noKeyYet") : t("views.keys.optional")]),
@@ -683,9 +687,9 @@ export function mount(root, ctx) {
 
   async function removeProvider(own) {
     const confirmed = await confirmDialog({
-      title: `Remove ${own.name}?`,
-      message: "Dot stops using it and deletes its key saved on this Mac. A setting that still names one of its models must name another first.",
-      confirmLabel: "Remove",
+      title: t("views.keys.removeCustomTitle", { name: own.name }),
+      message: t("views.keys.removeCustomMessage"),
+      confirmLabel: t("views.keys.removeConfirm"),
       danger: true,
       focusCancel: true,
     });
@@ -693,13 +697,13 @@ export function mount(root, ctx) {
       return;
     }
     await api.del(`/providers/custom/${encodeURIComponent(own.name)}`);
-    toast("ok", `${own.name} removed.`);
+    toast("ok", t("views.keys.customRemoved", { name: own.name }));
     chosen = null;
     await reload(null);
   }
 
   // Add provider (item 1949): a service that speaks the OpenAI or Anthropic API, at the foot of the list.
-  const addProvider = el("button", { class: "provider-item provider-add", type: "button", "aria-haspopup": "dialog" }, el("span", { class: "provider-tile", "aria-hidden": "true" }, icon("plus")), el("span", { class: "provider-text" }, el("span", { class: "provider-name" }, "Add provider"), el("span", { class: "provider-line" }, "A service that speaks a compatible API")));
+  const addProvider = el("button", { class: "provider-item provider-add", type: "button", "aria-haspopup": "dialog" }, el("span", { class: "provider-tile", "aria-hidden": "true" }, icon("plus")), el("span", { class: "provider-text" }, el("span", { class: "provider-name" }, t("views.keys.addProvider")), el("span", { class: "provider-line" }, t("views.keys.addProviderLine"))));
   addProvider.addEventListener("click", () => openProviderForm({ existing: null, returnFocus: addProvider, done: (saved) => reload(saved.name) }));
 
   ctx.head.setLead(t("views.keys.whereYouAddTheKeys"));

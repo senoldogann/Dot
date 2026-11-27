@@ -1,4 +1,9 @@
 {
+  "OpenAI Chat Completions": "a protocol's own name",
+  "OpenAI Responses": "a protocol's own name",
+  "Anthropic Messages": "a protocol's own name",
+  "groq": "an example of a provider's name, typed as it is",
+  "X-Title: Dot": "an example header, typed as it is",
   "${dot > 0 ? name.slice(0, dot) : name}.jpg": "a file name",
   "${uid}-colour": "a catalogue key or an id, not shown as it is",
   "${uid}-expression": "a catalogue key or an id, not shown as it is",

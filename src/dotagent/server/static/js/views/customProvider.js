@@ -8,6 +8,7 @@
 import { api } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
+import { t } from "../i18n.js";
 import { field } from "../panels.js";
 import { formDialog, toast } from "../ui.js";
 
@@ -48,7 +49,7 @@ function parseHeaders(text) {
     }
     const at = line.indexOf(":");
     if (at <= 0) {
-      throw new Error(`"${line}" is not a header: write it as Name: value.`);
+      throw new Error(t("views.customProvider.notAHeader", { line }));
     }
     headers[line.slice(0, at).trim()] = line.slice(at + 1).trim();
   }
@@ -57,13 +58,13 @@ function parseHeaders(text) {
 
 /** One row of the models table: its id and what it can do. */
 function modelRow(model, onRemove) {
-  const id = el("input", { class: "input sm mono", value: model.id, placeholder: "model id", "aria-label": "Model id", spellcheck: "false", autocomplete: "off" });
+  const id = el("input", { class: "input sm mono", value: model.id, placeholder: t("views.customProvider.modelIdPlaceholder"), "aria-label": t("views.customProvider.modelId"), spellcheck: "false", autocomplete: "off" });
   const box = (label, checked) => el("label", { class: "custom-check" }, el("input", { type: "checkbox", checked }), label);
-  const tools = box("tools", model.tools);
-  const vision = box("images", model.vision);
-  const thinking = box("thinks", model.thinking);
-  const context = el("input", { class: "input sm", type: "number", min: "1000", step: "1000", value: String(model.context), "aria-label": "Context size in tokens" });
-  const remove = el("button", { class: "btn ghost sm icon-only", type: "button", "aria-label": "Remove this model", onclick: onRemove }, icon("trash"));
+  const tools = box(t("views.customProvider.capTools"), model.tools);
+  const vision = box(t("views.customProvider.capImages"), model.vision);
+  const thinking = box(t("views.customProvider.capThinks"), model.thinking);
+  const context = el("input", { class: "input sm", type: "number", min: "1000", step: "1000", value: String(model.context), "aria-label": t("views.customProvider.contextSize") });
+  const remove = el("button", { class: "btn ghost sm icon-only", type: "button", "aria-label": t("views.customProvider.removeModel"), onclick: onRemove }, icon("trash"));
   const element = el("div", { class: "custom-model" }, id, el("div", { class: "custom-model-caps" }, tools, vision, thinking), context, remove);
   return {
     element,
@@ -91,15 +92,15 @@ function blankModel(id) {
  */
 export function openProviderForm({ existing, returnFocus, done }) {
   const config = existing?.config ?? null;
-  const docs = el("input", { class: "input", type: "url", placeholder: "https://… the provider's API documentation", "aria-label": "Documentation address", autocomplete: "off", spellcheck: "false" });
-  const fill = el("button", { class: "btn", type: "button" }, icon("sparkle"), "Fill from docs");
+  const docs = el("input", { class: "input", type: "url", placeholder: t("views.customProvider.docsPlaceholder"), "aria-label": t("views.customProvider.docsAddress"), autocomplete: "off", spellcheck: "false" });
+  const fill = el("button", { class: "btn", type: "button" }, icon("sparkle"), t("views.customProvider.fillFromDocs"));
   const docsNote = el("div", { class: "note", hidden: true, role: "status" });
-  const name = el("input", { class: "input mono", value: existing?.name ?? "", placeholder: "groq", "aria-label": "Name", autocomplete: "off", spellcheck: "false", maxlength: "32" });
+  const name = el("input", { class: "input mono", value: existing?.name ?? "", placeholder: "groq", "aria-label": t("views.customProvider.name"), autocomplete: "off", spellcheck: "false", maxlength: "32" });
   name.disabled = existing !== null;
-  const baseUrl = el("input", { class: "input mono", type: "url", value: config?.base_url ?? "", placeholder: "https://api.example.com/v1", "aria-label": "Base URL", autocomplete: "off", spellcheck: "false" });
+  const baseUrl = el("input", { class: "input mono", type: "url", value: config?.base_url ?? "", placeholder: "https://api.example.com/v1", "aria-label": t("views.customProvider.baseUrl"), autocomplete: "off", spellcheck: "false" });
   const protocol = el(
     "select",
-    { class: "select", "aria-label": "Protocol" },
+    { class: "select", "aria-label": t("views.customProvider.protocol") },
     Object.entries(PROTOCOLS).map(([value, label]) => el("option", { value, selected: (config?.protocol ?? "chat") === value }, label)),
   );
   const needsKey = el("input", { type: "checkbox", checked: config === null ? true : config.api_key_env !== "" });
@@ -108,18 +109,18 @@ export function openProviderForm({ existing, returnFocus, done }) {
     type: "password",
     autocomplete: "off",
     spellcheck: "false",
-    placeholder: existing?.key_set ? "Saved · type to replace it" : "Paste the key",
-    "aria-label": "Key",
+    placeholder: existing?.key_set ? t("views.customProvider.keySaved") : t("views.customProvider.pasteKey"),
+    "aria-label": t("views.customProvider.key"),
     maxlength: "1000",
   });
-  const keyField = field("Key", key, "Kept on this Mac, sent to the base URL alone, never shown again.");
+  const keyField = field(t("views.customProvider.key"), key, t("views.customProvider.keyHint"));
   const listModels = el("input", { type: "checkbox", checked: config?.list_models ?? false });
   const headers = el("textarea", {
     class: "textarea mono",
     rows: "2",
     spellcheck: "false",
     placeholder: "X-Title: Dot",
-    "aria-label": "Extra headers",
+    "aria-label": t("views.customProvider.extraHeaders"),
   });
   headers.value = Object.entries(config?.headers ?? {})
     .map(([header, value]) => `${header}: ${value}`)
@@ -138,9 +139,9 @@ export function openProviderForm({ existing, returnFocus, done }) {
   for (const model of config?.models ?? []) {
     addModel(model);
   }
-  const addButton = el("button", { class: "btn sm", type: "button", onclick: () => addModel(blankModel("")) }, icon("plus"), "Add model");
+  const addButton = el("button", { class: "btn sm", type: "button", onclick: () => addModel(blankModel("")) }, icon("plus"), t("views.customProvider.addModel"));
   const outcome = el("div", { class: "note", hidden: true, role: "status" });
-  const test = el("button", { class: "btn", type: "button" }, icon("refresh"), "Test");
+  const test = el("button", { class: "btn", type: "button" }, icon("refresh"), t("views.customProvider.test"));
 
   function paintKey() {
     keyField.hidden = !needsKey.checked;
@@ -152,7 +153,7 @@ export function openProviderForm({ existing, returnFocus, done }) {
   function provider() {
     const models = rows.map((row) => row.read()).filter((model) => model.id !== "");
     if (models.length === 0 && !listModels.checked) {
-      throw new Error("Add a model, or let Dot list the provider's models.");
+      throw new Error(t("views.customProvider.addAModel"));
     }
     return {
       base_url: baseUrl.value.trim(),
@@ -171,7 +172,7 @@ export function openProviderForm({ existing, returnFocus, done }) {
       return null;
     }
     if (!KEY_PATTERN.test(value)) {
-      throw new Error("A key has no spaces or line breaks in it. Copy it again from the provider's page.");
+      throw new Error(t("views.customProvider.keyNoSpaces"));
     }
     return value;
   }
@@ -190,7 +191,7 @@ export function openProviderForm({ existing, returnFocus, done }) {
     }
     fill.disabled = true;
     docsNote.className = "note";
-    docsNote.replaceChildren(el("span", { class: "spinner" }), el("span", null, "Reading the page…"));
+    docsNote.replaceChildren(el("span", { class: "spinner" }), el("span", null, t("views.customProvider.readingPage")));
     docsNote.hidden = false;
     try {
       const proposal = await api.post("/providers/custom/docs", { url });
@@ -212,14 +213,14 @@ export function openProviderForm({ existing, returnFocus, done }) {
         el(
           "span",
           null,
-          proposal.source === "page" ? "Filled from the page. " : "Filled with the fast model's help. ",
-          "Check each field before you save: nothing is saved yet.",
+          proposal.source === "page" ? t("views.customProvider.filledFromPage") : t("views.customProvider.filledWithModel"),
+          t("views.customProvider.checkEachField"),
           ...proposal.notes.map((note) => el("span", { class: "custom-note" }, ` ${note}`)),
         ),
       );
     } catch (error) {
       docsNote.className = "note bad";
-      docsNote.replaceChildren(icon("alert"), el("span", null, `The page could not be read: ${error.message}`));
+      docsNote.replaceChildren(icon("alert"), el("span", null, t("views.customProvider.pageNotRead", { error: error.message })));
     } finally {
       fill.disabled = false;
     }
@@ -232,54 +233,54 @@ export function openProviderForm({ existing, returnFocus, done }) {
       const first = shaped.models[0]?.id ?? "";
       body = { name: name.value.trim(), provider: shaped, key: typedKey(), model: shaped.list_models ? "" : first };
     } catch (error) {
-      say(false, "Not ready to test", error.message);
+      say(false, t("views.customProvider.notReady"), error.message);
       return;
     }
     test.disabled = true;
     outcome.className = "note";
-    outcome.replaceChildren(el("span", { class: "spinner" }), el("span", null, "Asking the provider…"));
+    outcome.replaceChildren(el("span", { class: "spinner" }), el("span", null, t("views.customProvider.asking")));
     outcome.hidden = false;
     try {
       const result = await api.post("/providers/custom/test", body);
-      say(result.ok, result.ok ? "It answers" : "The test failed", result.detail);
+      say(result.ok, result.ok ? t("views.customProvider.itAnswers") : t("views.customProvider.testFailed"), result.detail);
     } catch (error) {
-      say(false, "The test failed", error.message);
+      say(false, t("views.customProvider.testFailed"), error.message);
     } finally {
       test.disabled = false;
     }
   });
 
   const body = [
-    el("div", { class: "custom-docs" }, field("Documentation", el("div", { class: "custom-docs-row" }, docs, fill), "Optional: Dot reads the page and proposes the fields."), docsNote),
-    field("Name", name, existing === null ? "The prefix of its models, such as groq:llama-4-scout. Lower case; it cannot be changed later." : "The prefix of its models."),
-    field("Base URL", baseUrl, "The address before /chat/completions or /messages, often ending in /v1. https, or http://localhost."),
-    field("Protocol", protocol, "Dot speaks these three; nothing of a provider beyond them."),
-    el("label", { class: "custom-check" }, needsKey, "It takes an API key"),
+    el("div", { class: "custom-docs" }, field(t("views.customProvider.documentation"), el("div", { class: "custom-docs-row" }, docs, fill), t("views.customProvider.documentationHint")), docsNote),
+    field(t("views.customProvider.name"), name, existing === null ? t("views.customProvider.nameHintNew") : t("views.customProvider.nameHint")),
+    field(t("views.customProvider.baseUrl"), baseUrl, t("views.customProvider.baseUrlHint")),
+    field(t("views.customProvider.protocol"), protocol, t("views.customProvider.protocolHint")),
+    el("label", { class: "custom-check" }, needsKey, t("views.customProvider.takesKey")),
     keyField,
     el(
       "div",
       { class: "field" },
-      el("span", { class: "field-label" }, "Models"),
-      el("span", { class: "hint" }, "Each with its id as the provider names it, what it can do, and how many tokens it holds."),
+      el("span", { class: "field-label" }, t("views.customProvider.models")),
+      el("span", { class: "hint" }, t("views.customProvider.modelsHint")),
       modelList,
-      el("div", { class: "custom-models-foot" }, addButton, el("label", { class: "custom-check" }, listModels, "Also list the models it offers (GET /models)")),
+      el("div", { class: "custom-models-foot" }, addButton, el("label", { class: "custom-check" }, listModels, t("views.customProvider.alsoList"))),
     ),
-    field("Extra headers", headers, "Optional, one per line. No keys here: a header named like a key or token is refused."),
+    field(t("views.customProvider.extraHeaders"), headers, t("views.customProvider.extraHeadersHint")),
     outcome,
   ];
 
   return formDialog({
-    title: existing === null ? "Add a provider" : `Change ${existing.name}`,
-    description: "Any service that speaks the OpenAI or Anthropic API. Dot sends it what a run on its models sends.",
+    title: existing === null ? t("views.customProvider.addTitle") : t("views.customProvider.changeTitle", { name: existing.name }),
+    description: t("views.customProvider.description"),
     body,
     leading: [test],
-    submitLabel: "Save",
+    submitLabel: t("views.customProvider.save"),
     returnFocus,
     onSubmit: async () => {
       const chosen = name.value.trim();
       if (!customName(chosen)) {
         name.focus();
-        throw new Error("The name is lower case letters, digits, _ and -, from a letter, and not a built-in provider's.");
+        throw new Error(t("views.customProvider.badName"));
       }
       const shaped = provider();
       const secret = typedKey();
@@ -290,8 +291,8 @@ export function openProviderForm({ existing, returnFocus, done }) {
         key.focus();
         throw new Error(
           config === null || !existing.key_set
-            ? "Paste the provider's key, or untick “It takes an API key”."
-            : "The address changed: paste the key again, so that Dot sends it to the new address knowingly.",
+            ? t("views.customProvider.pasteOrUntick")
+            : t("views.customProvider.addressChanged"),
         );
       }
       const saved = await api.put(`/providers/custom/${encodeURIComponent(chosen)}`, shaped);
@@ -299,7 +300,7 @@ export function openProviderForm({ existing, returnFocus, done }) {
         await api.post(`/keys/${encodeURIComponent(saved.config.api_key_env)}`, { value: secret });
       }
       key.value = "";
-      toast("ok", `${chosen} saved. Its models are in the pickers now.`);
+      toast("ok", t("views.customProvider.saved", { name: chosen }));
       await done(saved);
       return true;
     },
