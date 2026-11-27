@@ -2235,13 +2235,19 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   paintQuestions(detail.questions);
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
-  // A choice tapped in a page of the conversation (item 658) is written into the box, for the user to send.
+  // A choice tapped in a page or a card of the conversation (items 658 and 1967) is written into the box, for the user to
+  // send: what a run wrote never goes out as the owner's word on a tap.
   // A delegated run has no box (syncControls): the page is told so rather than filling one nobody sees.
   const onPageAnswer = (/** @type {Event} */ event) => {
     if (frame.element.hidden) {
       return;
     }
-    frame.fill(/** @type {CustomEvent} */ (event).detail.text);
+    const { text, preserveDraft } = /** @type {CustomEvent<{ text: string, preserveDraft?: boolean }>} */ (event).detail;
+    if (preserveDraft === true && input.value.trim() !== "") {
+      toast("error", t("cards.finishMessage"));
+    } else {
+      frame.fill(text);
+    }
     event.preventDefault();
   };
   window.addEventListener(PAGE_ANSWER_EVENT, onPageAnswer);

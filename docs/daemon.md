@@ -584,7 +584,19 @@ whose turn read pages on the web (`web_fetch`, `web_extract`) has a quiet line b
 1184): the first letter of a few of the sites and how many pages ("3 sources"); opened, each page's title over its site,
 a link that opens it in the browser. A page is counted from the address the run asked for (or the one a redirect ended
 at), never from what a page says; its title is the page's own, shown as text and cut at a line. A turn lists 12 pages
-at most and counts the rest; a fetch that failed and a search read none. A delegated run
+at most and counts the rest; a fetch that failed and a search read none.
+
+Dot can place cards in the conversation with `show_cards`. The web UI displays charts with a data table, ordinary
+tables, image galleries and choices, whose tap writes the chosen words into the message box for you to send, as a page's
+choice does; while a message is half-written the tap is refused ("Finish the message in the composer first"), so your
+draft is never lost. A channel's step line for the call says "showed cards in the web view": the channel draws none. Post drafts show the platform, account and text together, and related drafts scroll sideways. You can copy,
+edit or cancel a draft in the current view. Cancelled drafts stay visible in muted colours. **Prepare to publish** puts
+a text-only draft in the composer for you to review and send as a request. The resulting run goes through the existing
+post policy. The renderer can show a confirmed X result as a collapsed **Shared** row that opens to the post text and
+its **Open on X** link. Recording that result from a card's Share action requires the planned publisher. Mail and
+iMessage drafts are sent through their own cards.
+
+A delegated run
 is a row, drawn as a developer tool draws its subagents (item 1331): a small face with its state at the corner (turning
 while it works, amber while it waits for you, a check in the text's ink when it is done, item 839, red when it
 failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Subagent
@@ -1548,7 +1560,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (`"review"` for `dotx run --review`, kept under Code reviews; a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170); `/events?tail=N` (1 to 2000) reads a run's newest N events instead of the ones after `after`, oldest first, and says it knew `tail` with the header `X-Dot-Events-Tail: N` (item 1370: a client that was away through a long run reads the end of it; one that finds no header is talking to a daemon that ignores `tail`) |
-| `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs (`stored=true`: only those stored so far, item 734); lifecycle of all runs |
+| `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs. A stored read (`stored=true`, item 734) includes any draft outcomes recorded after the run ended. The global stream follows the lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `GET\|POST /runs/{id}/messages/{message}/reactions`, `DELETE /runs/{id}/messages/{message}/reactions/{reaction}` | the reactions on a message of Dot's (item 586; `message` is `answer` or `step-<n>`, `n` written as the number it is, from 1: `step-01` and `step-0` are 422, so that a message has one key; item 612): list them; put one on (`{"reaction": "good"}`, one of `good`, `love`, `wrong`, `again`, `remember`, `explain`, `hold`) and do what it says, 201, or 200 when it was there (the reply has `reactions`, `effect`, `said` and `run_id`; 404 for no run or a step it did not say, 422 for a message with no words, for the answer of a run that works, or for a 📌 on a message that holds a secret); take one back |
