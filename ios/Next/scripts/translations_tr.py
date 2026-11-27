@@ -8,6 +8,8 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # A tool row of Dot's own: cards shown in the chat (item 1967).
+    "Show cards": "Kart göster",
     "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",
     "Not sent: an attachment could not be read on this phone": "Gönderilmedi: eklerden biri bu telefonda okunamadı",
     "Upload cancelled": "Yükleme iptal edildi",
