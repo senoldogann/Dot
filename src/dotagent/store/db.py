@@ -6583,8 +6583,13 @@ class Store:
         return await self._unit(statements)
 
     async def memories_without_kind(self, limit: int) -> list[MemoryRecord]:
-        """The most recently changed notes whose kind neither the rules nor the fast model told (item 1975)."""
-        rows = await self._all("SELECT * FROM memories WHERE kind IS NULL ORDER BY updated_at DESC LIMIT ?", (limit,))
+        """The most recently changed notes whose kind neither the rules nor the fast model told (item 1975), of those
+        that may still be handed: a note merged into another or replaced by a newer one is no longer asked about."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE kind IS NULL AND merged_into IS NULL AND replaced_by IS NULL"
+            " ORDER BY updated_at DESC LIMIT ?",
+            (limit,),
+        )
         return [_memory(row) for row in rows]
 
     @_writing

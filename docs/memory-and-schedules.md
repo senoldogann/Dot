@@ -110,7 +110,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   The store tells it as it writes a note, by fixed rules on its tags then its words (`lesson` and `journal` tags, then
   tags such as `tercih`, `karar`, `rule`; `deploy`, `site-…`; `client`; `aboutme`, `cv`; `proje`, `hesap`; then words
   such as "kuralı", "kararı", "wants", "istiyor"; `src/dotagent/store/kinds.py`); `memory_save` may name the kind
-  itself. Each note there got its kind once, by the same rules, as a store moved to schema version 5 (copied
+  itself (a note a schedule, a watcher or a helper only proposes takes the rules' or the model's kind once the
+  owner saves it). Each note there got its kind once, by the same rules, as a store moved to schema version 5 (copied
   first, as every upgrade is). A note the rules cannot tell has none until the daemon's background pass, at most once
   an hour, asks the fast model for its one word and records it as the model's (`kind_by`: `rule`, `model`, `run` or
   `owner`); an answer that is no kind is logged and asked again at the next pass. The kind ranks the notes some runs

@@ -17,6 +17,7 @@ from dotagent.server import REVIEW_SOURCE, UI_SOURCE
 from dotagent.store.db import Store
 from dotagent.store.kinds import HELPER_PLAN, REVIEW_PLAN, SCHEDULE_PLAN, MemoryKind, kind_plan, rule_kind
 from dotagent.tools.delegate import DELEGATE_SOURCE
+from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.team import TEAM_SOURCE
 
 PRICE: str = "Müşteriye fiyat (Senol'un kararı): workspace/price-list.md listesinden sorulur."
@@ -150,3 +151,43 @@ async def test_a_note_the_rules_cannot_tell_is_told_by_the_fast_model_and_record
         assert (await store.get_memory(printer)).kind_by == "owner"
     finally:
         await store.close()
+
+
+async def test_a_merged_note_takes_its_kept_notes_kind_and_a_note_merged_away_is_not_asked_about(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index, store = await _index(tmp_path, monkeypatch)
+    try:
+        kept: str = (await save_memory(index, "Kalle answers within a day.", [], "run_1", None, None, False)).record.id
+        other: str = (await save_memory(index, "Kalle replies the same day.", [], "run_2", None, None, False)).record.id
+        await store.set_memory_kind(kept, "people", "run")
+        merged = await store.merge_memories([kept, other], kept, "rest", 10.0)
+        assert (merged.kind, merged.kind_by) == ("people", "run")
+        # The source the rules could not tell rests in the merged note now: the model's pass leaves it.
+        assert other not in {note.id for note in await store.memories_without_kind(10)}
+    finally:
+        await store.close()
+
+
+async def test_memory_save_records_the_kind_a_run_names_on_a_new_note_and_keeps_an_older_notes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index, store = await _index(tmp_path, monkeypatch)
+    tool = next(tool for tool in build_memory_tools(600) if tool.spec.name == "memory_save")
+    ctx = SimpleNamespace(
+        runtime=SimpleNamespace(memory=index),
+        run_id="run_1",
+        agent_id=None,
+        tainted=lambda: False,
+        ever_tainted=lambda: False,
+    )
+    try:
+        for content in ("Kalle answers within a day.", PRICE):
+            prepared = await tool.prepare({"content": content, "kind": "people"}, ctx)  # type: ignore[arg-type]
+            assert (await prepared.run(ctx)).is_error is False  # type: ignore[arg-type]
+        notes = {note.content: (note.kind, note.kind_by) for note in await store.list_memories(10, 0)}
+    finally:
+        await store.close()
+    assert notes["Kalle answers within a day."] == ("people", "run")
+    # The owner's note had these words already: it keeps the kind it had.
+    assert notes[PRICE] == ("rule", "rule")
