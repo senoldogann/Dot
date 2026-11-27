@@ -718,6 +718,7 @@ const CORE = {
   // The lines of a conversation's messages (messages.js).
   "messages.pending": "Pending",
   "messages.starting": "Starting…",
+  "messages.routine": "Routine",
   "messages.scheduleRepeating": "on a repeating schedule",
   "messages.scheduleLabel": "Schedule made: {name}, {when}. Opens it on the Schedules page.",
   "messages.scheduleLabelBare": "Schedule made: {name}. Opens it on the Schedules page.",

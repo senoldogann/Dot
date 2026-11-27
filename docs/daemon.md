@@ -1270,7 +1270,9 @@ surface (`--msg-me`, one step off the page: lighter in dark, a shade darker in l
 of room, two of yours in a row on a touch screen joined at a 4 px corner, and what Dot and its agents say, the
 answer and the lines along the way, as plain text beside the face, on no fill, on every width, a phone's too (item 854: a soft bubble until then; item
 1091 gave each a bubble of its own on a phone, and item 1335 took it away again, so that the desktop and the phone have
-one design language and only what you wrote is a box); the group of the steps of a turn is one quiet line, its words
+one design language and only what you wrote is a box); a message a routine sent (a schedule's, a watcher's or a hook's
+run, item 2021) is the one box you did not write: one compact row on the same surface, a pill closed, with the
+calendar-clock mark, "Routine", the routine's title cut at its end and a chevron that unfolds its whole message; the group of the steps of a turn is one quiet line, its words
 in the muted ink with the small icon and the time, a chevron at its end; the
 line under an answer that ended well and under your message shows where the pointer rests or the focus is (a reaction
 that stands, a failure and a stop stay in sight; a screen with no pointer to rest shows only the reactions that stand,

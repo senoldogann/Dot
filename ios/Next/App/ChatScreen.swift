@@ -386,6 +386,8 @@ struct ChatScreen: View {
             .swipeToQuote(text, quote: quoteMessage)
         case .note(_, let text):
             DotNoteRow(text: text)
+        case .automation(_, let title, let prompt):
+            RoutineRow(title: title, prompt: prompt)
         case .answer(let id, let text, let writing, let endedAt):
             VStack(alignment: .leading, spacing: Space.xxs) {
                 AnswerBody(markdown: text, writing: writing)
