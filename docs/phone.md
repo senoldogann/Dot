@@ -136,7 +136,7 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    every 8 seconds as long as one is live, and keeps the last count, dimmed, with no link),
    the chat's loops and the queue, each a button that opens its own sheet (the queue's has an up and a down arrow, Send now and Remove for each message,
    and Resume when a stop held it), never stacked and not drawn when there is nothing to say,
-   a run inspector (plan, helpers with the ones at work first, each group newest first with its count, item 1467, the chat's schedules and loops with switches), the Schedules list and the models; the
+   a run inspector (no plan: the pill's Plan n/m opens it, item 1996; helpers with the ones at work first, each group newest first with its count, item 1467, the chat's schedules and loops with switches), the Schedules list and the models; the
    web UI stays as it is and opens full screen from Settings › Open web UI. The second slice (item 1361) adds a new chat
    (the pencil of the list: a message starts a chat of its own on the model and reasoning level picked, as the web's home
    does since item 1350, `POST /api/runs`; a model that cannot answer is refused by name with a button that sends the
@@ -1145,9 +1145,10 @@ web uses:
   Screen Recording on the Mac) is said in the daemon's words with Try again.
 - **Following a run** (a chat): while the chat's run uses its browser (`browser_*` tools) or the desktop (`desktop_*`),
   a mini player floats at the top of the chat with the picture (`GET /api/runs/{id}/screencast` for the browser, the
-  Mac's screen for the desktop) and what the run does now, read from the run's newest unanswered call ("Typing “Ada”",
-  "Opening example.com", "Clicking · 3 steps"; a ref such as `e12` is not shown); between steps, the chat capsule's
-  words. A tap opens it full screen (zoom with two fingers or a double tap, landscape), and the header's Watch live does
+  Mac's screen for the desktop) and what the run does now, read from the run's newest unanswered call with the mark and
+  the words of that call's row in the chat's work log (item 1996: a page's call wears the globe and reads "Browsed
+  example.com", as in the chat); while the run makes another call (a command, a file), that call's row the same way;
+  between calls, Thinking or Writing. A tap opens it full screen (zoom with two fingers or a double tap, landscape), and the header's Watch live does
   too. Folded into a Live pill, nothing is read. No click point is drawn: a step names its element by a ref, whose place
   on the picture the phone does not know.
 - **Taking over** (full screen, a run's browser): Take over is `POST /takeover/screen` (nothing comes to the front of

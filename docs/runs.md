@@ -78,7 +78,8 @@ the owner's 279 runs of two weeks that made a median of one line a run on Claude
 (at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
 the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
 may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
-the line wears the bot's face, and a finished run's steps fold behind one *Worked for* line before its answer. A run
+the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
+behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
