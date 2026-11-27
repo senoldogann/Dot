@@ -763,7 +763,7 @@ def _background_driver_row(desktop: DesktopConfig) -> CheckResult:
             )
         return _result("desktop background", False, False, error.message)
     refusal: str | None = cua.refusal_of(binary)
-    found: str = f"cua-driver {binary.version} (team {binary.team_id}) at {path}"
+    found: str = f"cua-driver {binary.version or '(version not read)'} (team {binary.team_id}) at {path}"
     if desktop.background_driver == "off":
         return _result("desktop background", True, False, f"off; {found}" + ("" if refusal is None else f"; {refusal}"))
     if refusal is not None:

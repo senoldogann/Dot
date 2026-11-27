@@ -1,6 +1,6 @@
 """A stand-in for cua-driver (item 2007): the three commands Dot runs, on a socket of its own, with no screen.
 
-- ``manifest`` prints the version in ``FAKE_CUA_VERSION`` (0.28.2 when unset).
+- ``manifest`` prints the version in ``FAKE_CUA_VERSION`` (0.28.2 when unset), noting that it ran in ``FAKE_CUA_LOG``.
 - ``serve --socket <path>`` listens on that Unix socket and answers what the proxy relays: ``initialize``
   and ``tools/call``. Each call is appended to the JSON-lines file ``FAKE_CUA_LOG`` with the daemon's argv and the
   environment variables Dot sets. ``get_window_state`` answers a window at (100, 100), 400 by 300 points, captured at
@@ -96,6 +96,8 @@ def mcp() -> None:
 def main() -> None:
     match sys.argv[1]:
         case "manifest":
+            with Path(os.environ["FAKE_CUA_LOG"]).open("a", encoding="utf-8") as log:
+                log.write(json.dumps({"tool": "manifest", "argv": sys.argv[1:]}) + "\n")
             print(json.dumps({"binary_version": os.environ.get("FAKE_CUA_VERSION", "0.28.2")}))
         case "serve":
             serve()
