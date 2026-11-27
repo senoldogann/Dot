@@ -318,7 +318,7 @@ function drawFlow(past, flow, asked, events, reactions) {
   }
   const nodes = blocks.map((block) =>
     block.told !== undefined
-      ? el("div", { class: "turn-say say-narration", role: "article", "aria-label": t("outcome.update") }, prose(block.told))
+      ? el("div", { class: "turn-told say-narration", role: "article", "aria-label": t("outcome.update") }, prose(block.told))
       : block.internal !== undefined
       ? internalRecord(block.internal)
       : block.page !== undefined
