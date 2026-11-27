@@ -1608,3 +1608,12 @@ TR.update(
         "Shows each helper": "Her yardımcıyı gösterir",
     }
 )
+
+# The chat told as a conversation, "Show steps" off (item 1976).
+TR.update(
+    {
+        "%lld min": "%lld dk",
+        "%lld s": "%lld sn",
+        "Looking at %@": "%@ inceleniyor",
+    }
+)

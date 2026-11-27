@@ -121,10 +121,12 @@ struct ChatScreen: View {
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
     private var builtItems: [TranscriptItem] {
-        // Messages only (item 1915): every step is built, the run at work's are left out, and a finished run's fold keeps
-        // its steps behind "Worked for 2m", so a tap shows them and nothing is lost.
+        // Messages only (items 1915 and 1976): the chat told as a conversation, Dot's words and the lines of the calls they
+        // did not tell; a finished run's steps fold behind "Worked for 2m" before its answer, so nothing is lost.
         guard !showsSteps, !stepsShown else { return transcript(in: mode) }
-        return messagesOnly(transcript(in: .showAll))
+        return DotEngine.conversation(
+            of: chat ?? ChatProjection(threadId: thread), pending: model.pending(in: thread), streaming: streaming,
+            context: TranscriptContext(answeredHere: model.answeredHere))
     }
 
     private func transcript(in mode: DotEngine.ToolCallMode) -> [TranscriptItem] {
@@ -286,7 +288,13 @@ struct ChatScreen: View {
                     } else if linesTheWork || now == .queued || now == .typing {
                         // With the steps shown too, while the run has no row to show yet (it waits to start, or its model
                         // has not answered), the line moves so the chat never stands still (item 1919).
-                        WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
+                        WorkLineView(
+                            now: now, stepsShown: stepsShown,
+                            speaker: showsSteps
+                                ? nil
+                                : WorkLineSpeaker(
+                                    id: botChat?.record.id ?? dotAgentId, look: botChat?.record.look, since: Date(timeIntervalSince1970: run.createdAt))
+                        ) { stepsShown.toggle() }
                     }
                 }
                 ChatDrafts(thread: thread)
@@ -401,6 +409,9 @@ struct ChatScreen: View {
             ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
+        case .narration(_, let step):
+            // One of Dot's short messages, drawn as its words are (item 1976).
+            AnswerBody(markdown: narrationWords(step), writing: false)
         case .helpers(_, _, let list):
             // The run's helpers as one row where it started them, a tap away from a card of each (item 1957); the
             // capsule's people segment keeps them a tap away too.
@@ -820,19 +831,6 @@ func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
         case .work(let fold):
             return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
         default: return item
-        }
-    }
-}
-
-/// A transcript with only the messages (item 1915): the owner's words, Dot's answers, the asks, the helpers, how runs
-/// ended and their folds; the steps of the run at work (its tool calls that did not fail, its thoughts) are left out, its
-/// live line saying what it does. A finished run's fold is kept whole: its steps open from "Worked for 2m". Pure.
-func messagesOnly(_ items: [TranscriptItem]) -> [TranscriptItem] {
-    items.filter { item in
-        switch item {
-        case .thought: false
-        case .tool(let entry): entry.state == .failed
-        default: true
         }
     }
 }
