@@ -34,6 +34,7 @@ import { attempt, toast } from "../ui.js";
 import { WORKING_STATES } from "../runstates.js";
 import { attemptWithFallback } from "../modelrefused.js";
 import { sendToWork } from "../sendwork.js";
+import { emptyBoxWords } from "../composershape.js";
 import { t } from "../i18n.js";
 
 const MAX_GOAL_PX = 320;
@@ -106,7 +107,7 @@ const HOME_KEPT = {
 /** The words in the home's empty box, with the name the owner calls Dot by (item 420), as a messaging app's few
  * (item 833); what the at sign and the slash open is the box's tooltip. */
 function placeholderFor(name) {
-  return t("views.runs.messageName", { name });
+  return emptyBoxWords(name, false);
 }
 
 /**
