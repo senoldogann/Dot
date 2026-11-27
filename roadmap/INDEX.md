@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1977](1977.md) | done | 2026-11-27 | The web UI speaks Turkish on every screen, and a check fails for a line of English that is not in the catalogue |
 | [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |
 | [1972](1972.md) | done | 2026-11-26 | Swipe a message to quote it |
 | [1971](1971.md) | done | 2026-11-26 | The pre-push hook checks the prompt surface before it asks a model |

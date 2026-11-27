@@ -14,21 +14,21 @@ import { toastError } from "./ui.js";
 const STATUS_BADGE = { approved: "b-ok", denied: "b-bad", expired: "b-muted" };
 // The shortest secret a card takes: one shorter would stand bare where a command prints it (held_secrets.py, item 857).
 const SECRET_LEAST_CHARS = 8;
-const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired", pending: "Waiting for you" };
+const STATUS_LABEL = { approved: t("approvals.approved"), denied: t("approvals.denied"), expired: t("approvals.expired"), pending: t("approvals.waitingForYou") };
 // The note the daemon gives a step nobody answered in time (agent/approvals.py): the settled line says it in its words.
 const EXPIRED_NOTES = new Set(["no decision before the deadline", "kept past its time"]);
 // What becomes of the answer to a question a run left (`leftNote` of a card): it carries the work on in the run's
 // conversation, or, for a session of a campaign, reaches the session while it works and the next session after that.
-export const LEFT_IN_RUN = "The task went on without your answer. Your answer goes to this conversation and carries the work on.";
-export const LEFT_IN_CAMPAIGN = "The session went on without your answer. While it works, your answer reaches it; after that, the campaign's next session reads it, and starts right away while the campaign is active.";
+export const LEFT_IN_RUN = t("approvals.theTaskWentOnWithout");
+export const LEFT_IN_CAMPAIGN = t("approvals.theSessionWentOnWithout");
 // What a step kept for the owner (item 482) says: nobody answered it in time, so the run went on without it.
-const KEPT_NOTE = "Nobody answered in time, so the task went on without this step. Once you have done it yourself, choose I did it to carry the work on in this conversation.";
+const KEPT_NOTE = t("approvals.nobodyAnsweredInTimeSo");
 // What a question kept for the owner's yes (item 483) says: Allow once lets the run do this exact step once.
-const KEPT_ASK_NOTE = "Nobody answered in time, so the task went on without this step. Choose Allow once to carry the work on in this conversation, where Dot may do this exact step once.";
+const KEPT_ASK_NOTE = t("approvals.nobodyAnsweredInTimeSo2");
 // The same for a step a session of a campaign kept (item 484): the answer reaches the session while it works, and the
 // campaign's next session after that.
-const KEPT_IN_CAMPAIGN = "Nobody answered in time, so the session went on without this step. Once you have done it yourself, choose I did it: it reaches the session while it works; after that, the campaign's next session reads it and starts right away while the campaign is active.";
-const KEPT_ASK_IN_CAMPAIGN = "Nobody answered in time, so the session went on without this step. Choose Allow once: it reaches the session while it works; after that, the campaign's next session reads it, may do this exact step once, and starts right away while the campaign is active.";
+const KEPT_IN_CAMPAIGN = t("approvals.nobodyAnsweredInTimeSo4");
+const KEPT_ASK_IN_CAMPAIGN = t("approvals.nobodyAnsweredInTimeSo5");
 
 /** The common shape of an approval, from a stored record. */
 export function fromRecord(record) {
@@ -98,7 +98,7 @@ function choiceText(option) {
   return el(
     "span",
     { class: "choice-text" },
-    el("span", { class: "choice-label" }, option.label, option.recommended ? el("span", { class: "badge b-info" }, "Recommended") : null),
+    el("span", { class: "choice-label" }, option.label, option.recommended ? el("span", { class: "badge b-info" }, t("approvals.recommended")) : null),
     option.description === "" ? null : el("span", { class: "choice-description" }, option.description),
   );
 }
@@ -109,18 +109,18 @@ const BUDGET = "budget";
 
 function titleOf(severity) {
   if (severity === "question") {
-    return "Dot is asking you";
+    return t("approvals.dotIsAskingYou");
   }
   if (severity === "secret") {
-    return "Dot asks for a secret";
+    return t("approvals.dotAsksForASecret");
   }
   if (severity === "handoff") {
-    return "Dot needs you to take over this step";
+    return t("approvals.dotNeedsYouToTake");
   }
   if (severity === BUDGET) {
-    return "A task reached its budget";
+    return t("approvals.aTaskReachedItsBudget");
   }
-  return "Approval needed";
+  return t("approvals.approvalNeeded");
 }
 
 function iconOf(severity) {
@@ -133,25 +133,25 @@ function iconOf(severity) {
   return severity === "handoff" ? "hand" : "shield";
 }
 
-const TAKEOVER_IDLE = "Dot's window comes to the front and Dot waits while you have it.";
-const TAKEOVER_HELD = "You have the browser. Do the step, return control, then say you did it.";
+const TAKEOVER_IDLE = t("approvals.dotSWindowComesTo");
+const TAKEOVER_HELD = t("approvals.youHaveTheBrowserDo");
 
 /** On the hand-off of a browser step, the offer of the live view: take the browser over, do the step, give it back;
  * with `onUseHere`, also using the page from this screen, which opens it over the whole page (item 475). */
 function takeoverOffer(runId, onUseHere) {
   let held = false;
-  const button = el("button", { class: "btn sm", type: "button" }, icon("hand"), "Take the browser over");
+  const button = el("button", { class: "btn sm", type: "button" }, icon("hand"), t("approvals.takeTheBrowserOver"));
   const text = el("span", { class: "small muted" }, TAKEOVER_IDLE);
   const here =
     onUseHere === null
       ? null
-      : el("div", { class: "row takeover-offer" }, el("button", { class: "btn sm", type: "button", onclick: () => onUseHere() }, "Use it here"), el("span", { class: "small muted" }, "Or use the page from this screen: it opens over the whole page and your taps go to it."));
+      : el("div", { class: "row takeover-offer" }, el("button", { class: "btn sm", type: "button", onclick: () => onUseHere() }, t("approvals.useItHere")), el("span", { class: "small muted" }, t("approvals.orUseThePageFrom")));
   button.addEventListener("click", async () => {
     button.disabled = true;
     try {
       await api.post(`/runs/${runId}/${held ? "handback" : "takeover"}`, {});
       held = !held;
-      button.replaceChildren(icon("hand"), held ? "Return control" : "Take the browser over");
+      button.replaceChildren(icon("hand"), held ? t("approvals.returnControl") : t("approvals.takeTheBrowserOver"));
       text.textContent = held ? TAKEOVER_HELD : TAKEOVER_IDLE;
     } catch (error) {
       toastError(error);
@@ -181,9 +181,9 @@ const GUARDED_FLAGS = new Set([
 // their rules say, so no rule is offered for it; the same step elsewhere keeps its offer.
 const INITIATIVE_WORDS = "On its own initiative, Dot asks before";
 // The line under a card that no rule answers, which says why Dot asks.
-const INITIATIVE_LINE = "In a chat Dot opened on its own initiative, Dot always asks you about this, whatever the approval mode. No rule can turn that off.";
-const OWNERS_LINE = "A payment, a message or mail sent for you and a public post wait for you whatever the approval mode. No rule can turn that off.";
-const GUARDED_LINE = "Dot always asks you about this in every mode that asks. No rule can turn that off.";
+const INITIATIVE_LINE = t("approvals.inAChatDotOpened");
+const OWNERS_LINE = t("approvals.aPaymentAMessageOr");
+const GUARDED_LINE = t("approvals.dotAlwaysAsksYouAbout");
 
 /** Whether the owner answers `approval` in every mode that asks, whatever their rules say (item 429). */
 function guarded(approval) {
@@ -235,7 +235,7 @@ function ruleOffer(approval) {
     "a",
     { class: "approval-rule", href: `#/settings/rules?wants=${encodeURIComponent(wants)}&should=allow` },
     icon("shield"),
-    "Make a rule of this",
+    t("approvals.makeARuleOfThis"),
   );
 }
 
@@ -286,7 +286,7 @@ function targetBlock(target, label, name) {
 /** What a kept step's card says of it: what I did it does, and until when the step waits. */
 function keptNote(handoff, keptUntil, inCampaign) {
   const said = inCampaign ? (handoff ? KEPT_IN_CAMPAIGN : KEPT_ASK_IN_CAMPAIGN) : handoff ? KEPT_NOTE : KEPT_ASK_NOTE;
-  return `${said} It waits until ${dateTime(keptUntil)}.`;
+  return t("approvals.saidItWaitsUntilDatetime", { said, dateTime: dateTime(keptUntil) });
 }
 
 /**
@@ -364,8 +364,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       class: "input",
       type: "text",
       maxlength: "2000",
-      placeholder: !isQuestion ? "Note for Dot (optional)" : choices.length > 0 ? "Or write your own answer" : "Your answer",
-      "aria-label": isQuestion ? "Your answer" : "Note for Dot",
+      placeholder: !isQuestion ? t("approvals.noteForDotOptional") : choices.length > 0 ? t("approvals.orWriteYourOwnAnswer") : t("approvals.yourAnswer"),
+      "aria-label": isQuestion ? t("approvals.yourAnswer") : t("approvals.noteForDot"),
     });
     const ticks = several ? choices.map((option) => el("input", { type: "checkbox", value: option.label })) : [];
     // "Don't ask again in this chat" (item 866): on a question of the policy open now, of a step that may be
@@ -413,8 +413,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
                 ),
           );
     const more = typeof approval.args.more_words === "string" ? ` (+${approval.args.more_words})` : "";
-    const yes = isQuestion ? "Send answer" : isHandoff ? "I did it" : isBudget ? `Continue${more}` : isKept ? "Allow once" : "Approve";
-    const no = isQuestion ? "Skip" : isHandoff ? "Skip this step" : isBudget ? "Stop" : isKept ? "Skip" : "Deny";
+    const yes = isQuestion ? t("approvals.sendAnswer") : isHandoff ? t("approvals.iDidIt") : isBudget ? t("approvals.continueMore", { more }) : isKept ? t("approvals.allowOnce") : t("approvals.approve");
+    const no = isQuestion ? t("approvals.skip") : isHandoff ? t("approvals.skipThisStep") : isBudget ? t("approvals.stop") : isKept ? t("approvals.skip") : t("approvals.deny");
     note.hidden = isBudget;
     const yesButton = el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes);
     // A yes with a note is the note first (item 1140): the daemon holds the step until the run read it, and the step
@@ -422,8 +422,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     if (!isQuestion && !isHandoff && !isLeft && !isBudget) {
       note.addEventListener("input", () => {
         const noted = note.value.trim() !== "";
-        yesButton.textContent = noted ? "Send note" : yes;
-        yesButton.title = noted ? "Dot reads your note first and takes this step only if the note still calls for it" : "";
+        yesButton.textContent = noted ? t("approvals.sendNote") : yes;
+        yesButton.title = noted ? t("approvals.dotReadsYourNoteFirst") : "";
       });
     }
     node.replaceChildren(
@@ -449,7 +449,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           "div",
           { class: "approval-actions" },
           note,
-          remember === null ? null : el("label", { class: "approval-remember", title: "Steps of this kind (the same action, in the same place) go without asking in this chat" }, remember, "Don't ask again in this chat"),
+          remember === null ? null : el("label", { class: "approval-remember", title: t("approvals.stepsOfThisKindThe") }, remember, t("approvals.donTAskAgainIn")),
           el("button", { class: "btn", type: "button", onclick: () => submit(false) }, no),
           yesButton,
         ),
@@ -474,8 +474,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       placeholder: label,
       "aria-label": label,
     });
-    const save = el("button", { class: "btn primary", type: "button", disabled: true }, "Save securely");
-    const decline = el("button", { class: "btn ghost", type: "button", onclick: () => decide(false, "") }, "Decline");
+    const save = el("button", { class: "btn primary", type: "button", disabled: true }, t("approvals.saveSecurely"));
+    const decline = el("button", { class: "btn ghost", type: "button", onclick: () => decide(false, "") }, t("approvals.decline"));
     // A value shorter than a card holds (item 1073: the owner typed a 4-digit code and Save did nothing, saying
     // nothing): the card says why, and a short code goes as a message instead, which Dot then sees.
     // A card left for the owner (no run waits on it): its answer reaches no run, so a short code is written in the chat,
@@ -484,14 +484,14 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       ? null
       : el(
           "button",
-          { class: "btn sm", type: "button", title: "Send it in words: Dot sees it, and the card is closed", onclick: () => decide(false, value.value.trim()) },
-          "Send as a message",
+          { class: "btn sm", type: "button", title: t("approvals.sendItInWordsDot"), onclick: () => decide(false, value.value.trim()) },
+          t("approvals.sendAsAMessage"),
         );
-    const instead = isLeft ? "A short code (an SMS code, a PIN) can be written in this chat as a message, which Dot reads." : "A short code (an SMS code, a PIN) can go as a message, which Dot sees.";
+    const instead = isLeft ? t("approvals.aShortCodeAnSms") : t("approvals.aShortCodeAnSms2");
     const short = el(
       "div",
       { class: "hint secret-short", role: "status", hidden: true },
-      el("span", { class: "grow" }, `A secret is at least ${SECRET_LEAST_CHARS} characters, so that it can be masked where a command prints it. ${instead}`),
+      el("span", { class: "grow" }, t("approvals.aSecretIsAtLeast", { SECRET_LEAST_CHARS, instead })),
       asMessage,
     );
     function paintLength() {
@@ -550,7 +550,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           "div",
           { class: "secret-foot" },
           icon("shield"),
-          el("span", { class: "grow" }, "Kept out of the chat and out of Dot's sight: this chat's commands read it for 24 hours."),
+          el("span", { class: "grow" }, t("approvals.keptOutOfTheChat")),
           decline,
         ),
       ),
@@ -566,7 +566,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           { class: "approval-head" },
           icon("key"),
           el("span", null, typeof approval.args.label === "string" ? approval.args.label : approval.summary),
-          el("span", { class: `badge ${STATUS_BADGE[status] ?? "b-muted"}` }, status === "approved" ? "Saved securely" : (STATUS_LABEL[status] ?? status)),
+          el("span", { class: `badge ${STATUS_BADGE[status] ?? "b-muted"}` }, status === "approved" ? t("approvals.savedSecurely") : (STATUS_LABEL[status] ?? status)),
           el("span", { class: "spacer" }),
           heading,
         ),
@@ -619,13 +619,13 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           el("span", { class: `badge ${STATUS_BADGE[status] ?? "b-muted"}`, title: why === "" ? outcome : why }, outcome),
           heading,
         ),
-        own ? el("div", { class: "small approval-note" }, el("span", { class: "muted" }, isQuestion ? "Answer: " : "Note: "), note) : null,
+        own ? el("div", { class: "small approval-note" }, el("span", { class: "muted" }, isQuestion ? t("approvals.answer") : t("approvals.note")), note) : null,
         shown === "" && reason === "" && why === ""
           ? null
           : el(
               "details",
               { class: "approval-more" },
-              el("summary", null, "Details"),
+              el("summary", null, t("approvals.details")),
               why === "" ? null : el("div", { class: "small muted" }, why),
               shown === "" ? null : el("pre", { class: "approval-command-whole" }, shown),
               reason === "" ? null : el("div", { class: "small muted" }, reason),

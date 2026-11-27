@@ -8,6 +8,7 @@ import { readsAsMarkdown } from "./markdown.js";
 import { quotedFilesMessage, splitQuote } from "./quotebutton.js";
 import { smallerPicture } from "./shrink.js";
 import { toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 // The flight of a picture Snapshots brought into its chip (item 414): as wide as this share of the page, at most this
 // many pixels, from this far down the page, this long (another coding agent's captures fly as long).
@@ -94,7 +95,7 @@ export function sentFiles(files) {
         {
           class: "attach-chip ready",
           type: "button",
-          title: `Show ${file.name}`,
+          title: t("attachments.showName", { name: file.name }),
           dataset: { attachment: file.id, name: file.name },
           onclick: (event) => requestFile(event.currentTarget),
         },
@@ -146,8 +147,8 @@ function sentPicture(file) {
     {
       class: "sent-picture",
       type: "button",
-      title: `Show ${file.name}`,
-      "aria-label": `Show ${file.name}`,
+      title: t("attachments.showName", { name: file.name }),
+      "aria-label": t("attachments.showName", { name: file.name }),
       dataset: { attachment: file.id, name: file.name },
       onclick: (event) => requestFile(event.currentTarget),
     },
@@ -245,8 +246,8 @@ export function createAttachments({ dropTarget, input, onChange }) {
       {
         class: "attach-open",
         type: "button",
-        title: `Show ${name}`,
-        "aria-label": entry.picture ? `Show ${name}` : null,
+        title: t("attachments.showName", { name }),
+        "aria-label": entry.picture ? t("attachments.showName", { name }) : null,
         disabled: true,
         onclick: (event) => requestFile(event.currentTarget),
       },
@@ -262,10 +263,10 @@ export function createAttachments({ dropTarget, input, onChange }) {
         ? null
         : el(
             "button",
-            { class: "btn ghost sm attach-unpaste", type: "button", title: "Put the text in the message instead", "aria-label": `Put ${name} in the message as text`, onclick: () => unpaste(entry) },
+            { class: "btn ghost sm attach-unpaste", type: "button", title: t("attachments.putTheTextInThe"), "aria-label": t("attachments.putNameInTheMessage", { name }), onclick: () => unpaste(entry) },
             icon("pencil"),
           ),
-      el("button", { class: "btn ghost sm attach-remove", type: "button", title: "Remove", "aria-label": `Remove ${name}`, onclick: () => remove(entry) }, icon("x")),
+      el("button", { class: "btn ghost sm attach-remove", type: "button", title: t("attachments.remove"), "aria-label": t("attachments.removeName", { name }), onclick: () => remove(entry) }, icon("x")),
     );
   }
 
@@ -283,7 +284,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
       opens(entry);
       setState(entry, "ready", sizeLabel(stored.size));
     } catch (error) {
-      setState(entry, "failed", `Failed: ${error.message}`);
+      setState(entry, "failed", t("attachments.failedMessage", { message: error.message }));
       entry.node.title = `${entry.file.name}: ${error.message}`;
       if (entry.picture) {
         // A photo that failed keeps its red tile and says why in its tooltip and to a screen reader; its × takes it away.
@@ -297,7 +298,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
   function addOne(file, pasted) {
     const kind = file.type.startsWith("image/") ? "image" : "file";
     const preview = kind === "image" ? URL.createObjectURL(file) : null;
-    const status = el("span", { class: "muted" }, "Uploading…");
+    const status = el("span", { class: "muted" }, t("attachments.uploading"));
     const entry = { file, id: null, name: file.name, size: file.size, kind, state: "uploading", preview, pasted, status, open: null, node: null, picture: false, thumb: null };
     entry.node = chip(file.name, preview, status, entry);
     entries.push(entry);
@@ -308,7 +309,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
   function add(files) {
     for (const file of files) {
       if (entries.length >= MAX_FILES) {
-        toast("error", `At most ${MAX_FILES} files go with one message`);
+        toast("error", t("attachments.atMostMaxFilesFiles", { MAX_FILES }));
         break;
       }
       addOne(file, null);
@@ -325,7 +326,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
     picker.click();
   }
   dropTarget.addEventListener("dragover", (event) => {
-    if (event.dataTransfer !== null && [...event.dataTransfer.types].includes("Files")) {
+    if (event.dataTransfer !== null && [...event.dataTransfer.types].includes(t("attachments.files"))) {
       event.preventDefault();
       dropTarget.classList.add("dropping");
     }
@@ -392,7 +393,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
     for (const { id, name, size, kind } of files) {
       if (entries.length >= MAX_FILES) {
         // A capture past the limit is left out here, where the owner sees it, not refused when the message is sent.
-        toast("error", `At most ${MAX_FILES} files go with one message`);
+        toast("error", t("attachments.atMostMaxFilesFiles", { MAX_FILES }));
         break;
       }
       const status = el("span", { class: "muted" }, sizeLabel(size));
@@ -450,14 +451,14 @@ export function createAttachments({ dropTarget, input, onChange }) {
         const picture = el("img", { class: "attach-thumb", alt: "" });
         entry.open = el(
           "button",
-          { class: "attach-open", type: "button", title: `Show ${name}`, "aria-label": `Show ${name}`, disabled: true, onclick: (event) => requestFile(event.currentTarget) },
+          { class: "attach-open", type: "button", title: t("attachments.showName", { name }), "aria-label": t("attachments.showName", { name }), disabled: true, onclick: (event) => requestFile(event.currentTarget) },
           kind === "image" ? picture : icon("file"),
         );
         entry.node = el(
           "span",
           { class: "attach-chip ready small", title: name },
           entry.open,
-          el("button", { class: "btn ghost sm attach-remove", type: "button", title: "Remove", "aria-label": `Remove ${name}`, onclick: () => remove(entry) }, icon("x")),
+          el("button", { class: "btn ghost sm attach-remove", type: "button", title: t("attachments.remove"), "aria-label": t("attachments.removeName", { name }), onclick: () => remove(entry) }, icon("x")),
         );
         if (kind === "image") {
           blobUrl(`/attachments/${encodeURIComponent(id)}/image`).then(
@@ -514,7 +515,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
 /** What a message of files alone says, as the goal its run is given (item 445): a pasted text or a picture goes without a
  * word typed, and this line is what the run reads — the files themselves are what the owner meant. */
 function wordsForFiles(attachments) {
-  return attachments.count() === 1 ? "See the attached file." : "See the attached files.";
+  return attachments.count() === 1 ? t("attachments.seeTheAttachedFile") : t("attachments.seeTheAttachedFiles");
 }
 
 /** The words a message goes with (item 445): what is in the box, else the line its files are worth, else nothing — an
@@ -529,11 +530,11 @@ export function messageText(text, attachments) {
 /** Whether a message may go now; says why not when files are still uploading or failed. */
 export function readyToSend(attachments) {
   if (attachments.busy()) {
-    toast("error", "Wait until the files are uploaded");
+    toast("error", t("attachments.waitUntilTheFilesAre"));
     return false;
   }
   if (attachments.failed()) {
-    toast("error", "Remove the files that failed to upload, or attach them again");
+    toast("error", t("attachments.removeTheFilesThatFailed"));
     return false;
   }
   return true;

@@ -1,8 +1,10 @@
 // The interface's own words in Turkish (i18n.js): the keys of the English catalogue (en.js), each written for a Turkish
 // reader rather than word for word. `tsc` refuses a key missing here or one en.js does not have.
 
-/** @type {Record<keyof typeof import("./en.js").EN, string>} */
-export const TR = {
+import { TR_APP } from "./tr-app.js";
+import { TR_VIEWS } from "./tr-views.js";
+
+const CORE = {
   "work.typing": "Yazıyor",
   "work.thinking": "Düşünüyor",
   "work.command": "Komut çalıştırıyor",
@@ -907,3 +909,6 @@ export const TR = {
   "composer.stop": "Durdur",
   "composer.stopHint": "Bu görevi durdur",
 };
+
+/** @type {Record<keyof typeof import("./en.js").EN, string>} */
+export const TR = { ...CORE, ...TR_VIEWS, ...TR_APP };

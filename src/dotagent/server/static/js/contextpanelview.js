@@ -7,7 +7,7 @@
 // the panel reads in every theme.
 
 import { addMemory, addReadings, addUsage, chatMemory, chatUsage, languageOf, memoryChange, readingsOf, usageOf } from "./contextpanel.js";
-import { clip, el, plural, requestFile } from "./dom.js";
+import { clip, el, requestFile } from "./dom.js";
 import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
@@ -16,7 +16,7 @@ import { panelSection } from "./panels.js";
 const SECTION_ROWS = 5;
 const MEMORY_WORDS_CHARS = 80;
 // What the conversation says of a memory change (timeline.js), in the same words.
-const MEMORY_CHANGES = { Saved: "Saved to memory", Updated: "Updated memory", Forgot: "Removed from memory" };
+const MEMORY_CHANGES = { Saved: t("contextpanelview.savedToMemory"), Updated: t("contextpanelview.updatedMemory"), Forgot: t("contextpanelview.removedFromMemory") };
 
 /** The mark of a row on its own tile: an icon, a language's logo, or the letters of a file's kind. A logo keeps the
  * light tile of a service's mark, so that a dark logo (Rust, JSON) reads in the dark scheme too. */
@@ -137,12 +137,12 @@ function skillsSection() {
           {
             class: "context-row",
             href: usage.kind === "skill" ? "#/settings/skills" : "#/settings/connectors",
-            title: `${usage.name} — open ${usage.kind === "skill" ? "Skills" : "Connectors"} in Settings`,
+            title: usage.kind === "skill" ? t("contextpanelview.openSkillsInSettings", { name: usage.name }) : t("contextpanelview.openConnectorsInSettings", { name: usage.name }),
           },
           row(
             usage.kind === "skill" ? "hammer" : "plug",
             usage.name,
-            usage.count === 1 ? "used once" : `used ${usage.count} times`,
+            usage.count === 1 ? t("contextpanelview.usedOnce") : t("contextpanelview.usedCountTimes", { count: usage.count }),
           ),
         ),
       ),
@@ -151,10 +151,10 @@ function skillsSection() {
     const servers = usages.length - skills;
     const counts = [];
     if (skills > 0) {
-      counts.push(plural(skills, "skill", "skills"));
+      counts.push(tCount(skills, "contextpanelview.countSkill", "contextpanelview.countSkills"));
     }
     if (servers > 0) {
-      counts.push(plural(servers, "connected app", "connected apps"));
+      counts.push(tCount(servers, "contextpanelview.countConnectedApp", "contextpanelview.countConnectedApps"));
     }
     section.setSummary(el("span", null, counts.join(" · ")));
     section.element.hidden = usages.length === 0;
@@ -208,7 +208,7 @@ function artifactsSection(onOpen) {
         el("button", { class: "context-more", type: "button", onclick: onOpen }, t("panel.moreInChanges", { count: files.length - shown.length })),
       );
     }
-    section.setSummary(el("span", null, plural(files.length, "file", "files")));
+    section.setSummary(el("span", null, tCount(files.length, "contextpanelview.countFile", "contextpanelview.countFiles")));
     section.element.hidden = false;
   }
 
@@ -241,10 +241,10 @@ function readingSection() {
     const pages = readings.filter((reading) => reading.kind === "page").length;
     const parts = [];
     if (pages > 0) {
-      parts.push(plural(pages, "page", "pages"));
+      parts.push(tCount(pages, "contextpanelview.countPage", "contextpanelview.countPages"));
     }
     if (readings.length > pages) {
-      parts.push(plural(readings.length - pages, "search", "searches"));
+      parts.push(tCount(readings.length - pages, "contextpanelview.countSearch", "contextpanelview.countSearches"));
     }
     section.setSummary(el("span", null, parts.join(" · ")));
     section.element.hidden = readings.length === 0;
@@ -286,7 +286,7 @@ function memorySection() {
           : el("a", { class: "context-row", href: `#/settings/memory?note=${encodeURIComponent(note.id)}` }, parts);
       }),
     );
-    section.setSummary(el("span", null, plural(notes.length, "note", "notes")));
+    section.setSummary(el("span", null, tCount(notes.length, "contextpanelview.countNote", "contextpanelview.countNotes")));
     section.element.hidden = notes.length === 0;
   }
 

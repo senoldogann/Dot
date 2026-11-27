@@ -14,7 +14,10 @@ Node to run). `npm run check` runs Biome's recommended lint rules over `src/dota
 `desktop/ui` and `tests/js` (`biome.json`; two rules of style alone are off), `tsc` over the scripts' JSDoc with
 `checkJs` (`tsconfig.json`, and `tsconfig.sw.json` for the service worker, whose globals are a worker's; the types the
 DOM library lacks are in `types/interface.d.ts`), and the unit tests of the pure modules (the Markdown reader, the words
-of a flow, the formatting helpers, the reasoning levels) under `tests/js` with `node --test`. The type check starts
+of a flow, the formatting helpers, the reasoning levels) under `tests/js` with `node --test`; one of them reads every
+module with acorn and fails for a word of English a module writes in its code where it reaches the screen
+(`tests/js/i18n-literals.test.js`: it goes through `t()` and has its Turkish in `js/lang`, or the line the program alone
+reads is named in `tests/js/i18n-exempt.json` with why). The type check starts
 loose: `strict` is off, so a parameter without a type is no error, and what it catches is a property an element does
 not have, a call with the wrong arguments, a union read without a check. `noImplicitAny` is the next step, taken once
 the modules carry their JSDoc. Biome's formatter is configured but off, as the scripts were not written to its line

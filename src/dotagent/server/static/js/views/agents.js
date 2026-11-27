@@ -14,7 +14,7 @@ import { AGENTS_CHANGED_EVENT, api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
-import { ago, clip, el, modelName, plural, setText, switchRow } from "../dom.js";
+import { ago, clip, el, modelName, setText, switchRow } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst, trackHeight } from "../layout.js";
@@ -32,6 +32,7 @@ import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 import { workOrdersPart } from "../workorders.js";
 import { WORKING_STATES } from "../runstates.js";
+import { t, tCount, listAnd } from "../i18n.js";
 
 const DOT_ID = "dot";
 const GOAL_CHARS = 90;
@@ -45,7 +46,7 @@ const MOST_AGENT_FILE_BYTES = 256 * 1024;
 // How often the cards' "5m ago" are written again while the list stays open (item 633).
 const AGE_REFRESH_MS = 60_000;
 // Names in one line of words, as a toast says them: "A", "A and B", "A, B, and C".
-const AND_LIST = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
+const AND_LIST = { format: listAnd };
 
 function faceOf(record, latest) {
   const state = latest !== null && WORKING.has(latest.status) ? "working" : "idle";
@@ -63,7 +64,7 @@ function hrefOf(record) {
  */
 function agentCard({ record, latest, latest_title: latestTitle }, picking = null) {
   // The chat's own title, which the owner may have named; a daemon from before it was sent says the run's goal.
-  const chat = latest === null ? "No chats yet" : clip(latestTitle ?? latest.goal, GOAL_CHARS);
+  const chat = latest === null ? t("views.agents.noChatsYet") : clip(latestTitle ?? latest.goal, GOAL_CHARS);
   // While the owner picks agents for a team (item 867), a card of theirs is a box to tick, not a way to its page.
   const pickable = picking !== null && record.id !== DOT_ID;
   const card = el(
@@ -83,11 +84,11 @@ function agentCard({ record, latest, latest_title: latestTitle }, picking = null
         "div",
         { class: "agent-card-name" },
         el("span", { class: "agent-card-title" }, record.name),
-        record.made_by === null ? null : el("span", { class: "agent-made" }, "Made by Dot"),
+        record.made_by === null ? null : el("span", { class: "agent-made" }, t("views.agents.madeByDot")),
         // A paused agent (item 465) says so in the list, as on its page.
-        record.paused_at === null ? null : el("span", { class: "badge b-warn", title: "Its schedules start nothing by themselves until you resume it" }, "Paused"),
+        record.paused_at === null ? null : el("span", { class: "badge b-warn", title: t("views.agents.itsSchedulesStartNothingBy") }, t("views.agents.paused")),
       ),
-      el("div", { class: "agent-card-role", title: record.role }, record.role === "" ? "No role yet" : record.role),
+      el("div", { class: "agent-card-role", title: record.role }, record.role === "" ? t("views.agents.noRoleYet") : record.role),
     ),
     el(
       "div",
@@ -129,17 +130,17 @@ function teamTile({ record, members, latest }) {
       "div",
       { class: "owned-team-head" },
       teamFaces(record, working ? "working" : "idle", MOST_TEAM_FACES),
-      el("div", { class: "owned-team-main" }, el("div", { class: "owned-team-name" }, record.name), el("div", { class: "owned-team-purpose" }, record.purpose === "" ? "No purpose written yet" : record.purpose)),
+      el("div", { class: "owned-team-main" }, el("div", { class: "owned-team-name" }, record.name), el("div", { class: "owned-team-purpose" }, record.purpose === "" ? t("views.agents.noPurposeWrittenYet") : record.purpose)),
     ),
     el(
       "div",
       { class: "owned-team-count muted", title: names.join(", ") },
-      members.length === 0 ? "No agents left" : plural(members.length, "agent", "agents"),
+      members.length === 0 ? t("views.agents.noAgentsLeft") : tCount(members.length, "views.agents.countAgent", "views.agents.countAgents"),
     ),
     el(
       "div",
       { class: "agent-card-chat" },
-      el("span", { class: "agent-card-chat-title muted", title: latest === null ? "" : latest.title }, latest === null ? "No chats yet" : clip(latest.title, GOAL_CHARS)),
+      el("span", { class: "agent-card-chat-title muted", title: latest === null ? "" : latest.title }, latest === null ? t("views.agents.noChatsYet") : clip(latest.title, GOAL_CHARS)),
       latest === null ? null : el("span", { class: "agent-when", dataset: { ts: String(latest.updated_at) } }, ago(latest.updated_at)),
     ),
   );
@@ -159,7 +160,7 @@ function templateTools(template, known) {
   return el(
     "details",
     { class: "template-tools" },
-    el("summary", null, `Actions (${template.tools.length})`),
+    el("summary", null, t("views.agents.actionsLength", { length: template.tools.length })),
     el(
       "div",
       { class: "template-tool-chips" },
@@ -167,7 +168,7 @@ function templateTools(template, known) {
         el(
           "code",
           known !== null && !known.has(name)
-            ? { class: "chip missing", title: "This Mac has no such action: its group is switched off in the settings file, or its app is not here" }
+            ? { class: "chip missing", title: t("views.agents.thisMacHasNoSuch") }
             : { class: "chip" },
           name,
         ),
@@ -185,7 +186,7 @@ function templateRefuses(template) {
   return el(
     "details",
     { class: "template-refuses" },
-    el("summary", null, `Never does (${template.refuses.length})`),
+    el("summary", null, t("views.agents.neverDoesLength", { length: template.refuses.length })),
     el(
       "ul",
       { class: "template-refuse-list" },
@@ -237,16 +238,16 @@ async function addSuggestedSchedules(pairs) {
     the owner has read its goal; `onUse(template, alsoSchedule)` makes them. */
 function templateCard(template, onUse, known) {
   // The app's own switch, which a finger finds on a phone (item 488), as every other on and off of the pages.
-  const alsoWords = "Also add this schedule, switched off until you read its goal";
+  const alsoWords = t("views.agents.alsoAddThisScheduleSwitched");
   const also = template.cron === "" ? null : el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords });
   also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
-  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Also add its schedule; you switch it on in Settings › Scheduled tasks after reading its goal")), also);
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, t("views.agents.alsoAddItsScheduleYou"))), also);
   const use = el(
     "button",
-    { class: "btn sm template-use", type: "button", "aria-label": `Use the template ${template.name}` },
+    { class: "btn sm template-use", type: "button", "aria-label": t("views.agents.useTheTemplateName", { name: template.name }) },
     icon("plus"),
-    el("span", { class: "use-long" }, "Use template"),
-    el("span", { class: "use-short" }, "Use"),
+    el("span", { class: "use-long" }, t("views.agents.useTemplate")),
+    el("span", { class: "use-short" }, t("views.agents.use")),
   );
   use.addEventListener("click", async () => {
     use.disabled = true;
@@ -268,8 +269,8 @@ function templateCard(template, onUse, known) {
     el(
       "div",
       { class: "template-facts" },
-      templateFact("Needs", "plug", template.needs),
-      templateFact("Schedule", "clock", template.schedule === "" ? "When you ask" : template.schedule),
+      templateFact(t("views.agents.needs"), "plug", template.needs),
+      templateFact(t("views.agents.schedule"), "clock", template.schedule === "" ? t("views.agents.whenYouAsk") : template.schedule),
     ),
     alsoRow,
     templateTools(template, known),
@@ -285,18 +286,18 @@ function templateCard(template, onUse, known) {
     switched off as a template's (item 464); `onUse(team, members, alsoSchedules)` makes them. */
 function teamCard(team, templates, onUse, owned, added) {
   const members = team.members.map((id) => templates.get(id));
-  const alsoWords = "Also add their schedules, switched off until you read their goals";
+  const alsoWords = t("views.agents.alsoAddTheirSchedulesSwitched");
   const also = members.some((template) => template.cron !== "")
     ? el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords })
     : null;
   also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
-  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Also add their schedules; you switch them on in Settings › Scheduled tasks after reading their goals")), also);
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, t("views.agents.alsoAddTheirSchedulesYou"))), also);
   const use = el(
     "button",
-    { class: "btn sm template-use", type: "button", "aria-label": `Use the team ${team.name}` },
+    { class: "btn sm template-use", type: "button", "aria-label": t("views.agents.useTheTeamName", { name: team.name }) },
     icon("plus"),
-    el("span", { class: "use-long" }, "Use team"),
-    el("span", { class: "use-short" }, "Use"),
+    el("span", { class: "use-long" }, t("views.agents.useTeam")),
+    el("span", { class: "use-short" }, t("views.agents.use")),
   );
   use.addEventListener("click", async () => {
     use.disabled = true;
@@ -313,18 +314,18 @@ function teamCard(team, templates, onUse, owned, added) {
       "div",
       { class: "template-head" },
       el("div", { class: "row-main" }, el("div", { class: "template-name" }, team.name), el("div", { class: "template-role" }, team.purpose)),
-      added ? el("span", { class: "badge b-muted team-added", title: "This team is under Your teams: Use team brings back an agent it lacks" }, "In your teams") : null,
+      added ? el("span", { class: "badge b-muted team-added", title: t("views.agents.thisTeamIsUnderYour") }, t("views.agents.inYourTeams")) : null,
     ),
     el(
       "ul",
-      { class: "team-members", "aria-label": `The agents of the ${team.name}` },
+      { class: "team-members", "aria-label": t("views.agents.theAgentsOfTheName", { name: team.name }) },
       members.map((template) =>
         el(
           "li",
           null,
           actorFace(`template-${template.id}`, "idle", template.look),
           el("span", null, template.name),
-          owned.has(template.name.trim().toLowerCase()) ? el("span", { class: "badge b-muted team-yours", title: "You have this agent: Use team keeps it as it is" }, "Yours") : null,
+          owned.has(template.name.trim().toLowerCase()) ? el("span", { class: "badge b-muted team-yours", title: t("views.agents.youHaveThisAgentUse") }, t("views.agents.yours")) : null,
         ),
       ),
     ),
@@ -354,7 +355,7 @@ async function exportAgent(record) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast("ok", `${record.name} is saved as ${name}.`);
+  toast("ok", t("views.agents.nameIsSavedAsName2", { name: record.name, name2: name }));
 }
 
 /** An agent made from its file (item 315); the daemon refuses a file that is not one, or that names tools not here. */
@@ -371,7 +372,7 @@ async function importAgent(file) {
   }
   const saved = await api.post("/agents/import", parsed);
   rememberLook(saved.id, saved.look);
-  toast("ok", `${saved.name} is imported.`);
+  toast("ok", t("views.agents.nameIsImported", { name: saved.name }));
   return saved;
 }
 
@@ -394,7 +395,7 @@ function select(label, entries, value) {
 function toolPicks(names, chosen) {
   const picked = new Set(chosen.length === 0 ? names : chosen);
   const boxes = names.map((name) => el("input", { type: "checkbox", value: name, checked: picked.has(name) }));
-  const all = el("input", { type: "checkbox", "aria-label": "All actions" });
+  const all = el("input", { type: "checkbox", "aria-label": t("views.agents.allActions") });
   const count = el("span", { class: "muted tool-picks-count" });
   const named = new Set(chosen);
   // Whether the owner ticked All tools since a box was last unticked: every tool, whatever the agent named.
@@ -407,7 +408,7 @@ function toolPicks(names, chosen) {
     const ticked = boxes.filter((box) => box.checked).length;
     all.checked = ticked === boxes.length;
     all.indeterminate = ticked > 0 && ticked < boxes.length;
-    count.textContent = widens() ? "every action, and any added later" : `${ticked} of ${boxes.length}`;
+    count.textContent = widens() ? t("views.agents.everyActionAndAnyAdded") : t("views.agents.tickedOfLength", { ticked, length: boxes.length });
   }
   all.addEventListener("change", () => {
     allTicked = all.checked;
@@ -426,7 +427,7 @@ function toolPicks(names, chosen) {
   const element = el(
     "div",
     { class: "stack tight" },
-    el("label", { class: "tool-pick tool-pick-all" }, all, el("span", null, "All actions"), count),
+    el("label", { class: "tool-pick tool-pick-all" }, all, el("span", null, t("views.agents.allActions")), count),
     el(
       "div",
       { class: "tool-picks" },
@@ -442,43 +443,43 @@ function toolPicks(names, chosen) {
  */
 export function agentForm({ record, onSaved, onCancel }) {
   const defaults = getSnapshot().status;
-  const name = el("input", { class: "input", type: "text", maxlength: "60", autocomplete: "off", placeholder: "Scout", "aria-label": "Name" });
-  const role = el("input", { class: "input", type: "text", maxlength: "120", autocomplete: "off", placeholder: "Finds and checks sources", "aria-label": "Role" });
+  const name = el("input", { class: "input", type: "text", maxlength: "60", autocomplete: "off", placeholder: t("views.agents.scout"), "aria-label": t("views.agents.name") });
+  const role = el("input", { class: "input", type: "text", maxlength: "120", autocomplete: "off", placeholder: t("views.agents.findsAndChecksSources"), "aria-label": t("views.agents.role") });
   const instructions = el("textarea", {
     class: "textarea",
     rows: "5",
-    placeholder: "How this agent works and what it cares about. It reads this at the start of every chat.",
-    "aria-label": "Instructions",
+    placeholder: t("views.agents.howThisAgentWorksAnd"),
+    "aria-label": t("views.agents.instructions"),
   });
   // What it never does, a line each (item 875): the edges of its job, which its runs hold to whoever asks.
   const refuses = el("textarea", {
     class: "textarea",
     rows: "3",
     maxlength: "2000",
-    placeholder: "Work inbound leads\nSend a message itself",
-    "aria-label": "Never does",
+    placeholder: t("views.agents.workInboundLeadsSendA"),
+    "aria-label": t("views.agents.neverDoes"),
   });
   const model = el(
     "select",
-    { class: "select", "aria-label": "Model" },
-    el("option", { value: "" }, defaults === null ? "Default model" : `Default (${modelName(defaults.models.main)})`),
+    { class: "select", "aria-label": t("views.agents.model") },
+    el("option", { value: "" }, defaults === null ? t("views.agents.defaultModel") : t("views.agents.defaultModelname", { modelName: modelName(defaults.models.main) })),
     record === null || record.model === "" ? null : el("option", { value: record.model }, record.model),
   );
   model.value = record === null ? "" : record.model;
-  const effort = el("select", { class: "select", "aria-label": "Reasoning level" }, el("option", { value: "" }, "Default"));
-  const effortField = field("Reasoning", effort, "");
+  const effort = el("select", { class: "select", "aria-label": t("views.agents.reasoningLevel") }, el("option", { value: "" }, t("views.agents.default")));
+  const effortField = field(t("views.agents.reasoning"), effort, "");
   effortField.hidden = true;
   const approvals = select(
-    "Approvals",
-    [{ id: "", label: "Default" }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label}: ${option.hint}` }))],
+    t("views.agents.approvals"),
+    [{ id: "", label: t("views.agents.default") }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label}: ${option.hint}` }))],
     record === null || record.approvals === null ? "" : record.approvals,
   );
   // The look (item 102): the agent's own, or for a new one the fallback of a face not yet named.
   const look = lookPicker({ look: record === null || record.look === null ? fallbackLook(record === null ? "new" : record.id) : record.look, uid: record === null ? "new" : record.id });
-  const lookField = field("Look", look.element, "The face this agent wears everywhere; it moves on its own page and beside its chats.");
+  const lookField = field(t("views.agents.look"), look.element, t("views.agents.theFaceThisAgentWears"));
   lookField.classList.add("wide");
-  const tools = el("div", null, el("span", { class: "muted" }, "Loading the actions"));
-  const toolsField = field("Actions", tools, "All actions: every action, and any added later. Finishing, asking you and turning on more actions stay in any case.");
+  const tools = el("div", null, el("span", { class: "muted" }, t("views.agents.loadingTheActions")));
+  const toolsField = field(t("views.agents.actions"), tools, t("views.agents.allActionsEveryActionAnd"));
   toolsField.classList.add("wide");
   let models = [];
 
@@ -486,13 +487,13 @@ export function agentForm({ record, onSaved, onCancel }) {
     const info = models.find((candidate) => candidate.ref === model.value) ?? null;
     const keep = effort.value === "" ? (record === null ? "" : record.effort ?? "") : effort.value;
     if (info === null || info.efforts.length < 2) {
-      effort.replaceChildren(el("option", { value: "" }, "Default"));
+      effort.replaceChildren(el("option", { value: "" }, t("views.agents.default")));
       effort.value = "";
       effortField.hidden = true;
       return;
     }
     effort.replaceChildren(
-      el("option", { value: "" }, info.default_effort === null ? "Default" : `Default (${levelLabel(info.default_effort)})`),
+      el("option", { value: "" }, info.default_effort === null ? t("views.agents.default") : t("views.agents.defaultLevellabel", { levelLabel: levelLabel(info.default_effort) })),
       ...info.efforts.map((level) => el("option", { value: level }, levelLabel(level))),
     );
     effort.value = info.efforts.includes(keep) ? keep : "";
@@ -507,7 +508,7 @@ export function agentForm({ record, onSaved, onCancel }) {
       const known = new Set(models.map((candidate) => candidate.ref));
       model.replaceChildren(
         model.firstElementChild,
-        ...(chosen !== "" && !known.has(chosen) ? [el("option", { value: chosen }, `${chosen} (not offered now)`)] : []),
+        ...(chosen !== "" && !known.has(chosen) ? [el("option", { value: chosen }, t("views.agents.chosenNotOfferedNow", { chosen }))] : []),
         ...models.map((candidate) => el("option", { value: candidate.ref }, modelName(candidate.ref))),
       );
       model.value = chosen;
@@ -527,7 +528,7 @@ export function agentForm({ record, onSaved, onCancel }) {
       toolsListed = true;
     })
     .catch((error) => {
-      tools.replaceChildren(el("span", { class: "muted" }, `The actions could not be listed: ${error.message}`));
+      tools.replaceChildren(el("span", { class: "muted" }, t("views.agents.theActionsCouldNotBe", { message: error.message })));
     });
   if (record !== null) {
     name.value = record.name;
@@ -535,11 +536,11 @@ export function agentForm({ record, onSaved, onCancel }) {
     instructions.value = record.instructions;
     refuses.value = record.refuses ?? "";
   }
-  const save = el("button", { class: "btn primary", type: "button", disabled: true }, icon(record === null ? "plus" : "check"), record === null ? "Create agent" : "Save changes");
+  const save = el("button", { class: "btn primary", type: "button", disabled: true }, icon(record === null ? "plus" : "check"), record === null ? t("views.agents.createAgent") : t("views.agents.saveChanges"));
   Promise.allSettled([modelsListed, toolsLoaded]).then(() => {
     save.disabled = !toolsListed;
   });
-  const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, "Cancel");
+  const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, t("views.agents.cancel"));
 
   async function submit() {
     const nameText = name.value.trim();
@@ -549,7 +550,7 @@ export function agentForm({ record, onSaved, onCancel }) {
     }
     const picked = picks.picked();
     if (picked.length === 0) {
-      toast("error", "Pick the actions it may use, or All actions for every one.");
+      toast("error", t("views.agents.pickTheActionsItMay"));
       tools.querySelector(".tool-pick-all input")?.focus();
       return;
     }
@@ -571,7 +572,7 @@ export function agentForm({ record, onSaved, onCancel }) {
     try {
       const saved = record === null ? await api.post("/agents", body) : await api.put(`/agents/${record.id}`, body);
       rememberLook(saved.id, saved.look);
-      toast("ok", record === null ? `${saved.name} is ready.` : "Agent saved.");
+      toast("ok", record === null ? t("views.agents.nameIsReady", { name: saved.name }) : t("views.agents.agentSaved"));
       onSaved(saved);
     } finally {
       save.disabled = false;
@@ -581,22 +582,22 @@ export function agentForm({ record, onSaved, onCancel }) {
   save.addEventListener("click", () => attempt(submit));
   const element = el(
     "section",
-    { class: "card agent-editor", "aria-label": record === null ? "New agent" : "Edit agent" },
-    el("div", { class: "card-head" }, el("span", null, record === null ? "New agent" : `Edit ${record.name}`)),
+    { class: "card agent-editor", "aria-label": record === null ? t("views.agents.newAgent") : t("views.agents.editAgent") },
+    el("div", { class: "card-head" }, el("span", null, record === null ? t("views.agents.newAgent") : t("views.agents.editName", { name: record.name }))),
     el(
       "div",
       { class: "card-pad stack" },
       el(
         "div",
         { class: "form-grid" },
-        field("Name", name, ""),
-        field("Role", role, "One line, as it shows under the name."),
-        Object.assign(field("Instructions", instructions, ""), { className: "field wide" }),
-        Object.assign(field("Never does", refuses, "One line each: the edges of its job. It stops there whoever asks, and says so."), { className: "field wide" }),
+        field(t("views.agents.name"), name, ""),
+        field(t("views.agents.role"), role, t("views.agents.oneLineAsItShows")),
+        Object.assign(field(t("views.agents.instructions"), instructions, ""), { className: "field wide" }),
+        Object.assign(field(t("views.agents.neverDoes"), refuses, t("views.agents.oneLineEachTheEdges")), { className: "field wide" }),
         lookField,
-        field("Model", model, ""),
+        field(t("views.agents.model"), model, ""),
         effortField,
-        field("Approvals", approvals, ""),
+        field(t("views.agents.approvals"), approvals, ""),
         toolsField,
       ),
       el("div", { class: "cluster end" }, cancel, save),
@@ -645,11 +646,11 @@ function mountList(root, ctx) {
   // to add, a team or one agent at a time, one of the two shown.
   // What each part is for stands behind an (i) beside its name (item 848).
   const teamsCount = el("span", { class: "agents-count" });
-  const teamsAbout = aboutToggle("Open a team to give it work: Dot leads it, hands each agent the part its role fits and puts their answers together.", "About your teams");
+  const teamsAbout = aboutToggle(t("views.agents.openATeamToGive"), t("views.agents.aboutYourTeams"));
   const yourTeams = el(
     "section",
-    { class: "agents-part", "aria-label": "Your teams" },
-    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your teams", teamsCount), teamsAbout.button),
+    { class: "agents-part", "aria-label": t("views.agents.yourTeams") },
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, t("views.agents.yourTeams"), teamsCount), teamsAbout.button),
     teamsAbout.note,
     teamsHolder,
   );
@@ -658,21 +659,21 @@ function mountList(root, ctx) {
   let summariesShown = [];
   let picking = null;
   const pickedCount = el("span", { class: "agent-select-count" });
-  const makeTeamButton = el("button", { class: "btn primary", type: "button", onclick: () => attempt(() => openTeamEditor([...(picking?.ids ?? [])])) }, icon("users"), "Make a team");
+  const makeTeamButton = el("button", { class: "btn primary", type: "button", onclick: () => attempt(() => openTeamEditor([...(picking?.ids ?? [])])) }, icon("users"), t("views.agents.makeATeam"));
   const selectBar = el(
     "div",
-    { class: "agent-select-bar", hidden: true, role: "region", "aria-label": "Agents picked for a team" },
+    { class: "agent-select-bar", hidden: true, role: "region", "aria-label": t("views.agents.agentsPickedForATeam") },
     pickedCount,
     el("span", { class: "spacer" }),
-    el("button", { class: "btn ghost", type: "button", onclick: () => setPicking(false) }, "Cancel"),
+    el("button", { class: "btn ghost", type: "button", onclick: () => setPicking(false) }, t("views.agents.cancel")),
     makeTeamButton,
   );
   // Hidden until the agents are read: a list that cannot be read offers nothing to pick.
-  const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, title: "Pick agents for a team", onclick: () => setPicking(true) }, "Select");
+  const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, title: t("views.agents.pickAgentsForATeam"), onclick: () => setPicking(true) }, t("views.agents.select"));
 
   function paintPicked() {
     const count = picking === null ? 0 : picking.ids.length;
-    pickedCount.textContent = count === 0 ? "Tick the agents of the team" : `${plural(count, "agent", "agents")} picked`;
+    pickedCount.textContent = count === 0 ? t("views.agents.tickTheAgentsOfThe") : t("views.agents.partPicked", { part: tCount(count, "views.agents.countAgent", "views.agents.countAgents") });
     makeTeamButton.disabled = count === 0;
   }
 
@@ -699,16 +700,16 @@ function mountList(root, ctx) {
     paintPicked();
     drawGrid();
   }
-  const mineAbout = aboutToggle("Open one to give it work, read its chats or change it. Ask Dot for a big job and it hands parts to them.", "About your agents");
+  const mineAbout = aboutToggle(t("views.agents.openOneToGiveIt"), t("views.agents.aboutYourAgents"));
   const yours = el(
     "section",
-    { class: "agents-part", "aria-label": "Your agents" },
-    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your agents", mineCount), mineAbout.button, el("span", { class: "spacer" }), selectButton),
+    { class: "agents-part", "aria-label": t("views.agents.yourAgents") },
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, t("views.agents.yourAgents"), mineCount), mineAbout.button, el("span", { class: "spacer" }), selectButton),
     mineAbout.note,
     holder,
     selectBar,
   );
-  const templates = el("section", { class: "agents-part", "aria-label": "Templates" }, loadingPanel());
+  const templates = el("section", { class: "agents-part", "aria-label": t("views.agents.templates") }, loadingPanel());
 
   async function loadTemplates() {
     try {
@@ -746,10 +747,10 @@ function mountList(root, ctx) {
         // pane is for stands behind the (i) of the head, the shown pane's (item 848).
         const abouts = {
           teams: aboutToggle(
-            "A few agents that work together, made in one click: ask Dot or any of them, and they hand each other the parts their roles fit. An agent of that name you have already is kept, and joins the team.",
-            "About the ready-made teams",
+            t("views.agents.aFewAgentsThatWork"),
+            t("views.agents.aboutTheReadyMadeTeams"),
           ),
-          single: aboutToggle("One agent of yours, to change as you like. What one writes to a person is a draft that you send.", "About the ready-made agents"),
+          single: aboutToggle(t("views.agents.oneAgentOfYoursTo"), t("views.agents.aboutTheReadyMadeAgents")),
         };
         const panes = {
           teams: el(
@@ -762,7 +763,7 @@ function mountList(root, ctx) {
                   el(
                     "p",
                     { class: "hint", dataset: { teamsAgentsUnknown: "" } },
-                    `Your agents could not be listed: ${summaries.problem.message}. The cards mark none of them Yours, and Use team still keeps an agent you have.`,
+                    t("views.agents.yourAgentsCouldNotBe", { message: summaries.problem.message }),
                   ),
                 ]),
             el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam, owned, mine.has(team.id)))),
@@ -777,15 +778,15 @@ function mountList(root, ctx) {
                   el(
                     "p",
                     { class: "hint", dataset: { templatesToolsUnknown: "" } },
-                    `The actions could not be listed: ${listingProblem.message}. A template that names one this Mac lacks is refused when used.`,
+                    t("views.agents.theActionsCouldNotBe2", { message: listingProblem.message }),
                   ),
                 ]),
             el("div", { class: "template-grid" }, listed.map((template) => templateCard(template, useTemplate, known))),
           ),
         };
         const choices = [
-          { id: "teams", label: `Teams (${teams.length})` },
-          { id: "single", label: `Single agents (${listed.length})` },
+          { id: "teams", label: t("views.agents.teamsLength", { length: teams.length }) },
+          { id: "single", label: t("views.agents.singleAgentsLength", { length: listed.length }) },
         ];
         const buttons = choices.map((choice) => el("button", { type: "button", dataset: { pane: choice.id }, onclick: () => show(choice.id) }, choice.label));
         const show = (id) => {
@@ -803,10 +804,10 @@ function mountList(root, ctx) {
           el(
             "div",
             { class: "agents-part-head" },
-            el("h2", { class: "section-label" }, "Add ready-made agents"),
+            el("h2", { class: "section-label" }, t("views.agents.addReadyMadeAgents")),
             abouts.teams.button,
             abouts.single.button,
-            el("div", { class: "segmented", role: "group", "aria-label": "Ready-made agents" }, buttons),
+            el("div", { class: "segmented", role: "group", "aria-label": t("views.agents.readyMadeAgents") }, buttons),
           ),
           panes.teams,
           panes.single,
@@ -828,12 +829,12 @@ function mountList(root, ctx) {
     const inputs = template.questions.map((question) => el("input", { class: "input", type: "text", maxlength: "500", autocomplete: "off", "aria-label": question }));
     let answers = null;
     const { closed } = formDialog({
-      title: `Set up ${template.name}`,
-      description: "What it needs to know to start. Leave any blank: it asks you once when it needs that.",
+      title: t("views.agents.setUpName", { name: template.name }),
+      description: t("views.agents.whatItNeedsToKnow"),
       body: template.questions.map((question, index) => field(question, inputs[index], "")),
-      submitLabel: "Use template",
+      submitLabel: t("views.agents.useTemplate"),
       alternative: {
-        label: "Skip",
+        label: t("views.agents.skip"),
         onSubmit: async () => {
           answers = [];
           return true;
@@ -857,13 +858,13 @@ function mountList(root, ctx) {
     const saved = await api.post(`/agent-templates/${template.id}/use`, answers.some((answer) => answer !== "") ? { answers } : null);
     rememberLook(saved.id, saved.look);
     if (!alsoSchedule) {
-      toast("ok", `${saved.name} is ready.`);
+      toast("ok", t("views.agents.nameIsReady", { name: saved.name }));
     } else {
       const { missed } = await addSuggestedSchedules([{ agent: saved, template }]);
       if (missed.length > 0) {
-        toast("error", `${saved.name} is ready, but its schedule was not added: ${missed[0]}.`);
+        toast("error", t("views.agents.nameIsReadyButIts", { name: saved.name, value: missed[0] }));
       } else {
-        toast("ok", `${saved.name} is ready, with its schedule switched off: read its goal, then switch it on.`);
+        toast("ok", t("views.agents.nameIsReadyWithIts", { name: saved.name }));
       }
     }
     ctx.navigate(`/agents/${saved.id}`);
@@ -886,27 +887,27 @@ function mountList(root, ctx) {
       : [];
     const { added, had: scheduledAlready, missed } = await addSuggestedSchedules(pairs);
     const made = AND_LIST.format(used.made.map((record) => record.name));
-    const had = used.kept.length === 0 ? "" : ` Already yours and kept as they were: ${AND_LIST.format(used.kept.map((record) => record.name))}.`;
+    const had = used.kept.length === 0 ? "" : t("views.agents.alreadyYoursAndKeptAs", { format: AND_LIST.format(used.kept.map((record) => record.name)) });
     // A kept agent that named its tools was given message_agent, to hand its teammates their parts (item 512).
-    const joined = used.joined.length === 0 ? "" : ` ${AND_LIST.format(used.joined)} can message ${used.joined.length === 1 ? "its" : "their"} teammates now.`;
+    const joined = used.joined.length === 0 ? "" : t(used.joined.length === 1 ? "views.agents.joinedOne" : "views.agents.joinedMany", { names: AND_LIST.format(used.joined) });
     // The team under Your teams: made now, or found with the agents it lacked put back (item 610).
     const placed = used.created
-      ? ` ${used.team.name} is under Your teams, on the Teams tab.`
+      ? t("views.agents.nameIsUnderYourTeams", { name: used.team.name })
       : used.added.length === 0
         ? ""
-        : ` ${AND_LIST.format(used.added)} ${used.added.length === 1 ? "is" : "are"} back in ${used.team.name}.`;
+        : t(used.added.length === 1 ? "views.agents.backInOne" : "views.agents.backInMany", { names: AND_LIST.format(used.added), team: used.team.name });
     const off =
       added.length === 0
         ? ""
-        : ` ${plural(added.length, "schedule was", "schedules were")} added, switched off: read ${added.length === 1 ? "its goal" : "their goals"} in Settings › Scheduled tasks, then switch ${added.length === 1 ? "it" : "them"} on.`;
-    const already = scheduledAlready.length === 0 ? "" : ` ${AND_LIST.format(scheduledAlready)} had ${scheduledAlready.length === 1 ? "its schedule" : "their schedules"} already.`;
+        : t(added.length === 1 ? "views.agents.schedulesAddedOne" : "views.agents.schedulesAddedMany", { count: added.length });
+    const already = scheduledAlready.length === 0 ? "" : t("views.agents.formatHadValueAlready", { format: AND_LIST.format(scheduledAlready), value: scheduledAlready.length === 1 ? t("views.agents.itsSchedule") : t("views.agents.theirSchedules") });
     if (missed.length > 0) {
-      const ready = used.made.length === 0 ? " not" : ` ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not`;
-      toast("error", `${team.name}:${ready} every schedule was added: ${missed.join("; ")}.${had}${placed}${joined}${off}${already}`);
+      const key = used.made.length === 0 ? "views.agents.teamNotAllAdded" : used.made.length === 1 ? "views.agents.teamMadeNotAllOne" : "views.agents.teamMadeNotAllMany";
+      toast("error", t(key, { name: team.name, made, join: missed.join("; "), had, placed, joined, off, already }));
     } else if (used.made.length === 0) {
-      toast("ok", `You have every agent of the ${team.name} already.${placed}${joined}${off}${already}`);
+      toast("ok", t("views.agents.youHaveEveryAgentOf", { name: team.name, placed, joined, off, already }));
     } else {
-      toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${placed}${joined}${off}${already}`);
+      toast("ok", t(used.made.length === 1 ? "views.agents.teamReadyOne" : "views.agents.teamReadyMany", { name: team.name, made, had, placed, joined, off, already }));
     }
     // The lists show the team and the agents, and the cards mark them Yours. The page stays on the ready-made ones, where
     // the owner was choosing; the toast says the Teams tab holds the team (item 1136).
@@ -946,7 +947,7 @@ function mountList(root, ctx) {
       teamsCount.textContent = String(teams.length);
       teamsHolder.replaceChildren(
         teams.length === 0
-          ? el("div", { class: "card empty-teams" }, el("p", { class: "muted" }, "No teams yet. Start from a ready team on the Agents tab, or put your own agents together with New team under “…”."))
+          ? el("div", { class: "card empty-teams" }, el("p", { class: "muted" }, t("views.agents.noTeamsYetStartFrom")))
           : el("div", { class: "team-grid" }, teams.map(teamTile)),
       );
     } catch (error) {
@@ -999,8 +1000,8 @@ function mountList(root, ctx) {
     editor.focus();
   }
 
-  const newButton = el("button", { class: "btn primary", type: "button", "aria-label": "New agent", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
-  const chooser = el("input", { type: "file", accept: ".json,application/json", hidden: true, "aria-label": "Agent file" });
+  const newButton = el("button", { class: "btn primary", type: "button", "aria-label": t("views.agents.newAgent"), onclick: openEditor }, icon("plus"), el("span", { class: "label" }, t("views.agents.newAgent")));
+  const chooser = el("input", { type: "file", accept: ".json,application/json", hidden: true, "aria-label": t("views.agents.agentFile") });
   chooser.addEventListener("change", () => {
     const [file] = chooser.files;
     chooser.value = "";
@@ -1013,19 +1014,19 @@ function mountList(root, ctx) {
   });
   // The page's other actions sit behind one button beside New agent (item 1136), as an agent's page keeps its own
   // behind More (item 993): one primary action in sight, the rest a click away.
-  const moreButton = el("button", { class: "btn ghost icon-only", type: "button", title: "More", "aria-label": "More actions", "aria-haspopup": "menu" }, icon("ellipsis"));
+  const moreButton = el("button", { class: "btn ghost icon-only", type: "button", title: t("views.agents.more"), "aria-label": t("views.agents.moreActions"), "aria-haspopup": "menu" }, icon("ellipsis"));
   moreButton.addEventListener("click", () => {
     const box = moreButton.getBoundingClientRect();
     openMenu({
-      label: "More actions",
+      label: t("views.agents.moreActions"),
       at: { x: box.right - 220, y: box.bottom + 4 },
       back: moreButton,
       button: moreButton,
       items: [
-        { label: "New team", icon: "users", title: "Put agents of yours together as a team", run: () => attempt(() => openTeamEditor()) },
-        { label: "Import an agent", icon: "upload", title: "Make an agent from a file exported from Dot", run: () => chooser.click() },
+        { label: t("views.agents.newTeam"), icon: "users", title: t("views.agents.putAgentsOfYoursTogether"), run: () => attempt(() => openTeamEditor()) },
+        { label: t("views.agents.importAnAgent"), icon: "upload", title: t("views.agents.makeAnAgentFromA"), run: () => chooser.click() },
         "separator",
-        { label: "Handoffs", icon: "branch", title: "Today's messages between agents", run: () => ctx.navigate("/team") },
+        { label: t("views.agents.handoffs"), icon: "branch", title: t("views.agents.todaySMessagesBetweenAgents"), run: () => ctx.navigate("/team") },
       ],
     });
   });
@@ -1034,9 +1035,9 @@ function mountList(root, ctx) {
   // The page in parts (item 1136): the agents the owner has and the ready-made ones first, then the teams, the work
   // orders, one part at a time; the part shown is kept in this browser.
   const parts = [
-    { id: "agents", label: "Agents", sections: [yours, templates] },
-    { id: "teams", label: "Teams", sections: [yourTeams] },
-    { id: "orders", label: "Orders", sections: [work.element] },
+    { id: "agents", label: t("views.agents.agents"), sections: [yours, templates] },
+    { id: "teams", label: t("views.agents.teams"), sections: [yourTeams] },
+    { id: "orders", label: t("views.agents.orders"), sections: [work.element] },
   ];
   const kept = readPref(PART_KEY);
   const tabs = segmented(
@@ -1045,7 +1046,7 @@ function mountList(root, ctx) {
     (id) => showPart(id),
   );
   tabs.element.classList.add("agents-tabs");
-  tabs.element.setAttribute("aria-label", "Parts of the Agents page");
+  tabs.element.setAttribute("aria-label", t("views.agents.partsOfTheAgentsPage"));
   function showPart(id) {
     writePref(PART_KEY, id);
     tabs.set(id);
@@ -1057,8 +1058,8 @@ function mountList(root, ctx) {
   }
   root.append(
     pageHead(
-      "Agents",
-      "Dot, your teams, and the agents you or Dot made, each with a role and its own chats.",
+      t("views.agents.agents"),
+      t("views.agents.dotYourTeamsAndThe"),
       el("div", { class: "agents-head" }, tabs.element, el("span", { class: "spacer" }), chooser, moreButton, newButton),
     ),
     editorSlot,
@@ -1173,9 +1174,9 @@ function agentComposer(record, ctx, follow) {
  */
 export function startComposer({ name, bounds, owner, ctx, follow }) {
   const frame = composerFrame({
-    label: `Message ${name}`,
-    boxLabel: "Message",
-    placeholder: `Message ${name}`,
+    label: t("views.agents.messageName", { name }),
+    boxLabel: t("views.agents.message"),
+    placeholder: t("views.agents.messageName", { name }),
     maxPx: MAX_GOAL_PX,
     commands: MESSAGE_MODES.map((option) => ({
       label: `/${option.id}`,
@@ -1184,7 +1185,7 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
       run: () => choices.setMode(option.id),
     })),
     send: submit,
-    sendLabel: "Start",
+    sendLabel: t("views.agents.start"),
     draftKey: null,
     listener: null,
   });
@@ -1193,7 +1194,7 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
     frame,
     modes: MESSAGE_MODES,
     kept: agentKept(bounds),
-    optionsTitle: "Approvals",
+    optionsTitle: t("views.agents.approvals"),
     more: () => [],
     onMode: (id) => {
       choices.goalMode.setAvailable(id !== "chat");
@@ -1286,14 +1287,14 @@ function who(record, face) {
     face,
     el("div", { class: "home-name" }, record.name),
     record.role === "" ? null : el("p", { class: "home-greeting" }, record.role),
-    record.made_by === null ? null : el("p", { class: "home-greeting agent-made" }, "Made by Dot in one of its tasks"),
+    record.made_by === null ? null : el("p", { class: "home-greeting agent-made" }, t("views.agents.madeByDotInOne")),
     record.paused_at === null
       ? null
       : el(
           "p",
           { class: "home-greeting agent-paused" },
-          el("span", { class: "badge b-warn" }, "Paused"),
-          " Its schedules start nothing by themselves; your messages here still go through.",
+          el("span", { class: "badge b-warn" }, t("views.agents.paused")),
+          t("views.agents.itsSchedulesStartNothingBy2"),
         ),
   );
 }
@@ -1309,16 +1310,16 @@ function agentScheduleRow(view, onToggle) {
     type: "button",
     role: "switch",
     "aria-checked": String(record.enabled),
-    "aria-label": `${record.enabled ? "Switch off" : "Switch on"} ${record.name}`,
-    title: done ? "It ran once and has no run left: give it a new time in Settings › Scheduled tasks" : record.enabled ? "Switch this schedule off" : "Switch this schedule on",
+    "aria-label": `${record.enabled ? t("views.agents.switchOff") : t("views.agents.switchOn")} ${record.name}`,
+    title: done ? t("views.agents.itRanOnceAndHas") : record.enabled ? t("views.agents.switchThisScheduleOff") : t("views.agents.switchThisScheduleOn"),
     disabled: done,
     onclick: () => onToggle(record),
   });
   const state = done
-    ? el("span", { class: "badge b-muted", title: `It ran once; it ended: ${record.last_status}` }, "ran once")
+    ? el("span", { class: "badge b-muted", title: t("views.agents.itRanOnceItEnded", { last_status: record.last_status }) }, t("views.agents.ranOnce"))
     : !record.enabled
-      ? el("span", { class: "badge b-muted" }, "switched off")
-      : el("span", null, view.next_local === null ? "Will not run again" : `Next ${view.next_local}`);
+      ? el("span", { class: "badge b-muted" }, t("views.agents.switchedOff"))
+      : el("span", null, view.next_local === null ? t("views.agents.willNotRunAgain") : t("views.agents.nextNextLocal", { next_local: view.next_local }));
   return el(
     "div",
     { class: "list-row", dataset: { schedule: record.id } },
@@ -1328,9 +1329,9 @@ function agentScheduleRow(view, onToggle) {
       { class: "row-main" },
       el("div", { class: "row-title" }, record.name),
       el("div", { class: "agent-schedule-goal" }, record.goal),
-      el("div", { class: "row-meta" }, el("span", { class: "mono", title: "When it runs" }, view.when), state),
+      el("div", { class: "row-meta" }, el("span", { class: "mono", title: t("views.agents.whenItRuns") }, view.when), state),
     ),
-    el("div", { class: "row-actions" }, el("a", { class: "btn ghost sm", href: `#/settings/schedules/${record.id}`, title: "Edit it in Settings › Scheduled tasks" }, "Edit")),
+    el("div", { class: "row-actions" }, el("a", { class: "btn ghost sm", href: `#/settings/schedules/${record.id}`, title: t("views.agents.editItInSettingsScheduled") }, t("views.agents.edit"))),
   );
 }
 
@@ -1345,17 +1346,17 @@ function suggestedScheduleRow(template, onAdd) {
     el(
       "div",
       { class: "row-main" },
-      el("div", { class: "row-title" }, "Suggested by its template"),
+      el("div", { class: "row-title" }, t("views.agents.suggestedByItsTemplate")),
       el("div", { class: "agent-schedule-goal" }, template.task),
-      el("div", { class: "row-meta" }, el("span", { title: "When it would run" }, template.schedule), el("span", { class: "badge b-muted" }, "not added")),
+      el("div", { class: "row-meta" }, el("span", { title: t("views.agents.whenItWouldRun") }, template.schedule), el("span", { class: "badge b-muted" }, t("views.agents.notAdded"))),
     ),
-    el("div", { class: "row-actions" }, el("button", { class: "btn sm", type: "button", title: "Add it switched off: you switch it on once you have read its goal", onclick: onAdd }, "Add it")),
+    el("div", { class: "row-actions" }, el("button", { class: "btn sm", type: "button", title: t("views.agents.addItSwitchedOffYou"), onclick: onAdd }, t("views.agents.addIt"))),
   );
 }
 
 /** A lesson the agent learned: the note, how the agent's own runs fared after it, and Forget. */
 function lessonRow(record, score, onForget) {
-  const forget = el("button", { class: "btn ghost sm", type: "button" }, "Forget");
+  const forget = el("button", { class: "btn ghost sm", type: "button" }, t("views.agents.forget"));
   forget.addEventListener("click", () => onForget(record));
   return el(
     "div",
@@ -1364,7 +1365,7 @@ function lessonRow(record, score, onForget) {
       "div",
       { class: "row-main" },
       el("div", { class: "row-text" }, record.content),
-      el("div", { class: "row-meta" }, el("span", null, `Saved ${ago(record.created_at)}`), scoreLine(score)),
+      el("div", { class: "row-meta" }, el("span", null, t("views.agents.savedAgo", { ago: ago(record.created_at) })), scoreLine(score)),
     ),
     el("div", { class: "row-actions" }, forget),
   );
@@ -1428,7 +1429,7 @@ function mountPage(root, ctx, agentId) {
       conversation.setAttribute("href", `#/runs/${homeChat.latest_run_id}`);
       conversation.title = clip(homeChat.title, GOAL_CHARS);
     }
-    setText(conversationLabel, `Open your chat with ${record.name}`);
+    setText(conversationLabel, t("views.agents.openYourChatWithName", { name: record.name }));
   }
   function follow() {
     if (freshChat || homeChat === null) {
@@ -1440,7 +1441,7 @@ function mountPage(root, ctx, agentId) {
   // The agent's page is laid out as the home is (item 124): its face, name and role over the composer in the middle,
   // and under them its chats, what it learned and its messages as the home's Today strip, each only when it has rows.
   const top = el("div", { class: "home-start agent-top" });
-  const sections = el("section", { class: "home-today agent-sections", "aria-label": "The agent's work" });
+  const sections = el("section", { class: "home-today agent-sections", "aria-label": t("views.agents.theAgentSWork") });
   // While the agent is read its page stands as a chat that opens: Dot's three dots in the middle, not a card's spinner
   // at the top that read as something else loading.
   const page = el("div", { class: "home agent-home" }, chatLoading());
@@ -1450,7 +1451,7 @@ function mountPage(root, ctx, agentId) {
 
   // The bar names the agent, as a heading of the page, and so does the tab (`Researcher · Agents · Dot`).
   function stageOf(record) {
-    ctx.setTitle(`${record.name} · Agents`);
+    ctx.setTitle(t("views.agents.nameAgents", { name: record.name }));
     setStageTitle(actorFace(record.id, "idle", record.look), el("h1", { class: "stage-h1 stage-name" }, record.name));
     // On a phone the bar is a chat's (item 1123): the name in its middle on glass, the tools in one pill of glass.
     setStageGlass();
@@ -1466,33 +1467,33 @@ function mountPage(root, ctx, agentId) {
   }
 
   function agentMenuButton(record) {
-    const button = el("button", { class: "icon-btn", type: "button", title: `More for ${record.name}`, "aria-label": `More for ${record.name}`, "aria-haspopup": "menu" }, icon("ellipsis"));
+    const button = el("button", { class: "icon-btn", type: "button", title: t("views.agents.moreForName", { name: record.name }), "aria-label": t("views.agents.moreForName", { name: record.name }), "aria-haspopup": "menu" }, icon("ellipsis"));
     button.addEventListener("click", () => {
       const box = button.getBoundingClientRect();
       openMenu({
-        label: `More for ${record.name}`,
+        label: t("views.agents.moreForName", { name: record.name }),
         at: { x: box.right - 200, y: box.bottom + 4 },
         back: button,
         button,
         items: [
           {
-            label: "New chat",
+            label: t("views.agents.newChat"),
             icon: "plus",
-            title: `The next message starts a chat of its own; ${record.name}'s conversation stays as it is`,
+            title: t("views.agents.theNextMessageStartsA", { name: record.name }),
             run: () => {
               freshChat = true;
               paintConversation(record);
-              toast("ok", `Your next message to ${record.name} starts a new chat.`);
+              toast("ok", t("views.agents.yourNextMessageToName", { name: record.name }));
               composer?.focus();
             },
           },
-          { label: "Edit", icon: "pencil", run: () => edit(record) },
-          { label: "Export", icon: "download", title: "Save the agent as a file, to import into another Dot", run: () => attempt(() => exportAgent(record)) },
+          { label: t("views.agents.edit"), icon: "pencil", run: () => edit(record) },
+          { label: t("views.agents.export"), icon: "download", title: t("views.agents.saveTheAgentAsA"), run: () => attempt(() => exportAgent(record)) },
           record.paused_at === null
-            ? { label: "Pause", icon: "pause", title: "Its schedules start nothing by themselves until you resume it", run: () => attempt(() => setPaused(record, true)) }
-            : { label: "Resume", icon: "play", title: "Its schedules start again", run: () => attempt(() => setPaused(record, false)) },
+            ? { label: t("views.agents.pause"), icon: "pause", title: t("views.agents.itsSchedulesStartNothingBy"), run: () => attempt(() => setPaused(record, true)) }
+            : { label: t("views.agents.resume"), icon: "play", title: t("views.agents.itsSchedulesStartAgain"), run: () => attempt(() => setPaused(record, false)) },
           "separator",
-          { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => remove(record)) },
+          { label: t("views.agents.delete"), icon: "trash", danger: true, run: () => attempt(() => remove(record)) },
         ],
       });
     });
@@ -1502,7 +1503,7 @@ function mountPage(root, ctx, agentId) {
   /** Pause the agent or resume it (item 465), then show the page as the daemon has it. */
   async function setPaused(record, paused) {
     await api.post(`/agents/${record.id}/${paused ? "pause" : "resume"}`, null);
-    toast("ok", paused ? `${record.name} paused: its schedules start nothing by themselves.` : `${record.name} resumed.`);
+    toast("ok", paused ? t("views.agents.namePausedItsSchedulesStart", { name: record.name }) : t("views.agents.nameResumed", { name: record.name }));
     await reload();
   }
 
@@ -1544,17 +1545,17 @@ function mountPage(root, ctx, agentId) {
     // Its schedules are switched off with it (item 462), and the dialog says how many: the ones on now.
     const schedules = (await api.get("/schedules")).filter((view) => view.record.options.agent_id === record.id && view.record.enabled);
     const switchedOff =
-      schedules.length === 0 ? "" : ` Its ${plural(schedules.length, "schedule is", "schedules are")} switched off.`;
+      schedules.length === 0 ? "" : t("views.agents.itsPartSwitchedOff", { part: tCount(schedules.length, "views.agents.countScheduleIs", "views.agents.countSchedulesAre") });
     const confirmed = await confirmDialog({
-      title: `Delete ${record.name}?`,
-      message: `Its chats stay, as Dot's. The agent's face, role and instructions are gone.${switchedOff}`,
-      confirmLabel: "Delete",
+      title: t("views.agents.deleteName", { name: record.name }),
+      message: t("views.agents.itsChatsStayAsDot", { switchedOff }),
+      confirmLabel: t("views.agents.delete"),
       danger: true,
       focusCancel: true,
     });
     if (confirmed) {
       await api.del(`/agents/${record.id}`);
-      toast("ok", `${record.name} deleted.`);
+      toast("ok", t("views.agents.nameDeleted", { name: record.name }));
       ctx.navigate("/settings/agents");
     }
   }
@@ -1563,9 +1564,9 @@ function mountPage(root, ctx, agentId) {
   async function addSuggested(record, template) {
     const { added, missed } = await addSuggestedSchedules([{ agent: record, template }]);
     if (missed.length > 0) {
-      toast("error", `Its schedule was not added: ${missed[0]}.`);
+      toast("error", t("views.agents.itsScheduleWasNotAdded", { value: missed[0] }));
     } else if (added.length > 0) {
-      toast("ok", "Its schedule is added, switched off: read its goal, then switch it on.");
+      toast("ok", t("views.agents.itsScheduleIsAddedSwitched"));
     }
     await refresh();
   }
@@ -1573,21 +1574,21 @@ function mountPage(root, ctx, agentId) {
   /** Switch one of the agent's schedules on or off, then show the lists as the daemon has them. */
   async function switchSchedule(record) {
     await api.post(`/schedules/${record.id}/${record.enabled ? "disable" : "enable"}`, null);
-    toast("ok", record.enabled ? `${record.name} is switched off.` : `${record.name} is switched on.`);
+    toast("ok", record.enabled ? t("views.agents.nameIsSwitchedOff", { name: record.name }) : t("views.agents.nameIsSwitchedOn", { name: record.name }));
     await refresh();
   }
 
   async function forget(record) {
     const confirmed = await confirmDialog({
-      title: "Forget this lesson?",
-      message: "The note is removed from memory; no task is handed it again.",
-      confirmLabel: "Forget",
+      title: t("views.agents.forgetThisLesson"),
+      message: t("views.agents.theNoteIsRemovedFrom"),
+      confirmLabel: t("views.agents.forget"),
       danger: true,
       focusCancel: true,
     });
     if (confirmed) {
       await api.del(`/memories/${record.id}`);
-      toast("ok", "Lesson forgotten.");
+      toast("ok", t("views.agents.lessonForgotten"));
       await refresh();
     }
   }
@@ -1643,7 +1644,7 @@ function mountPage(root, ctx, agentId) {
     const parts = [
       homeSection(
         "schedules",
-        "Schedules",
+        t("views.agents.schedules"),
         [
           ...detail.schedules.map((view) => agentScheduleRow(view, (record) => attempt(() => switchSchedule(record)))),
           ...(detail.suggested === null ? [] : [suggestedScheduleRow(detail.suggested, () => attempt(() => addSuggested(detail.record, detail.suggested)))]),
@@ -1651,7 +1652,7 @@ function mountPage(root, ctx, agentId) {
         folds,
         toggleFold,
       ),
-      homeSection("learned", "What it learned", learned, folds, toggleFold),
+      homeSection("learned", t("views.agents.whatItLearned"), learned, folds, toggleFold),
     ];
     sections.replaceChildren(...parts.filter((part) => part !== null));
     sections.hidden = sections.childElementCount === 0;
@@ -1700,7 +1701,7 @@ function mountPage(root, ctx, agentId) {
     }
   }
 
-  root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), "All agents"), page));
+  root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), t("views.agents.allAgents")), page));
   const stopLifecycle = onLifecycle((event) => {
     if (event.kind === "run_started" || event.kind === "run_finished") {
       attempt(refresh);

@@ -9,23 +9,24 @@
 import { compact, duration, el } from "./dom.js";
 import { panelSection } from "./panels.js";
 import { budgetLine, cacheWords, costWords, usedSoFar } from "./usagewords.js";
+import { t } from "./i18n.js";
 
 const HINTS = {
-  sofar: "What this task has used since it began: its time, what was sent to the model and what it wrote, and its steps",
-  window: "How full the window of your Claude plan was when the task's newest step ran, and when it resets",
-  budget: "The tokens of this task and its helpers against the cap you set in Settings › Models › Caps, and what tasks like it (same model, mode and source, last 30 days) usually used",
-  model: "The seconds the model took to answer: its steps and its side calls together",
-  summaries: "The time spent summing up the older part of the chat, and its share of the task",
-  tools: "The seconds the actions took, with the time spent waiting for your answer",
-  gate: "The part of that time spent waiting for your approval or your answer",
-  steps: "How many times Dot went back to the model",
-  input: "What was sent to the model in all its calls, and the share its service had ready from before",
-  cache: "Why the service did not have the task's prompt ready from before, where it did not: a new chat, a change in the instructions, a pause, a tool group turned on",
-  output: "What the model wrote",
-  dollars: "An estimate of this task's own tokens in dollars, call by call at the prices of the public list models.dev; a subscription such as your Claude plan has no price per token, and a model the list has no price for makes it unknown",
-  compactions: "How often the older part of the chat was summed up to make room",
-  searches: "The web searches that came back, by the search service that answered (the Anthropic one costs one cent a search)",
-  delegated: "The tasks this task handed to helpers and how long it waited for them",
+  sofar: t("cost.whatThisTaskHasUsed"),
+  window: t("cost.howFullTheWindowOf"),
+  budget: t("cost.theTokensOfThisTask"),
+  model: t("cost.theSecondsTheModelTook"),
+  summaries: t("cost.theTimeSpentSummingUp"),
+  tools: t("cost.theSecondsTheActionsTook"),
+  gate: t("cost.thePartOfThatTime"),
+  steps: t("cost.howManyTimesDotWent"),
+  input: t("cost.whatWasSentToThe"),
+  cache: t("cost.whyTheServiceDidNot"),
+  output: t("cost.whatTheModelWrote"),
+  dollars: t("cost.anEstimateOfThisTask"),
+  compactions: t("cost.howOftenTheOlderPart"),
+  searches: t("cost.theWebSearchesThatCame"),
+  delegated: t("cost.theTasksThisTaskHanded"),
 };
 
 function cell(label, value, hint) {
@@ -36,18 +37,21 @@ function share(part, whole) {
   return whole > 0 ? `${Math.round((part / whole) * 100)}%` : "–";
 }
 
-/** Seconds spent on one thing and their share of the run: "2m 10s · 35%", or "None". */
+/** What a figure of nothing reads as; a line of it is left out (item 452). */
+const NONE = t("cost.none");
+
+/** Seconds spent on one thing and their share of the run: "2m 10s · 35%", or none. */
 function spent(seconds, total) {
-  return seconds <= 0 ? "None" : `${duration(seconds)} · ${share(seconds, total)}`;
+  return seconds <= 0 ? NONE : `${duration(seconds)} · ${share(seconds, total)}`;
 }
 
 export function createCostCard() {
   // Label and value side by side, as the details above them are.
   const grid = el("dl", { class: "facts" });
-  const body = el("div", null, el("div", { class: "hint" }, "Counting…"));
-  const card = panelSection({ id: "run-cost", title: "Cost", actions: null, body });
+  const body = el("div", null, el("div", { class: "hint" }, t("cost.counting")));
+  const card = panelSection({ id: "run-cost", title: t("cost.cost"), actions: null, body });
   card.element.classList.add("cost-card");
-  card.element.setAttribute("aria-label", "Cost of this task");
+  card.element.setAttribute("aria-label", t("cost.costOfThisTask"));
   // The figures the grid was drawn from.
   let drawn = null;
 
@@ -55,26 +59,26 @@ export function createCostCard() {
     const stats = costs.stats;
     const time = stats.time;
     const total = costs.minutes * 60;
-    const cached = time.cached_share === null ? "" : ` · ${Math.round(time.cached_share * 100)}% cached`;
-    const perHundred = stats.compaction.per_100_steps === null ? "" : ` · ${stats.compaction.per_100_steps.toFixed(1)} per 100 steps`;
-    const compactions = stats.compaction.compactions === 0 ? "None" : `${stats.compaction.compactions}${perHundred}`;
-    const delegated = stats.delegation.runs === 0 ? "None" : `${stats.delegation.runs} · ${duration(stats.delegation.seconds)} waited`;
-    const searches = stats.searches.length === 0 ? "None" : stats.searches.map((entry) => `${entry.searches} ${entry.engine}`).join(" · ");
+    const cached = time.cached_share === null ? "" : t("cost.roundCached", { round: Math.round(time.cached_share * 100) });
+    const perHundred = stats.compaction.per_100_steps === null ? "" : t("cost.tofixedPer100Steps", { toFixed: stats.compaction.per_100_steps.toFixed(1) });
+    const compactions = stats.compaction.compactions === 0 ? NONE : `${stats.compaction.compactions}${perHundred}`;
+    const delegated = stats.delegation.runs === 0 ? NONE : t("cost.runsDurationWaited", { runs: stats.delegation.runs, duration: duration(stats.delegation.seconds) });
+    const searches = stats.searches.length === 0 ? NONE : stats.searches.map((entry) => `${entry.searches} ${entry.engine}`).join(" · ");
     // A figure of none says nothing worth a line (item 452).
     const facts = [
-      ["Model", spent(time.model_seconds, total), HINTS.model],
-      ["Summaries", spent(time.compaction_seconds, total), HINTS.summaries],
-      ["Actions", spent(costs.tool_seconds, total), HINTS.tools],
-      ["Waiting for you", spent(costs.waited_s, total), HINTS.gate],
-      ["Steps", String(stats.steps), HINTS.steps],
-      ["Usage in", `${compact(stats.input_tokens)}${cached}`, HINTS.input],
-      ["Cache misses", cacheWords(costs.cache), HINTS.cache],
-      ["Usage out", compact(stats.output_tokens), HINTS.output],
-      ["Cost", costWords(costs.cost) ?? "None", HINTS.dollars],
-      ["Chat summaries", compactions, HINTS.compactions],
-      ["Tasks given to helpers", delegated, HINTS.delegated],
-      ["Searches", searches, HINTS.searches],
-    ].filter(([, value]) => value !== "None");
+      [t("cost.model"), spent(time.model_seconds, total), HINTS.model],
+      [t("cost.summaries"), spent(time.compaction_seconds, total), HINTS.summaries],
+      [t("cost.actions"), spent(costs.tool_seconds, total), HINTS.tools],
+      [t("cost.waitingForYou"), spent(costs.waited_s, total), HINTS.gate],
+      [t("cost.steps"), String(stats.steps), HINTS.steps],
+      [t("cost.usageIn"), `${compact(stats.input_tokens)}${cached}`, HINTS.input],
+      [t("cost.cacheMisses"), cacheWords(costs.cache), HINTS.cache],
+      [t("cost.usageOut"), compact(stats.output_tokens), HINTS.output],
+      [t("cost.cost2"), costWords(costs.cost) ?? NONE, HINTS.dollars],
+      [t("cost.chatSummaries"), compactions, HINTS.compactions],
+      [t("cost.tasksGivenToHelpers"), delegated, HINTS.delegated],
+      [t("cost.searches"), searches, HINTS.searches],
+    ].filter(([, value]) => value !== NONE);
     // What a task at work has used so far, above the details (item 1403); none once it has ended.
     const sofar = usedSoFar(costs, Date.now() / 1000);
     // The task against its cap and what tasks like it usually use (item 1731), from its first step on.
@@ -92,7 +96,7 @@ export function createCostCard() {
         : el(
             "div",
             { class: "cost-so-far", "aria-live": "off" },
-            el("div", { class: "cost-so-far-label" }, "Used so far"),
+            el("div", { class: "cost-so-far-label" }, t("cost.usedSoFar")),
             el("div", { class: "cost-so-far-line", title: HINTS.sofar }, sofar.line),
             sofar.window === null ? null : el("div", { class: "cost-so-far-window", title: HINTS.window }, sofar.window),
           );

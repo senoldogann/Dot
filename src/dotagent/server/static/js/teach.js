@@ -13,6 +13,7 @@ import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { loopRhythm, REPEAT_RHYTHMS, repeatCron, WEEK_DAYS } from "./rhythm.js";
 import { toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 // How often the panel reads the steps while the owner works: often enough to see one's own click, seldom enough to
 // leave the daemon alone.
@@ -32,51 +33,51 @@ export function openTeachPanel({ threadId, onSaved }) {
   let recording = false;
 
   const steps = el("ol", { class: "teach-steps" });
-  const address = el("p", { class: "teach-address" }, "The tab comes to the front: work in it, and every step you take shows here.");
+  const address = el("p", { class: "teach-address" }, t("teach.theTabComesToThe"));
   const words = el("textarea", {
     class: "textarea teach-words",
     rows: "2",
-    placeholder: "What is this task for? “Pay the month's invoices” or “Book a meeting room for the team”",
-    "aria-label": "What is this task for",
+    placeholder: t("teach.whatIsThisTaskFor"),
+    "aria-label": t("teach.whatIsThisTaskFor2"),
   });
   const image = el("img", { class: "teach-frame", alt: "", hidden: true });
   const live = el("div", { class: "teach-live" }, image, address);
   const draft = el("section", { class: "teach-draft", hidden: true });
-  const start = el("button", { class: "btn primary", type: "button" }, "Start recording");
-  const stop = el("button", { class: "btn", type: "button", hidden: true }, "Stop");
-  const make = el("button", { class: "btn", type: "button", hidden: true }, "Write the skill");
-  const keep = el("button", { class: "btn primary", type: "button", hidden: true }, "Save it");
-  const go = el("button", { class: "btn", type: "button", hidden: true }, "Run it now");
-  const close = el("button", { class: "btn ghost", type: "button", "aria-label": "Close" }, icon("x"));
-  const rhythm = el("select", { class: "select", "aria-label": "How often" }, REPEAT_RHYTHMS.map((each) => el("option", { value: each.id }, each.label)));
-  const weekDay = el("select", { class: "select", "aria-label": "Which day", hidden: true }, WEEK_DAYS.map(([value, name]) => el("option", { value }, name)));
-  const time = el("input", { class: "input teach-time", type: "time", value: "09:00", "aria-label": "At what time" });
-  const repeat = el("button", { class: "btn", type: "button" }, "Repeat it");
+  const start = el("button", { class: "btn primary", type: "button" }, t("teach.startRecording"));
+  const stop = el("button", { class: "btn", type: "button", hidden: true }, t("teach.stop"));
+  const make = el("button", { class: "btn", type: "button", hidden: true }, t("teach.writeTheSkill"));
+  const keep = el("button", { class: "btn primary", type: "button", hidden: true }, t("teach.saveIt"));
+  const go = el("button", { class: "btn", type: "button", hidden: true }, t("teach.runItNow"));
+  const close = el("button", { class: "btn ghost", type: "button", "aria-label": t("teach.close") }, icon("x"));
+  const rhythm = el("select", { class: "select", "aria-label": t("teach.howOften") }, REPEAT_RHYTHMS.map((each) => el("option", { value: each.id }, each.label)));
+  const weekDay = el("select", { class: "select", "aria-label": t("teach.whichDay"), hidden: true }, WEEK_DAYS.map(([value, name]) => el("option", { value }, name)));
+  const time = el("input", { class: "input teach-time", type: "time", value: "09:00", "aria-label": t("teach.atWhatTime") });
+  const repeat = el("button", { class: "btn", type: "button" }, t("teach.repeatIt"));
   const repeated = el("p", { class: "teach-repeated", hidden: true });
   const repeating = el(
     "section",
-    { class: "teach-repeat", hidden: true, "aria-label": "Repeat this task" },
-    el("h3", null, "Repeat it by itself"),
-    el("div", { class: "teach-repeat-row" }, rhythm, weekDay, el("span", { class: "hint" }, "at"), time, repeat),
+    { class: "teach-repeat", hidden: true, "aria-label": t("teach.repeatThisTask") },
+    el("h3", null, t("teach.repeatItByItself")),
+    el("div", { class: "teach-repeat-row" }, rhythm, weekDay, el("span", { class: "hint" }, t("teach.at")), time, repeat),
     repeated,
   );
 
   const dialog = el(
     "dialog",
-    { class: "modal teach", "aria-label": "Teach a task" },
+    { class: "modal teach", "aria-label": t("teach.teachATask") },
     el(
       "div",
       { class: "modal-body" },
-      el("header", { class: "teach-head" }, el("h2", null, "Teach a task"), close),
+      el("header", { class: "teach-head" }, el("h2", null, t("teach.teachATask")), close),
       el(
         "p",
         { class: "teach-hint" },
-        "Show me the task once in Dot's browser: open the page you start from, then do it. Stop when it is done, and I ",
-        "will write it down as a skill for later tasks.",
+        t("teach.showMeTheTaskOnce"),
+        t("teach.willWriteItDownAs"),
       ),
       live,
       steps,
-      el("label", { class: "teach-label" }, "What is it for?", words),
+      el("label", { class: "teach-label" }, t("teach.whatIsItFor"), words),
       draft,
       repeating,
       el("div", { class: "teach-actions" }, start, stop, make, go, keep),
@@ -136,7 +137,7 @@ export function openTeachPanel({ threadId, onSaved }) {
         image.src = next;
         image.hidden = false;
       },
-    }).catch((error) => complain("The view of the tab stopped", error));
+    }).catch((error) => complain(t("teach.theViewOfTheTab"), error));
   }
 
   async function read() {
@@ -152,7 +153,7 @@ export function openTeachPanel({ threadId, onSaved }) {
       stopPolling();
       stopView();
       image.hidden = true;
-      address.textContent = "The recording ended, and the steps it had are gone. Start again to show the task.";
+      address.textContent = t("teach.theRecordingEndedAndThe");
       paint();
     }
   }
@@ -160,7 +161,7 @@ export function openTeachPanel({ threadId, onSaved }) {
   function startPolling() {
     if (poll === null) {
       poll = setInterval(() => {
-        read().catch((error) => complain("The steps stopped coming", error));
+        read().catch((error) => complain(t("teach.theStepsStoppedComing"), error));
       }, POLL_MS);
     }
   }
@@ -177,13 +178,13 @@ export function openTeachPanel({ threadId, onSaved }) {
     try {
       const state = await api.post("/teach", { thread_id: threadId });
       recording = true;
-      address.textContent = state.address || "The tab comes to the front: work in it.";
+      address.textContent = state.address || t("teach.theTabComesToThe2");
       listed([]);
       paint();
       watch();
       startPolling();
     } catch (error) {
-      toast("error", `The recording did not start: ${error.message}`);
+      toast("error", t("teach.theRecordingDidNotStart", { message: error.message }));
     } finally {
       start.disabled = false;
     }
@@ -200,7 +201,7 @@ export function openTeachPanel({ threadId, onSaved }) {
       image.hidden = true;
       paint();
     } catch (error) {
-      toast("error", `The recording did not stop: ${error.message}`);
+      toast("error", t("teach.theRecordingDidNotStop", { message: error.message }));
     } finally {
       stop.disabled = false;
     }
@@ -218,13 +219,13 @@ export function openTeachPanel({ threadId, onSaved }) {
         el("p", { class: "teach-when" }, skill.when),
         el("ol", { class: "teach-steps" }, ...skill.steps.map((step) => el("li", null, step))),
         skill.parameters.length === 0
-          ? el("p", { class: "teach-parameters" }, "No parameters: it does the same thing every time.")
-          : el("p", { class: "teach-parameters" }, `Parameters: ${skill.parameters.join("; ")}`),
+          ? el("p", { class: "teach-parameters" }, t("teach.noParametersItDoesThe"))
+          : el("p", { class: "teach-parameters" }, t("teach.parametersJoin", { join: skill.parameters.join("; ") })),
       );
       draft.hidden = false;
       paint();
     } catch (error) {
-      toast("error", `The skill was not written: ${error.message}`);
+      toast("error", t("teach.theSkillWasNotWritten", { message: error.message }));
     } finally {
       make.disabled = false;
     }
@@ -235,11 +236,11 @@ export function openTeachPanel({ threadId, onSaved }) {
     try {
       const written = await api.post(`/teach/${encodeURIComponent(threadId)}/save`, { thread_id: threadId, skill });
       saved = written.name;
-      toast("info", `Saved “${saved}”: a later task will be offered it like a learned skill.`);
+      toast("info", t("teach.savedSavedALaterTask", { saved }));
       onSaved?.(saved);
       paint();
     } catch (error) {
-      toast("error", `The skill was not saved: ${error.message}`);
+      toast("error", t("teach.theSkillWasNotSaved", { message: error.message }));
     } finally {
       keep.disabled = false;
     }
@@ -252,7 +253,7 @@ export function openTeachPanel({ threadId, onSaved }) {
       await api.post("/runs", { thread_id: threadId, goal: skill.description, skills: [saved] });
       finish();
     } catch (error) {
-      toast("error", `The task did not start: ${error.message}`);
+      toast("error", t("teach.theTaskDidNotStart", { message: error.message }));
     } finally {
       go.disabled = false;
     }
@@ -264,15 +265,15 @@ export function openTeachPanel({ threadId, onSaved }) {
     try {
       const cron = repeatCron(rhythm.value, weekDay.value, time.value || "09:00");
       const made = await api.post(`/teach/${encodeURIComponent(threadId)}/repeat`, { name: saved, cron });
-      const when = loopRhythm(made.cron) ?? "on its schedule";
+      const when = loopRhythm(made.cron) ?? t("teach.onItsSchedule");
       repeated.replaceChildren(
         icon("calendar"),
-        el("span", null, `It repeats ${when}, in this chat. `),
-        el("a", { href: `#/settings/schedules?schedule=${encodeURIComponent(made.id)}`, onclick: () => finish() }, "See it in Scheduled tasks"),
+        el("span", null, t("teach.itRepeatsWhenInThis", { when })),
+        el("a", { href: `#/settings/schedules?schedule=${encodeURIComponent(made.id)}`, onclick: () => finish() }, t("teach.seeItInScheduledTasks")),
       );
       repeated.hidden = false;
     } catch (error) {
-      toast("error", `It does not repeat: ${error.message}`);
+      toast("error", t("teach.itDoesNotRepeatMessage", { message: error.message }));
     } finally {
       repeat.disabled = false;
     }
@@ -292,7 +293,7 @@ export function openTeachPanel({ threadId, onSaved }) {
       // Nothing was recorded, or it had already ended: there is nothing to throw away. Anything else means the daemon
       // did not stop it, and the panel stays: a recording that goes on with its panel closed is one the owner cannot see.
       if (error.status !== 404) {
-        toast("error", `The recording did not stop: ${error.message}`);
+        toast("error", t("teach.theRecordingDidNotStop", { message: error.message }));
         return;
       }
     }

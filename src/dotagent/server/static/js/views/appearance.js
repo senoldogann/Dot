@@ -74,6 +74,7 @@ import {
 } from "../theme.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 import { themeEditor } from "./themeEditor.js";
+import { t } from "../i18n.js";
 
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 const NAME_UNITS = 48;
@@ -123,7 +124,7 @@ function schemeCards() {
     }
   }
   paint();
-  const group = { class: "scheme-cards", role: "group", "aria-label": "Colour scheme" };
+  const group = { class: "scheme-cards", role: "group", "aria-label": t("views.appearance.colourScheme") };
   const element = el("div", group, ...buttons.values());
   return { element, dispose: onSchemeChange(paint) };
 }
@@ -149,19 +150,19 @@ function themeCard(theme, handlers) {
         class: "theme-orb",
         type: "button",
         "data-orb": scheme,
-        "aria-label": `Use ${theme.label} for ${scheme}`,
-        title: `Use for ${scheme} only`,
+        "aria-label": t("views.appearance.useLabelForScheme", { label: theme.label, scheme }),
+        title: t("views.appearance.useForSchemeOnly", { scheme }),
         onclick: () => chooseThemeFor(scheme, theme.id),
       },
       orb(theme.orb(scheme), scheme),
       el("span", { class: "theme-orb-badge", "aria-hidden": "true" }, icon(scheme === "light" ? "sun" : "moon")),
     );
   const orbs = new Map(theme.schemes.map((scheme) => [scheme, orbButton(scheme)]));
-  const whole = theme.schemes.length === 2 ? "light and dark" : theme.schemes[0];
+  const whole = theme.schemes.length === 2 ? t("views.appearance.lightAndDark") : theme.schemes[0];
   const both = el("button", {
     class: "theme-card-pick",
     type: "button",
-    "aria-label": `Use ${theme.label} for ${whole}`,
+    "aria-label": t("views.appearance.useLabelForWhole", { label: theme.label, whole }),
     title: theme.hint,
     onclick: () => pick(theme),
   });
@@ -187,10 +188,10 @@ function themeCard(theme, handlers) {
     el(
       "div",
       { class: "theme-card-actions" },
-      action("copy", "Duplicate", () => handlers.duplicate(theme)),
-      theme.own ? action("pencil", "Edit", () => handlers.edit(theme)) : null,
-      theme.own ? action("download", "Export", () => handlers.exportTheme(theme)) : null,
-      theme.own ? action("trash", "Delete", () => handlers.remove(theme)) : null,
+      action("copy", t("views.appearance.duplicate"), () => handlers.duplicate(theme)),
+      theme.own ? action("pencil", t("views.appearance.edit"), () => handlers.edit(theme)) : null,
+      theme.own ? action("download", t("views.appearance.export"), () => handlers.exportTheme(theme)) : null,
+      theme.own ? action("trash", t("views.appearance.delete"), () => handlers.remove(theme)) : null,
     ),
   );
   function paint(picks) {
@@ -211,7 +212,7 @@ const DRAG_SLOP = 5;
  * arrow keys, each card snapping into place; the card in use is scrolled into view when the strip is drawn.
  */
 function themeStrip(cards) {
-  const strip = el("div", { class: "theme-gallery", role: "group", "aria-label": "Themes" }, ...cards.map((card) => card.element));
+  const strip = el("div", { class: "theme-gallery", role: "group", "aria-label": t("views.appearance.themes") }, ...cards.map((card) => card.element));
   // A mouse drags the strip; a touch and a trackpad scroll it natively.
   let drag = null;
   strip.addEventListener("pointerdown", (event) => {
@@ -322,20 +323,20 @@ function copyOf(theme) {
  * editor opens and closes, so that the other cards step aside while a theme is drawn on the page.
  */
 function themesCard(onEditing) {
-  const title = el("span", { class: "grow" }, "Themes");
+  const title = el("span", { class: "grow" }, t("views.appearance.themes"));
   const create = el(
     "button",
-    { class: "btn sm", type: "button", "data-action": "create", title: "Create theme", "aria-label": "Create theme" },
+    { class: "btn sm", type: "button", "data-action": "create", title: t("views.appearance.createTheme"), "aria-label": t("views.appearance.createTheme") },
     icon("plus"),
-    el("span", { class: "label" }, "Create theme"),
+    el("span", { class: "label" }, t("views.appearance.createTheme")),
   );
   const add = el(
     "button",
-    { class: "btn sm", type: "button", "data-action": "add", title: "Add theme", "aria-label": "Add theme" },
+    { class: "btn sm", type: "button", "data-action": "add", title: t("views.appearance.addTheme"), "aria-label": t("views.appearance.addTheme") },
     icon("upload"),
-    el("span", { class: "label" }, "Add theme"),
+    el("span", { class: "label" }, t("views.appearance.addTheme")),
   );
-  const chooser = el("input", { type: "file", accept: ".json,application/json", hidden: true, "aria-label": "Theme file" });
+  const chooser = el("input", { type: "file", accept: ".json,application/json", hidden: true, "aria-label": t("views.appearance.themeFile") });
   const body = el("div", { class: "card-pad stack" });
   const element = el(
     "section",
@@ -360,22 +361,22 @@ function themesCard(onEditing) {
       el(
         "div",
         { class: "hint" },
-        "A card takes its theme for light and dark; an orb, for its own scheme only. A sun or a moon on an orb marks the theme in use for light or for dark.",
+        t("views.appearance.aCardTakesItsTheme"),
       ),
       themeStrip(cards),
       el(
         "div",
         { class: "hint", "data-theme-folder": "" },
-        "Themes of your own are kept by Dot in ",
+        t("views.appearance.themesOfYourOwnAre"),
         el("code", { class: "mono theme-folder-path" }, path),
-        ", for every browser and the app; a theme file put there shows here.",
+        t("views.appearance.forEveryBrowserAndThe"),
       ),
       ...(skipped.length === 0
         ? []
         : [
             el(
               "ul",
-              { class: "theme-skipped hint", "aria-label": "Files left out of the themes folder" },
+              { class: "theme-skipped hint", "aria-label": t("views.appearance.filesLeftOutOfThe") },
               ...skipped.map((entry) => el("li", null, el("code", null, entry.file), `: ${entry.reason}`)),
             ),
           ]),
@@ -386,7 +387,7 @@ function themesCard(onEditing) {
   function closeEditor() {
     editor.close();
     editor = null;
-    title.textContent = "Themes";
+    title.textContent = t("views.appearance.themes");
     create.hidden = false;
     add.hidden = false;
     onEditing(false);
@@ -413,7 +414,7 @@ function themesCard(onEditing) {
         if (id === null) {
           pick(findTheme(target));
         }
-        toast("ok", `${named} saved.`);
+        toast("ok", t("views.appearance.namedSaved", { named }));
       },
       onCancel: closeEditor,
     });
@@ -431,30 +432,30 @@ function themesCard(onEditing) {
   function createTheme() {
     const picks = themePicks();
     const start = startingPoint({ light: findTheme(picks.light), dark: findTheme(picks.dark) });
-    openEditor({ heading: "New theme", id: null, name: "", start, keep: {} });
+    openEditor({ heading: t("views.appearance.newTheme"), id: null, name: "", start, keep: {} });
   }
 
   function duplicate(theme) {
-    const name = `${theme.label} copy`.slice(0, NAME_UNITS);
-    openEditor({ heading: `Copy of ${theme.label}`, id: null, name, start: copyOf(theme), keep: {} });
+    const name = t("views.appearance.labelCopy", { label: theme.label }).slice(0, NAME_UNITS);
+    openEditor({ heading: t("views.appearance.copyOfLabel", { label: theme.label }), id: null, name, start: copyOf(theme), keep: {} });
   }
 
   function edit(theme) {
     const keep = theme.file.collection === undefined ? {} : { collection: theme.file.collection };
-    openEditor({ heading: `Edit ${theme.label}`, id: theme.id, name: theme.label, start: copyOf(theme), keep });
+    openEditor({ heading: t("views.appearance.editLabel", { label: theme.label }), id: theme.id, name: theme.label, start: copyOf(theme), keep });
   }
 
   async function remove(theme) {
     const confirmed = await confirmDialog({
-      title: `Delete ${theme.label}?`,
-      message: "Its file goes from Dot's themes folder, for every browser and the app; where it is in use, Neutral takes its place.",
-      confirmLabel: "Delete",
+      title: t("views.appearance.deleteLabel", { label: theme.label }),
+      message: t("views.appearance.itsFileGoesFromDot"),
+      confirmLabel: t("views.appearance.delete"),
       danger: true,
       focusCancel: true,
     });
     if (confirmed) {
       await deleteOwnTheme(theme.id);
-      toast("ok", `${theme.label} deleted.`);
+      toast("ok", t("views.appearance.labelDeleted", { label: theme.label }));
     }
   }
 
@@ -466,7 +467,7 @@ function themesCard(onEditing) {
     const theme = importedFile(await file.text());
     const id = freeId(theme.id ?? idFromName(theme.name));
     await saveOwnTheme(id, { ...theme, id });
-    toast("ok", `${theme.name} added.`);
+    toast("ok", t("views.appearance.nameAdded", { name: theme.name }));
   }
 
   create.addEventListener("click", createTheme);
@@ -499,7 +500,7 @@ function themesCard(onEditing) {
 
 // The value of "Another family…" in a family's menu, which no stack has.
 const ANOTHER = "another";
-const TYPED_HINT = "Letters, digits, spaces, quotes, dots, dashes and underscores, with a comma between two families.";
+const TYPED_HINT = t("views.appearance.lettersDigitsSpacesQuotesDots");
 
 // An on/off setting of appearance/settings.js, whose values are "on" and "off".
 function onOffSetting({ label, hint, setting }) {
@@ -535,14 +536,14 @@ function familySetting({ label, hint, setting, stacks }) {
     "select",
     { class: "select sm", "aria-label": label },
     ...stacks.map((stack) => el("option", { value: stack.id }, stack.label)),
-    el("option", { value: ANOTHER }, "Another family…"),
+    el("option", { value: ANOTHER }, t("views.appearance.anotherFamily")),
   );
   const field = el("input", {
     class: "input",
     type: "text",
     maxlength: "200",
-    placeholder: "A family, or several with commas",
-    "aria-label": `${label}: another family`,
+    placeholder: t("views.appearance.aFamilyOrSeveralWith"),
+    "aria-label": t("views.appearance.labelAnotherFamily", { label }),
   });
   const note = el("div", { class: "hint family-note" }, hint);
   const offered = (value) => stacks.some((stack) => stack.id === value);
@@ -603,8 +604,8 @@ function preview(kind, words) {
  */
 function interfaceCard() {
   const contrast = rangeOf({
-    label: "Contrast",
-    hint: "How far the text and the lines stand from the page: under 100% they fade toward it, over 100% they move toward black in light and white in dark.",
+    label: t("views.appearance.contrast"),
+    hint: t("views.appearance.howFarTheTextAnd"),
     setting: CONTRAST,
     min: 50,
     max: 200,
@@ -612,41 +613,41 @@ function interfaceCard() {
     unit: "%",
   });
   const width = choiceSetting({
-    label: "Chat width",
-    hint: "How wide the home and a conversation read.",
+    label: t("views.appearance.chatWidth"),
+    hint: t("views.appearance.howWideTheHomeAnd"),
     options: [
-      { id: "comfortable", label: "Comfortable", hint: "Dot's own width." },
-      { id: "wide", label: "Wide", hint: "Wider than usual." },
-      { id: "full", label: "Full", hint: "As wide as the window." },
+      { id: "comfortable", label: t("views.appearance.comfortable"), hint: t("views.appearance.dotSOwnWidth") },
+      { id: "wide", label: t("views.appearance.wide"), hint: t("views.appearance.widerThanUsual") },
+      { id: "full", label: t("views.appearance.full"), hint: t("views.appearance.asWideAsTheWindow") },
     ],
     selected: settingValue(CHAT_WIDTH),
     onSelect: (id) => setValue(CHAT_WIDTH, id),
   });
   const density = choiceSetting({
-    label: "Density",
-    hint: "How close the rows, cards and lists sit.",
+    label: t("views.appearance.density"),
+    hint: t("views.appearance.howCloseTheRowsCards"),
     options: DENSITIES.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
     selected: currentDensity(),
     onSelect: chooseDensity,
   });
   const work = choiceSetting({
-    label: "Work in a chat",
-    hint: "What a conversation shows while Dot works: every step it takes, or one line of what it does now.",
+    label: t("views.appearance.workInAChat"),
+    hint: t("views.appearance.whatAConversationShowsWhile"),
     options: WORK_SHOWN.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
     selected: currentWork(),
     onSelect: chooseWork,
   });
   const layoutNote = el("div", { class: "hint grow" });
   const fold = switchSetting({
-    label: "Fold steps",
-    hint: "The steps of a stretch of work fold into one line that says what they did, “Ran 2 commands and read 1 file”; open it to see every step.",
+    label: t("views.appearance.foldSteps"),
+    hint: t("views.appearance.theStepsOfAStretch"),
     read: foldSteps,
     write: setFoldSteps,
     onToggled: paint,
   });
   const inspector = switchSetting({
-    label: "Side panel",
-    hint: "On wide windows a chat shows its details, plan and screenshots in a panel beside the conversation.",
+    label: t("views.appearance.sidePanel"),
+    hint: t("views.appearance.onWideWindowsAChat"),
     read: showInspector,
     write: setShowInspector,
     onToggled: paint,
@@ -661,19 +662,19 @@ function interfaceCard() {
         paint();
       },
     },
-    "Follow the theme",
+    t("views.appearance.followTheTheme"),
   );
   function paint() {
     fold.paint();
     inspector.paint();
     reset.disabled = !hasOwnLayout();
     layoutNote.textContent = hasOwnLayout()
-      ? "You set these two yourself; they stay as they are when you change the theme."
-      : `These two follow ${themeInUse().label}, the theme picked for light, until you change one of them.`;
+      ? t("views.appearance.youSetTheseTwoYourself")
+      : t("views.appearance.theseTwoFollowLabelThe", { label: themeInUse().label });
   }
   paint();
   const element = section(
-    "Interface",
+    t("views.appearance.interface"),
     el(
       "div",
       { class: "card-pad stack" },
@@ -694,8 +695,8 @@ function interfaceCard() {
 // whatever the settings say (item 107); the note says so, and where the system's own switch is.
 function motionCard() {
   const panels = rangeOf({
-    label: "Panel animation",
-    hint: "How long the sidebar and the side panel take to slide in and out; at 0 they are there at once.",
+    label: t("views.appearance.panelAnimation"),
+    hint: t("views.appearance.howLongTheSidebarAnd"),
     setting: PANEL_MOTION,
     min: 0,
     max: 400,
@@ -703,8 +704,8 @@ function motionCard() {
     unit: " ms",
   });
   const faces = switchSetting({
-    label: "Faces that move",
-    hint: "Dot's face on the home and the face beside a chat move while they work and rest; off, every face is a still frame.",
+    label: t("views.appearance.facesThatMove"),
+    hint: t("views.appearance.dotSFaceOnThe"),
     read: facesMove,
     write: setFacesMove,
     onToggled: () => faces.paint(),
@@ -712,7 +713,7 @@ function motionCard() {
   const motionNote = el(
     "div",
     { class: "hint", "data-reduced-motion": "" },
-    "Your system reduces motion, so every face holds still and the panels never slide, whatever this says. On a Mac: System Settings › Accessibility › Display › Reduce motion.",
+    t("views.appearance.yourSystemReducesMotionSo"),
   );
   faces.element.append(motionNote);
   const paintMotion = () => {
@@ -721,17 +722,17 @@ function motionCard() {
   REDUCED_MOTION.addEventListener("change", paintMotion);
   paintMotion();
   faces.paint();
-  const element = section("Motion", el("div", { class: "card-pad stack" }, panels.element, faces.element));
+  const element = section(t("views.appearance.motion"), el("div", { class: "card-pad stack" }, panels.element, faces.element));
   return { element, dispose: () => REDUCED_MOTION.removeEventListener("change", paintMotion) };
 }
 
 // The names of the families every face offers (item 1062), by their ids in appearance/settings.js (`FOLLOWING_STACKS`).
 const FAMILY_NAMES = {
-  interface: "The interface's",
-  mono: "The code's",
-  system: "System",
+  interface: t("views.appearance.theInterfaceS"),
+  mono: t("views.appearance.theCodeS"),
+  system: t("views.appearance.system"),
   inter: "Inter",
-  serif: "Serif",
+  serif: t("views.appearance.serif"),
   "geist-mono": "Geist Mono",
   "sf-mono": "SF Mono",
   menlo: "Menlo",
@@ -761,12 +762,12 @@ function weightSetting({ label, hint, setting }) {
  */
 function faceGroup({ name, own, family, weight, size, sample }) {
   const familyRow = familySetting({
-    label: `${name} font`,
-    hint: `Its own is ${own}.`,
+    label: t("views.appearance.nameFont", { name }),
+    hint: t("views.appearance.itsOwnIsOwn", { own }),
     setting: family,
-    stacks: [{ id: "", label: `Default (${own})` }, ...family.stacks.map((id) => ({ id, label: FAMILY_NAMES[id] }))],
+    stacks: [{ id: "", label: t("views.appearance.defaultOwn", { own }) }, ...family.stacks.map((id) => ({ id, label: FAMILY_NAMES[id] }))],
   });
-  const weightRow = weightSetting({ label: `${name} weight`, hint: "Regular is its own.", setting: weight });
+  const weightRow = weightSetting({ label: t("views.appearance.nameWeight", { name }), hint: t("views.appearance.regularIsItsOwn"), setting: weight });
   return [
     el("h3", { class: "setting-group-name" }, name),
     familyRow.element,
@@ -780,8 +781,8 @@ function faceGroup({ name, own, family, weight, size, sample }) {
  * its weight and its size; then the smoothing of every face and the wrapping of code. */
 function typeCard() {
   const answersSize = rangeOf({
-    label: "Answers size",
-    hint: "Dot's answers and your messages; until you set it, it grows and shrinks with the interface's size, and set to the size it shows then, it goes on doing so.",
+    label: t("views.appearance.answersSize"),
+    hint: t("views.appearance.dotSAnswersAndYour"),
     setting: ANSWER_SIZE,
     min: ANSWER_SIZE.least,
     max: ANSWER_SIZE.most,
@@ -789,8 +790,8 @@ function typeCard() {
     unit: " px",
   });
   const interfaceSize = rangeSetting({
-    label: "Interface size",
-    hint: "Labels, lists and headings, and the answers until they have their own size. A phone starts larger than a Mac; each device keeps its own.",
+    label: t("views.appearance.interfaceSize"),
+    hint: t("views.appearance.labelsListsAndHeadingsAnd"),
     min: INTERFACE_SIZE.least,
     max: INTERFACE_SIZE.most,
     step: 1,
@@ -803,8 +804,8 @@ function typeCard() {
     },
   });
   const composerSize = rangeOf({
-    label: "Message box size",
-    hint: "14 px is its own.",
+    label: t("views.appearance.messageBoxSize"),
+    hint: t("views.appearance.14PxIsItsOwn"),
     setting: COMPOSER_SIZE,
     min: 12,
     max: 20,
@@ -812,8 +813,8 @@ function typeCard() {
     unit: " px",
   });
   const codeSize = rangeOf({
-    label: "Code size",
-    hint: "Code blocks, files and changes; 13 px is its own.",
+    label: t("views.appearance.codeSize"),
+    hint: t("views.appearance.codeBlocksFilesAndChanges"),
     setting: CODE_SIZE,
     min: 10,
     max: 18,
@@ -821,46 +822,46 @@ function typeCard() {
     unit: " px",
   });
   const smoothing = onOffSetting({
-    label: "Font smoothing",
-    hint: "Thinner strokes on a Mac; off, the system's heavier ones.",
+    label: t("views.appearance.fontSmoothing"),
+    hint: t("views.appearance.thinnerStrokesOnAMac"),
     setting: SMOOTHING,
   });
   const wrap = onOffSetting({
-    label: "Wrap long lines of code",
-    hint: "A long line of code in an answer wraps instead of scrolling sideways.",
+    label: t("views.appearance.wrapLongLinesOfCode"),
+    hint: t("views.appearance.aLongLineOfCode"),
     setting: WRAP_CODE,
   });
   const element = section(
-    "Type",
+    t("views.appearance.type"),
     el(
       "div",
       { class: "card-pad stack" },
       ...faceGroup({
-        name: "Interface",
-        own: "the system's",
+        name: t("views.appearance.interface2"),
+        own: t("views.appearance.theSystemS"),
         family: INTERFACE_FONT,
         weight: INTERFACE_WEIGHT,
         size: interfaceSize,
-        sample: preview("interface", "Dot reads the page, fills in the form and asks before it sends."),
+        sample: preview("interface", t("views.appearance.dotReadsThePageFills")),
       }),
       ...faceGroup({
-        name: "Answers",
-        own: "the theme's",
+        name: t("views.appearance.answers"),
+        own: t("views.appearance.theThemeS"),
         family: ANSWER_FONT,
         weight: ANSWER_WEIGHT,
         size: answersSize,
-        sample: preview("answers", "The report is ready: three files changed, and the tests pass."),
+        sample: preview("answers", t("views.appearance.theReportIsReadyThree")),
       }),
       ...faceGroup({
-        name: "Message box",
-        own: "the interface's",
+        name: t("views.appearance.messageBox"),
+        own: t("views.appearance.theInterfaceS2"),
         family: COMPOSER_FONT,
         weight: COMPOSER_WEIGHT,
         size: composerSize,
-        sample: preview("composer", "Summarise the three newest files on my Desktop"),
+        sample: preview("composer", t("views.appearance.summariseTheThreeNewestFiles")),
       }),
       ...faceGroup({
-        name: "Code",
+        name: t("views.appearance.code"),
         own: "Geist Mono",
         family: CODE_FONT,
         weight: CODE_WEIGHT,
@@ -868,7 +869,7 @@ function typeCard() {
         sample: preview("code", 'const files = await list("~/Desktop"); // the three newest, by the time they changed'),
       }),
       wrap.element,
-      el("h3", { class: "setting-group-name" }, "Every face"),
+      el("h3", { class: "setting-group-name" }, t("views.appearance.everyFace")),
       smoothing.element,
     ),
   );
@@ -882,17 +883,17 @@ function sharedAppearanceCard() {
     await applySharedAppearance(current.revision, choice);
   }
   return section(
-    "Shared appearance",
+    t("views.appearance.sharedAppearance"),
     el(
       "div",
       { class: "card-pad" },
-      el("p", { class: "hint" }, "Ask Dot in chat to create or adjust a theme. Your shared appearance follows you across connected clients."),
+      el("p", { class: "hint" }, t("views.appearance.askDotInChatTo")),
       el(
         "div",
         { class: "row shared-appearance-actions" },
-        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("forest")) }, "Use Quiet Forest"),
-        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("undo")) }, "Undo appearance change"),
-        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("local")) }, "Use device theme"),
+        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("forest")) }, t("views.appearance.useQuietForest")),
+        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("undo")) }, t("views.appearance.undoAppearanceChange")),
+        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("local")) }, t("views.appearance.useDeviceTheme")),
       ),
     ),
   );
@@ -904,7 +905,7 @@ export function mount(root, ctx) {
   const look = interfaceCard();
   const motion = motionCard();
   const others = [
-    section("Colour scheme", el("div", { class: "card-pad" }, schemes.element)),
+    section(t("views.appearance.colourScheme"), el("div", { class: "card-pad" }, schemes.element)),
     sharedAppearanceCard(),
     typeCard().element,
     look.element,
@@ -915,7 +916,7 @@ export function mount(root, ctx) {
       card.hidden = editing;
     }
   });
-  ctx.head.setLead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the type (the font, weight and size of the interface, the answers, the message box and the code), the interface and the motion. Themes of your own are kept by Dot, for every browser.");
+  ctx.head.setLead(t("views.appearance.howDotLooksInThis"));
   root.append(
     others[0],
     themes.element,

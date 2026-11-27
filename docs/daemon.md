@@ -310,14 +310,21 @@ browser (item 230); on a touch screen Return always adds a line and the round se
 General › Messages › **Language** chooses the language of Dot's own words in the chats, the sidebar and the sign-in
 screen (English or Türkçe, kept in this browser, English until chosen; it never follows the browser, the model or a
 chat's words, and what you and Dot write stays as it was written; a change draws the page again): the words are in
-`js/lang/en.js` and `js/lang/tr.js`, whose keys `tsc` and `tests/js/i18n.test.js` hold together, and the dates follow
+`js/lang/en*.js` and `js/lang/tr*.js` (the core in `en.js` and `tr.js`, the pages of Settings and the other screens of
+`views/` in `en-views.js` and `tr-views.js`, every other module's in `en-app.js` and `tr-app.js`), whose keys `tsc` and
+`tests/js/i18n.test.js` hold together, and the dates follow
 the language too. Item 1172 brought the rest of a chat's flow into it: the steps and their group titles, the
 thoughts, the notes and resume lines between them, the tool words of a step's row and the model, mode and Options
 menus; item 1173 the run page's own words (its foot, plan, lessons, rewind and live-update notes), the sidebar's,
 the reasoning levels' names (the level ids the daemon and the models take are unchanged), the side panel's Set up and
 the tooltips and limit of a message's picks, and the toast a page shows when it could not read again what it shows;
 item 1187 the dialogs' own Cancel, Close and question before dropping what was typed, the rows of a phone's message
-sheet and the buttons of a block of code and of a table. The other settings pages are in English yet. The markdown
+sheet and the buttons of a block of code and of a table. Item 1977 brought the rest: every page of Settings, the first
+conversation, the cards that ask (an approval, a question, a secret), the composer and the notes between steps are in
+Turkish too, and `tests/js/i18n-literals.test.js` fails for a line of English that a module writes in its code and that
+reaches the screen (`tests/js/i18n-exempt.json` names the few lines only the program reads, each with its reason). What
+the daemon writes itself and sends as data (the descriptions of the agent templates, of the search engines, of the
+connectors and of the plugins in the gallery, a macOS tool's message) is English still. The markdown
 in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and

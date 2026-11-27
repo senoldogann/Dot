@@ -698,6 +698,9 @@ async def test_video_from_the_plus_menu_and_drag_and_drop_reaches_the_run(
             )
             await page.goto(ui_url(client.base_url.host, port, TOKEN))
             composer: Locator = page.locator(".composer")
+            # The home draws again when its first data arrives (about 0.6 s in), which closes a menu opened before then.
+            await expect(page.locator(".home-who")).to_be_visible()
+            await page.wait_for_timeout(1500)
             await composer.locator(".plus-button").click()
             async with page.expect_file_chooser() as choosing:
                 await page.get_by_role("menuitem", name="Add files").click()

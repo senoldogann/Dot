@@ -568,7 +568,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // this one set (item 836's pre-push review found the question asked apart in four places, each round one of them
   // missing a group).
   let above = new Set();
-  const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
+  const activityNav = el("nav", { class: "side-activity-nav", "aria-label": t("sidebar.activity"), hidden: true });
   const settledNav = el("nav", { class: "side-settled-nav", "aria-label": SETTLED.label, hidden: true });
   // Working's label folds what works; what waits for the owner is never folded out of sight.
   const workingCount = el("span", { class: "side-label-count" });
@@ -1015,7 +1015,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (kept === undefined) {
       const words = id === "settled" ? SETTLED.label : CHANNEL_SECTIONS[id].label;
       const count = el("span", { class: "side-label-count" });
-      const unread = el("span", { class: "side-label-dot", role: "img", "aria-label": "unread", hidden: true });
+      const unread = el("span", { class: "side-label-dot", role: "img", "aria-label": t("sidebar.unread"), hidden: true });
       kept = { count, unread, label: foldLabel("h3", false, () => toggleFold(id), `${words} `, unread, count) };
       keptLabels.set(id, kept);
     }
@@ -1629,7 +1629,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   // The sidebar is one component, in the window beside the page and as the drawer over it on a phone (item 294): a head
   // with the title, the search row, the list and its dock, and the foot's four tools, the same on both.
-  const body = el("div", { class: "side-body" }, el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav));
+  const body = el("div", { class: "side-body" }, el("nav", { class: "side-recent", "aria-label": t("sidebar.chats") }, head, bar, list, channelsNav));
   // The dock under the list (the sidebar of the reference app): what works and waits under Working, then what rests past a week,
   // Settled. It keeps its place while the list scrolls.
   const dock = el("div", { class: "side-dock" }, activityNav, settledNav);
@@ -1655,7 +1655,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const settingsNav = buildSettingsNav({ homeHref, onCollapse, onNavigate });
   const element = el(
     "aside",
-    { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
+    { class: "sidebar", id: "sidebar", "aria-label": t("sidebar.sidebar") },
     sideHead,
     top,
     body,

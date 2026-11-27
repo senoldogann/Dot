@@ -14,6 +14,7 @@ import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, inlineLoading, loadingPanel, segmented, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
 import { getSnapshot } from "../state.js";
 import { attempt, confirmDialog, settingFold, toast } from "../ui.js";
+import { t } from "../i18n.js";
 
 // How often the guide reads Tailscale again while a step is left, so that it follows an install or a sign-in.
 const FOLLOW_MS = 4000;
@@ -23,28 +24,28 @@ const TAILSCALE_PAGE = "https://tailscale.com/download";
 // The phone's own steps: a title and the line under it.
 const PHONE_STEPS = [
   {
-    title: "Install Tailscale on the phone",
-    text: "Sign in with the account this Mac uses. Scan the code with the phone's camera, or open tailscale.com/download on the phone.",
+    title: t("views.phone.installTailscaleOnThePhone"),
+    text: t("views.phone.signInWithTheAccount"),
   },
-  { title: "Open Dot on the phone, in Safari", text: "Scan the code with the phone's camera, or type the address." },
-  { title: "Add it to the home screen", text: "Share › Add to Home Screen." },
-  { title: "Sign in with a code", text: "Open Dot from the home screen, or in Safari, and type the code below." },
+  { title: t("views.phone.openDotOnThePhone"), text: t("views.phone.scanTheCodeWithThe") },
+  { title: t("views.phone.addItToTheHome"), text: t("views.phone.shareAddToHomeScreen") },
+  { title: t("views.phone.signInWithACode"), text: t("views.phone.openDotFromTheHome") },
 ];
 // What the one QR code can open: Tailscale's page, or Dot's address.
 const QR_CHOICES = [
-  { id: "tailscale", label: "Tailscale app", hint: "The code opens Tailscale's page for the phone" },
-  { id: "dot", label: "Open Dot", hint: "The code opens Dot on your Tailscale network" },
+  { id: "tailscale", label: t("views.phone.tailscaleApp"), hint: t("views.phone.theCodeOpensTailscaleS") },
+  { id: "dot", label: t("views.phone.openDot"), hint: t("views.phone.theCodeOpensDotOn") },
 ];
 // A pairing code is two groups of four characters: the dots that stand for it until it is shown are too.
 const CODE_GROUPS = 2;
 const CODE_GROUP_CHARS = 4;
-const CODE_HIDDEN = "Hidden until you show it, so it isn't on screen by accident.";
+const CODE_HIDDEN = t("views.phone.hiddenUntilYouShowIt");
 // Dot's link to the owner's iPhone over WebDriverAgent (item 1196, `GET /api/iphone`): each state, and what to do.
 const IPHONE_STATES = {
-  up: "Reachable and unlocked",
-  locked: "Reachable but locked: unlock it, and Dot reaches it again",
-  unclear: "Answering, but not saying whether it is locked: the daemon's log has what it answered",
-  unreachable: "Out of reach: bring it into reach of this Mac, or open the runner app on it",
+  up: t("views.phone.reachableAndUnlocked"),
+  locked: t("views.phone.reachableButLockedUnlockIt"),
+  unclear: t("views.phone.answeringButNotSayingWhether"),
+  unreachable: t("views.phone.outOfReachBringIt"),
 };
 
 function dayOf(seconds) {
@@ -69,11 +70,11 @@ function addressRow(address) {
         onclick: () =>
           attempt(async () => {
             await copyText(address);
-            toast("ok", "Address copied.");
+            toast("ok", t("views.phone.addressCopied"));
           }),
       },
       icon("copy"),
-      "Copy",
+      t("views.phone.copy"),
     ),
   );
 }
@@ -86,12 +87,12 @@ function lasted(seconds) {
 /** The card of Dot's link to the owner's iPhone, as the keeper's last look left it. */
 function iphoneSection(view) {
   const lead =
-    view.state === null ? "Not checked yet." : `${IPHONE_STATES[view.state]}. For ${lasted(view.since_s)}, checked ${lasted(view.checked_s)} ago.`;
+    view.state === null ? t("views.phone.notCheckedYet") : t("views.phone.valueForLastedCheckedLasted2", { value: IPHONE_STATES[view.state], lasted: lasted(view.since_s), lasted2: lasted(view.checked_s) });
   const row = setRow({ title: "iPhone", lead });
   row.dataset.iphone = view.state ?? "unchecked";
   return setSection({
-    title: "Dot's link to your iPhone",
-    lead: "WebDriverAgent on the phone, which the daemon keeps up while [phone] is on.",
+    title: t("views.phone.dotSLinkToYour"),
+    lead: t("views.phone.webdriveragentOnThePhoneWhich"),
     body: setCard(row),
   });
 }
@@ -135,7 +136,7 @@ export function mount(root, ctx) {
   let codeShown = false;
   let repaintSetup = () => undefined;
   const holder = el("div", { class: "stack" }, loadingPanel());
-  const code = el("output", { class: "pair-code mono", "aria-label": "Sign-in code", hidden: true });
+  const code = el("output", { class: "pair-code mono", "aria-label": t("views.phone.signInCode"), hidden: true });
   const codeLead = el("span", { class: "phone-code-lead" }, CODE_HIDDEN);
   const dots = el(
     "span",
@@ -148,7 +149,7 @@ export function mount(root, ctx) {
       ),
     ),
   );
-  const pairButton = el("button", { class: "btn primary", type: "button", onclick: () => attempt(pair) }, "Show code");
+  const pairButton = el("button", { class: "btn primary", type: "button", onclick: () => attempt(pair) }, t("views.phone.showCode"));
   // The QR code of the code on screen for Dot Next (`dotnext://pair?host=…&code=…`, `GET /phone/pair-qr`): the iPhone's
   // camera opens the app with both filled, and one tap pairs it. Drawn again for each new code.
   const pairQr = el("div", { class: "phone-pair-qr", hidden: true });
@@ -159,7 +160,7 @@ export function mount(root, ctx) {
       url = await blobUrl("/phone/pair-qr");
     } catch (error) {
       // No address on a tailnet yet: the code is typed, and the guide above says how to get one.
-      pairQr.replaceChildren(el("p", { class: "hint" }, `No QR code for the iPhone app: ${error.message}`));
+      pairQr.replaceChildren(el("p", { class: "hint" }, t("views.phone.noQrCodeForThe", { message: error.message })));
       pairQr.hidden = false;
       return;
     }
@@ -169,8 +170,8 @@ export function mount(root, ctx) {
     }
     made.push(url);
     pairQr.replaceChildren(
-      el("img", { class: "phone-qr", src: url, alt: "A QR code that opens Dot Next on the iPhone with this code", width: "152", height: "152" }),
-      el("p", { class: "hint" }, "Dot Next on the iPhone: scan it with the camera, and the app opens with the address and the code filled."),
+      el("img", { class: "phone-qr", src: url, alt: t("views.phone.aQrCodeThatOpens"), width: "152", height: "152" }),
+      el("p", { class: "hint" }, t("views.phone.dotNextOnTheIphone")),
     );
     pairQr.hidden = false;
   }
@@ -189,10 +190,10 @@ export function mount(root, ctx) {
     code.textContent = issued.code;
     code.hidden = false;
     dots.hidden = true;
-    codeLead.textContent = `Type it in Dot on the phone's home screen before ${clockTime(issued.expires_at)}. It works once, and a new code takes its place.`;
+    codeLead.textContent = t("views.phone.typeItInDotOn", { clockTime: clockTime(issued.expires_at) });
     // The code is on screen: the button now asks for another, which takes its place.
     pairButton.className = "btn";
-    pairButton.textContent = "New code";
+    pairButton.textContent = t("views.phone.newCode");
     codeShown = true;
     await paintPairQr();
     repaintSetup();
@@ -239,7 +240,7 @@ export function mount(root, ctx) {
     httpsLink = null;
     if (!disposed) {
       paint(phone);
-      toast("ok", "Set up for your Tailscale network.");
+      toast("ok", t("views.phone.setUpForYourTailscale"));
     }
   }
 
@@ -249,14 +250,16 @@ export function mount(root, ctx) {
     const running = status === null ? null : status.active_runs.length;
     const stops =
       running === null
-        ? " Any task going on now stops too."
+        ? t("views.phone.anyTaskGoingOnNow")
         : running === 0
           ? ""
-          : ` The ${running === 1 ? "task" : `${running} tasks`} going on now ${running === 1 ? "stops" : "stop"} too.`;
+          : running === 1
+            ? t("views.phone.runningOne")
+            : t("views.phone.runningMany", { tasks: t("views.phone.runningTasks", { running }) });
     const confirmed = await confirmDialog({
-      title: "Restart Dot?",
-      message: `Dot closes and starts again by itself, with the name of your Tailscale network.${stops}`,
-      confirmLabel: "Restart",
+      title: t("views.phone.restartDot"),
+      message: t("views.phone.dotClosesAndStartsAgain", { stops }),
+      confirmLabel: t("views.phone.restart"),
       danger: running !== 0,
       focusCancel: running !== 0,
     });
@@ -264,7 +267,7 @@ export function mount(root, ctx) {
       return;
     }
     await api.post("/system/restart", null);
-    toast("ok", "Dot is starting again and takes the name up; this page works again in a moment.");
+    toast("ok", t("views.phone.dotIsStartingAgainAnd"));
   }
 
   /** The card at the head: whether the phone reaches Dot (its tile, its name and, while a step is left, how many are
@@ -273,62 +276,62 @@ export function mount(root, ctx) {
     const tailnet = phone.tailnet;
     const onMac = tailnet.installed && tailnet.running && tailnet.name !== null;
     const served = onMac && tailnet.served && tailnet.written;
-    const said = tailnet.problem === null ? null : el("p", { class: "hint" }, `Tailscale said: ${tailnet.problem}`);
+    const said = tailnet.problem === null ? null : el("p", { class: "hint" }, t("views.phone.tailscaleSaidProblem", { problem: tailnet.problem }));
     const openTailscale = (done) => changed(api.post("/phone/tailscale", {}), done);
     const first = onMac
-      ? step(1, "Tailscale on this Mac", true, `This Mac is ${tailnet.name} on your Tailscale network.`)
+      ? step(1, t("views.phone.tailscaleOnThisMac"), true, t("views.phone.thisMacIsNameOn", { name: tailnet.name }))
       : tailnet.installed
         ? step(
             1,
-            "Tailscale on this Mac",
+            t("views.phone.tailscaleOnThisMac"),
             false,
-            "Open Tailscale and sign in, in its window or from its icon in the menu bar. This page follows.",
+            t("views.phone.openTailscaleAndSignIn"),
             said,
-            offer("Open Tailscale", "external", true, () => openTailscale("Tailscale is opening.")),
+            offer(t("views.phone.openTailscale"), "external", true, () => openTailscale(t("views.phone.tailscaleIsOpening"))),
           )
         : step(
             1,
-            "Tailscale on this Mac",
+            t("views.phone.tailscaleOnThisMac"),
             false,
-            "Tailscale is not on this Mac yet. Get it from the App Store, open it and sign in. This page follows.",
-            offer("Get Tailscale", "download", true, () => openTailscale("The App Store opens on Tailscale.")),
+            t("views.phone.tailscaleIsNotOnThis"),
+            offer(t("views.phone.getTailscale"), "download", true, () => openTailscale(t("views.phone.theAppStoreOpensOn"))),
           );
     const https =
       httpsLink === null
         ? null
-        : el("a", { class: "btn sm primary", href: httpsLink, target: "_blank", rel: "noopener noreferrer" }, icon("external"), el("span", null, "Turn on secure connections"));
+        : el("a", { class: "btn sm primary", href: httpsLink, target: "_blank", rel: "noopener noreferrer" }, icon("external"), el("span", null, t("views.phone.turnOnSecureConnections")));
     const second = served
-      ? step(2, "Dot on your Tailscale network", true, "Tailscale makes Dot available on your private network, securely, and Dot remembers this Mac's name.")
+      ? step(2, t("views.phone.dotOnYourTailscaleNetwork"), true, t("views.phone.tailscaleMakesDotAvailableOn"))
       : step(
           2,
-          "Dot on your Tailscale network",
+          t("views.phone.dotOnYourTailscaleNetwork"),
           false,
           !onMac
-            ? "After step 1."
+            ? t("views.phone.afterStep1")
             : httpsLink === null
-              ? "Set up makes Dot available on your private network, securely, and saves this Mac's name."
-              : "Tailscale needs secure connections turned on for your network: turn them on, then choose Set up again.",
+              ? t("views.phone.setUpMakesDotAvailable")
+              : t("views.phone.tailscaleNeedsSecureConnectionsTur"),
           onMac ? said : null,
           https,
-          onMac ? offer("Set up", "plug", httpsLink === null, setUp) : null,
+          onMac ? offer(t("views.phone.setUp"), "plug", httpsLink === null, setUp) : null,
         );
     const third = tailnet.reached
-      ? step(3, "Dot answers to the name", true, "Dot answers to it.")
+      ? step(3, t("views.phone.dotAnswersToTheName"), true, t("views.phone.dotAnswersToIt"))
       : step(
           3,
-          "Dot answers to the name",
+          t("views.phone.dotAnswersToTheName"),
           false,
-          tailnet.written ? "Dot takes the name up when it starts again." : "After step 2.",
-          tailnet.written ? offer("Restart Dot", "refresh", true, restart) : null,
+          tailnet.written ? t("views.phone.dotTakesTheNameUp") : t("views.phone.afterStep2"),
+          tailnet.written ? offer(t("views.phone.restartDot2"), "refresh", true, restart) : null,
         );
     const awake = switchRowSetting({
-      label: "Keep this Mac awake while it charges",
-      hint: "So the phone reaches Dot away from home. A closed lid still puts a MacBook to sleep.",
+      label: t("views.phone.keepThisMacAwakeWhile"),
+      hint: t("views.phone.soThePhoneReachesDot"),
       read: () => phone.keep_awake,
       // The words follow the change once it is made (item 559): a switch that failed says so alone.
       write: async (on) => {
         phone = await api.post("/phone/awake", { on });
-        toast("ok", phone.keep_awake ? "This Mac stays awake while it charges." : "This Mac sleeps as it would.");
+        toast("ok", phone.keep_awake ? t("views.phone.thisMacStaysAwakeWhile") : t("views.phone.thisMacSleepsAsIt"));
       },
       onToggled: () => {
         if (!disposed) {
@@ -354,22 +357,22 @@ export function mount(root, ctx) {
       el(
         "div",
         { class: "phone-reach-text" },
-        el("div", { class: "phone-reach-title" }, ready ? "Ready: your phone reaches Dot" : `${count} of 3 steps done on this Mac`),
+        el("div", { class: "phone-reach-title" }, ready ? t("views.phone.readyYourPhoneReachesDot") : t("views.phone.countOf3StepsDone", { count })),
         ready && name !== null ? el("code", { class: "phone-reach-name mono" }, name) : null,
       ),
       ready
         ? null
         : el(
             "div",
-            { class: "phone-progress-track", role: "progressbar", "aria-label": "Steps done on this Mac", "aria-valuemin": "0", "aria-valuemax": "3", "aria-valuenow": String(count) },
+            { class: "phone-progress-track", role: "progressbar", "aria-label": t("views.phone.stepsDoneOnThisMac"), "aria-valuemin": "0", "aria-valuemax": "3", "aria-valuenow": String(count) },
             done.map((ok, index) => el("span", { class: ok ? "phone-progress-part done" : index === now ? "phone-progress-part now" : "phone-progress-part" })),
           ),
     );
     return el(
       "section",
-      { class: "set-card phone-reach", "aria-label": "Reach Dot from anywhere" },
+      { class: "set-card phone-reach", "aria-label": t("views.phone.reachDotFromAnywhere") },
       head,
-      el("ol", { class: "phone-guide", "aria-label": "Steps on this Mac" }, first, second, third),
+      el("ol", { class: "phone-guide", "aria-label": t("views.phone.stepsOnThisMac") }, first, second, third),
       awake.element,
     );
   }
@@ -400,7 +403,7 @@ export function mount(root, ctx) {
         }
       })
       .catch((error) => {
-        picture.replaceWith(el("p", { class: "hint" }, `The QR code could not be made: ${error.message}`));
+        picture.replaceWith(el("p", { class: "hint" }, t("views.phone.theQrCodeCouldNot", { message: error.message })));
       });
     return picture;
   }
@@ -410,14 +413,14 @@ export function mount(root, ctx) {
    * shown; those before it are ticked. */
   function setupSection(phone) {
     const address = phone.addresses[0] ?? null;
-    const steps = el("ol", { class: "phone-steps", "aria-label": "Steps on the phone" });
+    const steps = el("ol", { class: "phone-steps", "aria-label": t("views.phone.stepsOnThePhone") });
     const picture = el("div", { class: "phone-qr-box" });
     const addresses = el("div", { class: "phone-addresses" });
     const choice = segmented(QR_CHOICES, which ?? (address === null ? "tailscale" : "dot"), (id) => {
       which = id;
       paintSetup();
     });
-    choice.element.setAttribute("aria-label", "What the QR code opens");
+    choice.element.setAttribute("aria-label", t("views.phone.whatTheQrCodeOpens"));
 
     function paintSetup() {
       const showing = choice.value();
@@ -433,7 +436,7 @@ export function mount(root, ctx) {
         ),
       );
       if (showing === "tailscale") {
-        picture.replaceChildren(qrPicture("tailscale", null, "A QR code of Tailscale's download page"));
+        picture.replaceChildren(qrPicture("tailscale", null, t("views.phone.aQrCodeOfTailscale")));
         addresses.replaceChildren(addressRow(TAILSCALE_PAGE));
       } else if (address === null) {
         picture.replaceChildren();
@@ -442,11 +445,11 @@ export function mount(root, ctx) {
             "div",
             { class: "note" },
             icon("info"),
-            el("span", null, "No address yet: the steps above give it.", settingFold("[server] reach")),
+            el("span", null, t("views.phone.noAddressYetTheSteps"), settingFold("[server] reach")),
           ),
         );
       } else {
-        picture.replaceChildren(qrPicture("dot", address, `A QR code of ${address}`));
+        picture.replaceChildren(qrPicture("dot", address, t("views.phone.aQrCodeOfAddress", { address })));
         addresses.replaceChildren(...phone.addresses.map(addressRow));
       }
     }
@@ -454,8 +457,8 @@ export function mount(root, ctx) {
     repaintSetup = paintSetup;
     paintSetup();
     return setSection({
-      title: "Set up a phone",
-      lead: "The phone reaches Dot while this Mac is on and awake.",
+      title: t("views.phone.setUpAPhone"),
+      lead: t("views.phone.thePhoneReachesDotWhile"),
       body: setCard(el("div", { class: "phone-setup-grid" }, steps, el("div", { class: "phone-side" }, choice.element, picture, addresses))),
     });
   }
@@ -463,8 +466,8 @@ export function mount(root, ctx) {
   // The code that signs in the app on a phone's home screen is made when it is asked for, and shown in place of the dots.
   // This row does not depend on what Tailscale says, so it is drawn once and stays through every drawing of the cards.
   const signIn = setSection({
-    title: "Sign-in code",
-    body: setCard(el("div", null, setRow({ title: "A code signs in the app on one phone", lead: codeLead, control: [dots, code, pairButton] }), pairQr)),
+    title: t("views.phone.signInCode"),
+    body: setCard(el("div", null, setRow({ title: t("views.phone.aCodeSignsInThe"), lead: codeLead, control: [dots, code, pairButton] }), pairQr)),
   });
   // The phones that hold a key of their own (item 670), each with Remove. A page signed in with a phone's key can neither
   // pair nor remove a phone: the daemon answers those to the Mac's own key alone, and the page says where to do it.
@@ -474,23 +477,23 @@ export function mount(root, ctx) {
     "p",
     { class: "hint phone-paired-note" },
     icon("info"),
-    el("span", null, "A phone that signed in before this list existed uses your Mac's own key and is not listed. To cut one off, remove it from your Tailscale network."),
+    el("span", null, t("views.phone.aPhoneThatSignedIn")),
   );
   const paired = setSection({
-    title: "Paired phones",
-    lead: "Each phone that signs in with a code gets a key of its own. Remove signs it out at once.",
+    title: t("views.phone.pairedPhones"),
+    lead: t("views.phone.eachPhoneThatSignsIn"),
     body: el("div", { class: "phone-paired" }, setCard(phonesBody), pairedNote),
   });
 
   function phoneRow(phone) {
-    const used = phone.last_used_at === null ? "not used yet" : `last used ${dayOf(phone.last_used_at)}`;
-    const remove = el("button", { class: "btn sm", type: "button", "aria-label": `Remove ${phone.name}, paired ${dayOf(phone.paired_at)}` }, "Remove");
+    const used = phone.last_used_at === null ? t("views.phone.notUsedYet") : t("views.phone.lastUsedDayof", { dayOf: dayOf(phone.last_used_at) });
+    const remove = el("button", { class: "btn sm", type: "button", "aria-label": t("views.phone.removeNamePairedDayof", { name: phone.name, dayOf: dayOf(phone.paired_at) }) }, t("views.phone.remove"));
     remove.addEventListener("click", () =>
       attempt(async () => {
         const confirmed = await confirmDialog({
-          title: `Remove this ${phone.name}?`,
-          message: "It is signed out at once, and needs a new sign-in code to use Dot again.",
-          confirmLabel: "Remove",
+          title: t("views.phone.removeThisName", { name: phone.name }),
+          message: t("views.phone.itIsSignedOutAt"),
+          confirmLabel: t("views.phone.remove"),
           danger: true,
           focusCancel: true,
         });
@@ -498,11 +501,11 @@ export function mount(root, ctx) {
           return;
         }
         await api.del(`/phone/phones/${encodeURIComponent(phone.id)}`);
-        toast("ok", `${phone.name} removed.`);
+        toast("ok", t("views.phone.nameRemoved", { name: phone.name }));
         await loadPhones();
       }),
     );
-    const row = setRow({ title: phone.name, lead: `Paired ${dayOf(phone.paired_at)}, ${used}`, control: remove });
+    const row = setRow({ title: phone.name, lead: t("views.phone.pairedDayofUsed", { dayOf: dayOf(phone.paired_at), used }), control: remove });
     row.dataset.phone = phone.id;
     return row;
   }
@@ -510,7 +513,7 @@ export function mount(root, ctx) {
   async function loadPhones() {
     if (holdsPhoneKey()) {
       pairedNote.hidden = true;
-      phonesBody.replaceChildren(emptyPanel("smartphone", "Pair phones on your Mac", "This phone signed in with a code. Settings › Phone on your Mac pairs and removes phones."));
+      phonesBody.replaceChildren(emptyPanel("smartphone", t("views.phone.pairPhonesOnYourMac"), t("views.phone.thisPhoneSignedInWith")));
       return;
     }
     let listed;
@@ -528,13 +531,13 @@ export function mount(root, ctx) {
     phonesBody.replaceChildren(
       ...(listed.phones.length > 0
         ? listed.phones.map(phoneRow)
-        : [emptyPanel("smartphone", "No phone paired yet", "A phone shows up here once it signs in with a code from Sign-in code above.")]),
+        : [emptyPanel("smartphone", t("views.phone.noPhonePairedYet"), t("views.phone.aPhoneShowsUpHere"))]),
     );
   }
 
   if (holdsPhoneKey()) {
     pairButton.hidden = true;
-    codeLead.textContent = "Show a code in Settings › Phone on your Mac.";
+    codeLead.textContent = t("views.phone.showACodeInSettings");
   }
   const reachSlot = el("div", null);
   const setupSlot = el("div", null);
@@ -629,7 +632,7 @@ export function mount(root, ctx) {
     await load();
   }
 
-  ctx.head.setLead("Use Dot from your phone, at home or away, as an app on its home screen.");
+  ctx.head.setLead(t("views.phone.useDotFromYourPhone"));
   root.append(holder);
   attempt(load);
   attempt(loadPhones);

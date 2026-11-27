@@ -5,6 +5,7 @@ import { mountCharacter } from "./character/character.js";
 import { EXPRESSION_IDS } from "./character/expressions.js";
 import { COLOUR_IDS, SHAPE_IDS } from "./character/skins.js";
 import { el } from "./dom.js";
+import { t } from "./i18n.js";
 
 /** A group of radio buttons: `name` joins them, and `label` is the word a screen reader names the group by (item 559),
  * not the machine name. */
@@ -22,10 +23,10 @@ function optionRow({ name, label, ids, picked, face, onPick }) {
 export function lookPicker({ look, uid }) {
   const chosen = { ...look };
   const stage = el("div", { class: "look-preview" });
-  const preview = mountCharacter(stage, { ...chosen, size: 120, label: "Preview of the look" });
+  const preview = mountCharacter(stage, { ...chosen, size: 120, label: t("lookpicker.previewOfTheLook") });
   const shapes = optionRow({
     name: `${uid}-shape`,
-    label: "Shape",
+    label: t("lookpicker.shape"),
     ids: SHAPE_IDS,
     picked: chosen.shape,
     face: (cell, id) => mountCharacter(cell, { shape: id, expression: "neutral", colour: chosen.colour, size: 40, moving: false, tight: true, phase: 0 }),
@@ -36,7 +37,7 @@ export function lookPicker({ look, uid }) {
   });
   const expressions = optionRow({
     name: `${uid}-expression`,
-    label: "Expression",
+    label: t("lookpicker.expression"),
     ids: EXPRESSION_IDS,
     picked: chosen.expression,
     face: (cell, id) => mountCharacter(cell, { shape: "circle", expression: id, colour: chosen.colour, size: 40, moving: false, tight: true, phase: 0 }),
@@ -47,7 +48,7 @@ export function lookPicker({ look, uid }) {
   });
   const colours = optionRow({
     name: `${uid}-colour`,
-    label: "Colour",
+    label: t("lookpicker.colour"),
     ids: COLOUR_IDS,
     picked: chosen.colour,
     face: (cell, id) => mountCharacter(cell, { shape: "circle", expression: "neutral", colour: id, size: 28, moving: false, tight: true, phase: 0 }),
@@ -66,7 +67,7 @@ export function lookPicker({ look, uid }) {
     "div",
     { class: "look-picker" },
     stage,
-    el("div", { class: "stack" }, el("span", { class: "field-label" }, "Shape"), shapes, el("span", { class: "field-label" }, "Expression"), expressions, el("span", { class: "field-label" }, "Colour"), colours),
+    el("div", { class: "stack" }, el("span", { class: "field-label" }, t("lookpicker.shape")), shapes, el("span", { class: "field-label" }, t("lookpicker.expression")), expressions, el("span", { class: "field-label" }, t("lookpicker.colour")), colours),
   );
   return { element, value: () => ({ ...chosen }), dispose: () => preview.destroy() };
 }

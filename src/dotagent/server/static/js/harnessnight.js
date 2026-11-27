@@ -1,5 +1,7 @@
 // What a night of learning that took no task says about the test tasks (item 762): pure, so it runs under Node.
 
+import { t } from "./i18n.js";
+
 /**
  * Where a night learned from no task, what it did with the pool of test tasks, in words; null for a night that is not
  * one of those (its record does not name what has headroom and it was not trying the pool).
@@ -18,7 +20,7 @@ export function poolNightWords(state, facts) {
   const tried = Array.isArray(facts.calibrated) ? facts.calibrated.length : 0;
   // The state alone says a night was trying the pool, whatever its record names.
   if (tried > 0 || state === "calibrating") {
-    return "tried test tasks, learned from no task";
+    return t("harnessnight.triedTestTasksLearnedFrom");
   }
-  return "tried no test task, learned from no task";
+  return t("harnessnight.triedNoTestTaskLearned");
 }

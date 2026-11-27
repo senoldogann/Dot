@@ -9,6 +9,7 @@ import { inlineError } from "./panels.js";
 import { onLifecycle } from "./state.js";
 import { attempt } from "./ui.js";
 import { tellLines, windowWords } from "./tellwords.js";
+import { t } from "./i18n.js";
 
 // A tell goes out and its half hour passes while the page is open: read again now and then, and when Dot tells.
 const REFRESH_MS = 60_000;
@@ -17,16 +18,16 @@ const RELOAD_KINDS = new Set(["owner_told"]);
 export function mountTells() {
   let disposed = false;
   let ticket = 0;
-  const holder = el("div", { class: "watcher-list" }, el("div", { class: "hint" }, "Reading…"));
+  const holder = el("div", { class: "watcher-list" }, el("div", { class: "hint" }, t("tellspanel.reading")));
   const window = el("span", { class: "hint" });
   const element = el(
     "section",
     { class: "memory-panel notes-panel watcher-panel tells-panel", dataset: { tells: "" } },
-    el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "What you do with its tells"), window),
+    el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, t("tellspanel.whatYouDoWithIts")), window),
     el(
       "p",
       { class: "hint watcher-lead" },
-      "How many of what Dot told you, on your phone, on this desktop and in iMessage, you opened or acted on within half an hour. It only counts: nothing Dot tells is changed by it.",
+      t("tellspanel.howManyOfWhatDot"),
     ),
     holder,
   );
@@ -42,7 +43,7 @@ export function mountTells() {
       const lines = tellLines(report);
       holder.replaceChildren(
         lines.length === 0
-          ? el("div", { class: "hint" }, "Nothing told yet.")
+          ? el("div", { class: "hint" }, t("tellspanel.nothingToldYet"))
           : el(
               "div",
               null,
