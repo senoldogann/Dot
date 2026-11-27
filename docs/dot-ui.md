@@ -23,7 +23,19 @@ the tokens of `themes.css` and `app.css`, never a literal (`tests/unit/test_css_
   apps, Watch the Mac and Models (there is no account usage page, so the fourth leads to Settings › Models). The agents
   are a menu behind the first button: each its badge, name and how many chats it has, to its conversation else its page,
   then All agents, New agent and Campaigns. Schedules has no icon here: its page is Settings › Scheduled tasks (`#/settings/schedules`, a row of `settingstabs.js`). The badge's letters
-  (`badge.js`) are drawn from `data-code`, a mark of the row and no text.
+  (`badge.js`) are drawn from `data-code`, a mark of the row and no text. While a row's run works, the badge gives its
+  place to the agent's face, living (`actors.js` `liven`): a short bob and now and then a flip (CSS on the compositor,
+  each face at its own moment), its eyes glancing to one side and back every few seconds (the character's engine); it
+  stands still off screen and while the page is away, glows instead under `prefers-reduced-motion`, and the row goes
+  back to its badge once the run rests, waits on the owner or fails. A chat's own face in its page lives the same way
+  while its run works. While the search has words, chips stand under it (`searchfinds.js`, `searchscope.js`): **All**,
+  **Messages**, **Agents** (the phone's Bots), **Files**. The chats whose titles hold the words stay the list's rows;
+  above them, each kind under its heading, what the chats say (`GET /api/threads/search`, the words found in bold), the
+  agents whose name or role holds every word, and the files attached to the chats or written by their runs
+  (`GET /api/threads/search/files`);
+  All shows three of each with **See all**, a chip every find of its kind, and Agents and Files hide the list. A message
+  opens its chat on the run it is of, scrolled to it, with a ring that fades (`chatfind.js`); a file opens its chat, an
+  agent its conversation.
 - **The stage bar** (`shell.js`, `stage.js`, `shell.css`): 52 px, sticky, a hairline under it only once the page has scrolled
   under it (`layout.js`, `data-scrolled`). At the left the sidebar's button (a phone's Back or menu: the edge swipe and the
   rules of Back are those of items 338, 1079 and 1321), then the breadcrumb: the agent's badge, its name, a slash and the

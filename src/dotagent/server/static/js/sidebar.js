@@ -22,7 +22,7 @@ import { serviceFailure, serviceWords } from "./errors.js";
 import { t, tCount } from "./i18n.js";
 import { goTo } from "./hop.js";
 import { icon } from "./icons.js";
-import { DOT_ID } from "./actors.js";
+import { actorFace, DOT_ID, keepPhase, liven } from "./actors.js";
 import { onAssistant } from "./assistant.js";
 import { badge, badgeCode } from "./badge.js";
 import { shownOwner } from "./presence.js";
@@ -33,6 +33,7 @@ import { loopRhythm, nextFiring } from "./rhythm.js";
 import { closeMenu, closeMenuFrom, menuOpenedBy, openMenu, openOnHold } from "./menu.js";
 import { placeWork } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
+import { buildSearchFinds } from "./searchfinds.js";
 import { buildSettingsNav } from "./settingsnav.js";
 import { tabAt } from "./settingstabs.js";
 import { onLifecycle, onStreamBack, readFailed } from "./state.js";
@@ -156,8 +157,8 @@ function mark(node, current) {
 }
 
 /** Whose chat a row is, for the row's first line: the agent's name and its two-letter badge. */
-function agentLabel(name) {
-  return { name, code: badgeCode(name) };
+function agentLabel(name, id) {
+  return { name, id, code: badgeCode(name) };
 }
 
 /** What a row whose run works shows at its right, where its age sits at rest (item 122): a
@@ -203,12 +204,37 @@ function helperChip(children) {
   );
 }
 
-/** A row's first line: the badge and name of its agent, and at the right what it says of its run (`right`). */
-function rowTop(agent, right) {
+// The living faces of the rows by the row they stand for (a chat's id, a run's address): the list paints its rows again as
+// the runs move, and a face kept from one paint to the next goes on moving where it was instead of starting again.
+const livingFaces = new Map();
+
+/** Where a row whose run works wears its badge, the agent's face, living (the owner's ask of 2026-11-27, after Grok's
+ * list): it bobs, glances and now and then flips while the run works, and the row goes back to the badge once it rests. */
+function livingBadge(agent, key) {
+  for (const [kept, entry] of livingFaces) {
+    if (!entry.face.hasAttribute("data-living")) {
+      livingFaces.delete(kept);
+    }
+  }
+  const kept = livingFaces.get(key);
+  if (kept !== undefined && kept.agent === agent.id) {
+    keepPhase(kept.face);
+    return kept.badge;
+  }
+  const face = actorFace(agent.id, "working", null);
+  liven(face, true, agent.id);
+  const badge = el("span", { class: "side-badge-face", "aria-hidden": "true" }, face);
+  livingFaces.set(key, { agent: agent.id, face, badge });
+  return badge;
+}
+
+/** A row's first line: the badge and name of its agent (its face, living, while its run works: `liveKey` is then the
+ * row's key, else null), and at the right what it says of its run (`right`). */
+function rowTop(agent, right, liveKey) {
   return el(
     "span",
     { class: "side-chat-top" },
-    el("span", { class: "side-badge", "aria-hidden": "true", dataset: { code: agent.code } }),
+    liveKey !== null ? livingBadge(agent, liveKey) : el("span", { class: "side-badge", "aria-hidden": "true", dataset: { code: agent.code } }),
     el("span", { class: "side-agent" }, agent.name),
     right === null ? null : el("span", { class: "side-chat-meta" }, right),
   );
@@ -222,7 +248,7 @@ function rowTop(agent, right) {
  * warning's ink (item 836). */
 function chatText(chat, agent, children, waits = null, right = null, unread = false) {
   const title = el("span", { class: "side-run-goal" }, clip(chat.title, 120));
-  const top = rowTop(agent, right);
+  const top = rowTop(agent, right, WORKING.has(chat.latest_status) && waits === null ? chat.id : null);
   const loop = loopWords(chat);
   const campaign = campaignWords(chat);
   const marks = [
@@ -346,7 +372,7 @@ function workRow(row, onNavigate, children, agent) {
       el(
         "span",
         { class: "side-chat-text" },
-        rowTop(agent, WORKING.has(row.status) ? workingSlot(row.since) : null),
+        rowTop(agent, WORKING.has(row.status) ? workingSlot(row.since) : null, WORKING.has(row.status) ? row.href : null),
         el("span", { class: "side-run-goal" }, clip(row.title, 120)),
         helpers === null && detail.length === 0 && campaign === null
           ? null
@@ -383,7 +409,7 @@ function waitingRow(row, onNavigate, agent) {
       el(
         "span",
         { class: "side-chat-text" },
-        rowTop(agent, waitingSlot(row.since)),
+        rowTop(agent, waitingSlot(row.since), null),
         el("span", { class: "side-run-goal" }, clip(row.title, 120)),
         waitsLine([WAITS_WORDS, ...facts].join(" · ")),
       ),
@@ -521,6 +547,19 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     "aria-label": t("side.search"),
     autocomplete: "off",
     spellcheck: "false",
+  });
+  // The search's chips and its finds beyond the chats' titles (searchfinds.js): Bots and Files hide the list
+  // (`data-scope`, shell.css).
+  const searchFinds = buildSearchFinds({
+    chatTitle: (id) => chats?.find((chat) => chat.id === id)?.title ?? "",
+    homeHref,
+    onScope: (scope) => {
+      element.dataset.scope = scope;
+      paintLists();
+    },
+    // What the search found beyond the titles came: the list's "No chat matches" goes when it found something.
+    onFound: () => paintLists(),
+    onNavigate,
   });
   // On a touch screen the drawer has no X (item 888, the owner's ask): a chat chosen closes it, and so does a swipe to
   // the left; a narrow window of the Mac, with no touch, keeps the button.
@@ -854,11 +893,13 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
 
   // What the list says when it shows no chat: that there is none yet, or none that matches the search; nothing while
-  // every chat stands under Working or in a channel's section, or while one there matches.
+  // every chat stands under Working or in a channel's section, or while one there matches, or while the search found
+  // messages, agents or files (searchfinds.js).
   function emptyNote(inChannels) {
     if (needle !== "") {
       const found =
         inChannels ||
+        searchFinds.hasFinds() ||
         [...work.working, ...waits.waiting].some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
       return found ? [] : [el("div", { class: "side-note" }, t("sidebar.noMatch", { query: search.value.trim() }))];
     }
@@ -1145,7 +1186,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   /** Whose a chat is, for its row's first line: the team it leads, the agent of its latest run, else Dot. */
   function agentOf(chat) {
     if (chat.team !== null && chat.team !== undefined && chat.actor_id === chat.team.id) {
-      return agentLabel(chat.team.name);
+      return agentLabel(chat.team.name, chat.team.id);
     }
     return agentOfId(chat.actor_id ?? null);
   }
@@ -1169,7 +1210,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return agentOfId(row.actor_id ?? null);
   }
   function agentOfId(id) {
-    return agentLabel(id === null || id === DOT_ID ? dotName() : (agentNames.get(id) ?? t("side.agent")));
+    return agentLabel(id === null || id === DOT_ID ? dotName() : (agentNames.get(id) ?? t("side.agent")), id ?? DOT_ID);
   }
 
   // A chat's entry: its row, wearing while its latest run works (`family`, that run's row and the runs it delegated;
@@ -1574,6 +1615,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   search.addEventListener("input", () => {
     needle = foldSearch(search.value);
+    searchFinds.setQuery(search.value);
     paintLists();
   });
   search.addEventListener("keydown", (event) => {
@@ -1582,6 +1624,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         event.preventDefault();
         search.value = "";
         needle = "";
+        searchFinds.setQuery("");
         paintLists();
       } else {
         search.blur();
@@ -1629,7 +1672,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   // The sidebar is one component, in the window beside the page and as the drawer over it on a phone (item 294): a head
   // with the title, the search row, the list and its dock, and the foot's four tools, the same on both.
-  const body = el("div", { class: "side-body" }, el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav));
+  const body = el("div", { class: "side-body" }, searchFinds.finds, el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav));
   // The dock under the list (the sidebar of the reference app): what works and waits under Working, then what rests past a week,
   // Settled. It keeps its place while the list scrolls.
   const dock = el("div", { class: "side-dock" }, activityNav, settledNav);
@@ -1658,6 +1701,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
     sideHead,
     top,
+    searchFinds.chips,
     body,
     dock,
     foot,

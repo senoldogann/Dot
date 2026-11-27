@@ -500,6 +500,7 @@ func chatListSections(_ rows: [ThreadRow]) -> ChatListSections {
 
 /// What a chat row shows.
 struct ChatRowModel: Equatable {
+    let id: String
     let title: String
     let preview: String
     let time: String
@@ -509,6 +510,7 @@ struct ChatRowModel: Equatable {
     let state: RowState
 
     init(row: ThreadRow, now: Date) {
+        id = row.summary.id
         title = row.summary.title
         preview = row.summary.lastMessage
         time = rowTime(row.summary.latestCreatedAt, now: now)
@@ -531,7 +533,11 @@ struct ChatRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: Space.s) {
             if !dynamicTypeSize.isAccessibilitySize {
-                if chat.agent == nil { DotFace(size: 32) } else { AgentAvatar(size: 32) }
+                if chat.agent == nil {
+                    LivingFace(alive: chat.state.isLive, seed: hueHash(chat.id), size: 32) { DotFaceDrawing(size: 32, pose: $0) }
+                } else {
+                    AgentAvatar(size: 32)
+                }
             }
             VStack(alignment: .leading, spacing: Space.xxs) {
                 HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
@@ -616,7 +622,7 @@ struct BotNewChat: View {
         .background(Tone.ground)
         .navigationTitle(botChat == nil ? bot?.record.name ?? "" : "")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { if let botChat { BotHeader(chat: botChat, subtitle: nil, find: nil, library: nil) } }
+        .toolbar { if let botChat { BotHeader(chat: botChat, subtitle: nil, alive: false, find: nil, library: nil) } }
         .task { await model.loadModels() }
         // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
         .onAppear { text = model.draft(of: AppModel.newChatDraft(agent: agent)) }
@@ -700,7 +706,7 @@ struct PushedNewChat: View {
             if model.startingChats[thread] != nil {
                 StartingChat(key: thread)
             } else {
-                ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false).id(thread)
+                ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false, find: nil).id(thread)
             }
         } else {
             BotNewChat(botId: botId, opened: { started = $0 })
@@ -780,7 +786,7 @@ struct LiveAgentsSheet: View {
             }
         }
         .navigationDestination(item: $opened) { helperThread in
-            ChatScreen(thread: helperThread, initialPanel: nil, editsFirstQueued: false)
+            ChatScreen(thread: helperThread, initialPanel: nil, editsFirstQueued: false, find: nil)
         }
         .inspectorSheet(title: String(localized: "Agents", comment: "Title of the sheet of a chat's helpers"), close: close)
     }

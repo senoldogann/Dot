@@ -109,7 +109,7 @@ struct RootView: View {
                 case .sampleChat(let panel): NavigationStack { SampleChatScreen(chat: Samples.chats[0], initialPanel: panel) }
                 case .chatFixture(let fixture):
                     NavigationStack {
-                        ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing)
+                        ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing, find: nil)
                     }
                     .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }
                 case .settingsFixture(let fixture):

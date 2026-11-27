@@ -1,8 +1,9 @@
 // One run as a conversation: the question, what Dot did about it, its answer, and the box to queue a message for after
 // the run, steer it or follow up on it.
 
-import { actorFace, dotFace, setActorState, teamDuo } from "../actors.js";
+import { actorFace, dotFace, liven, setActorState, teamDuo } from "../actors.js";
 import { agentList } from "../agentlist.js";
+import { revealFind } from "../chatfind.js";
 import { agentPanel } from "../agentpanel.js";
 import { automationsPanel } from "../automations.js";
 import { api, eventNotShown, follow, ONE_SHOT, query, readEventsTail, sharedGet, sse } from "../api.js";
@@ -428,6 +429,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     if (face.getAttribute("data-state") !== "done") {
       setActorState(face, faceState(status));
     }
+    // The face lives while the run works (the owner's ask of 2026-11-27) and rests when it ends, waits on the owner or fails.
+    liven(face, faceState(status) === "working", agent?.id ?? team?.id ?? run.id);
     details.paint({
       status,
       model,
@@ -1814,6 +1817,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       if (active) {
         setActorState(face, faceStateAtEnd(update.status));
       }
+      liven(face, false, run.id);
       active = false;
       // The snapshot kept for a return to this page is of a run that is over: it draws at rest, and its replayed end
       // gives no tick.
@@ -2674,7 +2678,11 @@ export function mount(root, ctx) {
   // The page shows its chat, scrolled where it opens, or why it cannot (item 328): sent once the frame that scrolls it
   // has run.
   function shown() {
-    requestAnimationFrame(() => root.dispatchEvent(new CustomEvent(PAGE_READY_EVENT, { bubbles: true })));
+    requestAnimationFrame(() => {
+      root.dispatchEvent(new CustomEvent(PAGE_READY_EVENT, { bubbles: true }));
+      // Opened from a find of the chat search: at the message it found, once the chat stands where it opens.
+      requestAnimationFrame(() => revealFind(root, runId));
+    });
   }
 
   attempt(open);

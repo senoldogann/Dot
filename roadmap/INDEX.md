@@ -6,6 +6,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2032](2032.md) | done | 2026-11-27 | The search's chips: All, Messages, Bots, Files, on the phone and the web |
+| [2031](2031.md) | done | 2026-11-27 | A living face while a chat works, on the phone and the web |
 | [1997](1997.md) | done | 2026-11-27 | The pre-push hook measures the first step's budget when the prompt surface changes |
 | [1996](1996.md) | done | 2026-11-27 | DotNext: Show steps off hides every step, an answer the finish says again stands once, the live caption speaks as the work log, no Plan in This chat |
 | [1995](1995.md) | in progress | 2026-11-27 | A bot's work on the phone: its work orders, objectives and hand-offs to read, and Pause and Resume in its profile's menu |

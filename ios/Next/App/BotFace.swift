@@ -216,6 +216,19 @@ struct BotFace: View {
     let size: CGFloat
 
     var body: some View {
+        BotFaceDrawing(id: id, look: look, size: size, pose: .rest)
+    }
+}
+
+/// A bot's face in a pose: the eyes where the pose looks, as open as it says (the whole face's bob and turn are its
+/// wearer's, `LivingFace`).
+struct BotFaceDrawing: View {
+    let id: String
+    let look: AgentLook?
+    let size: CGFloat
+    let pose: FacePose
+
+    var body: some View {
         let (shape, colour): (BotShape, BotColour) = botLook(id: id, look: look)
         ProfileShape(radii: shape.radii)
             .fill(colour.color)
@@ -223,15 +236,61 @@ struct BotFace: View {
                 ZStack {
                     Rectangle()
                     HStack(spacing: size * 0.15) {
-                        Capsule().frame(width: size * 0.11, height: size * 0.22)
-                        Capsule().frame(width: size * 0.11, height: size * 0.22)
+                        Capsule().frame(width: size * 0.11, height: size * 0.22 * pose.open)
+                        Capsule().frame(width: size * 0.11, height: size * 0.22 * pose.open)
                     }
-                    .offset(y: size * shape.eyeDrop)
+                    .offset(x: size * pose.glance, y: size * shape.eyeDrop)
                     .blendMode(.destinationOut)
                 }
                 .compositingGroup()
             }
             .frame(width: size, height: size)
             .accessibilityHidden(true)
+    }
+}
+
+/// A bot's face that lives while a chat of it works (the owner's ask of 2026-11-27, after Grok's list): a short bob,
+/// a glance to one side every few seconds, a blink, and now and then a flip; still at rest (done, waiting on the owner,
+/// failed). Under Reduce Motion it does not move: it breathes in brightness. It draws only while on screen and while
+/// the app is in front (`TimelineView` paused otherwise), thirty frames a second at most.
+struct LivingBotFace: View {
+    let id: String
+    let look: AgentLook?
+    let size: CGFloat
+    let alive: Bool
+
+    var body: some View {
+        LivingFace(alive: alive, seed: hueHash(id), size: size) { pose in
+            BotFaceDrawing(id: id, look: look, size: size, pose: pose)
+        }
+    }
+}
+
+/// The motion of a living face around any face drawn in a pose: the bob and the flip move the whole face, the pose
+/// goes to the drawing for its eyes. `face.living` while it moves, for the UI tests.
+struct LivingFace<Face: View>: View {
+    let alive: Bool
+    let seed: UInt32
+    let size: CGFloat
+    @ViewBuilder let face: (FacePose) -> Face
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @Environment(\.scenePhase) private var scenePhase: ScenePhase
+    @State private var onScreen: Bool = false
+
+    var body: some View {
+        let moving: Bool = alive && onScreen && scenePhase == .active
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 / 10 : 1.0 / 30, paused: !moving)) { timeline in
+            let time: Double = timeline.date.timeIntervalSinceReferenceDate
+            let pose: FacePose = alive && !reduceMotion ? livingPose(at: time, seed: seed) : .rest
+            face(pose)
+                .rotation3DEffect(.degrees(pose.turn), axis: (x: 0, y: 1, z: 0), perspective: 0.4)
+                .offset(y: size * pose.bob)
+                .opacity(alive && reduceMotion ? stillPulse(at: time) : 1)
+        }
+        .frame(width: size, height: size)
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
+        .accessibilityHidden(true)
+        .accessibilityIdentifier(alive ? "face.living" : "face.rest")
     }
 }

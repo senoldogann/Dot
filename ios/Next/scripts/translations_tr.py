@@ -1683,4 +1683,12 @@ TR.update(
         "Resume bot": "Botu sürdür",
     }
 )
+# The search's chips and its files (the owner's ask of 2026-11-27).
+TR.update(
+    {
+        "See all": "Tümünü gör",
+        "Attached": "Ekli",
+        "Files could not be searched: %@": "Dosyalarda aranamadı: %@",
+    }
+)
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})

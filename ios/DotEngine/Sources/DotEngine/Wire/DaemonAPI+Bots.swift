@@ -37,4 +37,10 @@ extension DaemonAPI {
     public func searchChats(_ query: String, limit: Int) async throws(DaemonRequestError) -> [ChatHit] {
         try await get("/api/threads/search", query: [URLQueryItem(name: "q", value: query), URLQueryItem(name: "limit", value: String(limit))])
     }
+
+    /// The files of the chats whose name holds the words of `query` (`GET /api/threads/search/files`), newest first:
+    /// what the owner attached and what the runs wrote.
+    public func searchFiles(_ query: String, limit: Int) async throws(DaemonRequestError) -> [FileHit] {
+        try await get("/api/threads/search/files", query: [URLQueryItem(name: "q", value: query), URLQueryItem(name: "limit", value: String(limit))])
+    }
 }

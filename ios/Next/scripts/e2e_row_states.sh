@@ -2,7 +2,8 @@
 # The rows' states end to end (item 1920): a throwaway daemon (e2e_daemon.py, its scripted model) in three mktemp
 # folders, a phone paired with a code, five agents each with one chat in one state (an approval that waits, a run at
 # work, a run that waits on a helper, a command left in the background, an answer not yet seen), then RowStatesLiveUITests
-# reads each bot's row on the home, Dot's ring, and pins a bot. Nothing touches the owner's Dot; no model is called.
+# reads each bot's row on the home, Dot's ring, and pins a bot; a working bot's face lives and rests once its run is
+# stopped, and the home's search filters by its chips. Nothing touches the owner's Dot; no model is called.
 # The app must be built for testing in <derived data> first (xcodebuild build-for-testing).
 #
 # Usage: ios/Next/scripts/e2e_row_states.sh <simulator udid> <derived data folder>
@@ -46,6 +47,8 @@ say "$(agent Reader)" "hello: say hi"
 say "$(agent Runner)" "bg: start the server"
 say "$(agent Asker)" "approve: touch the file"
 say "$(agent Worker)" "wait: for the build"
+# The search: a file a run wrote (its Files chip) and what the chats say (its Messages chip).
+say "$(agent Writer)" "write: the notes"
 rm -rf "$derived/rowstates.xcresult"
 fail=0
 if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test-without-building -project "$ios/Dot.xcodeproj" \

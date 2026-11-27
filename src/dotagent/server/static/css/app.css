@@ -795,6 +795,43 @@ input[type="radio"] {
   animation-play-state: var(--endless);
 }
 
+/* The living face of a chat at work (actors.js `liven`): a short bob and, about every 16 s, a flip about its upright
+   axis, each face at its own moment; both where the page's clock has them (`--bob-delay`, `--flip-delay`, actors.js
+   `keepPhase`), so a face moved to a new row goes on. Its eyes glance from the script. Off screen it stands still. */
+.avatar[data-living] {
+  animation:
+    face-bob 1.8s ease-in-out var(--bob-delay, 0s) infinite,
+    face-flip 16s ease-in-out var(--flip-delay, 0s) infinite;
+  animation-play-state: var(--endless), var(--endless);
+}
+
+.avatar[data-living][data-offscreen] {
+  animation-play-state: paused, paused;
+}
+
+@keyframes face-bob {
+  50% {
+    translate: 0 -6%;
+  }
+}
+
+@keyframes face-flip {
+  0% {
+    rotate: y 0deg;
+  }
+
+  5%,
+  100% {
+    rotate: y 360deg;
+  }
+}
+
+@keyframes face-glow {
+  50% {
+    opacity: 0.55;
+  }
+}
+
 /* A face whose run just ended blinks once, then rests. */
 .avatar.ended {
   animation:
@@ -5397,6 +5434,24 @@ dialog.modal.versions-dialog {
   min-width: 0;
 }
 
+/* The message a find of the chat search opened the chat at (chatfind.js): a ring of the focus colour that fades. */
+.find-hit {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: var(--radius-control);
+  animation: find-hit-fade 2.4s ease-in forwards;
+}
+
+@keyframes find-hit-fade {
+  70% {
+    outline-color: var(--ring);
+  }
+
+  100% {
+    outline-color: transparent;
+  }
+}
+
 /* Your message in ink (item 832; the raised surface since item 79, the yellow staying Dot's face alone). Its padding is
    a chat bubble's (item 401): the words, and no room above and below them to scroll past. */
 .bubble.user {
@@ -9758,6 +9813,12 @@ dialog.modal.file-dialog[open] {
   .spinner,
   .status-ring.s-queued {
     animation: none;
+  }
+
+  /* A living face does not move: it glows, slowly, while its chat works. */
+  .avatar[data-living] {
+    animation: face-glow 2.4s ease-in-out infinite;
+    animation-play-state: var(--endless);
   }
 
   .switch::after,

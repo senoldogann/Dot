@@ -24,6 +24,7 @@ from dotagent.agent.helper_reports import DetachedHelper, keep_detached
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.paths import db_path, ensure_layout
+from dotagent.core.types import JsonValue
 from dotagent.llm.types import Message
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -640,7 +641,7 @@ async def test_the_home_search_finds_what_a_chat_said_and_refuses_an_empty_query
     store: Store = served.runtime.store
     said: ThreadRecord = await store.create_thread("Car", "ui")
     other: ThreadRecord = await store.create_thread("Other", "ui")
-    await _run(store, said.id, None)
+    said_run: RunRecord = await _run(store, said.id, None)
     await _run(store, other.id, None)
     await store.append_messages(said.id, [_said("user", "Book the Lastikçi garage for Friday")])
     await store.append_messages(other.id, [_said("user", "Water the plants")])
@@ -649,10 +650,43 @@ async def test_the_home_search_finds_what_a_chat_said_and_refuses_an_empty_query
     hits: list[dict[str, object]] = found.json()
     assert [hit["thread_id"] for hit in hits] == [said.id]
     assert "[Lastikçi]" in str(hits[0]["snippet"])
+    assert hits[0]["run_id"] == said_run.id, "the web opens the chat on the run the message is of"
     none: httpx.Response = await served.http.get("/api/threads/search", params={"q": "nothing-said-here"})
     assert none.json() == []
     empty: httpx.Response = await served.http.get("/api/threads/search", params={"q": ""})
     assert empty.status_code == 422
+
+
+async def test_the_files_search_finds_attached_and_written_files_under_the_owners_chat(served: Served) -> None:
+    """The Files chip of the chat search: `GET /api/threads/search/files` finds a file the owner attached and one a
+    helper wrote, by any part of its name folded, each under the chat the owner sees, newest first; a write the tool
+    refused is no file, and a word no file holds finds nothing."""
+    store: Store = served.runtime.store
+    chat: ThreadRecord = await store.create_thread("Taxes", "ui")
+    helper_chat: ThreadRecord = await store.create_thread("Helper", "ui")
+    run: RunRecord = await _run(store, chat.id, None)
+    helper: RunRecord = await _run(store, helper_chat.id, run.id)
+    files: list[JsonValue] = [{"id": "att_1_ab", "name": "Vergi-Özeti.pdf", "kind": "pdf", "size": 10}]
+    await store.add_event(run.id, "attachments", {"files": files})
+    home: str = str(Path.home())
+    for call, path, ok in (("c1", f"{home}/Desktop/vergi-notes.md", True), ("c2", "/tmp/vergi-refused.md", False)):
+        await store.add_event(helper.id, "tool_call", {"call_id": call, "tool": "write_file", "args": {"path": path}})
+        await store.add_event(helper.id, "tool_result", {"call_id": call, "tool": "write_file", "ok": ok})
+    found: httpx.Response = await served.http.get("/api/threads/search/files", params={"q": "VERGI"})
+    assert found.status_code == 200
+    hits: list[dict[str, object]] = found.json()
+    assert [(hit["thread_id"], hit["kind"], hit["name"], hit["path"]) for hit in hits] == [
+        (chat.id, "made", "vergi-notes.md", "~/Desktop/vergi-notes.md"),
+        (chat.id, "attachment", "Vergi-Özeti.pdf", "Vergi-Özeti.pdf"),
+    ]
+    assert [hit["run_id"] for hit in hits] == [run.id, run.id], (
+        "a helper's file opens the owner's chat, not the helper's page"
+    )
+    assert hits[1]["attachment_id"] == "att_1_ab"
+    ozet: httpx.Response = await served.http.get("/api/threads/search/files", params={"q": "ozeti"})
+    assert [hit["name"] for hit in ozet.json()] == ["Vergi-Özeti.pdf"]
+    none: httpx.Response = await served.http.get("/api/threads/search/files", params={"q": "nothing-named-so"})
+    assert none.json() == []
 
 
 def _said(role: str, content: str) -> Message:

@@ -39,10 +39,30 @@ extension EnvironmentValues {
     @Entry var botChat: BotChat? = nil
 }
 
-/// Where the home goes: a bot, on a chat of its own (`thread` `nil`: its latest).
+/// Where the home goes: a bot, on a chat of its own (`thread` `nil`: its latest), at a find of the search when the
+/// search's find was a message (`find`).
 struct BotRoute: Hashable, Sendable {
     let bot: String
     let thread: String?
+    let find: ChatFind?
+}
+
+/// A message the search found: the chat opens with Find in chat on its marked `word`, at the find whose words hold the
+/// `snippet`'s.
+struct ChatFind: Hashable, Sendable {
+    let word: String
+    let snippet: String
+}
+
+/// Which of the finds of a search's word (`found`, the ids `findMatches` gave) is the search's message (pure): the
+/// first whose words hold the longest piece of the snippet (its marks and "..." taken out), else the newest, the one
+/// nearest the end where the chat opens.
+func findStart(_ items: [TranscriptItem], found: [String], snippet: String) -> Int {
+    guard !found.isEmpty else { return 0 }
+    let piece: String = snippet.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: "")
+        .components(separatedBy: "...").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.max { $0.count < $1.count } ?? ""
+    let holding: Set<String> = Set(findMatches(items, words: piece))
+    return found.firstIndex { holding.contains($0) } ?? found.count - 1
 }
 
 /// The chat a bot's screen shows (pure): the one chosen in its profile or begun in it, else the route's, else the one
@@ -137,7 +157,7 @@ struct BotChatScreen: View {
         if let key = shown, model.startingChats[key] != nil {
             StartingChat(key: key)
         } else if let thread = shown {
-            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
+            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false, find: thread == route.thread ? route.find : nil)
                 .id(thread)
                 .onAppear { if chosen == nil, route.thread == nil, held != thread { held = thread } }
         } else {
@@ -191,6 +211,8 @@ struct BotHeader: ToolbarContent {
     let chat: BotChat
     /// The chat's state line when it is not live ("Offline · saved 4 min ago"), under the name in the pill.
     let subtitle: String?
+    /// The chat has a run at work: the face in the pill lives (`LivingBotFace`).
+    let alive: Bool
     let find: (() -> Void)?
     let library: (() -> Void)?
 
@@ -213,7 +235,7 @@ struct BotHeader: ToolbarContent {
         ToolbarItem(placement: .principal) {
             Button(action: chat.openProfile) {
                 HStack(spacing: Space.xs) {
-                    BotFace(id: chat.record.id, look: chat.record.look, size: 26)
+                    LivingBotFace(id: chat.record.id, look: chat.record.look, size: 26, alive: alive)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(chat.record.name).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
                         if let subtitle { Text(subtitle).textRole(.micro).foregroundStyle(Tone.secondary).lineLimit(1) }

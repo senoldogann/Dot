@@ -83,6 +83,7 @@ from dotagent.store.models import (
     DraftRecord,
     DraftStatus,
     EventRecord,
+    FileHit,
     FollowUpOf,
     HarnessExperience,
     HarnessProbe,
@@ -433,6 +434,26 @@ _RUNS_FROM: str = (
     " AND later.parent_run_id IS NULL AND later.rewound_at IS NULL"
     " AND (later.created_at, later.rowid) >= (SELECT created_at, rowid FROM runs WHERE id = ?)"
     " ORDER BY later.created_at, later.rowid"
+)
+# The files of every chat, newest first (``search_chat_files``): what the owner attached to a message (an
+# ``attachments`` or a ``steer`` event's ``files``) and the path of a ``write_file`` or ``edit_file`` call whose result
+# says it did its job; each under the chat and the run at the root of its run's line of helpers (the page it opens).
+_FILE_FINDS: str = (
+    "WITH RECURSIVE roots(id, thread_id, root) AS (SELECT id, thread_id, id FROM runs WHERE parent_run_id IS NULL"
+    " UNION ALL SELECT runs.id, roots.thread_id, roots.root FROM runs JOIN roots ON runs.parent_run_id = roots.id)"
+    " SELECT roots.thread_id AS thread_id, roots.root AS run_id, events.ts AS ts, 'attachment' AS kind,"
+    " json_extract(file.value, '$.name') AS name, NULL AS path, json_extract(file.value, '$.id') AS attachment_id"
+    " FROM events JOIN roots ON roots.id = events.run_id, json_each(events.data, '$.files') AS file"
+    " WHERE events.kind IN ('attachments', 'steer') AND json_valid(events.data)"
+    " UNION ALL SELECT roots.thread_id, roots.root, results.ts, 'made', NULL,"
+    " json_extract(calls.data, '$.args.path'), NULL"
+    " FROM events AS calls JOIN roots ON roots.id = calls.run_id"
+    " JOIN events AS results ON results.run_id = calls.run_id AND results.kind = 'tool_result'"
+    " AND json_extract(results.data, '$.call_id') = json_extract(calls.data, '$.call_id')"
+    " AND json_extract(results.data, '$.ok') = 1"
+    " WHERE calls.kind = 'tool_call' AND json_extract(calls.data, '$.tool') IN ('write_file', 'edit_file')"
+    " AND json_type(calls.data, '$.args.path') = 'text'"
+    " ORDER BY ts DESC"
 )
 
 
@@ -3554,6 +3575,38 @@ class Store:
             )
             for row in rows
         ]
+
+    async def search_chat_files(self, terms: Sequence[str], limit: int) -> list[FileHit]:
+        """The files of the chats whose name or path holds every one of ``terms`` (folded words, see
+        :func:`dotagent.memory.words.search_terms`), newest first, at most ``limit``, each file once per chat: what the
+        owner attached to a message (the ``attachments`` and ``steer`` events) and what a run wrote or edited with
+        ``write_file`` or ``edit_file`` in a call that did its job. A helper's file stands under the chat of the run at
+        the root of its line, the chat the owner sees."""
+        if not terms:
+            return []
+        rows = await self._all(_FILE_FINDS, ())
+        found: dict[tuple[str, str, str], FileHit] = {}
+        for row in rows:
+            kind: Literal["attachment", "made"] = "attachment" if row["kind"] == "attachment" else "made"
+            path: str = str(row["path"] or "")
+            name: str = str(row["name"] or "") if kind == "attachment" else Path(path).name
+            if name == "" or not all(term in fold_search(path if kind == "made" else name) for term in terms):
+                continue
+            key: tuple[str, str, str] = (str(row["thread_id"]), kind, path if kind == "made" else name)
+            if key in found:
+                continue
+            found[key] = FileHit(
+                thread_id=key[0],
+                run_id=str(row["run_id"]),
+                kind=kind,
+                name=name,
+                path=path if kind == "made" else name,
+                attachment_id=None if kind == "made" else str(row["attachment_id"] or "") or None,
+                at=float(row["ts"]),
+            )
+            if len(found) >= limit:
+                break
+        return list(found.values())
 
     async def chat_messages_around(self, thread_id: str, seq: int, before: int, after: int) -> list[ChatMessage]:
         """The user's and the assistant's messages of the chat's history around place ``seq``: the ``before`` that come

@@ -122,13 +122,13 @@ final class BotsTests: XCTestCase {
             ChatHit(threadId: "t1", seq: 1, kind: "m", ref: "user", snippet: "no [sources] today"),
             ChatHit(threadId: "t1", seq: 4, kind: "r", ref: "r-t1", snippet: "[sources] again"),
         ]
-        let found: HomeFinds = homeFinds("sources", bots: built, hits: hits)
+        let found: HomeFinds = homeFinds("sources", bots: built, hits: hits, files: [])
         XCTAssertEqual(found.bots.map(\.id), ["a1"], "the role holds the word")
         XCTAssertEqual(found.chats.map(\.summary.id), ["t2"])
         XCTAssertEqual(found.messages.map(\.threadId), ["t1"], "a chat found by its title is not named again, nor twice")
-        XCTAssertTrue(homeFinds("  ", bots: built, hits: hits).isEmpty)
-        XCTAssertEqual(homeFinds("writer xyz", bots: built, hits: []).bots.map(\.id), [], "every word must match")
-        XCTAssertEqual(homeFinds("drafts posts", bots: built, hits: []).bots.map(\.id), ["a2"])
+        XCTAssertTrue(homeFinds("  ", bots: built, hits: hits, files: []).isEmpty)
+        XCTAssertEqual(homeFinds("writer xyz", bots: built, hits: [], files: []).bots.map(\.id), [], "every word must match")
+        XCTAssertEqual(homeFinds("drafts posts", bots: built, hits: [], files: []).bots.map(\.id), ["a2"])
     }
 
     func testANewBotIsItsNameAndWhatItDoesAndARenameKeepsEverythingElse() throws {

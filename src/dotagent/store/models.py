@@ -215,6 +215,24 @@ class ChatHit(FrozenModel):
     snippet: str
 
 
+class FileHit(FrozenModel):
+    """One find of the files search (the Files chip of the chat search): a file the owner attached to a message of a
+    chat (``kind`` ``attachment``, ``attachment_id`` its upload) or one a run of it wrote or edited with ``write_file``
+    or ``edit_file`` and that call did its job (``kind`` ``made``, ``attachment_id`` ``None``). ``thread_id`` and
+    ``run_id`` are the chat the owner sees and its run that opens it, a helper's file under the run at the root of its
+    line (the web opens ``#/runs/<run_id>``); ``name`` is the file's name,
+    ``path`` where it is (``~/`` for the home folder; an attachment's own name), ``at`` when it was attached or last
+    written."""
+
+    thread_id: str
+    run_id: str
+    kind: Literal["attachment", "made"]
+    name: str
+    path: str
+    attachment_id: str | None
+    at: float
+
+
 class ChatMessage(FrozenModel):
     """A user's or an assistant's message of a chat's history, with its place in it (item 1740)."""
 
