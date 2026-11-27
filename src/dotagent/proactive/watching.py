@@ -143,7 +143,7 @@ async def _gather(runtime: Runtime, watcher: WatcherRecord, now: float) -> Gathe
         case "github":
             return await look_github(runtime.accounts, watcher, now)
         case "check":
-            return await look_check(runtime.sandbox.current().commands, runtime.shell_env, watcher, now)
+            return await look_check(runtime.sandbox.unattended().commands, runtime.shell_env, watcher, now)
 
 
 async def _verdict(runtime: Runtime, watcher: WatcherRecord, item: Item) -> Chosen | None:

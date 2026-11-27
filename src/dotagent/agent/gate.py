@@ -222,7 +222,8 @@ class RunGate:
     a chat Dot opened on its own initiative (item 850): a message, a post or a release there is the owner's question
     in every mode, yolo's and auto's too (:func:`dotagent.policy.engine.initiative_guard`). ``owners_chat`` is set for a
     run of a chat the owner opened (item 860): in yolo, a payment, a message or mail and a public post there are the
-    owner's question (:func:`dotagent.policy.engine.owners_guard`).
+    owner's question (:func:`dotagent.policy.engine.owners_guard`). ``unattended`` is set for a run nobody started (item
+    2016), whose processes keep the sandbox in every mode.
     ``instructions`` are the user's own words so far, which is all the reviewer takes as authority. ``pace`` bounds the
     public and social actions of the browser on each site, in every mode. ``locks`` are the runtime's
     :class:`SiteLocks`, shared with the gates of the other runs.
@@ -247,6 +248,7 @@ class RunGate:
         owners_chat: bool = False,
         owner_there: bool = True,
         chat_id: str | None = None,
+        unattended: bool = False,
     ) -> None:
         self._store: Store = store
         # Whether the run is of a chat Dot opened on its own initiative (item 850), whose messages, posts and releases
@@ -258,6 +260,10 @@ class RunGate:
         # Whether the owner is there to answer such a step (item 860): in a run that a schedule, a watcher or a notice
         # started in their chat, the review model judges a message or a post, and passes on what it cannot tell.
         self.owner_there: bool = owner_there
+        # Whether nobody started the run (item 2016, :func:`dotagent.agent.unattended.unattended_origin`): its
+        # processes start in the sandbox in every mode, whatever the owner's switch says. The gate decides nothing by
+        # it; the tools read it (``ToolContext.unattended``).
+        self.unattended: bool = unattended
         # The chat whose "don't ask again" yeses answer this run's questions (item 866): its own chat's, or for a
         # delegated run its parent's; ``None``: none answer them.
         self.chat_id: str | None = chat_id

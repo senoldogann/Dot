@@ -114,6 +114,7 @@ Only the Mac makes, rotates, lists or deletes hooks: the API answers those to th
 phone's key, as it does for everything that opens a way into Dot.
 
 **Where they are kept.** `hooks.json` in Dot's home (readable by you only) holds each hook, its secret and its last
-calls; a run's commands cannot read it outside `yolo`, as they cannot read the API token. A `yolo` run, whose shell
-is not sandboxed, could read it and sign a call: that call starts the bound work tainted, within its own rights, as
-any call does.
+calls; a run's commands cannot read it outside `yolo`, as they cannot read the API token, nor in `yolo` those of a run a
+hook, a schedule, a watcher or Dot's own initiative started (item 2016: a run nobody started keeps the sandbox in
+every mode). A `yolo` run you started, whose shell is not sandboxed, could read it and sign a call: that call starts
+the bound work tainted, within its own rights, as any call does.

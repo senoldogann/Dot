@@ -51,7 +51,8 @@ dictation model (your microphone, another look), a look waits for one to end, up
   probe, and yt-dlp runs as before.
   yt-dlp then connects by itself: the addresses its extractor takes out of the page (the media's own) are the site's to
   choose and are not seen here.
-- ffprobe, ffmpeg and yt-dlp start in the run's sandbox outside `yolo`, as a shell command does. ffmpeg opens video
+- ffprobe, ffmpeg and yt-dlp start in the run's sandbox as a shell command does: outside `yolo`, and in every mode
+  for a run nobody started (item 2016). ffmpeg opens video
   and sound files only (MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, MP3, WAV and the like) and reaches no address: a
   playlist or a concat list that names other files, whatever it is called, is refused.
 - A video is anyone's: the title and the transcript come inside a `<web_content>` fence, and a look marks the run

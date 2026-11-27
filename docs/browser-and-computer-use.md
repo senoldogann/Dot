@@ -764,7 +764,7 @@ A bundle that is not on the sealed system volume (`/System`, and not the data vo
 made, which runs outside Dot's sandbox: it asks first, as a step outside the sandbox (item 418), whether it is named by
 its path or by a name or a bundle id Launch Services resolves to one. The bundle is resolved again as the call starts and
 one that leads elsewhere by then is refused, as a path a file tool names is (item 181), so a link moved while the call
-waited for its approval opens nothing. Outside yolo a run's command opens nothing (`open` is refused in the sandbox), so
+waited for its approval opens nothing. Outside yolo, and in every mode for a run nobody started (item 2016), a run's command opens nothing (`open` is refused in the sandbox), so
 this tool is how a run's command starts an application; an AppleScript can still start one itself (see
 [Safety](safety.md#safety)).
 A name that fits several running copies of one application, "Google Chrome" while your Chrome and Dot's own both run
@@ -787,7 +787,8 @@ every mode but `yolo` (item 433).
   ref to read one of them with `ref` (Mail's window: 692 characters instead of 10,115). `desktop_read` reads one
   element's full text. `desktop_clipboard_read` reads the text on the clipboard, which can hold a password you just copied from your password manager, so it asks in every
   preset, as `pbpaste` and an AppleScript that names the clipboard do (item 534); and outside a yolo run the sandbox, where
-  it is on, closes the clipboard to a run's commands as well; a yolo run asks nothing (item 443).
+  it is on, closes the clipboard to a run's commands as well, and in every mode for a run nobody started (item 2016); a
+  yolo run asks nothing (item 443).
 - `desktop_act` runs up to `max_batch_steps` steps in one call (25 by default; a longer batch is cut the same way):
   `click`, `double_click`, `right_click`, `hover`, `press`,
   `focus`, `set_value`, `type`, `paste`, `key`, `scroll`, `drag`, `menu`, `wait` and `activate`. A step names an element

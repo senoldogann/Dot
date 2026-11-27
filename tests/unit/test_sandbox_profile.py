@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -27,6 +28,7 @@ from dotagent.policy.sandbox import (
     hard_linked,
     sandbox_profile,
 )
+from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import _dot_paths, _own_code
 
 
@@ -207,7 +209,7 @@ async def test_the_switch_starts_processes_without_the_sandbox_while_off_and_wit
     built: Sandbox = build_sandbox(
         (tmp_path / "token",), (tmp_path / "token",), (tmp_path / "skills",), tmp_path / "LaunchAgents"
     )
-    switched: SwitchedSandbox = SwitchedSandbox(built, False)
+    switched: SwitchedSandbox = SwitchedSandbox(built, False, True)
     assert (switched.on, switched.current()) == (False, UNSANDBOXED)
     await switched.switch(True)
     assert (switched.on, switched.current()) == (True, built)
@@ -215,10 +217,32 @@ async def test_the_switch_starts_processes_without_the_sandbox_while_off_and_wit
     assert (switched.on, switched.current()) == (False, UNSANDBOXED)
 
 
+def test_a_run_nobody_started_keeps_the_sandbox_in_every_mode_while_its_setting_holds(tmp_path: Path) -> None:
+    """Item 2016: a run nobody started starts its processes in the sandbox in yolo and with the owner's switch off,
+    and what nobody watches (a schedule's or a watcher's check) does too; ``[shell] sandbox_unattended = false`` has
+    them follow the switch and yolo as the owner's runs do."""
+    built: Sandbox = build_sandbox(
+        (tmp_path / "token",), (tmp_path / "token",), (tmp_path / "skills",), tmp_path / "LaunchAgents"
+    )
+    for on in (True, False):
+        kept: SwitchedSandbox = SwitchedSandbox(built, on, True)
+        for approvals in get_args(ApprovalMode):
+            assert kept.for_run(approvals, True) == built, (on, approvals)
+            assert kept.for_run(approvals, False) == (UNSANDBOXED if approvals == "yolo" or not on else built), (
+                on,
+                approvals,
+            )
+        assert kept.unattended() == built
+        followed: SwitchedSandbox = SwitchedSandbox(built, on, False)
+        for approvals in get_args(ApprovalMode):
+            assert followed.for_run(approvals, True) == followed.for_run(approvals, False), (on, approvals)
+        assert followed.unattended() == followed.current()
+
+
 async def test_a_sandbox_whose_program_does_not_start_is_never_switched_on(tmp_path: Path) -> None:
     missing: str = str(tmp_path / "no-sandbox-exec")
     broken: Sandbox = Sandbox(commands=(missing, "-p", "(version 1)"), search=(missing, "-p", "(version 1)"))
-    switched: SwitchedSandbox = SwitchedSandbox(broken, False)
+    switched: SwitchedSandbox = SwitchedSandbox(broken, False, False)
     with pytest.raises(ConfigError, match="cannot start") as refused:
         await switched.switch(True)
     assert refused.value.context["program"] == missing
