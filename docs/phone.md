@@ -107,6 +107,10 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
+   Work (Work orders, Objectives and Hand-offs, each to read: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
+   and writes none, so the phone only reads, and scopes them to the bot itself: an agent's page has the orders given to it,
+   the objectives those serve and the messages to or from it; Dot's own has every order and objective and the messages it sent
+   or was sent, not those between two other agents; all within the newest 60 orders and 60 objectives the daemon sends), a ⋯ menu with Pause bot and Resume bot for an agent (`POST /api/agents/{id}/pause|resume`, item 465), then
    Routines, Model, Activity, and a Notifications switch that is the phone's own count of its unread chats and what waits
    on the owner on the home: the Mac has no push setting per bot), and one settings sheet from an avatar button; a bot's unread mark counts the
    chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push
@@ -356,7 +360,7 @@ Over the composer there is one row and nothing stacked (item 1383, which ended t
 on the subagents, the queue, the loops and the commands at work, five panes one upon the other at different widths): a
 capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
-never a layer over it. Its segments are the run's status with its Stop (**Working · 36 s**, **Waiting for you**,
+never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Reconnecting…**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
@@ -633,6 +637,18 @@ key, read from a file as it is sent and written to the Mac's disk as it arrives,
 goes as base64 in JSON (`POST /api/attachments`), up to 20 MiB. Only a video over 200 MiB (about 15 minutes) gets
 **Trim video** on its chip, to choose a shorter part. Files show their name, type and size. Up to 10 attachments go
 with a message.
+
+In the composer a photo or a video stands as a tile: the picture (a video's first frame), its length at the foot, a play
+glyph over a video and a × at the corner; while a video is re-encoded its tile is already there with a ring that fills
+(item 1992). In the chat the owner's message shows what it carried above its words: a photo as its picture, a video as a
+tile with its length that plays full screen on a tap, a sound or any other file as a chip with its name and size. The
+files come from the run's `attachments` event (the first message) and the `steer` event (a message sent into a run),
+and a video is played from `GET /api/attachments/{id}/media`, which serves it in ranges so that it starts at once and
+can be moved through. The chat of a run older than the newest the phone holds shows no tiles until it is opened. The
+web page shows the same tiles in its box and over a sent message ([Runs](runs.md#tools)). The model button in the
+composer wears the provider's mark; a DeepSeek, Kimi, GLM, Qwen or MiniMax model that a gateway
+(OpenCode Go, OpenRouter, Ollama) hosts wears a neutral symbol instead of the gateway's, which for OpenCode Go is a
+plain block.
 
 After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
 The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer

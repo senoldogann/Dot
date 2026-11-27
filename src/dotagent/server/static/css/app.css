@@ -5560,6 +5560,43 @@ dialog.modal.versions-dialog {
   display: none;
 }
 
+/* A message on its way (item 1999, as DotNext says it, items 1919 and 1927): under the bubble a quiet "Pending" at its
+   right edge, the one place it shows, and under the message the agent's typing dots and "Starting…", shimmering as the
+   line of the work does, until the page of the run it starts is open. */
+.pending-place:empty {
+  display: none;
+}
+
+.pending-send {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pending-note {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.starting-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.starting-line > .typing-dots {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 28px;
+  height: 28px;
+}
+
 .message-time {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -10565,6 +10602,93 @@ button.attach-chip {
 .attach-chip.picture .attach-open .icon {
   width: 20px;
   height: 20px;
+}
+
+/* A video's tile (item 1992), in the box and over a sent message, the same on the phone's DotNext: its first frame, a play
+   glyph over it, its length at the foot and, while it goes up, a ring that fills. */
+.attach-chip.picture .attach-open,
+.sent-picture {
+  position: relative;
+}
+
+.media-play,
+.media-ring {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.media-play {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--media-shade);
+  color: var(--on-media);
+}
+
+.media-play .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.attach-chip.uploading .media-play {
+  display: none;
+}
+
+.media-ring {
+  width: 22px;
+  height: 22px;
+  background: conic-gradient(var(--on-media) calc(var(--progress, 0) * 360deg), var(--media-track) 0);
+  box-shadow: 0 0 0 6px var(--media-shade);
+  mask: radial-gradient(circle, transparent 6px, var(--media-stage) 7px);
+}
+
+.media-length {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--media-shade);
+  color: var(--on-media);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* The video played full screen over the page, closed by its ×, Escape or a click outside it. */
+.player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: var(--media-stage);
+}
+
+.player-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.player-status {
+  position: absolute;
+  color: var(--on-media);
+}
+
+.player-close {
+  position: absolute;
+  top: max(var(--space-2), env(safe-area-inset-top));
+  left: var(--space-2);
+  z-index: 1;
+  border-radius: 50%;
+  background: var(--media-shade);
+  color: var(--on-media);
 }
 
 .attach-chip.uploading {

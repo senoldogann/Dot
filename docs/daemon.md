@@ -794,7 +794,7 @@ danger colour with a square) and cancels it; a word typed turns it back into the
 send does (item 1320): while the run works a message waits in the chat's queue, **After this
 task**, where its **Steer** sends it into the run at once (see [How a run works](runs.md#how-a-run-works)), unless
 Settings › General › Messages has it steer the run now, **Add to task**; the send, its tooltip, its name to a screen
-reader and the box's placeholder say which. The run's choices (its model, reasoning and options) shown from the
+reader and the box's placeholder say which. A message that starts the chat's next run (the run before it ended) is in the chat the moment it is sent (item 1999, as the iPhone app does it): its words leave the box, its bubble stands under the conversation with a quiet **Pending** at its right edge, and under it the agent's typing dots say **Starting…** until the page of the new run is open; a send Dot refuses takes the bubble away and gives the words back to the box. The run's choices (its model, reasoning and options) shown from the
 button beside the "+" stand at the right, by the microphone and the send, on every page. Where one way alone is open (a held run, a campaign's
 session, a run a Terminal command drives) the send names that way. A message queued waits above the box: a sheet whose head (Queued
 and the count) folds it, with a row per message: an up and a down arrow that move it a place (32 px with a pointer, 44 px on a phone,
@@ -817,7 +817,7 @@ part closes it. It does not say what the run does now, which the conversation sh
 the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for subagents, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
-divided by hairlines and each at least 44 px tall: the run's status (**Working · 36 s**, **Waiting for you**,
+divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Reconnecting…**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
@@ -1578,6 +1578,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `PUT /attachments/stream?name=…&media_type=…` (the file as the raw body)         | the same for a video, a sound or a large file (item 1933): the body is written to disk in chunks as it arrives, never held whole in memory, up to 200 MiB for a video or a sound and 20 MiB for any other file (422 past it); a body that is cut or refused leaves no file. Answers as `POST /attachments` does |
 | `GET /attachments/{id}/image`                                                  | the picture of an image kept for a message (item 376), for its small chip in the box that edits a queued message |
+| `GET /attachments/{id}/media`                                                  | a video or a sound kept for a message, served in ranges (`Range` → 206) as the type its name says, for the phone's chat to play it (item 1992); 422 for any other kind of file |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first, each with the face it wears (`actor_id`), the team it is with (`team`, item 610), its last line (`last_message`, `last_role`) and its loop (`loop_cron`, `loop_next_at`, item 580); delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |
 | `GET /threads/{id}/helpers?limit=N`                                            | the runs a chat's runs delegated, newest first (the side panel's Agents tab; 404 for no chat) |

@@ -123,6 +123,31 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
   );
 }
 
+/**
+ * A message just sent that Dot has not taken yet (item 1999, DotNext's items 1919 and 1927): the bubble at once, as it
+ * will stand, a quiet "Pending" at its right edge, and under it the agent's typing dots and "Starting…", so the chat
+ * moves the moment the send is pressed rather than when the run's first event comes. The page Dot's answer opens draws
+ * the message itself; a send that fails takes this away and gives the words back to the box.
+ */
+export function pendingMessage(text) {
+  return el(
+    "div",
+    { class: "pending-send", dataset: { pending: "" } },
+    el(
+      "div",
+      { class: "user-message fresh" },
+      el("div", { class: "bubble user" }, prose(text)),
+      el("div", { class: "pending-note" }, t("messages.pending")),
+    ),
+    el(
+      "div",
+      { class: "starting-line", role: "status" },
+      el("span", { class: "typing-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
+      el("span", { class: "work-status-words" }, t("messages.starting")),
+    ),
+  );
+}
+
 /** When a schedule a run made runs, in words: its rhythm from the cron ("on Mondays at 09:00"), a one-time one's time
  * from `run_at` ("today at 18:53"); an event written before item 1178 has no `run_at` and keeps the daemon's own words
  * (`when`). */

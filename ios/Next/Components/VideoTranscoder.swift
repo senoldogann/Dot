@@ -35,7 +35,8 @@ enum VideoTranscodeError: Error, Equatable {
 /// Re-encodes a movie with ``VideoTarget``. Frames above 30 a second are left out, the sound is kept as AAC, and the
 /// rotation the phone recorded the movie with stays a flag of the file, not baked into the picture.
 enum VideoTranscoder {
-    static func export(from source: URL, to destination: URL) async throws {
+    /// ``progress`` is told how far the picture has got, 0 to 1, as it goes (from any thread).
+    static func export(from source: URL, to destination: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
         let asset: AVURLAsset = AVURLAsset(url: source)
         guard let track: AVAssetTrack = try await asset.loadTracks(withMediaType: .video).first else {
             throw VideoTranscodeError.noVideo
@@ -43,9 +44,10 @@ enum VideoTranscoder {
         let natural: CGSize = try await track.load(.naturalSize)
         let transform: CGAffineTransform = try await track.load(.preferredTransform)
         let audio: AVAssetTrack? = try await asset.loadTracks(withMediaType: .audio).first
+        let length: Double = try await asset.load(.duration).seconds
         let job: TranscodeJob = try TranscodeJob(
             asset: asset, video: track, audio: audio, size: VideoTarget.size(of: natural), transform: transform,
-            destination: destination)
+            destination: destination, length: length, progress: progress)
         try await withTaskCancellationHandler {
             try await job.run()
         } onCancel: {
@@ -64,13 +66,17 @@ private final class TranscodeJob: @unchecked Sendable {
     private let audioPair: (out: AVAssetReaderTrackOutput, input: AVAssetWriterInput)?
     private let queue: DispatchQueue = DispatchQueue(label: "dev.dotagent.phone.next.transcode")
     private let destination: URL
+    private let length: Double
+    private let progress: @Sendable (Double) -> Void
     private var nextVideoTime: CMTime = .zero
     private var finished: Bool = false
     /// What ``run()`` waits on, resumed once: by the export's end, its failure or its cancellation.
     private var waiting: CheckedContinuation<Void, any Error>?
 
-    init(asset: AVURLAsset, video: AVAssetTrack, audio: AVAssetTrack?, size: (width: Int, height: Int), transform: CGAffineTransform, destination: URL) throws {
+    init(asset: AVURLAsset, video: AVAssetTrack, audio: AVAssetTrack?, size: (width: Int, height: Int), transform: CGAffineTransform, destination: URL, length: Double, progress: @escaping @Sendable (Double) -> Void) throws {
         self.destination = destination
+        self.length = length
+        self.progress = progress
         try? FileManager.default.removeItem(at: destination)
         do { reader = try AVAssetReader(asset: asset) } catch { throw VideoTranscodeError.cannotRead(error.localizedDescription) }
         do { writer = try AVAssetWriter(outputURL: destination, fileType: .mp4) } catch { throw VideoTranscodeError.cannotWrite(error.localizedDescription) }
@@ -186,6 +192,9 @@ private final class TranscodeJob: @unchecked Sendable {
                 pending.close(input)
                 if pending.allClosed { complete(done) }
                 return
+            }
+            if dropsFrames, length > 0 {
+                progress(min(1, max(0, CMSampleBufferGetPresentationTimeStamp(sample).seconds / length)))
             }
             if dropsFrames {
                 // A 60 fps recording spends half the bitrate on frames nobody reads: keep one in 30 a second.

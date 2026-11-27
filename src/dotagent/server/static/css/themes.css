@@ -140,6 +140,12 @@
   --file-kind: light-dark(#3a6fc4, #7fabf0);
   --on-file-kind: light-dark(#ffffff, #0f2036);
   --scrim: light-dark(rgb(28 28 28 / 40%), rgb(0 0 0 / 55%));
+  /* A video's tile and its player (item 1992): white marks on a dark shade over the picture, whatever the look, as the
+     phone's tile draws them. */
+  --media-shade: rgb(0 0 0 / 50%);
+  --on-media: #ffffff;
+  --media-track: rgb(255 255 255 / 30%);
+  --media-stage: #000000;
   /* Shadows: a trace of ink in light, none in dark but under what floats over a scrim. */
   --shadow-ink: light-dark(rgb(28 28 28 / 5%), transparent);
   --shadow-ink-soft: light-dark(rgb(28 28 28 / 10%), rgb(0 0 0 / 30%));

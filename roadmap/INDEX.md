@@ -6,8 +6,13 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2000](2000.md) | done | 2026-11-27 | The capsule's clock says whole seconds, as DotNext's pill does |
+| [1999](1999.md) | done | 2026-11-27 | A message sent in a chat is in it at once, with a quiet "Pending" and "Starting…", as DotNext does it |
+| [1998](1998.md) | in progress | 2026-11-27 | The web chat takes DotNext's decisions: what it already has, what differs, what is missing |
 | [1997](1997.md) | done | 2026-11-27 | The pre-push hook measures the first step's budget when the prompt surface changes |
 | [1996](1996.md) | done | 2026-11-27 | DotNext: Show steps off hides every step, an answer the finish says again stands once, the live caption speaks as the work log, no Plan in This chat |
+| [1995](1995.md) | in progress | 2026-11-27 | A bot's work on the phone: its work orders, objectives and hand-offs to read, and Pause and Resume in its profile's menu |
+| [1992](1992.md) | done | 2026-11-27 | DotNext shows the photos, videos and files of a message: tiles in the composer and in the chat, a player on a tap |
 | [1990](1990.md) | done | 2026-11-27 | A terminal session whose program ended leaves room for another |
 | [1988](1988.md) | done | 2026-11-27 | A search pattern ripgrep cannot read is told as the call's own error, with the syntax it reads |
 | [1986](1986.md) | done | 2026-11-27 | A code review whose chat was deleted starts in a new chat instead of failing |
