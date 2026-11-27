@@ -1,6 +1,8 @@
 // The first steps of a Dot that started with an empty store (item 811), as words and counts, with no page: which steps
 // there are, where each is done, how many are, and whether the home shows them.
 
+import { t } from "./i18n.js";
+
 /** Where the card is put away for good. */
 export const FIRST_STEPS_KEY = "dot.firstSteps";
 export const HIDDEN = "hidden";
@@ -11,12 +13,12 @@ export const HIDDEN = "hidden";
  * @type {readonly { id: string, title: string, where: string, href: string | null }[]}
  */
 export const STEPS = [
-  { id: "name", title: "Tell Dot your name", where: "Settings › General", href: "#/settings/general" },
-  { id: "passwords", title: "Bring your passwords", where: "Settings › Vault: Import from CSV", href: "#/settings/vault" },
-  { id: "imessage", title: "Reach Dot from iMessage", where: "Settings › Channels", href: "#/settings/channels" },
-  { id: "phone", title: "Pair your phone", where: "Settings › Phone", href: "#/settings/phone" },
-  { id: "apps", title: "Connect your apps", where: "Settings › Connectors", href: "#/settings/connectors" },
-  { id: "chat", title: "Introduce yourself", where: "Write to Dot: who you are and what you work on", href: null },
+  { id: "name", title: t("firststepslist.tellDotYourName"), where: t("firststepslist.settingsGeneral"), href: "#/settings/general" },
+  { id: "passwords", title: t("firststepslist.bringYourPasswords"), where: t("firststepslist.settingsVaultImportFromCsv"), href: "#/settings/vault" },
+  { id: "imessage", title: t("firststepslist.reachDotFromImessage"), where: t("firststepslist.settingsChannels"), href: "#/settings/channels" },
+  { id: "phone", title: t("firststepslist.pairYourPhone"), where: t("firststepslist.settingsPhone"), href: "#/settings/phone" },
+  { id: "apps", title: t("firststepslist.connectYourApps"), where: t("firststepslist.settingsConnectors"), href: "#/settings/connectors" },
+  { id: "chat", title: t("firststepslist.introduceYourself"), where: t("firststepslist.writeToDotWhoYou"), href: null },
 ];
 
 /**

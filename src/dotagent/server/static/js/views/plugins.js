@@ -18,20 +18,21 @@
 
 import { api } from "../api.js";
 import { customizeHead } from "../customizehead.js";
-import { compact, el, foldSearch, joined, plural } from "../dom.js";
+import { compact, el, foldSearch, joined, } from "../dom.js";
 import { icon } from "../icons.js";
 import { markContent } from "../marks.js";
 import { aboutToggle, emptyPanel, errorPanel, loadingPanel, segmented } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
+import { t, tCount } from "../i18n.js";
 
 /** The kinds of the gallery's plugins, in their words. */
 const CATEGORIES = {
-  development: { label: "Development" },
-  design: { label: "Design" },
-  product: { label: "Product" },
-  data: { label: "Data" },
-  business: { label: "Business" },
-  writing: { label: "Writing" },
+  development: { label: t("views.plugins.development") },
+  design: { label: t("views.plugins.design") },
+  product: { label: t("views.plugins.product") },
+  data: { label: t("views.plugins.data") },
+  business: { label: t("views.plugins.business") },
+  writing: { label: t("views.plugins.writing") },
 };
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -49,9 +50,9 @@ function isInstalled(plugin) {
 
 /** The words of a proposal's risk, as a badge of its colour. */
 const RISKS = {
-  low: { label: "Low risk", tone: "b-ok" },
-  medium: { label: "Medium risk", tone: "b-warn" },
-  high: { label: "High risk", tone: "b-bad" },
+  low: { label: t("views.plugins.lowRisk"), tone: "b-ok" },
+  medium: { label: t("views.plugins.mediumRisk"), tone: "b-warn" },
+  high: { label: t("views.plugins.highRisk"), tone: "b-bad" },
 };
 const TIME = new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -59,7 +60,7 @@ const TIME = new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit
 function verified(plugin) {
   return el(
     "span",
-    { class: "gallery-verified", title: `From ${plugin.publisher}, who make what its skills are about`, role: "img", "aria-label": "From its maker" },
+    { class: "gallery-verified", title: t("views.plugins.fromPublisherWhoMakeWhat", { publisher: plugin.publisher }), role: "img", "aria-label": t("views.plugins.fromItsMaker") },
     icon("badgeCheck"),
   );
 }
@@ -83,21 +84,21 @@ export function mount(root, ctx) {
   let scoutTimer = null;
   const holder = el("div", { class: "stack" }, loadingPanel());
 
-  const search = el("input", { class: "input customize-search", type: "search", placeholder: "Search plugins and skills", "aria-label": "Search plugins", autocomplete: "off", spellcheck: "false" });
+  const search = el("input", { class: "input customize-search", type: "search", placeholder: t("views.plugins.searchPluginsAndSkills"), "aria-label": t("views.plugins.searchPlugins"), autocomplete: "off", spellcheck: "false" });
   search.addEventListener("input", () => {
     words = foldSearch(search.value);
     paint();
   });
   const head = customizeHead({
-    line: "Skills from the makers of the apps you use and from the community, each one checked by Dot before it is used. Install one and the tasks that start after can use it.",
+    line: t("views.plugins.skillsFromTheMakersOf"),
     search,
     controls: [],
   });
   const filters = segmented(
     [
-      { id: "all", label: "All", hint: "Every plugin of the gallery" },
-      { id: "featured", label: "Featured", hint: "The plugins the gallery features" },
-      { id: "installed", label: "Installed", hint: "The plugins Dot has installed, and the others it reads" },
+      { id: "all", label: t("views.plugins.all"), hint: t("views.plugins.everyPluginOfTheGallery") },
+      { id: "featured", label: t("views.plugins.featured"), hint: t("views.plugins.thePluginsTheGalleryFeatures") },
+      { id: "installed", label: t("views.plugins.installed"), hint: t("views.plugins.thePluginsDotHasInstalled") },
     ],
     shown,
     (id) => {
@@ -105,11 +106,11 @@ export function mount(root, ctx) {
       paint();
     },
   );
-  filters.element.setAttribute("aria-label", "Plugins to show");
+  filters.element.setAttribute("aria-label", t("views.plugins.pluginsToShow"));
   const orders = segmented(
     [
-      { id: "popular", label: "Popular", hint: "The most liked on GitHub first" },
-      { id: "newest", label: "Newest", hint: "The plugins added to the gallery most recently first" },
+      { id: "popular", label: t("views.plugins.popular"), hint: t("views.plugins.theMostLikedOnGithub") },
+      { id: "newest", label: t("views.plugins.newest"), hint: t("views.plugins.thePluginsAddedToThe") },
     ],
     order,
     (id) => {
@@ -117,26 +118,26 @@ export function mount(root, ctx) {
       paint();
     },
   );
-  orders.element.setAttribute("aria-label", "Order");
+  orders.element.setAttribute("aria-label", t("views.plugins.order"));
   const featuredGrid = el("div", { class: "gallery-featured" });
-  const featured = el("section", { class: "gallery-section", dataset: { section: "noteworthy" } }, el("h2", { class: "section-label gallery-section-title" }, "New & noteworthy"), featuredGrid);
+  const featured = el("section", { class: "gallery-section", dataset: { section: "noteworthy" } }, el("h2", { class: "section-label gallery-section-title" }, t("views.plugins.newNoteworthy")), featuredGrid);
   const allGrid = el("div", { class: "gallery-grid" });
   const all = el(
     "section",
     { class: "gallery-section", dataset: { section: "all" } },
-    el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, "All plugins"), el("div", { class: "gallery-controls" }, filters.element, orders.element)),
+    el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, t("views.plugins.allPlugins")), el("div", { class: "gallery-controls" }, filters.element, orders.element)),
     allGrid,
   );
   const scoutGrid = el("div", { class: "scout-grid" });
   // What the nightly look does and found stands behind the (i) beside the part's name (item 848).
-  const scoutAbout = aboutToggle("", "About the proposals", "hint scout-line");
+  const scoutAbout = aboutToggle("", t("views.plugins.aboutTheProposals"), "hint scout-line");
   const scoutLine = scoutAbout.note;
-  const lookButton = el("button", { class: "btn sm scout-look", type: "button" }, icon("refresh"), "Look now");
+  const lookButton = el("button", { class: "btn sm scout-look", type: "button" }, icon("refresh"), t("views.plugins.lookNow"));
   lookButton.addEventListener("click", () => attempt(lookNow));
   const scoutSection = el(
     "section",
     { class: "gallery-section scout-section", dataset: { section: "proposals" }, hidden: true },
-    el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, "Proposed for you"), scoutAbout.button, lookButton),
+    el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, t("views.plugins.proposedForYou")), scoutAbout.button, lookButton),
     scoutLine,
     scoutGrid,
   );
@@ -156,7 +157,7 @@ export function mount(root, ctx) {
       busy.delete(plugin.id);
       paint();
     }
-    toast("ok", `${plugin.name} is installed: the tasks that start now are offered its ${plural(plugin.skills.length, "skill", "skills")}.`);
+    toast("ok", t("views.plugins.nameIsInstalledTheTasks", { name: plugin.name, part: tCount(plugin.skills.length, "views.plugins.countSkill", "views.plugins.countSkills") }));
   }
 
   /** Ask the scout for its proposals, and again every few seconds while a night runs. */
@@ -204,8 +205,8 @@ export function mount(root, ctx) {
     toast(
       "ok",
       proposal.kind === "update"
-        ? `${proposal.name} is updated; Revert on its card puts the earlier version back.`
-        : `${proposal.name} is installed: the tasks that start now are offered its ${plural(proposal.skills.length, "skill", "skills")}.`,
+        ? t("views.plugins.nameIsUpdatedRevertOn", { name: proposal.name })
+        : t("views.plugins.nameIsInstalledTheTasks", { name: proposal.name, part: tCount(proposal.skills.length, "views.plugins.countSkill", "views.plugins.countSkills") }),
     );
   }
 
@@ -224,9 +225,9 @@ export function mount(root, ctx) {
   /** Put back the version an update replaced (item 712). */
   async function revert(plugin) {
     const sure = await confirmDialog({
-      title: `Put back the earlier version of ${plugin.name}?`,
-      message: "The updated version goes to the Trash, and the tasks that start after read the earlier one again.",
-      confirmLabel: "Revert",
+      title: t("views.plugins.putBackTheEarlierVersion", { name: plugin.name }),
+      message: t("views.plugins.theUpdatedVersionGoesTo"),
+      confirmLabel: t("views.plugins.revert"),
       focusCancel: true,
     });
     if (!sure) {
@@ -243,7 +244,7 @@ export function mount(root, ctx) {
       busy.delete(plugin.id);
       paint();
     }
-    toast("ok", `${plugin.name} is back at its earlier version.`);
+    toast("ok", t("views.plugins.nameIsBackAtIts", { name: plugin.name }));
   }
 
   /** A proposal's card: its mark and name, whether it is new or an update and where it comes from, its risk, what it
@@ -252,14 +253,14 @@ export function mount(root, ctx) {
   function proposalCard(proposal) {
     const key = `scout:${proposal.kind}:${proposal.id}`;
     const working = busy.has(key);
-    const risk = RISKS[proposal.risk] ?? { label: "Not reviewed", tone: "b-muted" };
+    const risk = RISKS[proposal.risk] ?? { label: t("views.plugins.notReviewed"), tone: "b-muted" };
     const takeButton = el(
       "button",
-      { class: "btn sm primary scout-take", type: "button", disabled: working, "aria-label": `${proposal.kind === "update" ? "Update" : "Install"} ${proposal.name}` },
-      working ? [el("span", { class: "spinner", "aria-hidden": "true" }), proposal.kind === "update" ? "Updating…" : "Installing…"] : [icon("download"), proposal.kind === "update" ? "Update" : "Install"],
+      { class: "btn sm primary scout-take", type: "button", disabled: working, "aria-label": `${proposal.kind === "update" ? t("views.plugins.update") : t("views.plugins.install")} ${proposal.name}` },
+      working ? [el("span", { class: "spinner", "aria-hidden": "true" }), proposal.kind === "update" ? t("views.plugins.updating") : t("views.plugins.installing")] : [icon("download"), proposal.kind === "update" ? t("views.plugins.update") : t("views.plugins.install")],
     );
     takeButton.addEventListener("click", () => attempt(() => take(proposal)));
-    const skipButton = el("button", { class: "btn sm ghost scout-skip", type: "button", disabled: working, "aria-label": `Skip ${proposal.name}` }, "Skip");
+    const skipButton = el("button", { class: "btn sm ghost scout-skip", type: "button", disabled: working, "aria-label": t("views.plugins.skipName", { name: proposal.name }) }, t("views.plugins.skip"));
     skipButton.addEventListener("click", () => attempt(() => skip(proposal)));
     const findings = proposal.findings.map((finding) =>
       el("li", { dataset: { severity: finding.severity } }, el("span", { class: `badge ${finding.severity === "high" ? "b-bad" : finding.severity === "medium" ? "b-warn" : "b-muted"}` }, finding.rule), " ", el("span", { class: "mono" }, finding.path), ": ", finding.detail),
@@ -267,26 +268,26 @@ export function mount(root, ctx) {
     const details = el(
       "details",
       { class: "scout-details" },
-      el("summary", null, "Details"),
+      el("summary", null, t("views.plugins.details")),
       // Why its risk is what it is and what its skills need (item 949) open the card's details (item 1136): the card
       // says what it does, its risk and the one action.
       proposal.why ? el("p", { class: "hint scout-why" }, proposal.why) : null,
       // What its skills need that it does not bring: installed alone, they would only describe it.
-      proposal.needs ? el("p", { class: "hint scout-needs" }, `Needs: ${proposal.needs}`) : null,
+      proposal.needs ? el("p", { class: "hint scout-needs" }, t("views.plugins.needsNeeds", { needs: proposal.needs })) : null,
       el("dl", { class: "gallery-facts" }, [
-        el("dt", null, "Fits your work"),
-        el("dd", { class: "scout-fit", title: "How close its skills are to the tasks you gave Dot lately" }, `${Math.round(proposal.fit * 100)}%`),
-        el("dt", null, "Source"),
-        el("dd", null, el("a", { href: proposal.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${proposal.repository}`, icon("external")), ` · ${proposal.source}`),
-        el("dt", null, "Version checked"),
-        el("dd", null, el("span", { class: "mono" }, proposal.commit.slice(0, 7)), proposal.previous ? ` (installed: ${proposal.previous.slice(0, 7)})` : ""),
-        el("dt", null, "Licence"),
-        el("dd", null, `${proposal.licence} · ${compact(proposal.stars)} stars on GitHub`),
-        el("dt", null, "Skills"),
+        el("dt", null, t("views.plugins.fitsYourWork")),
+        el("dd", { class: "scout-fit", title: t("views.plugins.howCloseItsSkillsAre") }, `${Math.round(proposal.fit * 100)}%`),
+        el("dt", null, t("views.plugins.source")),
+        el("dd", null, el("a", { href: proposal.homepage, target: "_blank", rel: "noopener noreferrer" }, t("views.plugins.githubComRepository", { repository: proposal.repository }), icon("external")), ` · ${proposal.source}`),
+        el("dt", null, t("views.plugins.versionChecked")),
+        el("dd", null, el("span", { class: "mono" }, proposal.commit.slice(0, 7)), proposal.previous ? t("views.plugins.installedSlice", { slice: proposal.previous.slice(0, 7) }) : ""),
+        el("dt", null, t("views.plugins.licence")),
+        el("dd", null, t("views.plugins.licenceCompactStarsOnGithub", { licence: proposal.licence, compact: compact(proposal.stars) })),
+        el("dt", null, t("views.plugins.skills")),
         el("dd", null, el("span", { class: "mono" }, proposal.skills.join(", "))),
-        ...(proposal.changed.length > 0 ? [el("dt", null, "Changed"), el("dd", null, el("span", { class: "mono" }, proposal.changed.join(", ")))] : []),
+        ...(proposal.changed.length > 0 ? [el("dt", null, t("views.plugins.changed")), el("dd", null, el("span", { class: "mono" }, proposal.changed.join(", ")))] : []),
       ]),
-      findings.length > 0 ? el("ul", { class: "scout-findings" }, findings) : el("p", { class: "hint" }, "The scan found nothing to point out."),
+      findings.length > 0 ? el("ul", { class: "scout-findings" }, findings) : el("p", { class: "hint" }, t("views.plugins.theScanFoundNothingTo")),
     );
     return el(
       "article",
@@ -299,7 +300,7 @@ export function mount(root, ctx) {
         el(
           "div",
           { class: "gallery-card-by" },
-          ...joined([proposal.kind === "update" ? "Update" : "New", proposal.publisher, proposal.tier === "a" ? "Anthropic or its maker" : "Community", plural(proposal.skills.length, "skill", "skills")]),
+          ...joined([proposal.kind === "update" ? t("views.plugins.update") : t("views.plugins.new"), proposal.publisher, proposal.tier === "a" ? t("views.plugins.anthropicOrItsMaker") : t("views.plugins.community"), tCount(proposal.skills.length, "views.plugins.countSkill", "views.plugins.countSkills")]),
         ),
         el(
           "div",
@@ -319,24 +320,24 @@ export function mount(root, ctx) {
     }
     scoutSection.hidden = words !== "";
     lookButton.disabled = scout.running;
-    lookButton.replaceChildren(...(scout.running ? [el("span", { class: "spinner", "aria-hidden": "true" }), "Looking…"] : [icon("refresh"), "Look now"]));
-    const when = scout.last_run === null ? "Dot has not looked yet." : `Last looked ${TIME.format(new Date(scout.last_run * 1000))}: ${scout.last_summary}.`;
-    const nightly = scout.time === "off" ? "The nightly look is off in the settings." : `Dot looks every night at ${scout.time} for plugins worth having and for updates, checks each and waits for your word.`;
+    lookButton.replaceChildren(...(scout.running ? [el("span", { class: "spinner", "aria-hidden": "true" }), t("views.plugins.looking")] : [icon("refresh"), t("views.plugins.lookNow")]));
+    const when = scout.last_run === null ? t("views.plugins.dotHasNotLookedYet") : t("views.plugins.lastLookedFormatLastSummary", { format: TIME.format(new Date(scout.last_run * 1000)), last_summary: scout.last_summary });
+    const nightly = scout.time === "off" ? t("views.plugins.theNightlyLookIsOff") : t("views.plugins.dotLooksEveryNightAt", { time: scout.time });
     scoutLine.textContent = `${nightly} ${when}`;
     const parts = scout.proposals.map(proposalCard);
     if (parts.length === 0) {
-      parts.push(emptyPanel("sparkles", "Nothing waiting", "What the next look finds, and passes Dot's checks, comes here for you to install or skip."));
+      parts.push(emptyPanel("sparkles", t("views.plugins.nothingWaiting"), t("views.plugins.whatTheNextLookFinds")));
     }
     if (scout.refused.length > 0) {
       parts.push(
         el(
           "details",
           { class: "scout-refused" },
-          el("summary", null, `${plural(scout.refused.length, "plugin", "plugins")} refused by Dot's review`),
+          el("summary", null, t("views.plugins.partRefusedByDotS", { part: tCount(scout.refused.length, "views.plugins.countPlugin", "views.plugins.countPlugins") })),
           el(
             "ul",
             null,
-            scout.refused.map((one) => el("li", null, el("strong", null, one.name), ` (github.com/${one.repository}): `, one.why)),
+            scout.refused.map((one) => el("li", null, el("strong", null, one.name), t("views.plugins.githubComRepository2", { repository: one.repository }), one.why)),
           ),
         ),
       );
@@ -348,12 +349,12 @@ export function mount(root, ctx) {
    * the page names it, `servers` how many MCP servers it brings. */
   async function remove(name, title, servers) {
     const sure = await confirmDialog({
-      title: `Remove ${title} from Dot?`,
+      title: t("views.plugins.removeTitleFromDot", { title }),
       message:
         servers > 0
-          ? "Its connected apps stop now and its skills leave the tasks that start after. Its folder goes to the Trash, where you can put it back."
-          : "Its skills leave the tasks that start after. Its folder goes to the Trash, where you can put it back.",
-      confirmLabel: "Remove",
+          ? t("views.plugins.itsConnectedAppsStopNow")
+          : t("views.plugins.itsSkillsLeaveTheTasks"),
+      confirmLabel: t("views.plugins.remove"),
       focusCancel: true,
     });
     if (!sure) {
@@ -371,17 +372,17 @@ export function mount(root, ctx) {
       busy.delete(name);
       paint();
     }
-    toast("ok", `${title} went to the Trash.`);
+    toast("ok", t("views.plugins.titleWentToTheTrash", { title }));
   }
 
   /** What a card or a plugin's page offers: Install, or Installed with Remove, or that a plugin of Dot holds its name.
    * `wide` writes Remove out, as the plugin's page has room for. */
   function action(plugin, wide) {
     if (isInstalled(plugin)) {
-      const label = `Remove ${plugin.name}`;
+      const label = t("views.plugins.removeName", { name: plugin.name });
       const removing = busy.has(plugin.id);
       const button = wide
-        ? el("button", { class: "btn sm", type: "button", disabled: removing }, icon("trash"), "Remove")
+        ? el("button", { class: "btn sm", type: "button", disabled: removing }, icon("trash"), t("views.plugins.remove"))
         : el("button", { class: "btn sm ghost icon-only gallery-remove", type: "button", title: label, "aria-label": label, disabled: removing }, icon("trash"));
       button.addEventListener("click", () => attempt(() => remove(plugin.id, plugin.name, 0)));
       // The pin moved since: the runs read the skills of the commit installed, and Install is refused while they are.
@@ -390,17 +391,17 @@ export function mount(root, ctx) {
         plugin.state === "outdated"
           ? el(
               "span",
-              { class: "badge b-warn gallery-installed gallery-outdated", title: `Installed from ${plugin.installed_commit.slice(0, 7)}; the gallery now has ${plugin.commit.slice(0, 7)}. Remove it and Install it again to get the new one.` },
-              "Older version",
+              { class: "badge b-warn gallery-installed gallery-outdated", title: t("views.plugins.installedFromSliceTheGallery", { slice: plugin.installed_commit.slice(0, 7), slice2: plugin.commit.slice(0, 7) }) },
+              t("views.plugins.olderVersion"),
             )
           : plugin.state === "updated"
-            ? el("span", { class: "badge b-ok gallery-installed gallery-updated", title: `Updated to ${plugin.installed_commit.slice(0, 7)} from a proposal of Dot's.` }, icon("check"), "Updated")
-            : el("span", { class: "badge b-ok gallery-installed" }, icon("check"), "Installed");
+            ? el("span", { class: "badge b-ok gallery-installed gallery-updated", title: t("views.plugins.updatedToSliceFromA", { slice: plugin.installed_commit.slice(0, 7) }) }, icon("check"), t("views.plugins.updated"))
+            : el("span", { class: "badge b-ok gallery-installed" }, icon("check"), t("views.plugins.installed"));
       let revertButton = null;
       if (plugin.revertible) {
-        const revertLabel = `Put back the earlier version of ${plugin.name}`;
+        const revertLabel = t("views.plugins.putBackTheEarlierVersion2", { name: plugin.name });
         revertButton = wide
-          ? el("button", { class: "btn sm", type: "button", disabled: removing }, icon("undo"), "Revert")
+          ? el("button", { class: "btn sm", type: "button", disabled: removing }, icon("undo"), t("views.plugins.revert"))
           : el("button", { class: "btn sm ghost icon-only gallery-revert", type: "button", title: revertLabel, "aria-label": revertLabel, disabled: removing }, icon("undo"));
         revertButton.addEventListener("click", () => attempt(() => revert(plugin)));
       }
@@ -410,14 +411,14 @@ export function mount(root, ctx) {
       return el(
         "div",
         { class: "gallery-action" },
-        el("span", { class: "badge b-muted", title: `Dot has a plugin named ${plugin.id} already: Installed lists it.` }, "Name taken"),
+        el("span", { class: "badge b-muted", title: t("views.plugins.dotHasAPluginNamed", { id: plugin.id }) }, t("views.plugins.nameTaken")),
       );
     }
     const installing = busy.has(plugin.id);
     const button = el(
       "button",
-      { class: wide ? "btn sm primary gallery-install" : "btn sm gallery-install", type: "button", disabled: installing, "aria-label": `Install ${plugin.name}` },
-      installing ? [el("span", { class: "spinner", "aria-hidden": "true" }), "Installing…"] : [icon("download"), "Install"],
+      { class: wide ? "btn sm primary gallery-install" : "btn sm gallery-install", type: "button", disabled: installing, "aria-label": t("views.plugins.installName", { name: plugin.name }) },
+      installing ? [el("span", { class: "spinner", "aria-hidden": "true" }), t("views.plugins.installing")] : [icon("download"), t("views.plugins.install")],
     );
     button.addEventListener("click", () => attempt(() => install(plugin)));
     return el("div", { class: "gallery-action" }, button);
@@ -434,7 +435,7 @@ export function mount(root, ctx) {
         "div",
         { class: "gallery-card-main" },
         el("div", { class: "gallery-card-head" }, el("a", { class: "gallery-card-name", href: `#/settings/plugins/${plugin.id}` }, plugin.name), plugin.official ? verified(plugin) : null),
-        el("div", { class: "gallery-card-by" }, ...joined([plugin.publisher, CATEGORIES[plugin.category]?.label ?? null, plural(plugin.skills.length, "skill", "skills")])),
+        el("div", { class: "gallery-card-by" }, ...joined([plugin.publisher, CATEGORIES[plugin.category]?.label ?? null, tCount(plugin.skills.length, "views.plugins.countSkill", "views.plugins.countSkills")])),
         el("p", { class: "gallery-card-does" }, plugin.does),
       ),
       action(plugin, false),
@@ -447,7 +448,7 @@ export function mount(root, ctx) {
     const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, icon("puzzle"));
     let removeButton = null;
     if (other.own) {
-      const label = `Remove ${other.name}`;
+      const label = t("views.plugins.removeName", { name: other.name });
       removeButton = el("button", { class: "btn sm ghost icon-only gallery-remove", type: "button", title: label, "aria-label": label, disabled: busy.has(other.name) }, icon("trash"));
       removeButton.addEventListener("click", () => attempt(() => remove(other.name, other.name, other.servers)));
     }
@@ -462,7 +463,7 @@ export function mount(root, ctx) {
         el(
           "div",
           { class: "gallery-card-by" },
-          ...joined([other.own ? "In Dot's plugins folder" : "From a folder in Dot's settings", other.servers > 0 ? plural(other.servers, "connected app", "connected apps") : null]),
+          ...joined([other.own ? t("views.plugins.inDotSPluginsFolder") : t("views.plugins.fromAFolderInDot"), other.servers > 0 ? tCount(other.servers, "views.plugins.countConnectedApp", "views.plugins.countConnectedApps") : null]),
         ),
         other.description === null ? null : el("p", { class: "gallery-card-does" }, other.description),
       ),
@@ -486,9 +487,9 @@ export function mount(root, ctx) {
   function paintCounts() {
     const [allButton, featuredButton, installedButton] = filters.element.children;
     const installed = gallery.plugins.filter(isInstalled).length + gallery.others.length;
-    allButton.textContent = `All ${gallery.plugins.length}`;
-    featuredButton.textContent = `Featured ${gallery.plugins.filter((plugin) => plugin.featured).length}`;
-    installedButton.textContent = `Installed ${installed}`;
+    allButton.textContent = t("views.plugins.allLength", { length: gallery.plugins.length });
+    featuredButton.textContent = t("views.plugins.featuredLength", { length: gallery.plugins.filter((plugin) => plugin.featured).length });
+    installedButton.textContent = t("views.plugins.installedInstalled", { installed });
   }
 
   function paintList() {
@@ -503,13 +504,13 @@ export function mount(root, ctx) {
       shown === "installed" ? gallery.others.filter((other) => words === "" || foldSearch(`${other.name} ${other.description ?? ""}`).includes(words)) : [];
     const parts = showing.map(card);
     if (others.length > 0) {
-      parts.push(el("h3", { class: "section-label gallery-others-title" }, "Not from the gallery"), ...others.map(otherCard));
+      parts.push(el("h3", { class: "section-label gallery-others-title" }, t("views.plugins.notFromTheGallery")), ...others.map(otherCard));
     }
     if (parts.length === 0) {
       parts.push(
         words !== ""
-          ? emptyPanel("search", "No plugin matches the search", "")
-          : emptyPanel("puzzle", "No plugin installed yet", "Install one from All, and the tasks that start after can use its skills."),
+          ? emptyPanel("search", t("views.plugins.noPluginMatchesTheSearch"), "")
+          : emptyPanel("puzzle", t("views.plugins.noPluginInstalledYet"), t("views.plugins.installOneFromAllAnd")),
       );
     }
     allGrid.replaceChildren(...parts);
@@ -518,18 +519,18 @@ export function mount(root, ctx) {
   }
 
   function paintPlugin(plugin) {
-    ctx.setTitle(`${plugin.name} · Plugins`);
+    ctx.setTitle(t("views.plugins.namePlugins", { name: plugin.name }));
     const kind = CATEGORIES[plugin.category]?.label ?? null;
     const facts = [
-      ["Source", el("a", { href: plugin.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${plugin.repository}`, icon("external"))],
-      ["Version checked", el("span", { class: "mono" }, plugin.commit.slice(0, 7))],
-      ...(plugin.state === "outdated" || plugin.state === "updated" ? [["Installed from", el("span", { class: "mono" }, plugin.installed_commit.slice(0, 7))]] : []),
-      ["Licence", plugin.licence],
-      ["Stars", `${compact(plugin.stars)} on GitHub`],
-      ["In the gallery since", DAY.format(new Date(`${plugin.added}T00:00:00`))],
+      [t("views.plugins.source"), el("a", { href: plugin.homepage, target: "_blank", rel: "noopener noreferrer" }, t("views.plugins.githubComRepository", { repository: plugin.repository }), icon("external"))],
+      [t("views.plugins.versionChecked"), el("span", { class: "mono" }, plugin.commit.slice(0, 7))],
+      ...(plugin.state === "outdated" || plugin.state === "updated" ? [[t("views.plugins.installedFrom"), el("span", { class: "mono" }, plugin.installed_commit.slice(0, 7))]] : []),
+      [t("views.plugins.licence"), plugin.licence],
+      [t("views.plugins.stars"), t("views.plugins.compactOnGithub", { compact: compact(plugin.stars) })],
+      [t("views.plugins.inTheGallerySince"), DAY.format(new Date(`${plugin.added}T00:00:00`))],
     ];
     holder.replaceChildren(
-      el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/settings/plugins" }, icon("arrowLeft"), "Plugins")),
+      el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/settings/plugins" }, icon("arrowLeft"), t("views.plugins.plugins"))),
       el(
         "header",
         { class: "gallery-page-head", dataset: { plugin: plugin.id, state: plugin.state } },
@@ -538,14 +539,14 @@ export function mount(root, ctx) {
           "div",
           { class: "gallery-card-main" },
           el("div", { class: "gallery-card-head" }, el("h2", { class: "plugin-title" }, plugin.name), plugin.official ? verified(plugin) : null),
-          el("div", { class: "gallery-card-by" }, ...joined([plugin.publisher, kind, plural(plugin.skills.length, "skill", "skills")])),
+          el("div", { class: "gallery-card-by" }, ...joined([plugin.publisher, kind, tCount(plugin.skills.length, "views.plugins.countSkill", "views.plugins.countSkills")])),
           el("p", { class: "gallery-page-does" }, plugin.does),
         ),
         action(plugin, true),
       ),
       pageCard(
         "skills",
-        "Skills it brings",
+        t("views.plugins.skillsItBrings"),
         "puzzle",
         el(
           "ul",
@@ -555,7 +556,7 @@ export function mount(root, ctx) {
       ),
       pageCard(
         "source",
-        "Where it comes from",
+        t("views.plugins.whereItComesFrom"),
         "shield",
         el(
           "div",
@@ -564,7 +565,7 @@ export function mount(root, ctx) {
           el(
             "p",
             { class: "hint connect-hint" },
-            "Install downloads this version from GitHub and checks its files against the fingerprint Dot keeps before it puts them in its plugins folder; the tasks that start after are offered its skills, with no restart. Remove moves the folder to the Trash.",
+            t("views.plugins.installDownloadsThisVersionFrom"),
           ),
         ),
       ),

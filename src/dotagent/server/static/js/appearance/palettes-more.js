@@ -4,6 +4,8 @@
 
 // A palette's roles from its colours in the order of ROLES; the placeholder and the muted icons take the muted text,
 // the send button the accent.
+import { t } from "../i18n.js";
+
 const ROLES = ["canvas", "sidebar", "surface", "accentSurface", "border", "input", "text", "textMuted", "accent", "hover", "onAccent", "update", "msg", "msgFg", "error", "errorFg", "errorSurface", "warning", "warningFg", "warningSurface"];
 
 function roles(colours) {
@@ -70,11 +72,11 @@ export const MORE_PALETTES = {
 
 // The words of each palette above, for its card: [id, label, hint].
 export const MORE_THEMES = [
-  ["midnight", "Midnight", "Ice blue days and deep navy nights, a cobalt accent."],
-  ["nord", "Nord", "Arctic snow and polar night, a frost-blue accent."],
-  ["solarized", "Solarized", "Schoonover's base tones, a calm blue accent."],
-  ["sepia", "Sepia", "Old paper and coffee, a sepia-brown accent."],
-  ["forest", "Forest", "Moss and pine, a leaf-green accent."],
-  ["graphite", "Graphite", "Grok's neutral greys, white ink and a white action."],
-  ["contrast", "High contrast", "Pure black and white, bold edges, a strong blue."],
+  ["midnight", t("appearance.palettes-more.midnight"), t("appearance.palettes-more.iceBlueDaysAndDeep")],
+  ["nord", "Nord", t("appearance.palettes-more.arcticSnowAndPolarNight")],
+  ["solarized", "Solarized", t("appearance.palettes-more.schoonoverSBaseTonesA")],
+  ["sepia", t("appearance.palettes-more.sepia"), t("appearance.palettes-more.oldPaperAndCoffeeA")],
+  ["forest", t("appearance.palettes-more.forest"), t("appearance.palettes-more.mossAndPineALeaf")],
+  ["graphite", t("appearance.palettes-more.graphite"), t("appearance.palettes-more.grokSNeutralGreysWhite")],
+  ["contrast", t("appearance.palettes-more.highContrast"), t("appearance.palettes-more.pureBlackAndWhiteBold")],
 ];

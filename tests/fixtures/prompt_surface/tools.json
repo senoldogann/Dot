@@ -1833,6 +1833,18 @@
           "minLength": 3,
           "type": "string"
         },
+        "kind": {
+          "description": "What the note is.",
+          "enum": [
+            "profile",
+            "people",
+            "workflow",
+            "rule",
+            "fact",
+            "lesson"
+          ],
+          "type": "string"
+        },
         "subject": {
           "description": "A short name for the fact's slot when it has one current value, like 'user-city'; a newer note with the same subject replaces the older. Omit for facts that add up.",
           "maxLength": 60,
@@ -2859,7 +2871,7 @@
     }
   },
   {
-    "description": "Draw a chart, table, choice or image gallery, or show post drafts in the conversation. Group draft alternatives in one call. Post drafts are previews only. Use draft_message for sendable email and iMessage drafts. Images must be raster files you made in the workspace. The web UI draws cards; the phone's app and the channels do not yet, so say what matters in your answer.",
+    "description": "Draw a chart, table, choice or image gallery, or show post drafts in the conversation. Group draft alternatives in one call. Post drafts are previews only. Use draft_message for sendable email and iMessage drafts. Images must be raster files you made in the workspace. Titles and labels take up to 120 characters, a post 5,000, a table cell 240. The web UI draws cards; the phone's app and the channels do not yet, so say what matters in your answer.",
     "name": "show_cards",
     "parameters": {
       "additionalProperties": false,
@@ -2872,8 +2884,6 @@
                 "additionalProperties": false,
                 "properties": {
                   "account": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   },
                   "kind": {
@@ -2886,14 +2896,10 @@
                       "additionalProperties": false,
                       "properties": {
                         "alt": {
-                          "maxLength": 120,
-                          "minLength": 1,
                           "type": "string"
                         },
                         "path": {
                           "description": "Raster file in the workspace.",
-                          "maxLength": 500,
-                          "minLength": 1,
                           "type": "string"
                         }
                       },
@@ -2907,14 +2913,9 @@
                     "type": "array"
                   },
                   "platform": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   },
                   "text": {
-                    "maxLength": 5000,
-                    "minLength": 1,
-                    "pattern": "\\S",
                     "type": "string"
                   }
                 },
@@ -2948,14 +2949,10 @@
                       "additionalProperties": false,
                       "properties": {
                         "name": {
-                          "maxLength": 120,
-                          "minLength": 1,
                           "type": "string"
                         },
                         "values": {
                           "items": {
-                            "maximum": 1000000000000.0,
-                            "minimum": -1000000000000.0,
                             "type": "number"
                           },
                           "maxItems": 60,
@@ -2974,13 +2971,9 @@
                     "type": "array"
                   },
                   "title": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   },
                   "unit": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   },
                   "x": {
@@ -2988,13 +2981,9 @@
                     "items": {
                       "anyOf": [
                         {
-                          "maxLength": 120,
-                          "minLength": 1,
                           "type": "string"
                         },
                         {
-                          "maximum": 1000000000000.0,
-                          "minimum": -1000000000000.0,
                           "type": "number"
                         }
                       ]
@@ -3004,13 +2993,9 @@
                     "type": "array"
                   },
                   "x_label": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   },
                   "y_label": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -3028,8 +3013,6 @@
                 "properties": {
                   "columns": {
                     "items": {
-                      "maxLength": 120,
-                      "minLength": 1,
                       "type": "string"
                     },
                     "maxItems": 8,
@@ -3043,7 +3026,6 @@
                   "rows": {
                     "items": {
                       "items": {
-                        "maxLength": 240,
                         "type": "string"
                       },
                       "maxItems": 8,
@@ -3055,8 +3037,6 @@
                     "type": "array"
                   },
                   "title": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -3078,8 +3058,6 @@
                   "options": {
                     "description": "Visible answers; a tap writes one into the owner's message box for them to send.",
                     "items": {
-                      "maxLength": 240,
-                      "minLength": 1,
                       "type": "string"
                     },
                     "maxItems": 6,
@@ -3087,8 +3065,6 @@
                     "type": "array"
                   },
                   "prompt": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -3107,14 +3083,10 @@
                       "additionalProperties": false,
                       "properties": {
                         "alt": {
-                          "maxLength": 120,
-                          "minLength": 1,
                           "type": "string"
                         },
                         "path": {
                           "description": "Raster file in the workspace.",
-                          "maxLength": 500,
-                          "minLength": 1,
                           "type": "string"
                         }
                       },
@@ -3133,8 +3105,6 @@
                     "type": "string"
                   },
                   "title": {
-                    "maxLength": 120,
-                    "minLength": 1,
                     "type": "string"
                   }
                 },

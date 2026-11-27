@@ -14,6 +14,7 @@ import { PALETTES } from "./appearance/palettes.js";
 import { MORE_PALETTES, MORE_THEMES } from "./appearance/palettes-more.js";
 import { THEME_TOKENS, lookTokens, paletteTokens, pairedTokens } from "./appearance/tokens.js";
 import { readPref, removePref, writePref } from "./prefs.js";
+import { t } from "./i18n.js";
 
 // A theme: its id and words, whether it is a look of themes.css and whether one's own, the schemes it has a palette
 // for, the layout it starts with, its tokens for a scheme, and the three colours its orb is drawn with
@@ -42,21 +43,21 @@ function palette(id, label, hint) {
 
 /** Dot's own themes. */
 export const THEMES = [
-  look("neutral", "Neutral", "Dot's own: neutral grey and ink, plain like a chat app.", true),
-  look("paper", "Paper", "Warm paper, serif answers and one terracotta accent.", false),
-  palette("clean", "Clean", "Near-white, grey and a blue accent."),
-  palette("rose", "Rose", "Blush whites and a raspberry accent."),
-  palette("grove", "Grove", "Sage greys and an ochre accent."),
-  palette("ocean", "Ocean", "Cool greys and a teal accent."),
-  palette("ember", "Ember", "Warm stone and a rust accent."),
-  palette("iris", "Iris", "Lavender greys and a magenta accent."),
+  look("neutral", t("theme.neutral"), t("theme.dotSOwnNeutralGrey"), true),
+  look("paper", t("theme.paper"), t("theme.warmPaperSerifAnswersAnd"), false),
+  palette("clean", t("theme.clean"), t("theme.nearWhiteGreyAndA")),
+  palette("rose", t("theme.rose"), t("theme.blushWhitesAndARaspberry")),
+  palette("grove", t("theme.grove"), t("theme.sageGreysAndAnOchre")),
+  palette("ocean", t("theme.ocean"), t("theme.coolGreysAndATeal")),
+  palette("ember", t("theme.ember"), t("theme.warmStoneAndARust")),
+  palette("iris", t("theme.iris"), t("theme.lavenderGreysAndAMagenta")),
   ...MORE_THEMES.map(([id, label, hint]) => palette(id, label, hint)),
 ];
 
 export const SCHEMES = [
-  { id: "system", label: "System", hint: "Light or dark as your system is." },
-  { id: "light", label: "Light", hint: "Light, whatever the system says." },
-  { id: "dark", label: "Dark", hint: "Dark, whatever the system says." },
+  { id: "system", label: t("theme.system"), hint: t("theme.lightOrDarkAsYour") },
+  { id: "light", label: t("theme.light"), hint: t("theme.lightWhateverTheSystemSays") },
+  { id: "dark", label: t("theme.dark"), hint: t("theme.darkWhateverTheSystemSays") },
 ];
 
 // The theme picked for light, which is the pick for dark too unless THEME_DARK_KEY holds another.

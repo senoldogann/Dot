@@ -41,11 +41,7 @@ HAIKU: str = "anthropic:claude-haiku-5-5"
 _BETAS: str = "thinking-binding-controls-2026-08-01"
 _FAST_BETA: str = "fast-mode-2026-02-01"
 _RUN_WAIT_S: float = 30.0
-_SHOTS: tuple[tuple[int, int, Literal["light", "dark"]], ...] = (
-    (1440, 900, "light"),
-    (1440, 900, "dark"),
-    (390, 844, "light"),
-)
+_SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
 # A reply of Anthropic's Messages API, streamed: one line of text, at the speed the request asked.
 _EVENTS: tuple[tuple[str, JsonObject], ...] = (
     (
@@ -258,34 +254,19 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            for index, (width, height, scheme) in enumerate(_SHOTS):
+            for index, (width, scheme) in enumerate(_SHOTS):
                 page: Page = await browser.new_page(
-                    viewport={"width": width, "height": height}, color_scheme=scheme, reduced_motion="reduce"
+                    viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{first.id}")
-                # A phone's box holds the reasoning in the model's menu, once the box is used (items 1120 and 1121).
-                held: str = "model" if width < 720 else "reasoning"
-                if width < 720:
-                    await page.locator(".dock textarea").click()
-                pill: Locator = page.locator(f".dock .composer-pill[data-pill='{held}']")
+                # The model's pill opens the chat's settings on every width (items 1202 and 2015), whose Reasoning row
+                # holds the speed.
+                pill: Locator = page.locator(".dock .composer-pill[data-pill='model']")
                 await expect(pill).to_be_visible()
-                # The model pill (item 1991, as the iPhone's chip): the provider's mark and the model's name, never
-                # the provider's name in front of it.
-                model_pill: Locator = page.locator(".dock .composer-pill[data-pill='model']")
-                await expect(model_pill).to_be_visible()
-                await expect(model_pill.locator("svg, img").first).to_be_visible()
-                name: str = (await model_pill.inner_text()).lower()
-                assert "opus" in name and "anthropic" not in name, name
                 await pill.click()
-                # A phone's chat settings (item 1202) hold the reasoning in a row that opens in place.
-                menu: Locator = (
-                    page.get_by_role("dialog", name="Chat settings")
-                    if width < 720
-                    else page.locator(".composer-popover[aria-label='Reasoning']")
-                )
-                if width < 720:
-                    await menu.locator("summary", has_text="Reasoning").click()
+                menu: Locator = page.get_by_role("dialog", name="Chat settings")
+                await menu.locator("summary", has_text="Reasoning").click()
                 speed: Locator = menu.get_by_role("listbox", name="Speed")
                 await expect(speed.get_by_role("option")).to_have_count(2)
                 fast: Locator = speed.get_by_role("option", name="Fast")
@@ -298,36 +279,9 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                     await expect(pill).to_contain_text("Fast")
                     # The page tells the daemon, which keeps it with the chat's choices.
                     await _kept_fast(runtime, first.thread_id)
-                    await pill.click()
                 await expect(fast).to_have_attribute("aria-selected", "true")
                 await page.screenshot(path=str(tmp_path / f"fast-{width}-{scheme}.png"), animations="disabled")
                 await page.keyboard.press("Escape")
-                # The chip (item 1991, as the iPhone's): while the box is short the model's pill is its mark alone;
-                # once it is tall (over 32 characters, a second line, a file) the name stands beside it and, in grey,
-                # the level with Fast.
-                box: Locator = page.locator(".dock textarea")
-                value: Locator = model_pill.locator(".composer-pill-value")
-                extra: Locator = model_pill.locator(".composer-pill-extra")
-                await box.fill("")
-                short_pill = await model_pill.bounding_box()
-                short = await value.bounding_box()
-                assert short is not None and short["width"] <= 2, ("short: the mark alone", short)
-                await box.fill("a message of more than thirty-two characters")
-                await expect(extra).to_contain_text("Fast")
-                tall_pill = await model_pill.bounding_box()
-                # The name stands beside the mark; on a phone the pill is narrow and a long name gives way to the level
-                # (item 1202), so what is measured is that the pill grew by the name and the grey words.
-                assert short_pill is not None and tall_pill is not None
-                assert tall_pill["width"] > short_pill["width"] + 40, (
-                    "tall: the name and the level",
-                    tall_pill,
-                    short_pill,
-                )
-                grey = await extra.evaluate("node => getComputedStyle(node).color")
-                ink = await value.evaluate("node => getComputedStyle(node).color")
-                assert grey != ink, ("the level and Fast are grey", grey, ink)
-                await page.screenshot(path=str(tmp_path / f"chip-{width}-{scheme}.png"), animations="disabled")
-                await box.fill("")
                 await page.close()
         finally:
             await browser.close()

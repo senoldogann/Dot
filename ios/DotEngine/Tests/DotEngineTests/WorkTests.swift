@@ -105,11 +105,19 @@ final class WorkTests: XCTestCase {
         func objective(tainted: Bool, noteTainted: Bool) -> ObjectiveRecord {
             ObjectiveRecord(
                 id: "obj", title: "t", why: "", measure: "", status: "active", notes: [ObjectiveNote(at: 1, text: "n", tainted: noteTainted)], tainted: tainted,
-                createdAt: 0, updatedAt: 0, workflow: ObjectiveWorkflow(nextStep: ""))
+                createdAt: 0, updatedAt: 0, workflow: ObjectiveWorkflow(nextStep: "", nextStepTainted: false))
         }
         XCTAssertFalse(objective(tainted: false, noteTainted: false).hasOutsideWords)
         XCTAssertTrue(objective(tainted: true, noteTainted: false).hasOutsideWords)
         XCTAssertTrue(objective(tainted: false, noteTainted: true).hasOutsideWords, "one line written after outside content marks it")
+    }
+
+    func testANextStepWrittenAfterOutsideContentMarksTheObjectiveToo() throws {
+        let json: String =
+            #"{"id":"o","title":"t","why":"","measure":"","status":"active","notes":[],"tainted":false,"created_at":0,"updated_at":0,"workflow":{"sources":"","rules":"","evidence":"","exceptions":"","next_step":"Wire the money","record":"","next_step_tainted":true}}"#
+        let objective: ObjectiveRecord = try decode(ObjectiveRecord.self, json)
+        XCTAssertTrue(objective.workflow.nextStepTainted)
+        XCTAssertTrue(objective.hasOutsideWords, "the step has a flag of its own, which the mark must not leave out")
     }
 
     func testTheDaemonsStatusesAreAllKnown() {

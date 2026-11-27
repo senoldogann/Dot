@@ -20,6 +20,7 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import (
     failsafe_path,
 )
+from dotagent.desktop.cua import starter_of
 from dotagent.desktop.perms import (
     Pane,
     check_permissions,
@@ -41,7 +42,9 @@ _CLI_THREAD: str = "cli"
 @contextlib.asynccontextmanager
 async def _desktop_session(config: AppConfig) -> AsyncIterator[DesktopSession]:
     """A desktop session, closed again afterwards."""
-    session: DesktopSession = DesktopSession(config.desktop, failsafe_path(), no_browser_chrome)
+    session: DesktopSession = DesktopSession(
+        config.desktop, failsafe_path(), no_browser_chrome, background=starter_of(config.desktop)
+    )
     try:
         yield session
     finally:

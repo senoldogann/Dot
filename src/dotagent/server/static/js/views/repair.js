@@ -11,30 +11,31 @@ import { ago, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, setCard, setRow, setSection } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
+import { t } from "../i18n.js";
 
 const STATUS = {
-  open: "Open",
-  working: "Being fixed",
-  fixed: "Fixed",
-  waiting: "Waits for you",
-  declined: "Not Dot's",
-  closed: "Closed",
+  open: t("views.repair.open"),
+  working: t("views.repair.beingFixed"),
+  fixed: t("views.repair.fixed"),
+  waiting: t("views.repair.waitsForYou"),
+  declined: t("views.repair.notDotS"),
+  closed: t("views.repair.closed"),
 };
 // Where a pull request stands on GitHub, read again when the page opens (item 958): what it reads, and its tone.
-const PR_STATES = { merged: ["Merged", "good"], closed: ["Closed", undefined] };
+const PR_STATES = { merged: [t("views.repair.merged"), "good"], closed: [t("views.repair.closed"), undefined] };
 const ENDS = {
-  merged: "Merged",
-  merged_unpulled: "Merged",
-  ready: "Ready for you",
-  review_blocked: "Review stopped it",
-  main_moved: "Main moved: look",
-  out_of_time: "Night ran out",
-  needs_owner: "Needs you",
-  declined: "Not a defect",
-  checks_failed: "Checks failed",
-  no_answer: "No answer",
-  limited: "Plan limit",
-  failed: "Failed",
+  merged: t("views.repair.merged"),
+  merged_unpulled: t("views.repair.merged"),
+  ready: t("views.repair.readyForYou"),
+  review_blocked: t("views.repair.reviewStoppedIt"),
+  main_moved: t("views.repair.mainMovedLook"),
+  out_of_time: t("views.repair.nightRanOut"),
+  needs_owner: t("views.repair.needsYou"),
+  declined: t("views.repair.notADefect"),
+  checks_failed: t("views.repair.checksFailed"),
+  no_answer: t("views.repair.noAnswer"),
+  limited: t("views.repair.planLimit"),
+  failed: t("views.repair.failed"),
 };
 // How an end reads at a glance: good, a warning for the owner, or quiet.
 const END_TONE = {
@@ -53,22 +54,22 @@ const TITLE_CHARS = 110;
 // How Claude Code may work for Dot (item 933): its model, by Claude Code's names of the newest of each family, and how
 // hard it thinks; "default" is Claude Code's own choice.
 const MODELS = [
-  ["default", "Claude Code's default"],
+  ["default", t("views.repair.claudeCodeSDefault")],
   ["fable", "Fable"],
   ["opus", "Opus"],
   ["sonnet", "Sonnet"],
   ["haiku", "Haiku"],
 ];
 const EFFORTS = [
-  ["default", "Default"],
-  ["low", "Low"],
-  ["medium", "Medium"],
-  ["high", "High"],
-  ["xhigh", "Extra high"],
-  ["max", "Max"],
+  ["default", t("views.repair.default")],
+  ["low", t("views.repair.low")],
+  ["medium", t("views.repair.medium")],
+  ["high", t("views.repair.high")],
+  ["xhigh", t("views.repair.extraHigh")],
+  ["max", t("views.repair.max")],
 ];
 // Why a session that asked for fast mode ran at the standard speed, as Claude Code says it.
-const FAST_OFF = { extra_usage_disabled: "the account has no extra usage, which fast mode is billed to" };
+const FAST_OFF = { extra_usage_disabled: t("views.repair.theAccountHasNoExtra") };
 // The book's placeholders, as words.
 const PLACEHOLDERS = [
   [/<n>/g, "…"],
@@ -89,7 +90,7 @@ export function readable(title) {
 
 /** A link to a pull request, or nothing. */
 function prLink(url) {
-  return url === "" ? null : el("a", { class: "btn sm", href: url, target: "_blank", rel: "noopener" }, icon("external"), "Pull request");
+  return url === "" ? null : el("a", { class: "btn sm", href: url, target: "_blank", rel: "noopener" }, icon("external"), t("views.repair.pullRequest"));
 }
 
 function badge(words, tone) {
@@ -125,29 +126,29 @@ function overview(view, runNow) {
   const working = view.problems.find((problem) => problem.status === "working");
   const now = view.running
     ? working === undefined
-      ? "A night is under way"
+      ? t("views.repair.aNightIsUnderWay")
       : readable(working.title)
     : view.sessions.length === 0
-      ? "No night yet"
-      : `Last session ${ago(view.sessions[0].started_at)}`;
+      ? t("views.repair.noNightYet")
+      : t("views.repair.lastSessionAgo", { ago: ago(view.sessions[0].started_at) });
   const tiles = setCard(
-    tile("Self-repair", on ? `On, ${view.time}` : "Off", on ? (view.merge === "on_pass" ? "Merged once every check passes" : "Merged by you") : "Set [repair] repo to turn it on"),
-    tile(view.running ? "Working on" : "Now", view.running ? "Working" : "Idle", now),
-    tile("Fixed", String(count(view.problems, "fixed")), `${count(view.problems, "declined")} not Dot's · ${count(view.problems, "closed")} closed`),
-    tile("Waits for you", String(count(view.problems, "waiting")), `${count(view.problems, "open")} open`),
+    tile(t("views.repair.selfRepair"), on ? t("views.repair.onTime", { time: view.time }) : t("views.repair.off"), on ? (view.merge === "on_pass" ? t("views.repair.mergedOnceEveryCheckPasses") : t("views.repair.mergedByYou")) : t("views.repair.setRepairRepoToTurn")),
+    tile(view.running ? t("views.repair.workingOn") : t("views.repair.now"), view.running ? t("views.repair.working") : t("views.repair.idle"), now),
+    tile(t("views.repair.fixed"), String(count(view.problems, "fixed")), t("views.repair.declinedClosed", { declined: count(view.problems, "declined"), closed: count(view.problems, "closed") })),
+    tile(t("views.repair.waitsForYou"), String(count(view.problems, "waiting")), t("views.repair.countOpenProblems", { count: count(view.problems, "open") })),
   );
   tiles.classList.add("stat-card");
   tiles.setAttribute("role", "group");
-  tiles.setAttribute("aria-label", "Overview");
+  tiles.setAttribute("aria-label", t("views.repair.overview"));
   const account = setRow({
     title: "Claude Code",
-    lead: view.account === null ? "Not signed in on this Mac: run claude once and sign in." : `${view.account.email}${view.account.organization === "" ? "" : ` · ${view.account.organization}`}`,
+    lead: view.account === null ? t("views.repair.notSignedInOnThis") : `${view.account.email}${view.account.organization === "" ? "" : ` · ${view.account.organization}`}`,
     control: on
       ? el(
           "button",
           { class: "btn sm", type: "button", disabled: view.running || view.account === null, onclick: runNow },
           icon("play"),
-          view.running ? "Working…" : "Run now",
+          view.running ? t("views.repair.working2") : t("views.repair.runNow"),
         )
       : null,
   });
@@ -156,12 +157,12 @@ function overview(view, runNow) {
 
 // A step of a session at work as the page names it (item 939): a mark and a verb by its kind.
 const STEP_MARKS = { read: "R", edit: "✎", write: "+", run: "$", search: "⌕", plan: "≡", other: "•" };
-const STEP_VERBS = { read: "Read", edit: "Edited", write: "Wrote", run: "Ran", search: "Searched", plan: "Planned", other: "Used" };
+const STEP_VERBS = { read: t("views.repair.read"), edit: t("views.repair.edited"), write: t("views.repair.wrote"), run: t("views.repair.ran"), search: t("views.repair.searched"), plan: t("views.repair.planned"), other: t("views.repair.used") };
 // The newest steps the card shows before "All steps", and how often the page reads the night while one is at work.
 const NOW_STEPS = 4;
 const POLL_MS = 4000;
 // What a session waits on between its rounds, in the card's head.
-const PHASE_WORDS = { review: "Waiting for the review", checks: "Waiting for the checks" };
+const PHASE_WORDS = { review: t("views.repair.waitingForTheReview"), checks: t("views.repair.waitingForTheChecks") };
 // While no night works, the night is read once in this many of those.
 const IDLE_TICKS = 8;
 
@@ -188,30 +189,30 @@ function stepLine(step, current) {
  */
 function nowCard(live, allSteps, onAll, onStop) {
   const steps = allSteps ? live.steps : live.steps.slice(-NOW_STEPS);
-  const model = live.model === "default" ? "Claude Code's model" : `${live.model[0].toUpperCase()}${live.model.slice(1)}`;
+  const model = live.model === "default" ? t("views.repair.claudeCodeSModel") : `${live.model[0].toUpperCase()}${live.model.slice(1)}`;
   const effort = live.effort === "default" ? "" : ` · ${live.effort}`;
   return el(
     "section",
-    { class: "card repair-now", "aria-label": "Working now" },
+    { class: "card repair-now", "aria-label": t("views.repair.workingNow") },
     el(
       "div",
       { class: "repair-now-head" },
       el("span", { class: "repair-live", "aria-hidden": "true" }),
-      el("b", null, PHASE_WORDS[live.phase] ?? (live.kind === "look" ? "Looking again" : "Working")),
-      el("span", { class: "hint" }, " · ", el("span", { class: "repair-elapsed", dataset: { since: String(live.started_at) } }, elapsed(live.started_at, Date.now() / 1000)), ` · round ${live.round}`),
+      el("b", null, PHASE_WORDS[live.phase] ?? (live.kind === "look" ? t("views.repair.lookingAgain") : t("views.repair.working"))),
+      el("span", { class: "hint" }, " · ", el("span", { class: "repair-elapsed", dataset: { since: String(live.started_at) } }, elapsed(live.started_at, Date.now() / 1000)), t("views.repair.roundRound", { round: live.round })),
       el("span", { class: "grow" }),
-      el("button", { class: "btn sm danger", type: "button", onclick: onStop }, icon("stop"), "Stop"),
+      el("button", { class: "btn sm danger", type: "button", onclick: onStop }, icon("stop"), t("views.repair.stop")),
     ),
     el("div", { class: "repair-now-title", title: live.title }, readable(live.title)),
     el("div", { class: "hint" }, `${model}${effort} · ${live.account}`),
     steps.length === 0
-      ? el("p", { class: "hint repair-now-wait" }, "Starting…")
-      : el("ol", { class: "repair-steps", "aria-label": "Its newest steps" }, steps.map((step, index) => stepLine(step, live.phase === "working" && index === steps.length - 1))),
+      ? el("p", { class: "hint repair-now-wait" }, t("views.repair.starting"))
+      : el("ol", { class: "repair-steps", "aria-label": t("views.repair.itsNewestSteps") }, steps.map((step, index) => stepLine(step, live.phase === "working" && index === steps.length - 1))),
     live.steps.length > NOW_STEPS
       ? el(
           "button",
           { class: "btn ghost sm", type: "button", "aria-expanded": String(allSteps), onclick: onAll },
-          allSteps ? "Fewer steps" : `All ${live.steps.length} steps`,
+          allSteps ? t("views.repair.fewerSteps") : t("views.repair.allLengthSteps", { length: live.steps.length }),
         )
       : null,
   );
@@ -230,10 +231,10 @@ function fastSaid(seen) {
     return "";
   }
   if (seen.state === "on") {
-    return `The last session ran in fast mode, ${ago(seen.at)}.`;
+    return t("views.repair.theLastSessionRanIn", { ago: ago(seen.at) });
   }
   const why = seen.why === null ? "" : `: ${FAST_OFF[seen.why] ?? seen.why.replaceAll("_", " ")}`;
-  return `The last session ran at the standard speed${why}.`;
+  return t("views.repair.theLastSessionRanAt", { why });
 }
 
 /** How Claude Code works for Dot: its model, its effort and fast mode, each saved as it changes. */
@@ -244,15 +245,15 @@ function workerCard(view, save) {
     type: "button",
     role: "switch",
     "aria-checked": String(worker.fast),
-    "aria-label": "Fast mode",
+    "aria-label": t("views.repair.fastMode"),
     onclick: () => save({ ...worker, fast: !worker.fast }),
   });
   const seen = fastSaid(view.fast_seen);
   return setCard(
-    view.worker_lost ? setRow({ title: "Choose again", lead: "Your last choice cannot be read, so the nights wait: pick a model to save a new one." }) : null,
-    setRow({ title: "Model", lead: "Of each session and second look.", control: picker("Model", MODELS, worker.model, (model) => save({ ...worker, model })) }),
-    setRow({ title: "Effort", lead: "How hard it thinks before it answers.", control: picker("Effort", EFFORTS, worker.effort, (effort) => save({ ...worker, effort })) }),
-    setRow({ title: "Fast mode", lead: `Faster answers, billed to your plan as extra usage.${seen === "" ? "" : ` ${seen}`}`, control: fast }),
+    view.worker_lost ? setRow({ title: t("views.repair.chooseAgain"), lead: t("views.repair.yourLastChoiceCannotBe") }) : null,
+    setRow({ title: t("views.repair.model"), lead: t("views.repair.ofEachSessionAndSecond"), control: picker(t("views.repair.model"), MODELS, worker.model, (model) => save({ ...worker, model })) }),
+    setRow({ title: t("views.repair.effort"), lead: t("views.repair.howHardItThinksBefore"), control: picker(t("views.repair.effort"), EFFORTS, worker.effort, (effort) => save({ ...worker, effort })) }),
+    setRow({ title: t("views.repair.fastMode"), lead: t("views.repair.fasterAnswersBilledToYour", { value: seen === "" ? "" : ` ${seen}` }), control: fast }),
   );
 }
 
@@ -265,7 +266,7 @@ function workerFold(view, save) {
   const worker = view.worker;
   const card = foldCard({ id: "repair-worker", title: "Claude Code", actions: null, body: workerCard(view, save), openByDefault: false });
   const words = MODELS.find(([key]) => key === worker.model)?.[1] ?? worker.model;
-  card.setSummary(el("span", { class: "hint" }, `${words} · ${worker.effort === "default" ? "default effort" : worker.effort}${worker.fast ? " · fast" : ""}`));
+  card.setSummary(el("span", { class: "hint" }, `${words} · ${worker.effort === "default" ? t("views.repair.defaultEffort") : worker.effort}${worker.fast ? " · fast" : ""}`));
   return card.element;
 }
 
@@ -281,7 +282,7 @@ function statusBadge(problem) {
 
 /** The row of a problem: its words, how often and how lately it was seen, its status and its pull request. */
 function problemRow(problem) {
-  const seen = `${problem.kind.replace("_", " ")} · seen ${problem.count}× · last ${ago(problem.last_at)}`;
+  const seen = t("views.repair.replaceSeenCountLastAgo", { replace: problem.kind.replace("_", " "), count: problem.count, ago: ago(problem.last_at) });
   return setRow({
     title: el("span", { class: "repair-title", title: problem.title }, readable(problem.title)),
     lead: seen,
@@ -302,17 +303,17 @@ function endBadge(session, status) {
   }
   const settled = session.end === "merged" || session.end === "merged_unpulled" || session.end === "declined";
   if (!settled && status === "fixed") {
-    return badge("Fixed later", "good");
+    return badge(t("views.repair.fixedLater"), "good");
   }
   if (!settled && status === "declined") {
-    return badge("Let go", undefined);
+    return badge(t("views.repair.letGo"), undefined);
   }
   return badge(ENDS[session.end] ?? session.end, END_TONE[session.end]);
 }
 
 /** The row of a session: its problem, how it ended (as it reads now), why in a line, what it used, and its pull request. */
 function sessionRow(session, titles, statuses) {
-  const used = `${session.rounds} round${session.rounds === 1 ? "" : "s"} · ${Math.round((session.input_tokens + session.output_tokens) / 1000)}k tokens · ${session.account}`;
+  const used = t("views.repair.roundsRoundValueRoundK", { rounds: session.rounds, value: session.rounds === 1 ? "" : "s", round: Math.round((session.input_tokens + session.output_tokens) / 1000), account: session.account });
   const title = titles.get(session.problem_id) ?? session.problem_id;
   return setRow({
     title: el("span", { class: "repair-title", title }, readable(title)),
@@ -336,7 +337,7 @@ function nights(sessions, titles, statuses) {
     el(
       "div",
       { class: "stack repair-night" },
-      el("div", { class: "repair-night-head" }, el("span", null, day), el("span", { class: "hint" }, `${list.length} session${list.length === 1 ? "" : "s"}`)),
+      el("div", { class: "repair-night-head" }, el("span", null, day), el("span", { class: "hint" }, t("views.repair.lengthSessionValue", { length: list.length, value: list.length === 1 ? "" : "s" }))),
       setCard(...list.map((session) => sessionRow(session, titles, statuses))),
     ),
   );
@@ -357,16 +358,16 @@ export function mount(root, ctx) {
   async function saveWorker(worker) {
     await attempt(async () => {
       view = await api.put("/repair/worker", worker);
-      toast("ok", "Saved: the next night works so.");
+      toast("ok", t("views.repair.savedTheNextNightWorks"));
       paint();
     });
   }
 
   async function stopNight() {
     const sure = await confirmDialog({
-      title: "Stop the night?",
-      message: "The session of Claude Code ends with what it started; its problem stays as it was, to be tried again.",
-      confirmLabel: "Stop",
+      title: t("views.repair.stopTheNight"),
+      message: t("views.repair.theSessionOfClaudeCode"),
+      confirmLabel: t("views.repair.stop"),
       danger: true,
       focusCancel: true,
     });
@@ -375,7 +376,7 @@ export function mount(root, ctx) {
     }
     await attempt(async () => {
       view = await api.post("/repair/stop", {});
-      toast("ok", "The night is stopped.");
+      toast("ok", t("views.repair.theNightIsStopped"));
       paint();
     });
   }
@@ -413,7 +414,7 @@ export function mount(root, ctx) {
     } catch (error) {
       if (!readFailed) {
         readFailed = true;
-        toast("error", `Self-repair could not be read: ${error instanceof Error ? error.message : String(error)}`);
+        toast("error", t("views.repair.selfRepairCouldNotBe", { value: error instanceof Error ? error.message : String(error) }));
       }
       return;
     }
@@ -433,14 +434,14 @@ export function mount(root, ctx) {
   async function runNow() {
     await attempt(async () => {
       view = await api.post("/repair/now", {});
-      toast("ok", "A night of repairs started: Claude Code works on the first problem.");
+      toast("ok", t("views.repair.aNightOfRepairsStarted"));
       paint();
     });
   }
 
   function nextUp(open) {
     if (open.length === 0) {
-      return emptyPanel("check", "Nothing in line", "Dot has found nothing going wrong again and again.");
+      return emptyPanel("check", t("views.repair.nothingInLine"), t("views.repair.dotHasFoundNothingGoing"));
     }
     const shown = showAll ? open : open.slice(0, NEXT_SHOWN);
     const card = setCard(...shown.map(problemRow));
@@ -457,7 +458,7 @@ export function mount(root, ctx) {
           paint();
         },
       },
-      showAll ? "Show fewer" : `Show all ${open.length}`,
+      showAll ? t("views.repair.showFewer") : t("views.repair.showAllLength", { length: open.length }),
     );
     return el("div", { class: "stack" }, card, more);
   }
@@ -471,17 +472,17 @@ export function mount(root, ctx) {
     holder.replaceChildren(
       el(
         "div",
-        { class: "set-sections", role: "region", "aria-label": "Self-repair" },
+        { class: "set-sections", role: "region", "aria-label": t("views.repair.selfRepair") },
         nowSlot,
         overview(view, runNow),
-        waiting.length === 0 ? null : setSection({ title: "Waits for you", lead: "A fix that needs your look, or one Dot stopped on.", body: setCard(...waiting.map(problemRow)) }),
+        waiting.length === 0 ? null : setSection({ title: t("views.repair.waitsForYou"), lead: t("views.repair.aFixThatNeedsYour"), body: setCard(...waiting.map(problemRow)) }),
         setSection({
-          title: "Nights",
-          lead: "Each session: the problem, how it ended and why.",
-          body: view.sessions.length === 0 ? emptyPanel("clock", "No night yet", "") : el("div", { class: "stack" }, ...nights(view.sessions, titles, statuses)),
+          title: t("views.repair.nights"),
+          lead: t("views.repair.eachSessionTheProblemHow"),
+          body: view.sessions.length === 0 ? emptyPanel("clock", t("views.repair.noNightYet"), "") : el("div", { class: "stack" }, ...nights(view.sessions, titles, statuses)),
         }),
-        setSection({ title: "Next in line", lead: "What Dot's record shows going wrong again and again, the most seen first.", body: nextUp(open) }),
-        closed.length === 0 ? null : setSection({ title: "Closed", body: el("details", { class: "repair-closed" }, el("summary", null, `${closed.length} fixed, closed or not Dot's`), setCard(...closed.map(problemRow))) }),
+        setSection({ title: t("views.repair.nextInLine"), lead: t("views.repair.whatDotSRecordShows"), body: nextUp(open) }),
+        closed.length === 0 ? null : setSection({ title: t("views.repair.closed"), body: el("details", { class: "repair-closed" }, el("summary", null, t("views.repair.lengthFixedClosedOrNot", { length: closed.length })), setCard(...closed.map(problemRow))) }),
         workerFold(view, saveWorker),
       ),
     );
@@ -503,7 +504,7 @@ export function mount(root, ctx) {
     }
   }
 
-  ctx.head.setLead("Each night Claude Code fixes a problem Dot found in its own record, with a test and a pull request.");
+  ctx.head.setLead(t("views.repair.eachNightClaudeCodeFixes"));
   root.append(holder);
   attempt(load);
   // The time on the card goes on by the second; the night is read again every few seconds while one works.

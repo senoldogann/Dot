@@ -14,6 +14,7 @@
 
 import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
+import { composerShape } from "./composershape.js";
 import { el, setText } from "./dom.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
@@ -32,9 +33,6 @@ import { openTeachPanel } from "./teach.js";
 
 const DRAFT_PREFIX = "dot.draft.";
 // The draft key of a new chat's composer.
-// More characters than this make the box tall, as on the iPhone (item 1991).
-const EXPANDED_CHARS = 32;
-
 export const NEW_CHAT_DRAFT = "home";
 // The tallest box of a chat's composer, on its page (views/run.js) and on the curtain while Dot opens (waiting.js).
 export const CHAT_BOX_PX = 160;
@@ -371,18 +369,10 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
     return stop !== null && typedWords() === "" && attachments.count() === 0;
   }
 
-  // The box is tall (item 1991, as the iPhone's): a second line, more than 32 characters or a file. Its model pill then
-  // names the model and says its level and fast mode in grey; short, the pill is its mark alone.
-  function paintExpanded() {
-    element.toggleAttribute(
-      "data-expanded",
-      textarea.value.includes("\n") || textarea.value.length > EXPANDED_CHARS || attachments.count() > 0,
-    );
-  }
-
   function paintEmpty() {
-    paintExpanded();
     element.toggleAttribute("data-empty", typedWords() === "");
+    // One row while the words are short, the words over the controls once they are not (item 2015).
+    element.dataset.shape = composerShape(textarea.value, attachments.count(), picks.count());
     const stopShown = stopping();
     element.toggleAttribute("data-stop", stopShown);
     const words = stopShown ? t("composer.stop") : sendWords;
@@ -575,7 +565,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
       return words;
     },
     giveBack: (words) => {
-      textarea.value = textarea.value.trim() === "" ? words : `${words}\n${textarea.value}`;
+      textarea.value = textarea.value.trim() === "" ? words : words === "" ? textarea.value : `${words}\n${textarea.value}`;
       taken = false;
       drafting = true;
       edited();

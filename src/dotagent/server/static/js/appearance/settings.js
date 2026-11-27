@@ -8,6 +8,7 @@ import { readPref, removePref, writePref } from "../prefs.js";
 // this module has them, a page of a test among them (the nightly run of 2026-11-09 found four whose modules stopped at
 // a missing DOT_APPEARANCE, item 1087). Run twice, the script sets the same rules again.
 import "./rules.js";
+import { t } from "../i18n.js";
 
 const ROOT = document.documentElement;
 const APPEARANCE = globalThis.DOT_APPEARANCE;
@@ -80,7 +81,7 @@ export const HOME_DAY = {
 
 /** The languages the microphone listens in and an answer is read aloud in (item 574): the page's own, or one of these tags. */
 export const VOICE_LANGUAGES = [
-  { id: "page", label: "The page's language" },
+  { id: "page", label: t("appearance.settings.thePageSLanguage") },
   { id: "en-US", label: "English" },
   { id: "tr-TR", label: "Türkçe" },
   { id: "fi-FI", label: "Suomi" },

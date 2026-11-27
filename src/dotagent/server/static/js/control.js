@@ -6,6 +6,7 @@
 import { api } from "./api.js";
 import { el } from "./dom.js";
 import { LONG_PRESS_MS, clampedFractionOf, drawnOf, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor, textPieces } from "./pointer.js";
+import { t } from "./i18n.js";
 
 // How long input waits to go with the next (moves and scrolls; a press, a release and a key go at once), how many
 // events a batch carries at most (the daemon takes 64), and how much text one event carries (it takes 500).
@@ -309,8 +310,8 @@ export function createControl({ runId, screen, image, onRefused }) {
 
   // The screen's keyboard: a field kept out of sight takes what is typed and hands it on; it is 16 px high, so that a
   // phone does not zoom into it.
-  const field = el("textarea", { class: "control-keys", autocapitalize: "off", autocomplete: "off", spellcheck: "false", "aria-label": "Keys for the page" });
-  const keyboard = el("button", { class: "btn sm", type: "button", onclick: () => field.focus() }, "Keyboard");
+  const field = el("textarea", { class: "control-keys", autocapitalize: "off", autocomplete: "off", spellcheck: "false", "aria-label": t("control.keysForThePage") });
+  const keyboard = el("button", { class: "btn sm", type: "button", onclick: () => field.focus() }, t("control.keyboard"));
   const onKey = (event) => {
     const name = keyName(event);
     if (name !== null) {
@@ -325,7 +326,7 @@ export function createControl({ runId, screen, image, onRefused }) {
       insertReplacementText: text,
       insertFromPaste: text,
     }[event.inputType];
-    const key = { deleteContentBackward: "Backspace", deleteContentForward: "Delete", insertLineBreak: "Enter", insertParagraph: "Enter" }[event.inputType];
+    const key = { deleteContentBackward: "Backspace", deleteContentForward: t("control.delete"), insertLineBreak: "Enter", insertParagraph: "Enter" }[event.inputType];
     if (typed === undefined && key === undefined) {
       return;
     }

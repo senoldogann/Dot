@@ -33,15 +33,15 @@ export function detailsFold(text) {
   if (text === "") {
     return null;
   }
-  return el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted mono" }, text));
+  return el("details", { class: "error-details" }, el("summary", null, t("ui.details")), el("p", { class: "small muted mono" }, text));
 }
 
 /**
  * A closed "Details" fold that names the key of the settings file a setting is kept under (item 625), for those who edit
  * the file: the page says what the setting does, and this says where it lives.
  */
-export function settingFold(key, lead = "In the settings file:") {
-  return el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, `${lead} `, el("code", { class: "mono" }, key)));
+export function settingFold(key, lead = t("ui.inTheSettingsFile")) {
+  return el("details", { class: "error-details" }, el("summary", null, t("ui.details")), el("p", { class: "small muted" }, `${lead} `, el("code", { class: "mono" }, key)));
 }
 
 /** Show a short message; `kind` is "ok" or "error". `action` (`{ label, run }`), when given, is a button in it that runs

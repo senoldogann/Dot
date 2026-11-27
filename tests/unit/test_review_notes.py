@@ -48,16 +48,17 @@ async def test_a_runs_source_decides_which_notes_it_starts_with(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     index, store = await _index(tmp_path, monkeypatch)
-    runtime = SimpleNamespace(memory=index)
+    # start_notes reads the memory and, for how long it waits for the notes by meaning, [memory] start_recall_s.
+    runtime = SimpleNamespace(memory=index, config=SimpleNamespace(memory=index.config))
     try:
         review: Remembered = await start_notes(
-            runtime,  # type: ignore[arg-type]  # start_notes reads the memory alone
+            runtime,  # type: ignore[arg-type]  # start_notes reads the memory and its config
             SimpleNamespace(source=REVIEW_SOURCE, agent_id=None),  # type: ignore[arg-type]
             GOAL,
             4000,
         )
         chat: Remembered = await start_notes(
-            runtime,  # type: ignore[arg-type]  # start_notes reads the memory alone
+            runtime,  # type: ignore[arg-type]  # start_notes reads the memory and its config
             SimpleNamespace(source=UI_SOURCE, agent_id=None),  # type: ignore[arg-type]
             GOAL,
             4000,

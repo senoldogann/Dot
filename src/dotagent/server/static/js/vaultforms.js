@@ -20,6 +20,7 @@ import {
   numberProblem,
   numberTyping,
 } from "./vaultcard.js";
+import { t } from "./i18n.js";
 
 const MOST_PHOTO_BYTES = 12_000_000;
 // How long the eye shows a saved secret before it hides it again by itself. The daemon leaves Dot's own windows out of a
@@ -27,15 +28,15 @@ const MOST_PHOTO_BYTES = 12_000_000;
 const SHOWN_FOR_MS = 20_000;
 // The details of a contact, and of the billing address of a card, with their labels.
 const DETAILS = [
-  { name: "name", label: "Full name" },
-  { name: "address", label: "Address" },
-  { name: "address2", label: "Address line 2" },
-  { name: "city", label: "City" },
-  { name: "region", label: "State or region" },
-  { name: "postal_code", label: "Postal code" },
-  { name: "country", label: "Country" },
-  { name: "phone", label: "Phone" },
-  { name: "email", label: "Email" },
+  { name: "name", label: t("vaultforms.fullName") },
+  { name: "address", label: t("vaultforms.address") },
+  { name: "address2", label: t("vaultforms.addressLine2") },
+  { name: "city", label: t("vaultforms.city") },
+  { name: "region", label: t("vaultforms.stateOrRegion") },
+  { name: "postal_code", label: t("vaultforms.postalCode") },
+  { name: "country", label: t("vaultforms.country") },
+  { name: "phone", label: t("vaultforms.phone") },
+  { name: "email", label: t("vaultforms.email") },
 ];
 const BILLING_NAMES = ["name", "address", "address2", "city", "region", "postal_code", "country"];
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -114,8 +115,8 @@ function secretBox(input, { saved, what, startShown, eye: withEye, onError, onSh
       // A box that holds no text while it is hidden takes none: the eye shows it first.
       input.readOnly = !shown;
     }
-    input.placeholder = kept !== null && !shown ? "Your change is kept: press the eye to read it" : idle;
-    const words = `${shown ? "Hide" : "Show"} the ${what}`;
+    input.placeholder = kept !== null && !shown ? t("vaultforms.yourChangeIsKeptPress") : idle;
+    const words = t(shown ? "vaultforms.hideThe" : "vaultforms.showThe", { what });
     eye.title = words;
     eye.setAttribute("aria-label", words);
     eye.replaceChildren(icon(shown ? "eyeOff" : "eye"));
@@ -243,10 +244,10 @@ export function openLoginDialog({ existing, returnFocus, done }) {
     maxlength: "2000",
   });
   const username = el("input", { class: "input", type: "text", autocomplete: "off", spellcheck: "false", autocapitalize: "none", maxlength: "320" });
-  const password = passwordInput(existing === null ? "" : "Saved: write to change it");
+  const password = passwordInput(existing === null ? "" : t("vaultforms.savedWriteToChangeIt"));
   const passwordBox = secretBox(password, { saved: saved("password"), what: "password", startShown: false, eye: true, onError, onShown });
   const notes = el("textarea", { class: "textarea", rows: "3", maxlength: "1000", spellcheck: "false" });
-  notes.placeholder = existing === null ? "" : "Saved notes stay as they are: show them to change them";
+  notes.placeholder = existing === null ? "" : t("vaultforms.savedNotesStayAsThey");
   const notesBox = secretBox(notes, { saved: saved("notes"), what: "notes", startShown: existing === null, eye: existing !== null, onError, onShown });
   if (existing !== null) {
     website.value = existing.website ?? "";
@@ -259,17 +260,17 @@ export function openLoginDialog({ existing, returnFocus, done }) {
   };
 
   dialog = formDialog({
-    title: existing === null ? "New login" : "Edit login",
-    description: `A site and the account you sign in with. ${dotName()} types it for you where you ask, only on that site.`,
+    title: existing === null ? t("vaultforms.newLogin") : t("vaultforms.editLogin"),
+    description: t("vaultforms.aSiteAndTheAccount", { dotName: dotName() }),
     body: [
-      labelled("Website", website),
-      labelled("Username or email (optional)", username),
-      labelled("Password", password, "", passwordBox.box),
-      labelled("Notes (optional)", notes, "", notesBox.box),
+      labelled(t("vaultforms.website"), website),
+      labelled(t("vaultforms.usernameOrEmailOptional"), username),
+      labelled(t("vaultforms.password"), password, "", passwordBox.box),
+      labelled(t("vaultforms.notesOptional"), notes, "", notesBox.box),
     ],
-    submitLabel: "Save login",
+    submitLabel: t("vaultforms.saveLogin"),
     valid,
-    leading: [assurance(`${dotName()} can use this login to sign in for you`)],
+    leading: [assurance(t("vaultforms.dotnameCanUseThisLogin", { dotName: dotName() }))],
     returnFocus,
     onSubmit: async () => {
       const body = { kind: "login", website: website.value.trim(), username: username.value.trim() };
@@ -282,7 +283,7 @@ export function openLoginDialog({ existing, returnFocus, done }) {
         body.notes = written;
       }
       const record = await keep(existing, body);
-      toast("ok", existing === null ? "Login saved." : "Login changed.");
+      toast("ok", existing === null ? t("vaultforms.loginSaved") : t("vaultforms.loginChanged"));
       done(record);
       return true;
     },
@@ -357,13 +358,13 @@ export function openCardDialog({ existing, returnFocus, done }) {
     autocomplete: "off",
     spellcheck: "false",
     maxlength: "23",
-    placeholder: existing === null ? "1234 5678 9012 3456" : `Saved: •••• ${existing.last4}`,
+    placeholder: existing === null ? "1234 5678 9012 3456" : t("vaultforms.savedLast4", { last4: existing.last4 }),
   });
   number.dataset.secret = "password";
   const brand = el("span", { class: "vault-brand", "aria-live": "polite" });
   const numberSays = problemLine();
   // A number being written is seen as it is typed; a saved one starts hidden, and shows when the eye is pressed.
-  const numberBox = secretBox(number, { saved: saved("number"), what: "card number", startShown: existing === null, eye: true, onError, onShown });
+  const numberBox = secretBox(number, { saved: saved("number"), what: t("vaultforms.cardNumber"), startShown: existing === null, eye: true, onError, onShown });
   const expiry = el("input", {
     class: "input mono",
     type: "text",
@@ -371,19 +372,19 @@ export function openCardDialog({ existing, returnFocus, done }) {
     autocomplete: "off",
     spellcheck: "false",
     maxlength: "7",
-    placeholder: existing === null ? "MM/YY" : "Saved: write to change it",
+    placeholder: existing === null ? "MM/YY" : t("vaultforms.savedWriteToChangeIt"),
   });
   const expirySays = problemLine();
-  const code = passwordInput(existing === null ? "" : "Saved: write to change it", "numeric");
+  const code = passwordInput(existing === null ? "" : t("vaultforms.savedWriteToChangeIt"), "numeric");
   code.maxLength = 4;
   const codeSays = problemLine();
-  const codeBox = secretBox(code, { saved: saved("code"), what: "security code", startShown: false, eye: true, onError, onShown });
+  const codeBox = secretBox(code, { saved: saved("code"), what: t("vaultforms.securityCode"), startShown: false, eye: true, onError, onShown });
   // The name on the card is kept in the Keychain like the code, so it has the same eye: shown, it can be read, changed or
   // emptied (which removes it); left alone, it is kept.
-  const name = passwordInput(existing === null ? "" : "Saved: write to change it");
+  const name = passwordInput(existing === null ? "" : t("vaultforms.savedWriteToChangeIt"));
   name.maxLength = 120;
-  const nameBox = secretBox(name, { saved: saved("name"), what: "name on the card", startShown: existing === null, eye: true, onError, onShown });
-  const nickname = el("input", { class: "input", type: "text", autocomplete: "off", maxlength: "40", placeholder: "Travel" });
+  const nameBox = secretBox(name, { saved: saved("name"), what: t("vaultforms.nameOnTheCard"), startShown: existing === null, eye: true, onError, onShown });
+  const nickname = el("input", { class: "input", type: "text", autocomplete: "off", maxlength: "40", placeholder: t("vaultforms.travel") });
   nickname.value = existing?.nickname ?? "";
 
   const billing = addressBoxes(BILLING_NAMES, existing?.fields ?? {}, countryNames());
@@ -393,7 +394,7 @@ export function openCardDialog({ existing, returnFocus, done }) {
   function paintBilling() {
     const open = !billingBox.hidden;
     billingToggle.setAttribute("aria-expanded", String(open));
-    billingToggle.replaceChildren(icon(open ? "x" : "plus"), open ? "Remove the billing address" : "Add a billing address (optional)");
+    billingToggle.replaceChildren(icon(open ? "x" : "plus"), open ? t("vaultforms.removeTheBillingAddress") : t("vaultforms.addABillingAddressOptional"));
   }
   billingToggle.addEventListener("click", () => {
     if (!billingBox.hidden) {
@@ -407,8 +408,8 @@ export function openCardDialog({ existing, returnFocus, done }) {
   paintBilling();
 
   // The photo: a picture of the card, read on this Mac (Vision) and sent nowhere.
-  const picture = el("input", { type: "file", accept: "image/*", hidden: true, "aria-label": "Photo of the card" });
-  const upload = el("button", { class: "btn", type: "button" }, icon("upload"), "Upload a photo");
+  const picture = el("input", { type: "file", accept: "image/*", hidden: true, "aria-label": t("vaultforms.photoOfTheCard") });
+  const upload = el("button", { class: "btn", type: "button" }, icon("upload"), t("vaultforms.uploadAPhoto"));
   const photoNote = el("p", { class: "hint vault-photo-note", role: "status", hidden: true });
   upload.addEventListener("click", () => picture.click());
   picture.addEventListener("change", async () => {
@@ -423,27 +424,27 @@ export function openCardDialog({ existing, returnFocus, done }) {
     }
     upload.disabled = true;
     photoNote.hidden = false;
-    photoNote.textContent = "Reading the photo on this Mac…";
+    photoNote.textContent = t("vaultforms.readingThePhotoOnThis");
     try {
       const read = await api.post("/vault/card-photo", { image: await pictureOf(file) });
       dialog?.fail(null);
       const found = [];
       if (read.number !== null) {
         setValue(number, read.number);
-        found.push("the number");
+        found.push(t("vaultforms.theNumber"));
       }
       if (read.expiry !== null) {
         setValue(expiry, read.expiry);
-        found.push("the expiry");
+        found.push(t("vaultforms.theExpiry"));
       }
       if (read.name !== null && name.value === "") {
         setValue(name, read.name);
-        found.push("the name");
+        found.push(t("vaultforms.theName"));
       }
       photoNote.textContent =
         found.length === 0
-          ? "No card number could be read in this photo. Try a sharper photo, straight on, or type it."
-          : `Read ${found.join(", ")} from the photo, on this Mac. Check them before you save.`;
+          ? t("vaultforms.noCardNumberCouldBe")
+          : t("vaultforms.readJoinFromThePhoto", { join: found.join(", ") });
       dialog?.revalidate();
     } catch (error) {
       photoNote.hidden = true;
@@ -481,25 +482,25 @@ export function openCardDialog({ existing, returnFocus, done }) {
   };
 
   dialog = formDialog({
-    title: existing === null ? "New card" : "Edit card",
-    description: `A card kept in your Mac's Keychain. ${dotName()} never sees its number, expiry or code.`,
+    title: existing === null ? t("vaultforms.newCard") : t("vaultforms.editCard"),
+    description: t("vaultforms.aCardKeptInYour", { dotName: dotName() }),
     body: [
-      el("div", { class: "vault-photo" }, upload, el("span", { class: "muted" }, "or enter it"), picture),
+      el("div", { class: "vault-photo" }, upload, el("span", { class: "muted" }, t("vaultforms.orEnterIt")), picture),
       photoNote,
-      labelled("Card number", number, "", numberBox.box, brand),
+      labelled(t("vaultforms.cardNumber2"), number, "", numberBox.box, brand),
       numberSays.element,
-      labelled("Expiry (MM / YY)", expiry),
+      labelled(t("vaultforms.expiryMmYy"), expiry),
       expirySays.element,
-      labelled("Security code (optional)", code, "", codeBox.box),
+      labelled(t("vaultforms.securityCodeOptional"), code, "", codeBox.box),
       codeSays.element,
-      labelled("Name on the card (optional)", name, "", nameBox.box),
-      labelled("Nickname (optional)", nickname, "Like Travel or Work: how the card is named in lists."),
+      labelled(t("vaultforms.nameOnTheCardOptional"), name, "", nameBox.box),
+      labelled(t("vaultforms.nicknameOptional"), nickname, t("vaultforms.likeTravelOrWorkHow")),
       billingToggle,
       billingBox,
     ],
-    submitLabel: "Save card",
+    submitLabel: t("vaultforms.saveCard"),
     valid,
-    leading: [assurance(`${dotName()} never sees the number`)],
+    leading: [assurance(t("vaultforms.dotnameNeverSeesTheNumber", { dotName: dotName() }))],
     returnFocus,
     onSubmit: async () => {
       const body = { kind: "card", nickname: nickname.value.trim() };
@@ -522,7 +523,7 @@ export function openCardDialog({ existing, returnFocus, done }) {
         body.billing = billingBox.hidden ? {} : billing.values();
       }
       const record = await keep(existing, body);
-      toast("ok", existing === null ? "Card saved." : "Card changed.");
+      toast("ok", existing === null ? t("vaultforms.cardSaved") : t("vaultforms.cardChanged"));
       done(record);
       return true;
     },
@@ -537,7 +538,7 @@ export function openCardDialog({ existing, returnFocus, done }) {
  * @param {{ existing: any, returnFocus: (() => HTMLElement | null) | HTMLElement | null, done: (record: any) => void }} options
  */
 export function openContactDialog({ existing, returnFocus, done }) {
-  const label = el("input", { class: "input", type: "text", autocomplete: "off", maxlength: "40", placeholder: "Home" });
+  const label = el("input", { class: "input", type: "text", autocomplete: "off", maxlength: "40", placeholder: t("vaultforms.home") });
   label.value = existing?.label ?? "";
   const details = addressBoxes(
     DETAILS.map((spec) => spec.name),
@@ -548,15 +549,15 @@ export function openContactDialog({ existing, returnFocus, done }) {
   const emailBox = details.boxes.get("email");
   const emailSays = problemLine();
   const emailGood = () => emailBox.value.trim() === "" || EMAIL.test(emailBox.value.trim());
-  emailBox.addEventListener("input", () => emailSays.say(emailGood() ? null : "The email address does not look right."));
+  emailBox.addEventListener("input", () => emailSays.say(emailGood() ? null : t("vaultforms.theEmailAddressDoesNot")));
 
   const valid = () => label.value.trim() !== "" && details.any() && emailGood();
 
   return formDialog({
-    title: existing === null ? "New contact" : "Edit contact",
-    description: `Details ${dotName()} may type into forms for you: a name, an address, a phone number, an email.`,
+    title: existing === null ? t("vaultforms.newContact") : t("vaultforms.editContact"),
+    description: t("vaultforms.detailsDotnameMayTypeInto", { dotName: dotName() }),
     body: [
-      labelled("Label", label, "Like Home or Work."),
+      labelled(t("vaultforms.label"), label, t("vaultforms.likeHomeOrWork")),
       fullName,
       address,
       address2,
@@ -565,12 +566,12 @@ export function openContactDialog({ existing, returnFocus, done }) {
       el("div", { class: "vault-pair" }, phone, email),
       emailSays.element,
     ],
-    submitLabel: "Save contact",
+    submitLabel: t("vaultforms.saveContact"),
     valid,
     returnFocus,
     onSubmit: async () => {
       const record = await keep(existing, { kind: "contact", label: label.value.trim(), fields: details.values() });
-      toast("ok", existing === null ? "Contact saved." : "Contact changed.");
+      toast("ok", existing === null ? t("vaultforms.contactSaved") : t("vaultforms.contactChanged"));
       done(record);
       return true;
     },

@@ -3,9 +3,10 @@
 
 import { el } from "./dom.js";
 import { forgetLevel, levelLabel, offersChoice, savedLevel, saveLevel } from "./efforts.js";
+import { t } from "./i18n.js";
 
 function defaultText(model) {
-  return model.default_effort === null ? "Default" : `Default (${levelLabel(model.default_effort)})`;
+  return model.default_effort === null ? t("reasoning.default") : t("reasoning.defaultLevellabel", { levelLabel: levelLabel(model.default_effort) });
 }
 
 /**

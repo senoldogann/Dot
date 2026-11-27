@@ -7,6 +7,7 @@ import { el } from "./dom.js";
 import { explain } from "./errors.js";
 import { markContent } from "./marks.js";
 import { attempt, detailsFold, toast } from "./ui.js";
+import { t, listAnd } from "./i18n.js";
 
 // How often the card reads the accounts again after a sign-in starts, and for how long.
 const FOLLOW_MS = 3000;
@@ -24,8 +25,8 @@ export function accountsCard() {
   const list = el("div", { class: "accounts-list" });
   const element = el(
     "section",
-    { class: "card", "aria-label": "Accounts" },
-    el("div", { class: "card-head" }, el("span", { class: "grow" }, "Accounts"), el("span", { class: "hint" }, "Gmail, Google Calendar, Outlook and Microsoft 365, through their own sign-in")),
+    { class: "card", "aria-label": t("accounts.accounts") },
+    el("div", { class: "card-head" }, el("span", { class: "grow" }, t("accounts.accounts")), el("span", { class: "hint" }, t("accounts.gmailGoogleCalendarOutlookAnd"))),
     el("div", { class: "card-pad" }, list),
   );
 
@@ -38,7 +39,7 @@ export function accountsCard() {
     const signIn = el(
       "button",
       { class: "btn sm primary", type: "button", disabled: !provider.configured },
-      el("span", null, provider.accounts.length > 0 ? "Sign in another" : "Sign in"),
+      el("span", null, provider.accounts.length > 0 ? t("accounts.signInAnother") : t("accounts.signIn")),
     );
     signIn.addEventListener("click", () =>
       attempt(async () => {
@@ -46,7 +47,7 @@ export function accountsCard() {
         try {
           const started = await api.post(`/accounts/${provider.id}/start`, null);
           window.open(started.link, "_blank", "noopener,noreferrer");
-          toast("ok", `Say yes on ${provider.name}'s page; this card follows.`);
+          toast("ok", t("accounts.sayYesOnNameS", { name: provider.name }));
           until = Date.now() + FOLLOW_FOR_MS;
           follow();
         } finally {
@@ -70,23 +71,23 @@ export function accountsCard() {
                 paint(answered.providers);
                 // The sign-out always stands here; when the provider has not ended Dot's access too, the toast says where.
                 if (answered.revoked) {
-                    toast("ok", `${account.address} is signed out.`);
+                    toast("ok", t("accounts.addressIsSignedOut", { address: account.address }));
                 } else {
                     toast("info", `${account.address}: ${answered.notice}`);
                 }
               }),
           },
-          "Sign out",
+          t("accounts.signOut"),
         ),
       ),
     );
     const status = !provider.configured
       ? [
-          `Not set up yet. It needs a sign-in app that you make at ${provider.name} first; docs/extending.md says how.`,
-          detailsFold(`Save ${provider.client_names.join(" and ")} in the Keychain.`),
+          t("accounts.notSetUpYetIt", { name: provider.name }),
+          detailsFold(t("accounts.saveNamesInTheKeychain", { names: listAnd(provider.client_names) })),
         ]
       : provider.accounts.length === 0
-        ? ["Not signed in."]
+        ? [t("accounts.notSignedIn")]
         : null;
     return el(
       "div",
@@ -112,7 +113,7 @@ export function accountsCard() {
     } catch (error) {
       shown = "";
       const { text, details } = explain(error);
-      list.replaceChildren(el("div", { class: "hint" }, `The accounts could not be read. ${text}`, detailsFold(details)));
+      list.replaceChildren(el("div", { class: "hint" }, t("accounts.theAccountsCouldNotBe", { text }), detailsFold(details)));
       throw error;
     }
     if (!disposed) {

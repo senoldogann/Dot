@@ -11,6 +11,7 @@ import { onLifecycle, onStreamBack } from "../state.js";
 import { attempt } from "../ui.js";
 import { plainText } from "../markdown.js";
 import { WORKING_STATES } from "../runstates.js";
+import { t } from "../i18n.js";
 
 const DOT_ID = "dot";
 const MESSAGE_CHARS = 240;
@@ -41,21 +42,21 @@ function messageRow(message) {
         { class: "row team-heads" },
         memberLink(message.from_id, message.from_name),
         // The word is text, which a screen reader reads; a label on a plain span it does not (item 559).
-        el("span", { class: "team-arrow" }, icon("arrowRight"), el("span", { class: "visually-hidden" }, "to")),
+        el("span", { class: "team-arrow" }, icon("arrowRight"), el("span", { class: "visually-hidden" }, t("views.team.to"))),
         memberLink(message.to_id, message.to_name),
         statusBadge(message.status),
       ),
       // Words with their markdown taken off (item 778): a preview printed "**Files:**" and backticks as they were written.
       el("div", { class: "row-text" }, clip(plainText(message.message), MESSAGE_CHARS)),
       message.reply === null
-        ? el("div", { class: "row-text muted" }, working ? `${message.to_name} is working on it` : "No reply")
+        ? el("div", { class: "row-text muted" }, working ? t("views.team.toNameIsWorkingOn", { to_name: message.to_name }) : t("views.team.noReply"))
         : el("div", { class: "row-text muted team-reply" }, clip(plainText(message.reply), REPLY_CHARS)),
       el(
         "div",
         { class: "row-meta" },
         el("span", null, ago(message.ts)),
-        el("a", { href: `#/runs/${message.parent_run_id}` }, "The sender's task"),
-        el("a", { href: `#/runs/${message.run_id}` }, "The reply's task"),
+        el("a", { href: `#/runs/${message.parent_run_id}` }, t("views.team.theSenderSTask")),
+        el("a", { href: `#/runs/${message.run_id}` }, t("views.team.theReplySTask")),
       ),
     ),
   );
@@ -75,7 +76,7 @@ export function mount(root) {
       }
       holder.replaceChildren(
         view.messages.length === 0
-          ? emptyPanel("message", "No messages today", "Ask Dot to bring one of your agents into a task, and what they say to each other shows here.")
+          ? emptyPanel("message", t("views.team.noMessagesToday"), t("views.team.askDotToBringOne"))
           : el("div", { class: "card" }, view.messages.map(messageRow)),
       );
     } catch (error) {
@@ -86,8 +87,8 @@ export function mount(root) {
   }
 
   root.append(
-    el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), "All agents"),
-    pageHead("Handoffs", "Today's messages between Dot and your agents, oldest first.", null),
+    el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), t("views.team.allAgents")),
+    pageHead(t("views.team.handoffs"), t("views.team.todaySMessagesBetweenDot"), null),
     holder,
   );
   const stopLifecycle = onLifecycle((event) => {

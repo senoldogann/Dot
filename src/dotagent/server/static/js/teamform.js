@@ -3,10 +3,11 @@
 
 import { actorFace } from "./actors.js";
 import { api } from "./api.js";
-import { el, plural } from "./dom.js";
+import { el, } from "./dom.js";
 import { icon } from "./icons.js";
 import { field } from "./panels.js";
 import { attempt, toast } from "./ui.js";
+import { t, tCount } from "./i18n.js";
 
 const NAME_CHARS = 60;
 const PURPOSE_CHARS = 500;
@@ -27,13 +28,13 @@ function listed(team, agents, chosen) {
  * `onSaved(record)` runs with the saved team; `onCancel` closes the form. Returns `element`, `focus()`.
  */
 export function teamForm({ team, agents, onSaved, onCancel, chosen = [] }) {
-  const name = el("input", { class: "input", type: "text", maxlength: String(NAME_CHARS), autocomplete: "off", placeholder: "Content team", "aria-label": "Name" });
+  const name = el("input", { class: "input", type: "text", maxlength: String(NAME_CHARS), autocomplete: "off", placeholder: t("teamform.contentTeam"), "aria-label": t("teamform.name") });
   const purpose = el("textarea", {
     class: "textarea",
     rows: "3",
     maxlength: String(PURPOSE_CHARS),
-    placeholder: "What the team is for. Dot reads this at the start of every chat with the team, and hands each agent the part its role fits.",
-    "aria-label": "Purpose",
+    placeholder: t("teamform.whatTheTeamIsFor"),
+    "aria-label": t("teamform.purpose"),
   });
   if (team !== null) {
     name.value = team.name;
@@ -45,15 +46,15 @@ export function teamForm({ team, agents, onSaved, onCancel, chosen = [] }) {
     box: el("input", { type: "checkbox", value: agent.id, checked: inTeam.has(agent.id) }),
   }));
   const count = el("span", { class: "muted team-picks-count" });
-  const save = el("button", { class: "btn primary", type: "button" }, icon(team === null ? "plus" : "check"), team === null ? "Create team" : "Save changes");
-  const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, "Cancel");
+  const save = el("button", { class: "btn primary", type: "button" }, icon(team === null ? "plus" : "check"), team === null ? t("teamform.createTeam") : t("teamform.saveChanges"));
+  const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, t("teamform.cancel"));
 
   function picked() {
     return boxes.filter(({ box }) => box.checked).map(({ agent }) => agent.id);
   }
   function paint() {
     const chosen = picked().length;
-    count.textContent = agents.length === 0 ? "" : `${chosen} of ${agents.length}`;
+    count.textContent = agents.length === 0 ? "" : t("teamform.chosenOfLength", { chosen, length: agents.length });
     save.disabled = chosen === 0;
   }
   for (const { box } of boxes) {
@@ -71,7 +72,7 @@ export function teamForm({ team, agents, onSaved, onCancel, chosen = [] }) {
     save.disabled = true;
     try {
       const saved = team === null ? await api.post("/teams", body) : await api.put(`/teams/${team.id}`, body);
-      toast("ok", team === null ? `${saved.name} is ready: ${plural(saved.agents.length, "agent", "agents")}.` : "Team saved.");
+      toast("ok", team === null ? t("teamform.nameIsReadyPart", { name: saved.name, part: tCount(saved.agents.length, "teamform.countAgent", "teamform.countAgents") }) : t("teamform.teamSaved"));
       onSaved(saved);
     } finally {
       paint();
@@ -81,10 +82,10 @@ export function teamForm({ team, agents, onSaved, onCancel, chosen = [] }) {
 
   const agentList =
     agents.length === 0
-      ? el("p", { class: "hint" }, "You have no agents yet. Make one with New agent, or start from a ready team, then put them together here.")
+      ? el("p", { class: "hint" }, t("teamform.youHaveNoAgentsYet"))
       : el(
           "div",
-          { class: "team-picks", role: "group", "aria-label": "The agents of the team" },
+          { class: "team-picks", role: "group", "aria-label": t("teamform.theAgentsOfTheTeam") },
           boxes.map(({ agent, box }) =>
             el(
               "label",
@@ -99,18 +100,18 @@ export function teamForm({ team, agents, onSaved, onCancel, chosen = [] }) {
   const agentsField = el(
     "div",
     { class: "field wide" },
-    el("span", { class: "field-label" }, "Agents ", count),
+    el("span", { class: "field-label" }, t("teamform.agents"), count),
     agentList,
-    el("span", { class: "hint" }, "Dot leads the team: it hands each of these agents the part its role fits and puts their answers together. They stay your agents, with their own chats, if the team goes."),
+    el("span", { class: "hint" }, t("teamform.dotLeadsTheTeamIt")),
   );
   const element = el(
     "section",
-    { class: "card agent-editor team-editor", "aria-label": team === null ? "New team" : "Edit team" },
-    el("div", { class: "card-head" }, el("span", null, team === null ? "New team" : `Edit ${team.name}`)),
+    { class: "card agent-editor team-editor", "aria-label": team === null ? t("teamform.newTeam") : t("teamform.editTeam") },
+    el("div", { class: "card-head" }, el("span", null, team === null ? t("teamform.newTeam") : t("teamform.editName", { name: team.name }))),
     el(
       "div",
       { class: "card-pad stack" },
-      el("div", { class: "form-grid" }, field("Name", name, ""), Object.assign(field("Purpose", purpose, ""), { className: "field wide" }), agentsField),
+      el("div", { class: "form-grid" }, field(t("teamform.name"), name, ""), Object.assign(field(t("teamform.purpose"), purpose, ""), { className: "field wide" }), agentsField),
       el("div", { class: "cluster end" }, cancel, save),
     ),
   );

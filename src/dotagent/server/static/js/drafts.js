@@ -4,14 +4,15 @@
 // may be answered long after its run ended.
 
 import { api } from "./api.js";
-import { clock, el, plural, setText } from "./dom.js";
+import { clock, el, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
+import { t, tCount } from "./i18n.js";
 
-const KIND = { mail: "Email", message: "Message" };
+const KIND = { mail: t("drafts.email"), message: t("drafts.message") };
 const ICON = { mail: "mail", message: "message" };
-const SEND = { mail: "Send email", message: "Send message" };
-const STATE = { waiting: "Draft", sending: "Sending…", sent: "Sent", discarded: "Discarded", failed: "Not sent" };
+const SEND = { mail: t("drafts.sendEmail"), message: t("drafts.sendMessage") };
+const STATE = { waiting: t("drafts.draft"), sending: t("drafts.sending"), sent: t("drafts.sent"), discarded: t("drafts.discarded"), failed: t("drafts.notSent") };
 const BADGE = { waiting: "b-warn", sending: "b-muted", sent: "b-ok", discarded: "b-muted", failed: "b-bad" };
 // The drafts that still take an answer: one that waits, and one whose send failed; and the answered ones.
 const OPEN = new Set(["waiting", "failed"]);
@@ -43,12 +44,12 @@ export function draftCard(initial, changed) {
   let busy = false;
   let ticks = false;
   const node = el("section", { class: "draft-card", dataset: { draft: draft.id } });
-  const pick = el("input", { class: "draft-pick", type: "checkbox", "aria-label": "Send with the other ticked drafts" });
+  const pick = el("input", { class: "draft-pick", type: "checkbox", "aria-label": t("drafts.sendWithTheOtherTicked") });
   pick.addEventListener("change", () => changed());
-  const toInput = el("input", { class: "input", type: "text", autocomplete: "off", spellcheck: "false", "aria-label": "To" });
-  const ccInput = el("input", { class: "input", type: "text", autocomplete: "off", spellcheck: "false", "aria-label": "Cc" });
-  const subjectInput = el("input", { class: "input", type: "text", autocomplete: "off", "aria-label": "Subject" });
-  const bodyInput = el("textarea", { class: "textarea", rows: "8", "aria-label": "Body" });
+  const toInput = el("input", { class: "input", type: "text", autocomplete: "off", spellcheck: "false", "aria-label": t("drafts.to") });
+  const ccInput = el("input", { class: "input", type: "text", autocomplete: "off", spellcheck: "false", "aria-label": t("drafts.cc") });
+  const subjectInput = el("input", { class: "input", type: "text", autocomplete: "off", "aria-label": t("drafts.subject") });
+  const bodyInput = el("textarea", { class: "textarea", rows: "8", "aria-label": t("drafts.body") });
 
   /** What Send sends: the form's words while it is open, the draft's otherwise. */
   function words() {
@@ -88,15 +89,15 @@ export function draftCard(initial, changed) {
 
   async function send() {
     if (await deliver()) {
-      toast("ok", `${KIND[draft.channel]} sent.`);
+      toast("ok", t("drafts.valueSent", { value: KIND[draft.channel] }));
     }
   }
 
   async function discard() {
     const confirmed = await confirmDialog({
-      title: "Discard this draft?",
-      message: "Nothing is sent, and the draft cannot be brought back.",
-      confirmLabel: "Discard",
+      title: t("drafts.discardThisDraft"),
+      message: t("drafts.nothingIsSentAndThe"),
+      confirmLabel: t("drafts.discard"),
       danger: true,
       focusCancel: true,
     });
@@ -124,8 +125,8 @@ export function draftCard(initial, changed) {
       { class: "draft-head" },
       ticks && OPEN.has(draft.status) ? pick : null,
       icon(ICON[draft.channel]),
-      el("span", { class: "draft-kind" }, `${KIND[draft.channel]} draft`),
-      el("span", { class: `badge ${BADGE[draft.status]}` }, busy && draft.status !== "sending" ? "Sending…" : STATE[draft.status]),
+      el("span", { class: "draft-kind" }, t("drafts.valueDraft", { value: KIND[draft.channel] })),
+      el("span", { class: `badge ${BADGE[draft.status]}` }, busy && draft.status !== "sending" ? t("drafts.sending") : STATE[draft.status]),
       el("span", { class: "spacer" }),
       el("span", { class: "draft-time muted" }, clock(when)),
     );
@@ -139,7 +140,7 @@ export function draftCard(initial, changed) {
         { class: "draft-fields" },
         field("To", draft.to.join(", ")),
         mail && draft.cc.length > 0 ? field("Cc", draft.cc.join(", ")) : null,
-        mail ? field("Subject", draft.subject) : null,
+        mail ? field(t("drafts.subject"), draft.subject) : null,
       ),
       el("div", { class: "draft-body" }, draft.body),
     ];
@@ -149,7 +150,7 @@ export function draftCard(initial, changed) {
     const mail = draft.channel === "mail";
     const row = (label, input) => el("label", { class: "draft-field" }, el("span", { class: "draft-label" }, label), input);
     return [
-      el("div", { class: "draft-fields" }, row("To", toInput), mail ? row("Cc", ccInput) : null, mail ? row("Subject", subjectInput) : null),
+      el("div", { class: "draft-fields" }, row("To", toInput), mail ? row("Cc", ccInput) : null, mail ? row(t("drafts.subject"), subjectInput) : null),
       bodyInput,
     ];
   }
@@ -160,17 +161,17 @@ export function draftCard(initial, changed) {
     }
     const button = (label, className, action, iconName) =>
       el("button", { class: className, type: "button", disabled: busy, onclick: () => attempt(action) }, iconName === null ? null : icon(iconName), label);
-    const sendLabel = draft.status === "failed" ? "Send again" : SEND[draft.channel];
+    const sendLabel = draft.status === "failed" ? t("drafts.sendAgain") : SEND[draft.channel];
     return el(
       "div",
       { class: "draft-actions" },
       editing
-        ? button("Cancel", "btn", async () => {
+        ? button(t("drafts.cancel"), "btn", async () => {
             editing = false;
             paint();
           }, null)
-        : button("Discard", "btn", discard, null),
-      editing ? null : button("Edit", "btn", async () => edit(), "pencil"),
+        : button(t("drafts.discard"), "btn", discard, null),
+      editing ? null : button(t("drafts.edit"), "btn", async () => edit(), "pencil"),
       button(sendLabel, "btn primary draft-send", send, "send"),
     );
   }
@@ -252,8 +253,8 @@ export function draftsBar(cards) {
       return;
     }
     const picked = open.filter((card) => card.picked());
-    setText(count, picked.length === 0 ? `${open.length} drafts wait: tick the ones to send together` : `${picked.length} of ${open.length} drafts ticked`);
-    setText(label, picked.length === 0 ? "Send ticked" : `Send ${picked.length}`);
+    setText(count, picked.length === 0 ? t("drafts.lengthDraftsWaitTickThe", { length: open.length }) : t("drafts.lengthOfLength2DraftsTicked", { length: picked.length, length2: open.length }));
+    setText(label, picked.length === 0 ? t("drafts.sendTicked") : t("drafts.sendLength", { length: picked.length }));
     sendButton.disabled = picked.length === 0;
     const last = open[open.length - 1].node;
     if (last.nextElementSibling !== node) {
@@ -277,7 +278,7 @@ export function draftsBar(cards) {
     if (sent < picked.length) {
       throw new Error(`${sent} of ${picked.length} sent; the cards say why the others were not${problems.length > 0 ? `: ${problems[0]}` : "."}`);
     }
-    toast("ok", `${plural(sent, "draft", "drafts")} sent.`);
+    toast("ok", t("drafts.partSent", { part: tCount(sent, "drafts.countDraft", "drafts.countDrafts") }));
   }
 
   sendButton.addEventListener("click", () => attempt(sendTicked));

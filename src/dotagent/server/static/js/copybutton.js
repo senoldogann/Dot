@@ -30,7 +30,7 @@ export function copyButton(text, label) {
               button.setAttribute("aria-label", label);
             }, COPIED_MS);
           },
-          (error) => toast("error", `Could not copy: ${error.message}`),
+          (error) => toast("error", t("copybutton.couldNotCopyMessage", { message: error.message })),
         ),
     },
     icon("copy"),
