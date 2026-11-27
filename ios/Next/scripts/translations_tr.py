@@ -1,6 +1,8 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# A new chat's first send opens the one chat screen (item 2025).
+TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
 # The question card like another coding agent's (item 2001).
 # Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
