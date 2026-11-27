@@ -1342,9 +1342,10 @@ light on the way in; a screenshot tour (`tests/smoke/test_tour.py`) photographs 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) Chat · Dot`. Settings › General ›
 Notifications adds desktop notifications (off until you switch them on; the browser asks for its permission on that
 click): Dot says when it asks for an approval, a question or your help, and when it leaves you a question that a run
-could not wait for (a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or
-stopped, with the first line of its answer; the sub-runs of a run stay quiet, and a schedule's run is told as its
-notification level says, item 461, see [Memory and schedules](memory-and-schedules.md)); when a campaign ends by itself
+could not wait for (a `yolo`, scheduled or campaign run goes on without the answer). Task end notices say when the
+task succeeded, failed or the goal check found it blocked. A stopped task and sub-run ends stay quiet. Task notices
+use fixed copy and open the chat for details. A schedule's run is told at its own notification level, as described
+in [Memory and schedules](memory-and-schedules.md). Dot also tells when a campaign ends by itself
 (achieved, or stopped by the emergency stop, by `campaign_max_sessions` or by `campaign_failed_sessions`, item 724);
 when a schedule misses a firing that nobody saw (overdue, or its run could not start; told once while the reason stays
 the same, and not at its level "never"); when a repeating schedule is switched off because its runs failed so many times

@@ -46,7 +46,7 @@ if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" TES
     -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
     -only-testing:DotNextUITests/SettingsLiveUITests -only-testing:DotNextUITests/SettingsMaintenanceLiveUITests \
     -only-testing:DotNextUITests/ConnectAppsLiveUITests -only-testing:DotNextUITests/PushLinkLiveUITests >"$t/xcodebuild.log" 2>&1; then
-    echo "FAIL  SettingsLiveUITests, SettingsMaintenanceLiveUITests or ConnectAppsLiveUITests (xcodebuild test failed; its log: $t/xcodebuild.log)" >&2
+    echo "FAIL  Settings or Live Activity link UI tests (xcodebuild test failed; its log: $t/xcodebuild.log)" >&2
     fail=1
 fi
 grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" "$t/xcodebuild.log" | sort -u

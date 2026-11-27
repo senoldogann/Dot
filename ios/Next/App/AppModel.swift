@@ -96,8 +96,10 @@ final class AppModel {
         if next.list != list || next.chats != chats { PerfCounters.shared.published() }
         // Every screen reads the list with the deletes on their way hidden (item 1964), and drops a chat that went (item 1965).
         let shown: ListProjection = next.shownList
-        if shown != list { list = shown }
-        push?.show(shown)
+        if shown != list {
+            list = shown
+            push?.show(shown)
+        }
         let gone: Set<String> = next.goneChats
         if gone != goneChats { goneChats = gone }
         // A chat the Mac says went may have been a bot's home chat: the agents are read again for the one that follows it.

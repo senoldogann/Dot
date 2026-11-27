@@ -190,7 +190,7 @@ function firstLine(text) {
   return text.split(LINE_BREAK).find((line) => line.trim() !== "") ?? "";
 }
 
-/** The notification of a run's end: how it ended and the first line of its answer. */
+/** The notification of a scheduled run's end at the schedule's own notice level. */
 function endNote(runId, status, result) {
   return {
     title: FINISHED_TITLE[status] ?? t("attention.aTaskHasEnded"),
@@ -255,7 +255,7 @@ function tellAboutMissedFiring(event) {
   tell({ title: t("attention.aScheduleDidNotRun"), body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed", counted: false });
 }
 
-/** The end of a schedule's run that its level tells (item 461), in the words of every run's end. */
+/** The end of a schedule's run that its level tells (item 461). */
 function tellAboutScheduledEnd(event) {
   const { run_id: runId, status, result } = event.data;
   if (!worthATell(runId)) {

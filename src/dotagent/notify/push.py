@@ -83,8 +83,8 @@ _GROUP_OF: dict[str, PushGroup] = {
     # ``approval_requested``, or of ``question_left`` once the run went on without an answer).
     **{kind: "needs_you" for kind in _ASKED_KINDS},
     # Dot's own work broke, which the owner is to look at: a schedule that did not run or was switched off, learning
-    # that stopped, a restart after an unexpected stop. They are not "done": a phone that switches the ends of tasks off
-    # still hears them, the only way it learns Dot's own work failed.
+    # that stopped, a restart after an unexpected stop. They remain in their own group so they can be switched
+    # independently of task ends. DotNext's APNs topic takes only task alerts.
     SCHEDULE_MISSED_EVENT: "needs_you",
     SCHEDULE_STOPPED_EVENT: "needs_you",
     DAEMON_RESTARTED_EVENT: "needs_you",
@@ -180,8 +180,7 @@ def _cut_off(runs: int) -> str:
 
 
 def finished_message(status: str, result: str, run_id: str) -> PushMessage:
-    """The message of the end of a run: how it ended, and the first line of its answer. A schedule's run is told in
-    these words too, when its level tells it (``dotagent.scheduler.notices``)."""
+    """The end of a scheduled run: how it ended and the first line of its answer, at the schedule's own notice level."""
     return PushMessage(
         title=_FINISHED_TITLE.get(status, "A task has ended"),
         body=_shorten(_first_line(result)),
@@ -223,9 +222,8 @@ def _told_by_its_schedule(run: RunRecord) -> bool:
 
 def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
     """The message an event of a run is worth, or ``None``: an approval or a question asked or left; a draft written
-    for the owner to send (item 314); the end of a run of its own (the sub-runs of a run stay quiet, as in the web UI),
-    but for a schedule's run, which its schedule tells at its level (item 461); the
-    end of a campaign by itself."""
+    for the owner to send (item 314); a successful, failed or blocked end of a run with no parent, apart from a
+    scheduled run, which its schedule tells at its notice level; or the end of a campaign."""
     if event.kind in _ASKED_KINDS:
         severity: object = event.data.get("severity")
         title: str = _ASKING_TITLE.get(str(severity), "Dot asks for approval")

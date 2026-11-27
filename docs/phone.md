@@ -251,9 +251,9 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    alert about another chat is a banner with its sound, and so is every alert while the app is inactive or shows the list. The app's pushes come in three kinds that each phone switches for itself (item 1421,
    `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, and Dot's own
    failures you are to look at: a schedule that did not run or was switched off, learning that stopped, a restart after
-   an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run, a
-   schedule's run or a campaign that ended); all three are on until the phone says otherwise, a kind that is off is not
-   sent to that phone, and a schedule's own level of notices (Settings › Scheduled tasks) still decides whether the end
+   an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run that
+   succeeded, failed or was blocked, or a schedule's run or campaign that ended). All three are on until the phone
+   says otherwise. A kind that is off is not sent to that phone, and a schedule's own level of notices (Settings › Scheduled tasks) still decides whether the end
    of its run is told at all. Once the app sent
    the activity's token every change goes to it, and an activity whose token came before its run started waits a
    minute for it (one opened by a request that started no run, a message queued behind a held queue, ends then); a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
@@ -666,7 +666,11 @@ announcement Apple requires for remote starts.
 DotNext shows task alerts for a question or approval, a stored successful or failed end, and an end the goal check
 found blocked. The app opens the chat so the owner can read an ask before answering. The phone's language selects the
 English or Turkish task notice. The web uses Settings › General's language for the same task notices. The alert
-contains fixed copy and the chat's route. Task content stays in the chat.
+contains fixed copy and the chat's route. Task content stays in the chat. A stopped task stays quiet.
+
+The web and older app still carry routine warnings and ends, campaign ends, drafts, the morning brief and watcher
+notices. DotNext's notification switches cover questions and approvals and the three task outcomes above. The other
+notices stay on their existing surfaces, including the web and the channels that already deliver them.
 
 The daemon's `[apns].topic` selects one application. Use `dev.dotagent.phone.next` for DotNext or
 `dev.dotagent.phone` for the older app. Restart the daemon after changing the topic, then pair and open the selected
@@ -762,9 +766,8 @@ Reply, 200:
 `ttl_s` is the time as the daemon took it (capped), `expires_at` is when it ends, in seconds since the epoch. After
 `background` the reply is `{"state": "background", "chat": null, "ttl_s": 0.0, "expires_at": null}`.
 
-What it changes and what it does not: while a lease holds, the end of a run (done, failed, stopped), of a schedule's run
-and of a campaign are not sent to that phone as alerts, for the chat on screen and for any other, as the app shows them
-itself. Everything else is sent whatever the lease says: an approval, a question (also one a run left), a secret and a
+While a lease holds, the older app shows successful, failed and blocked task ends and the ends of scheduled runs
+and campaigns in the app. The daemon keeps those alerts quiet for every chat. Everything else is sent whatever the lease says: an approval, a question (also one a run left), a secret and a
 hand-off, a draft written for you, what Dot tells you on its own and its own warnings (a schedule that did not run or was
 switched off, learning that stopped, a restart). The Live Activity is not touched by the lease, nor are the other phones,
 nor the web push of a browser. A phone that is removed loses its lease.
@@ -801,7 +804,7 @@ three.
   stopped, a restart after an unexpected stop), so that switching the ends of tasks off does not silence them.
 - `ready`: something is ready for you to look over: a draft written for you to send, and what Dot tells you on its own
   (the morning brief, what a watcher found).
-- `done`: something finished or failed: the end of a run (done, failed, stopped), of a schedule's run or of a campaign.
+- `done`: a run's successful, failed or blocked end, or the notice of a schedule's run or a campaign.
   A schedule's level of notices decides, as before, whether its run's end is told; this switch decides whether the
   phone hears what was told.
 
@@ -1251,11 +1254,13 @@ An **alert** (`alert_payload`):
   badge again from `count` whenever the app reads the list, since an answer given on the Mac sends no alert that would
   lower it.
 - `title` is one of: "Dot asks for approval", "Dot has a question", "Dot needs your help" (a hand-off, item 1423), "A task
-  is done", "A task failed", "A task was stopped", "A task has ended", "A campaign is achieved", "A campaign stopped", "Dot drafted an email",
+  is done", "A task failed", "A task is blocked", "A campaign is achieved", "A campaign stopped", "Dot drafted an email",
   "Dot drafted a message", "A schedule did not run", "A schedule was switched off", "Dot's learning has stopped", "Dot
   restarted after an unexpected stop" and, for a message Dot wrote to you, "Dot has a message for you" (never its own
-  words). `route` is a route of Dot's own pages that the tap opens, always starting `#/`: `#/runs/<run id>`,
-  `#/campaigns/<id>`, `#/settings/schedules`, `#/settings/memory` or `#/runs`.
+  words). Schedule notices can also say that a scheduled task stopped or ended. The tap follows `route` to one of
+  Dot's pages, always starting `#/`: `#/runs/<run id>`, `#/campaigns/<id>`, `#/settings/schedules`,
+  `#/settings/memory` or `#/runs`. DotNext task alerts use `title-loc-key` and `loc-key` so iOS resolves the
+  title and body in the app's language.
 - An **approval** of a step of low or medium risk adds `"category": "DOT_APPROVAL"` to `aps` and `"approval_id":
   "<approval id>"` next to `route`: the app's notification offers Approve and Deny, each after Face ID, and answers with
   `POST /api/approvals/{id}/decision`. A step of high risk, a question, a secret and a hand-off are alerts without the
@@ -1270,7 +1275,7 @@ priority 5; a start, a wait and an end go at once at priority 10.
 
 **Which pushes a phone is told.** Each event is one of three kinds, switched by `PUT /api/phone/push-settings`: `needs_you`
 (`approval_requested`, `question_left`, a schedule that did not run or was switched off, learning that stopped, a restart
-after an unexpected stop), `ready` (a draft written for you, what Dot tells you on its own) and `done` (the end of a run,
-of a schedule's run at its schedule's level of notices, of a campaign). A kind that is off is not sent to that phone. While
+after an unexpected stop), `ready` (a draft written for you, what Dot tells you on its own) and `done` (a run's
+successful, failed or blocked end, a schedule's run at its notice level, or a campaign's end). A kind that is off is not sent to that phone. While
 the phone's lease (`POST /api/phone/activity`) holds, the `done` kind's three events are not sent to it as alerts; nothing
 else is held back by it. A phone that is removed is sent nothing.

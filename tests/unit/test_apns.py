@@ -3,6 +3,7 @@ than a fixed title and a chat's short title), and the watch that sends them, wit
 
 import base64
 import json
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from dotagent.config import ApnsConfig, AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import DRAFT_CREATED_EVENT
+from dotagent.evals import EVAL_SOURCE
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID
 from dotagent.notify.apns import (
     ALERT_BODY,
@@ -61,6 +63,7 @@ from dotagent.notify.live_now import LiveNow, tool_now
 from dotagent.notify.live_start import keep_live_start_token, live_start_token_of
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.notify.settings import PushSettings, keep_push_settings
+from dotagent.proactive import UNWATCHED_SOURCES
 from dotagent.runtime import _guarded_files
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_RUN_ENDED_EVENT, SCHEDULE_STOPPED_EVENT
 from dotagent.scheduler.notices import tells
@@ -961,6 +964,12 @@ async def test_a_start_token_that_apns_calls_gone_is_forgotten_and_a_push_that_f
         assert down.posts == 3
     finally:
         await store.close()
+
+
+def test_dotnext_explicitly_excludes_the_daemons_unwatched_live_activity_sources() -> None:
+    path: Path = Path(__file__).resolve().parents[2] / "ios/Next/Push/PhonePush.swift"
+    declaration: str = next(line for line in path.read_text().splitlines() if "let unwatchedSources:" in line)
+    assert set(re.findall(r'"([^"]+)"', declaration)) == {*UNWATCHED_SOURCES, EVAL_SOURCE}
 
 
 async def test_dotnext_sends_only_task_alerts_and_ends_its_card_with_the_last_run(tmp_path: Path) -> None:

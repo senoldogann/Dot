@@ -209,11 +209,12 @@ class ApnsWatch:
             log.info("apns_device_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
 
     async def alert(self, message: PushMessage, now: float, kind: str) -> None:
-        if self._sender.topic == DOT_NEXT_TOPIC:
-            if message.title_tr is not None:
-                await self._alert(localized_alert_payload(message.title, message.route), now, kind)
-        else:
+        if self._sender.topic != DOT_NEXT_TOPIC:
             await self._alert(alert_payload(message.title, message.route), now, kind)
+        elif message.title_tr is not None:
+            await self._alert(localized_alert_payload(message.title, message.route), now, kind)
+        else:
+            log.info("apns_notice_outside_dotnext_task_alerts", kind=kind)
 
     def _shown(self, phone_id: str, now: float) -> bool:
         """Whether the app of ``phone_id`` said it is in the foreground and its lease still holds at ``now``."""

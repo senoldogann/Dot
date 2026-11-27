@@ -140,14 +140,17 @@ final class PhonePush {
         activityStateWatch = nil
         activityID = nil
         guard let paired else { return }
-        async let start: Bool = Self.post("forget start token", { () async throws(DaemonRequestError) in try await paired.forgetLiveStart() })
-        for activity in Activity<DotFleetAttributes>.activities {
-            await activity.end(nil, dismissalPolicy: .immediate)
-            if let token = activity.pushToken.flatMap(PhonePushToken.init) {
+        let activities: [Activity<DotFleetAttributes>] = Activity<DotFleetAttributes>.activities
+        let tokens: [PhonePushToken] = activities.compactMap { $0.pushToken.flatMap(PhonePushToken.init) }
+        for activity in activities { await activity.end(nil, dismissalPolicy: .immediate) }
+        // The cleanup captures the old paired API. Removing the local key can finish even if the Mac is offline.
+        Task {
+            async let start: Bool = Self.post("forget start token", { () async throws(DaemonRequestError) in try await paired.forgetLiveStart() })
+            for token in tokens {
                 _ = await Self.post("forget activity token") { () async throws(DaemonRequestError) in try await paired.forgetFleetPush(token) }
             }
+            _ = await start
         }
-        _ = await start
     }
 
     func receivedDeviceToken(_ token: Data) {
@@ -224,6 +227,13 @@ final class PhonePush {
         guard let api, activityID != activity.id,
             activity.activityState == .active || activity.activityState == .stale
         else { return }
+        // A remote start can arrive while a foreground card is still getting its update token. Keep one card.
+        if let activityID, Activity<DotFleetAttributes>.activities.contains(where: {
+            $0.id == activityID && ($0.activityState == .active || $0.activityState == .stale)
+        }) {
+            Task { await activity.end(nil, dismissalPolicy: .immediate) }
+            return
+        }
         let previous: Task<Void, Never>? = activityWork
         previous?.cancel()
         activityStateWatch?.cancel()
