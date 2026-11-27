@@ -46,7 +46,8 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | Home | `runs.js` | Dot's presence and the composer; one conversation at a time. |
 | One run | `run.js` | A run as a conversation: the question, the steps, the answer and the queued message. |
 | Bots | `agents.js` | The owner's bot profiles: face, name, role, instructions, tools and model. |
-| Team | `team.js` | The day's messages between bots, oldest first. |
+| Team | `team.js` | The day's messages between bots, newest first, with no badge (item 2035). |
+| A bot's work | `agentwork.js` | A bot's work orders, objectives or hand-offs, scoped to it (`botwork.js`) as the phone's bot profile scopes them (item 2035). |
 | One team | `teams.js` | A team's bots, its name and purpose, and a box to message it. |
 | Watch | `watch.js` | The Mac's screen, live, whether a task works or not. |
 | Campaigns | `campaigns.js` | Goals Dot keeps working on in sessions until a check confirms the outcome. |

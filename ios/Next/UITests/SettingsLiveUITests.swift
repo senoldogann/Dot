@@ -87,9 +87,12 @@ final class SettingsLiveUITests: XCTestCase {
         let review: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Code review model")).firstMatch
         XCTAssertTrue(review.waitForExistence(timeout: 10))
         review.tap()
-        // The level is a segment of the model catalog's picker (one picker for the app, item 1801).
-        let high: XCUIElement = app.buttons["High"]
-        for _ in 0..<6 where !high.isHittable { app.swipeUp() }
+        // The level is the menu of the model catalog's picker (one picker for the app, item 1801; a menu since item 2023).
+        let level: XCUIElement = app.descendants(matching: .any).matching(identifier: "modelPicker.reasoning").firstMatch
+        for _ in 0..<6 where !level.isHittable { app.swipeUp() }
+        level.tap()
+        let high: XCUIElement = app.buttons["High"].firstMatch
+        XCTAssertTrue(high.waitForExistence(timeout: 5), "the menu of levels opened")
         high.tap()
         app.buttons["Save"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "High")).firstMatch.waitForExistence(timeout: 10))
