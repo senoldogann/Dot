@@ -5762,6 +5762,17 @@
         }
       }
     },
+    "Full screen": {
+      "comment": "Opens a page shown in the chat full screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tam ekran"
+          }
+        }
+      }
+    },
     "Gallery": {
       "comment": "Component gallery (debug builds): a heading or sample text\nSettings row of debug builds: the component gallery",
       "localizations": {
@@ -11718,6 +11729,17 @@
         }
       }
     },
+    "Show it again": {
+      "comment": "Retries loading a page shown in the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tekrar göster"
+          }
+        }
+      }
+    },
     "Show less": {
       "comment": "Under a long owner's message: folds it again",
       "localizations": {
@@ -13200,6 +13222,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diğer yol her zaman düğmeye uzun basınca çıkar."
+          }
+        }
+      }
+    },
+    "The page could not be shown.": {
+      "comment": "A page in the chat failed to load",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfa gösterilemedi."
           }
         }
       }

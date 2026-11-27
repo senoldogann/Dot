@@ -1684,3 +1684,12 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+
+# PG1: pages shown in the conversation.
+TR.update(
+    {
+        "Full screen": "Tam ekran",
+        "Show it again": "Tekrar göster",
+        "The page could not be shown.": "Sayfa gösterilemedi.",
+    }
+)

@@ -200,6 +200,8 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     /// The model's thinking of a step: `live` while it is being written.
     case thought(id: String, text: String, live: Bool)
     case tool(ToolEntry)
+    /// A page the run showed, kept at its event rather than folded into the steps.
+    case page(id: String, page: ShownPage)
     /// A call the run told as one of Dot's short messages, which its step's own words did not tell (a `narration` event,
     /// item 1976): drawn in the conversation of "Show steps" off alone, in the words of the live line for that call.
     case narration(id: String, step: HelperStep)
@@ -217,7 +219,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .owner(let id, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
-            .limit(let id, _), .narration(let id, _):
+            .limit(let id, _), .narration(let id, _), .page(let id, _):
             id
         case .tool(let entry): entry.id
         case .decision(let anchor): anchor.id
@@ -265,11 +267,12 @@ private func builtRuns(of chat: ChatProjection, streaming: Bool, context: Transc
     }
     let runs: [RunRecord] = (listed + told).sorted { $0.createdAt < $1.createdAt }
     let helpers: [HelperView] = chat.view?.helpers ?? []
+    let pages: [String: [EventRecord]] = Dictionary(grouping: chat.view?.shownPageEvents ?? [], by: \.runId)
     return runs.map { run in
         BuiltRun(
             rows: runItems(
                 run, timeline: chat.runs[run.id], writing: streaming ? chat.writing[run.id] : nil, thinking: streaming ? chat.thinking[run.id] : nil,
-                helpers: helpers.filter { $0.parentRunId == run.id }, context: context),
+                helpers: helpers.filter { $0.parentRunId == run.id }, pageEvents: pages[run.id] ?? [], context: context),
             finished: !run.isActive || hasEnded(chat.runs[run.id]))
     }
 }
@@ -345,6 +348,7 @@ enum Category: Equatable {
     case thought
     case decision
     case runEnd
+    case page
     case narration
 }
 
@@ -361,7 +365,9 @@ private func hasEnded(_ timeline: RunTimeline?) -> Bool {
 }
 
 private func runItems(
-    _ run: RunRecord, timeline: RunTimeline?, writing: String?, thinking: LiveThought?, helpers: [HelperView], context: TranscriptContext) -> [Built] {
+    _ run: RunRecord, timeline: RunTimeline?, writing: String?, thinking: LiveThought?, helpers: [HelperView],
+    pageEvents: [EventRecord], context: TranscriptContext
+) -> [Built] {
     // A run a helper's report started (item 1351) begins with Dot's note, not the owner's words.
     let opening: TranscriptItem =
         run.source == "helper_report" ? .note(id: "u:\(run.id)", text: run.goal) : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil)
@@ -378,7 +384,10 @@ private func runItems(
     var said: Bool = false
     // The step each of Dot's words came from, by its row's id: the run's end names the steps its answer restates.
     var stepOf: [String: Int] = [:]
-    let events: [EventRecord] = timeline?.events ?? []
+    let held: [EventRecord] = timeline?.events ?? []
+    // The view fills in old pages without treating their sparse ids as the run's event cursor.
+    let extra: [EventRecord] = pageEvents.filter { $0.kind == "page_shown" && timeline?.ids.contains($0.id) != true }
+    let events: [EventRecord] = extra.isEmpty ? held : (held + extra).sorted { $0.id < $1.id }
     for event in events {
         switch event.kind {
         case "narration":
@@ -416,6 +425,9 @@ private func runItems(
                 id: entry.id, tool: entry.tool, kind: entry.kind, target: entry.target.isEmpty ? (event.data["target"]?.string ?? "") : entry.target,
                 args: entry.args, output: output, state: state, images: images, startedAt: entry.startedAt, endedAt: event.ts)
             items[at] = Built(item: .tool(done), category: .tool(state), start: entry.startedAt, end: event.ts)
+        case "page_shown":
+            guard let page: ShownPage = ShownPage(event: event) else { continue }
+            items.append(Built(item: .page(id: "page:\(event.id)", page: page), category: .page, start: event.ts, end: event.ts))
         case "plan":
             let steps: [PlanStep] = (event.data["steps"]?.array ?? []).compactMap { step in
                 guard let text: String = step["text"]?.string, !text.isEmpty else { return nil }
@@ -496,7 +508,7 @@ private func runItems(
             continue
         }
     }
-    if events.isEmpty, !run.isActive {
+    if held.isEmpty, !run.isActive {
         appendHelpers(&items, run: run, helpers: helpers, at: run.finishedAt ?? run.createdAt)
         let result: String = run.result.trimmingCharacters(in: .whitespacesAndNewlines)
         if !result.isEmpty {
@@ -506,7 +518,7 @@ private func runItems(
             items.append(Built(item: .ended(id: "e:\(run.id)", status: run.status, detail: ""), category: .runEnd, start: run.createdAt, end: run.createdAt))
         }
     }
-    if !hasEnded(timeline), run.isActive || !events.isEmpty {
+    if !hasEnded(timeline), run.isActive || !held.isEmpty {
         appendHelpers(&items, run: run, helpers: helpers, at: events.last?.ts ?? run.createdAt)
     }
     // The finish is the answer, which stands on its own: its row shows only when it was refused, as on the web (item
@@ -583,7 +595,7 @@ func shows(_ category: Category, mode: ToolCallMode) -> Bool {
     // A call's line is the conversation's alone (`conversation`), never beside the steps it tells.
     case (_, .narration): false
     case (.showAll, _): true
-    case (_, .owner), (_, .note), (_, .answer(final: true)), (_, .writing), (_, .decision), (_, .runEnd): true
+    case (_, .owner), (_, .note), (_, .answer(final: true)), (_, .writing), (_, .decision), (_, .runEnd), (_, .page): true
     case (.zen, .thought), (.hideAll, .thought): false
     case (_, .thought): true
     case (.hideSuccessful, .tool(let state)): state != .done

@@ -39,6 +39,8 @@
         case jank = "n2-jank"
         /// A run that wrote its answer and finished with it in slightly other words (item 1996): the answer stands once.
         case restated = "n2-restated"
+        /// A page in the transcript, loaded from the UI test's loopback server.
+        case shownPage = "n2-shown-page"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -122,7 +124,7 @@
         private var runB: String {
             switch self {
             case .failed: "failed"
-            case .deleted, .restated: "done"
+            case .deleted, .restated, .shownPage: "done"
             default: "running"
             }
         }
@@ -186,6 +188,8 @@
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"failed","result":"","error":{"kind":"model","message":"The model answered HTTP 529: overloaded. Try again in a minute."}}}"#)
             case .deleted:
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"done","result":"Booked Tuesday 14:00."}}"#)
+            case .shownPage:
+                events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 50),"kind":"page_shown","data":{"page_id":"page_0123456789ABCDEFGHIJKLMN","title":"Sales by month"}}"#)
             case .restated:
                 events.append(contentsOf: [
                     #"{"id":30,"run_id":"run_b","ts":\#(b + 50),"kind":"assistant","data":{"text":"Booked: Tuesday at 14:00 with Dr. Lind. ","step":5,"tool_calls":[]}}"#,

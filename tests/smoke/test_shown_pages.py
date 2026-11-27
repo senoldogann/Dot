@@ -100,8 +100,8 @@ if (window.parent !== window) {{
 </script></body></html>"""
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
-    (1280, "light"),
-    (1280, "dark"),
+    (1440, "light"),
+    (1440, "dark"),
     (390, "light"),
     (390, "dark"),
 )
@@ -231,8 +231,12 @@ async def _one_size(
 ) -> None:
     """A run shows the page, and the run's page in Chrome at ``size`` (a width and a scheme) shows it."""
     width, scheme = size
+    height: int = 844 if width == 390 else 900
     page: Page = await browser.new_page(
-        viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+        viewport={"width": width, "height": height},
+        color_scheme=scheme,
+        reduced_motion="reduce",
+        has_touch=width == 390,
     )
     context: BrowserContext = page.context
     await context.route("https://example.com/**", _answer_locally)
@@ -304,7 +308,10 @@ async def _one_size(
 
     # Full screen, in a dialog of the UI: the page in the theme on screen, reaching nothing; Escape closes it.
     await card.hover()
-    await card.get_by_role("button", name="Full screen").click()
+    expand: Locator = card.get_by_role("button", name="Full screen")
+    if width == 390:
+        await expect(expand).to_have_css("height", "44px")
+    await expand.click()
     dialog: Locator = page.get_by_role("dialog", name=TITLE)
     await expect(dialog).to_be_visible()
     await expect(dialog.frame_locator("iframe.shown-page-frame").locator("#ink")).to_have_text(TITLE)
@@ -312,7 +319,7 @@ async def _one_size(
     # It covers the window, and zooms (item 1056): zoomed, a clear layer over the page takes the gestures; fitted, the
     # page is its own again.
     covered: dict[str, float] | None = await dialog.bounding_box()
-    assert covered is not None and (covered["width"], covered["height"]) == (width, 900)
+    assert covered is not None and (covered["width"], covered["height"]) == (width, height)
     glass: Locator = dialog.locator(".viewer-glass")
     await expect(glass).to_be_hidden()
     await dialog.get_by_role("button", name="Zoom in").click()
@@ -323,7 +330,7 @@ async def _one_size(
     await page.screenshot(path=str(shots / f"full-{width}-{_OTHER[scheme]}.png"))
     # A pinch on the page at its fitted size reaches the page's frame, which passes it to the viewer: the trackpad's
     # pinch comes as the wheel with Ctrl.
-    await page.mouse.move(width / 2, 450)
+    await page.mouse.move(width / 2, height / 2)
     await page.keyboard.down("Control")
     await page.mouse.wheel(0, -300)
     await page.keyboard.up("Control")
@@ -341,6 +348,15 @@ async def _one_size(
     await page.screenshot(path=str(shots / f"left-{width}-{_OTHER[scheme]}.png"))
     await left.get_by_role("button", name="Show it again").click()
     await expect(card.frame_locator("iframe.shown-page-frame").locator("#ink")).to_have_text(TITLE)
+    if size == (390, "dark"):
+        await page.evaluate("localStorage.setItem('dot.uiLanguage', 'tr')")
+        await page.reload()
+        full_screen: Locator = card.get_by_role("button", name="Tam ekran")
+        await full_screen.click()
+        await expect(dialog).to_be_visible()
+        await dialog.get_by_role("button", name="Kapat").click()
+        await expect(dialog).to_have_count(0)
+
     await context.close()
 
 

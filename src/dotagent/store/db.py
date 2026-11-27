@@ -4723,6 +4723,16 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def events_of_kind_for_runs(self, run_ids: Sequence[str], kind: str) -> list[EventRecord]:
+        """The events of one kind for the runs in a chat window, in stored order."""
+        if not run_ids:
+            return []
+        marks: str = ", ".join("?" for _ in run_ids)
+        rows = await self._all(
+            f"SELECT * FROM events WHERE run_id IN ({marks}) AND kind = ? ORDER BY id", (*run_ids, kind)
+        )
+        return [_event(row) for row in rows]
+
     async def calls_that_worked(self, run_id: str, tool: str) -> int:
         """How many calls of ``tool`` the run ``run_id`` made that worked, by their ``tool_result`` events (item
         957)."""

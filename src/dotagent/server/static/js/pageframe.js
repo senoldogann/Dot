@@ -12,6 +12,7 @@
  * the conversation does not jump under the reader.
  */
 import { el } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { shownScheme } from "./theme.js";
 import { ZOOM_EVENT, openViewer } from "./viewer.js";
@@ -294,8 +295,8 @@ export function pageCard(pageId, title) {
   const address = `/pages/${encodeURIComponent(pageId)}`;
   const show = () => {
     const frame = pageFrame(pageId, address, title, (shown) => {
-      const again = el("button", { class: "btn sm ghost", type: "button" }, "Show it again");
-      const left = el("div", { class: "shown-page-left" }, el("span", null, "The page loaded another page in its place, so Dot closed it."), again);
+      const again = el("button", { class: "btn sm ghost", type: "button" }, t("shownPage.retry"));
+      const left = el("div", { class: "shown-page-left" }, el("span", null, t("shownPage.left")), again);
       again.addEventListener("click", () => left.replaceWith(show()));
       shown.replaceWith(left);
     });
@@ -308,11 +309,11 @@ export function pageCard(pageId, title) {
     });
     return frame;
   };
-  const full = el("button", { class: "shown-page-tool", type: "button", "aria-label": "Full screen", title: "Full screen" }, icon("maximize"));
+  const full = el("button", { class: "shown-page-tool", type: "button", "aria-label": t("shownPage.fullScreen"), title: t("shownPage.fullScreen") }, icon("maximize"));
   full.addEventListener("click", () => showFull(pageId, address, title, full));
   const open = el(
     "a",
-    { class: "shown-page-tool shown-page-open", href: address, target: "_blank", rel: "noopener noreferrer", "aria-label": "Open in your browser", title: "Open in your browser" },
+    { class: "shown-page-tool shown-page-open", href: address, target: "_blank", rel: "noopener noreferrer", "aria-label": t("shownPage.openInBrowser"), title: t("shownPage.openInBrowser") },
     icon("external"),
   );
   open.addEventListener("click", () => {

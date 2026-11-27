@@ -429,6 +429,8 @@ public struct ThreadView: Codable, Sendable, Hashable {
     public let newest: RunDetail?
     public let newestEvents: [EventRecord]
     public let newestEventsCut: Bool
+    /// Page references for the runs in this window. Older daemons and cached views omit the field.
+    public let shownPageEvents: [EventRecord]?
     public let queue: QueueView
     public let asks: [ApprovalRecord]
     public let helpers: [HelperView]
@@ -440,6 +442,7 @@ public struct ThreadView: Codable, Sendable, Hashable {
         case revision, thread, summary, runs, older, newest, queue, asks, helpers, background, reactions, drafts
         case newestEvents = "newest_events"
         case newestEventsCut = "newest_events_cut"
+        case shownPageEvents = "shown_page_events"
     }
 
     /// The same view with its helpers replaced (a helper's step came on the stream).
@@ -447,13 +450,14 @@ public struct ThreadView: Codable, Sendable, Hashable {
         ThreadView(
             revision: revision, thread: thread, summary: summary, runs: runs, older: older, newest: newest,
             newestEvents: newestEvents, newestEventsCut: newestEventsCut, queue: queue, asks: asks, helpers: next,
-            background: background, reactions: reactions, drafts: drafts)
+            background: background, reactions: reactions, drafts: drafts, shownPageEvents: shownPageEvents)
     }
 
     public init(
         revision: Int, thread: ThreadRecord, summary: ThreadSummary?, runs: [RunRecord], older: Bool, newest: RunDetail?,
         newestEvents: [EventRecord], newestEventsCut: Bool, queue: QueueView, asks: [ApprovalRecord],
-        helpers: [HelperView], background: [BackgroundWork], reactions: [ReactionRecord], drafts: [DraftRecord]
+        helpers: [HelperView], background: [BackgroundWork], reactions: [ReactionRecord], drafts: [DraftRecord],
+        shownPageEvents: [EventRecord]? = nil
     ) {
         self.revision = revision
         self.thread = thread
@@ -463,6 +467,7 @@ public struct ThreadView: Codable, Sendable, Hashable {
         self.newest = newest
         self.newestEvents = newestEvents
         self.newestEventsCut = newestEventsCut
+        self.shownPageEvents = shownPageEvents
         self.queue = queue
         self.asks = asks
         self.helpers = helpers

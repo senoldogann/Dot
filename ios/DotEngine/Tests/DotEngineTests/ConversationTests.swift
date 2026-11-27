@@ -9,16 +9,16 @@ final class ConversationTests: XCTestCase {
         EventRecord(id: id, runId: "run_a", ts: Double(id), kind: kind, data: data)
     }
 
-    private func chat(status: String, _ events: [EventRecord]) -> ChatProjection {
+    private func chat(status: String, _ events: [EventRecord], pageEvents: [EventRecord]?) -> ChatProjection {
         var chat: ChatProjection = ChatProjection(threadId: "thr_1")
         let run: RunRecord = RunRecord(
             id: "run_a", threadId: "thr_1", goal: "Fill the form", mode: "chat", model: "m", status: status, createdAt: 1, finishedAt: nil,
-            result: "", parentRunId: nil, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
+            result: "Stored result.", parentRunId: nil, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
         chat.view = ThreadView(
             revision: 1, thread: ThreadRecord(id: "thr_1", title: "Chat", source: "ui", createdAt: 1, updatedAt: 1, agentId: nil),
             summary: nil, runs: [run], older: false, newest: nil, newestEvents: [], newestEventsCut: false,
             queue: QueueView(held: false, messages: [], besideRunId: nil, besideThreadId: nil), asks: [], helpers: [], background: [],
-            reactions: [], drafts: [])
+            reactions: [], drafts: [], shownPageEvents: pageEvents)
         for event in events {
             chat.runs[event.runId] = (chat.runs[event.runId] ?? RunTimeline()).adding(event) ?? chat.runs[event.runId]
         }
@@ -48,7 +48,7 @@ final class ConversationTests: XCTestCase {
     }
 
     func testAWorkingRunShowsItsWordsAndTheLinesItsWordsDidNotTellAndNoSteps() {
-        let items: [TranscriptItem] = conversation(of: chat(status: "running", events), pending: [], streaming: true, context: .none)
+        let items: [TranscriptItem] = conversation(of: chat(status: "running", events, pageEvents: nil), pending: [], streaming: true, context: .none)
         XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10", "n:22"], "the page's line stands beside the words that told it: it is not drawn")
         guard case .narration(_, let told) = items[2] else { return XCTFail("the search is told") }
         XCTAssertEqual(told.tool, "web_search")
@@ -57,7 +57,7 @@ final class ConversationTests: XCTestCase {
 
     func testAFinishedRunKeepsTheConversationAndFoldsItsStepsBeforeTheAnswer() {
         let finished: [EventRecord] = events + [step(30, "", ["finish"]), event(31, "run_finished", ["status": .string("done"), "result": .string("Two fields.")])]
-        let items: [TranscriptItem] = conversation(of: chat(status: "done", finished), pending: [], streaming: true, context: .none)
+        let items: [TranscriptItem] = conversation(of: chat(status: "done", finished, pageEvents: nil), pending: [], streaming: true, context: .none)
         XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10", "n:22", "f:t:c11", "r:run_a"])
         guard case .work(let fold) = items[3] else { return XCTFail("the steps fold before the answer") }
         XCTAssertEqual(fold.items.map(\.id), ["t:c11", "t:c21"])
@@ -69,10 +69,10 @@ final class ConversationTests: XCTestCase {
         let failing: [EventRecord] =
             events + [event(30, "tool_call", ["call_id": .string("c30"), "tool": .string("shell"), "args": .object([:])]),
                 event(31, "tool_result", ["call_id": .string("c30"), "ok": .bool(false), "text": .string("no such command")])]
-        let working: [TranscriptItem] = conversation(of: chat(status: "running", failing), pending: [], streaming: true, context: .none)
+        let working: [TranscriptItem] = conversation(of: chat(status: "running", failing, pageEvents: nil), pending: [], streaming: true, context: .none)
         XCTAssertFalse(working.contains { if case .tool = $0 { true } else { false } }, "no step row, a failed one neither")
         let ended: [EventRecord] = failing + [event(40, "run_finished", ["status": .string("done"), "result": .string("Two fields.")])]
-        let items: [TranscriptItem] = conversation(of: chat(status: "done", ended), pending: [], streaming: true, context: .none)
+        let items: [TranscriptItem] = conversation(of: chat(status: "done", ended, pageEvents: nil), pending: [], streaming: true, context: .none)
         guard let fold: WorkFold = items.compactMap({ if case .work(let fold) = $0 { fold } else { nil } }).first else { return XCTFail("one fold") }
         XCTAssertTrue(fold.hasFailure)
         XCTAssertFalse(fold.startsOpen, "folded with Show steps off, its failure inside")
@@ -91,15 +91,48 @@ final class ConversationTests: XCTestCase {
             event(7, "run_finished", ["status": .string("done"), "result": .string("Two parts:\n\n1) the park.\n2) the screen."), "restated": .array([.int(3)])]),
         ]
         for mode in ToolCallMode.allCases {
-            let items: [TranscriptItem] = transcript(of: chat(status: "done", said), pending: [], mode: mode, streaming: true, context: .none)
+            let items: [TranscriptItem] = transcript(of: chat(status: "done", said, pageEvents: nil), pending: [], mode: mode, streaming: true, context: .none)
             XCTAssertEqual(items.map(\.id), ["u:run_a", "r:run_a"], "\(mode): the answer once, no Finish row")
         }
-        XCTAssertEqual(conversation(of: chat(status: "done", said), pending: [], streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"])
+        XCTAssertEqual(conversation(of: chat(status: "done", said, pageEvents: nil), pending: [], streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"])
+    }
+
+    func testShownPageStaysBetweenItsMessagesInEveryMode() throws {
+        let id: String = "page_0123456789ABCDEFGHIJKLMN"
+        let shown: EventRecord = event(11, "page_shown", ["page_id": .string(id), "title": .string("Sales")])
+        let page: ShownPage = try XCTUnwrap(ShownPage(event: shown))
+        let host: DaemonHost = try parseDaemonHost("mac.tailnet.ts.net", buildHost: nil).get()
+        XCTAssertEqual(page.url(on: host).absoluteString, "https://mac.tailnet.ts.net/pages/\(id)")
+        let malformed: EventRecord = event(12, "page_shown", ["page_id": .string("../api/status"), "title": .string("Invalid")])
+        let missingTitle: EventRecord = event(13, "page_shown", ["page_id": .string(id)])
+        let projection: ChatProjection = chat(status: "done", [
+            step(10, "Here is the chart.", []), shown, malformed, missingTitle,
+            event(14, "run_finished", ["status": .string("done"), "result": .string("Sales are up.")]),
+        ], pageEvents: [shown])
+        let expected: TranscriptItem = .page(id: "page:11", page: page)
+        let words: [TranscriptItem] = conversation(of: projection, pending: [], streaming: true, context: .none)
+        XCTAssertEqual(words.map(\.id), ["u:run_a", "a:10", expected.id, "r:run_a"])
+        XCTAssertEqual(words[2], expected)
+        for mode in ToolCallMode.allCases {
+            let items: [TranscriptItem] = transcript(of: projection, pending: [], mode: mode, streaming: true, context: .none)
+            XCTAssertEqual(items.filter { if case .page = $0 { true } else { false } }, [expected], "\(mode)")
+        }
+    }
+
+    func testACachedViewWithSparsePagesKeepsTheAnswerWithoutMovingTheRunCursor() throws {
+        let shown: EventRecord = event(10, "page_shown", ["page_id": .string("page_0123456789ABCDEFGHIJKLMN"), "title": .string("Sales")])
+        let cold: ChatProjection = chat(status: "done", [], pageEvents: [shown])
+        let data: Data = try JSONEncoder().encode(cold)
+        let projection: ChatProjection = ChatReducer.restored(try JSONDecoder().decode(ChatProjection.self, from: data))
+        XCTAssertTrue(projection.cursors.isEmpty)
+        let items: [TranscriptItem] = conversation(of: projection, pending: [], streaming: true, context: .none)
+        XCTAssertEqual(items.map(\.id), ["u:run_a", "page:10", "r:run_a"])
+        XCTAssertEqual(items.last, .answer(id: "r:run_a", text: "Stored result.", writing: false, endedAt: 1))
     }
 
     func testNoToolModeDrawsALineOfACall() {
         for mode in ToolCallMode.allCases {
-            let items: [TranscriptItem] = transcript(of: chat(status: "running", events), pending: [], mode: mode, streaming: true, context: .none)
+            let items: [TranscriptItem] = transcript(of: chat(status: "running", events, pageEvents: nil), pending: [], mode: mode, streaming: true, context: .none)
             XCTAssertFalse(items.contains { if case .narration = $0 { true } else { false } }, "\(mode)")
         }
     }

@@ -22,6 +22,7 @@ import pytest_asyncio
 from dotagent import events as events_module
 from dotagent.agent.helper_reports import DetachedHelper, keep_detached
 from dotagent.agent.manager import RunManager
+from dotagent.agent.pages import PAGE_EVENT
 from dotagent.config import load_config
 from dotagent.core.paths import db_path, ensure_layout
 from dotagent.llm.types import Message
@@ -29,9 +30,9 @@ from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
-from dotagent.server.thread_sync import follow_thread, watch_revisions
+from dotagent.server.thread_sync import ThreadView, follow_thread, watch_revisions
 from dotagent.store.db import Store
-from dotagent.store.models import NO_PICKS, EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, EventRecord, RunRecord, ShownPage, ThreadRecord
 
 pytestmark = pytest.mark.asyncio
 
@@ -219,6 +220,28 @@ async def test_a_chats_view_holds_its_state_at_a_revision_that_every_writer_move
             told: dict[str, object] = await _changed(frames, gone.id)
             assert told["deleted"] is True
     assert (await http.get(f"/api/threads/{gone.id}/view")).status_code == 404
+
+
+async def test_a_cold_chat_view_includes_pages_from_older_runs_in_its_window(served: Served) -> None:
+    store: Store = served.runtime.store
+    chat: ThreadRecord = await store.create_thread("Charts", "ui")
+    earlier: RunRecord = await _run(store, chat.id, None)
+    page: ShownPage = await store.add_shown_page(earlier.id, "Sales", "<p>Chart</p>")
+    event: EventRecord = await store.add_event(earlier.id, PAGE_EVENT, {"page_id": page.id, "title": page.title})
+    await store.finish_run(earlier.id, "done", "The chart is above.")
+    latest: RunRecord = await _run(store, chat.id, None)
+
+    address: str = f"/api/threads/{chat.id}/view"
+    answer: httpx.Response = await served.http.get(address)
+    assert answer.status_code == 200, answer.text
+    view: ThreadView = ThreadView.model_validate_json(answer.content)
+    assert view.newest is not None and view.newest.run.id == latest.id
+    assert view.shown_page_events == [event]
+    assert event not in view.newest_events
+
+    narrow: httpx.Response = await served.http.get(address, params={"tail": 1})
+    assert narrow.status_code == 200, narrow.text
+    assert ThreadView.model_validate_json(narrow.content).shown_page_events == []
 
 
 async def test_a_row_says_how_many_helpers_its_run_waits_on(served: Served) -> None:

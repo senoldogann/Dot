@@ -55,6 +55,7 @@ content of a run is copied here, only counts and dates.
 | Meetings (Google Meet) | unproven | Both tries, on 2026-11-12, failed before Dot was admitted | Meet never worked live |
 | Meetings (Teams, Zoom) | unproven | Not built | |
 | The iPhone app (DotNext) | unproven | Being rewritten; not yet passed its parity list on the real phone | |
+| Pages shown in a DotNext chat | unproven | Fixture coverage for the inline card and full-screen viewer | The owner has yet to see them on the real iPhone |
 | A schedule's or watcher's check (item 1855) | unproven | New: tests only | |
 | Dollar estimates (item 1856) | unproven | New: tests only | |
 <!-- maturity:end -->
