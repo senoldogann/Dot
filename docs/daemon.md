@@ -342,6 +342,9 @@ Until the tick the box keeps what it held. The dictation also ends:
 - after a pause of fifteen seconds once a word was (a recording: a sound), the words going into the box;
 - when you type (it is dropped), when you send, and when the page goes out of sight.
 
+A pause shorter than that loses no word: the words heard before it stay in the box and the next ones follow them, also
+where a browser hands the words after a pause in a result list of its own (item 2048).
+
 It listens in the page's language, given its region ("en" listens as "en-US", item 593), or the one chosen in Settings ›
 General › Voice (English, Türkçe, Suomi, Svenska, Deutsch, Français or Español). The silence is counted from the moment
 the browser begins to listen, not while it asks for the microphone and its speech recognition the first time (an iPhone
