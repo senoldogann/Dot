@@ -778,6 +778,10 @@ class DesktopConfig(FrozenModel):
     input_only_when_away: bool
     away_after_s: int = Field(ge=0)
     away_wait_s: int = Field(ge=0)
+    # What sends the steps that would take the Mac's own pointer or keyboard (item 2007): "off", the Mac's own, or
+    # "cua", cua-driver, to the application's window in the background; and where cua-driver is.
+    background_driver: Literal["off", "cua"]
+    background_driver_path: str = Field(min_length=1)
     launch_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     activate_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     osascript_timeout_s: float = Field(gt=0, allow_inf_nan=False)
@@ -879,6 +883,9 @@ class MemoryConfig(FrozenModel):
     embed_provider: EmbedProvider
     embed_model: str
     embed_enabled: bool
+    # How long a run's start waits for its notes, and for its skills, by meaning before it takes them by their words
+    # (item 2004).
+    start_recall_s: float = Field(gt=0, allow_inf_nan=False)
     # The tokens a run's starting notes may take: inject_share of the model's context window, at most inject_tokens.
     inject_tokens: int = Field(ge=0)
     inject_share: float = Field(gt=0, le=1)

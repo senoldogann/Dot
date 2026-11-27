@@ -15,6 +15,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from chat_settings import close_settings, menu, open_for
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -279,8 +280,9 @@ async def test_a_choice_for_one_message_sets_the_level_of_its_run_alone(
     ]
 
 
-def _menu(page: Page, scope: str) -> Locator:
-    return page.locator(f"{scope}.composer-popover[aria-label='Reasoning']")
+def _menu(page: Page) -> Locator:
+    """The Reasoning row of the chat's settings, which the model's pill opens on every width (item 2015)."""
+    return menu(page, "Reasoning")
 
 
 @pytest.mark.browser
@@ -299,21 +301,12 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs")
-                # A phone's box holds the reasoning in the model's menu, once the box is used (items 1120 and 1121).
-                held: str = "model" if width < 720 else "reasoning"
-                if width < 720:
-                    await page.locator(_HOME_GOAL).click()
-                pill: Locator = page.locator(f".composer-pill[data-pill='{held}']")
+                # The model's pill opens the chat's settings on every width, whose Reasoning row holds the choices for
+                # one message (items 1202 and 2015).
+                pill: Locator = page.locator(".composer-pill[data-pill='model']")
                 await expect(pill).to_contain_text("Medium")
-                await pill.click()
-                # A phone's chat settings (item 1202) hold the reasoning in a row that opens in place.
-                menu: Locator = (
-                    page.get_by_role("dialog", name="Chat settings")
-                    if width < 720
-                    else page.locator(".composer-popover[aria-label='Reasoning']")
-                )
-                if width < 720:
-                    await menu.locator("summary", has_text="Reasoning").click()
+                await open_for(page, page, "reasoning")
+                menu: Locator = _menu(page)
                 single: Locator = menu.get_by_role("listbox", name="This message only")
                 await expect(single.get_by_role("option")).to_have_count(2)
                 thinking: Locator = single.get_by_role("option", name="Ultrathink")
@@ -330,7 +323,10 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                     continue
                 await thinking.click()
                 await expect(pill).to_contain_text("Ultrathink")
-                await expect(pill.locator("[data-icon='sparkle']")).to_have_count(1)
+                await expect(page.locator(".composer-pill[data-pill='reasoning'] [data-icon='sparkle']")).to_have_count(
+                    1
+                )
+                await close_settings(page)
                 await page.screenshot(path=str(tmp_path / "pill-ultrathink.png"), animations="disabled")
                 await page.locator(_HOME_GOAL).fill("Say hi.")
                 await page.locator(_HOME_GOAL).press("Enter")
@@ -340,8 +336,9 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 await expect(dock).to_contain_text("Medium")
                 first: RunRecord = await _ended(manager, page.url.rpartition("/")[2])
                 assert (first.effort, first.once) == ("max", "ultrathink")
-                await dock.click()
-                await _menu(page, ".dock ").get_by_role("option", name="Ultracode").click()
+                await open_for(page.locator(".dock"), page, "reasoning")
+                await _menu(page).get_by_role("option", name="Ultracode").click()
+                await close_settings(page)
                 await expect(dock).to_contain_text("Ultracode")
                 await expect(dock.locator("[data-icon='branch']")).to_have_count(1)
                 await page.get_by_role("textbox", name="Message for Dot").fill("Compare the three reports.")
@@ -362,8 +359,8 @@ async def test_the_reasoning_menu_offers_ultrathink_and_ultracode_for_the_next_m
                 page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
-                await page.locator(".dock .composer-pill[data-pill='reasoning']").click()
-                menu: Locator = _menu(page, ".dock ")
+                await open_for(page.locator(".dock"), page, "reasoning")
+                menu = _menu(page)
                 await expect(menu.get_by_role("listbox", name="Reasoning")).to_be_visible()
                 await expect(
                     menu.get_by_role("listbox", name="This message only").locator(".pop-option-text > span:first-child")

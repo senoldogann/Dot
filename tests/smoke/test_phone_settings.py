@@ -69,6 +69,7 @@ _TABS: dict[str, str] = {
     "system": "System",
     "repair": "Self-repair",
     "diagnostics": "Diagnostics",
+    "speed": "Speed",
     "licences": "Open source licences",
 }
 _ROWS: list[str] = list(_TABS.values())

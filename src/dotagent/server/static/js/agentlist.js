@@ -259,7 +259,7 @@ export function agentList({ threadId, helper, lead, onOpenAgents }) {
     rows.hidden = done.length === 0;
     const left = done.length - shown.length;
     more.hidden = left === 0;
-    setText(more, `Show ${left} more`);
+    setText(more, t("agentlist.showLeftMore", { left }));
   }
 
   function paint() {

@@ -14,6 +14,7 @@
 
 import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
+import { composerShape } from "./composershape.js";
 import { el, setText } from "./dom.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
@@ -370,6 +371,8 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
 
   function paintEmpty() {
     element.toggleAttribute("data-empty", typedWords() === "");
+    // One row while the words are short, the words over the controls once they are not (item 2015).
+    element.dataset.shape = composerShape(textarea.value, attachments.count(), picks.count());
     const stopShown = stopping();
     element.toggleAttribute("data-stop", stopShown);
     const words = stopShown ? t("composer.stop") : sendWords;

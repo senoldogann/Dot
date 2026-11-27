@@ -3,14 +3,15 @@
 
 import { el } from "./dom.js";
 import { drawInked } from "./inked.js";
+import { t } from "./i18n.js";
 
 const LABELS = {
   openai: "OpenAI",
   anthropic: "Anthropic",
-  opencode_go: "OpenCode Go",
+  opencode_go: t("providers.opencodeGo"),
   openrouter: "OpenRouter",
   google: "Google",
-  antigravity: "Google Antigravity",
+  antigravity: t("providers.googleAntigravity"),
   opencode: "OpenCode",
   claude_code: "Claude Code",
   ollama: "Ollama",

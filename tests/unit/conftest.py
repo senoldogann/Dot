@@ -45,6 +45,7 @@ MACOS_ONLY: tuple[str, ...] = (
     "test_closed_pages.py",
     "test_desktop_apps.py",
     "test_desktop_away.py",
+    "test_desktop_background.py",
     "test_desktop_batch_front.py",
     "test_desktop_failures.py",
     "test_desktop_front.py",

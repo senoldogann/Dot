@@ -351,7 +351,7 @@ export function nextNight(stepTime, now = new Date()) {
   }
   const today = at.getDate() === now.getDate();
   const day = hour < 6 || (hour >= 21 && today) ? "tonight" : today ? "today" : "tomorrow";
-  return `Next: ${day}, ${stepTime}`;
+  return t("dom.nextDaySteptime", { day, stepTime });
 }
 
 /** The start of the local day of `date`, in milliseconds. */
@@ -372,7 +372,7 @@ export function messageTime(ts) {
     return HOUR_MINUTE.format(date);
   }
   if (days === 1) {
-    return `Yesterday, ${HOUR_MINUTE.format(date)}`;
+    return t("dom.yesterdayFormat", { format: HOUR_MINUTE.format(date) });
   }
   return date.getFullYear() === now.getFullYear() ? dateTime(ts) : `${DAY_YEAR.format(date)}, ${HOUR_MINUTE.format(date)}`;
 }
@@ -381,13 +381,13 @@ export function messageTime(ts) {
 export function ago(ts) {
   const seconds = Date.now() / 1000 - ts;
   if (seconds < 45) {
-    return "just now";
+    return t("dom.justNow");
   }
   if (seconds < 3600) {
-    return `${Math.round(seconds / 60)}m ago`;
+    return t("dom.roundMAgo", { round: Math.round(seconds / 60) });
   }
   if (seconds < 86400) {
-    return `${Math.round(seconds / 3600)}h ago`;
+    return t("dom.roundHAgo", { round: Math.round(seconds / 3600) });
   }
   if (seconds < 172800) {
     return "yesterday";

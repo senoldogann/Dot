@@ -14,16 +14,17 @@ import { icon } from "./icons.js";
 import { segmented } from "./panels.js";
 import { prose } from "./prose.js";
 import { showImage, toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 const KINDS = {
   pdf: "PDF",
-  image: "Image",
-  document: "Word document",
-  workbook: "Excel workbook",
-  presentation: "Presentation",
-  table: "Table",
-  text: "Text",
-  unshown: "File",
+  image: t("filepanel.image"),
+  document: t("filepanel.wordDocument"),
+  workbook: t("filepanel.excelWorkbook"),
+  presentation: t("filepanel.presentation"),
+  table: t("filepanel.table"),
+  text: t("filepanel.text"),
+  unshown: t("filepanel.file"),
 };
 // The most cells a grid draws, the empty ones among them included.
 const GRID_CELLS = 40_000;
@@ -97,7 +98,7 @@ function cellContent(cell) {
   if (cell.formula === null) {
     return cell.value;
   }
-  return `${cell.formula} → ${cell.value ?? "not worked out yet"}`;
+  return `${cell.formula} → ${cell.value ?? t("filepanel.notWorkedOutYet")}`;
 }
 
 /**
@@ -147,7 +148,7 @@ function sheetGrid(sheet, onPick) {
     }
   });
   const left = numbers.length - drawn.length;
-  return [table, left > 0 ? hint(`The grid stops at row ${drawn[drawn.length - 1]}; ${left} more rows hold something. Open the file on the Mac to see them.`) : null];
+  return [table, left > 0 ? hint(t("filepanel.theGridStopsAtRow", { value: drawn[drawn.length - 1], left })) : null];
 }
 
 /** The note under a sheet that was read in part. */
@@ -155,12 +156,12 @@ function cutNote(sheet, maxCells, noun) {
   if (sheet.cut_at_row === null) {
     return null;
   }
-  return hint(`The ${noun} holds more than ${maxCells.toLocaleString()} cells; from row ${sheet.cut_at_row} on it is not shown here. Open it on the Mac to see it all.`);
+  return hint(t("filepanel.theNounHoldsMoreThan", { noun, toLocaleString: maxCells.toLocaleString(), cut_at_row: sheet.cut_at_row }));
 }
 
 function sheetView(sheet, maxCells, noun, line) {
   if (sheet.cells.length === 0 && sheet.cut_at_row === null) {
-    return [hint("This sheet is empty.")];
+    return [hint(t("filepanel.thisSheetIsEmpty"))];
   }
   const pick = (cell) => {
     line.hidden = false;
@@ -183,8 +184,8 @@ function workbookView(preview, toolbar, body) {
       ? segmented(
           preview.sheets.map((sheet, index) => ({
             id: index,
-            label: sheet.state === "visible" ? sheet.title : `${sheet.title} (hidden)`,
-            hint: `Show the sheet ${sheet.title}`,
+            label: sheet.state === "visible" ? sheet.title : t("filepanel.titleHidden", { title: sheet.title }),
+            hint: t("filepanel.showTheSheetTitle", { title: sheet.title }),
           })),
           0,
           show,
@@ -192,9 +193,9 @@ function workbookView(preview, toolbar, body) {
       : null;
   if (tabs !== null) {
     tabs.classList.add("file-tabs");
-    tabs.setAttribute("aria-label", "Sheets");
+    tabs.setAttribute("aria-label", t("filepanel.sheets"));
   }
-  fill(toolbar, tabs, unread > 0 ? el("p", { class: "small muted" }, `${unread} more sheets are not shown.`) : null, line);
+  fill(toolbar, tabs, unread > 0 ? el("p", { class: "small muted" }, t("filepanel.unreadMoreSheetsAreNot", { unread })) : null, line);
   show(0);
 }
 
@@ -226,13 +227,13 @@ function documentView(preview) {
       nodes.push(el("p", { class: "para" }, block.text));
     }
   }
-  return el("div", { class: "file-doc prose" }, nodes.length > 0 ? nodes : hint("The document holds no text."));
+  return el("div", { class: "file-doc prose" }, nodes.length > 0 ? nodes : hint(t("filepanel.theDocumentHoldsNoText")));
 }
 
 function chartView(chart) {
-  const named = chart.title === "" ? "Chart" : `Chart “${chart.title}”`;
+  const named = chart.title === "" ? t("filepanel.chart") : t("filepanel.chartTitle", { title: chart.title });
   if (chart.kinds === null) {
-    return el("p", { class: "muted" }, `${named}: of a kind that is not read (3D bars or lines, stock or surface).`);
+    return el("p", { class: "muted" }, t("filepanel.namedOfAKindThat", { named }));
   }
   const longest = chart.series.reduce((most, series) => (series.points.length > most.points.length ? series : most), { points: [] });
   const categories = longest.points.map((point, index) => point.category ?? String(index + 1));
@@ -257,7 +258,7 @@ function partView(part) {
 
 function presentationView(preview) {
   if (preview.slides.length === 0) {
-    return hint("The presentation has no slides.");
+    return hint(t("filepanel.thePresentationHasNoSlides"));
   }
   const count = preview.slides.length;
   return el(
@@ -266,11 +267,11 @@ function presentationView(preview) {
     preview.slides.map((slide, index) =>
       el(
         "section",
-        { class: "file-slide prose", "aria-label": `Slide ${index + 1} of ${count}` },
-        el("div", { class: "file-slide-number small muted" }, `Slide ${index + 1}`),
+        { class: "file-slide prose", "aria-label": t("filepanel.slideValueOfCount", { value: index + 1, count }) },
+        el("div", { class: "file-slide-number small muted" }, t("filepanel.slideValue", { value: index + 1 })),
         slide.title === "" ? null : el("h3", null, slide.title),
         slide.parts.map(partView),
-        slide.notes === "" ? null : el("div", { class: "file-slide-notes small" }, el("strong", null, "Notes"), el("p", { class: "para" }, slide.notes)),
+        slide.notes === "" ? null : el("div", { class: "file-slide-notes small" }, el("strong", null, t("filepanel.notes")), el("p", { class: "para" }, slide.notes)),
       ),
     ),
   );
@@ -306,7 +307,7 @@ function officeView(file, lookAddress, views, toolbar, body) {
     chosen = "contents";
     body.dataset.view = "contents";
     contentsView(file.preview, toolbar, body);
-    toolbar.prepend(note("warn", `Quick Look could not draw this file (${error.message}); this is what Dot reads of it.`));
+    toolbar.prepend(note("warn", t("filepanel.quickLookCouldNotDraw", { message: error.message })));
   };
   const show = (id) => {
     chosen = id;
@@ -316,7 +317,7 @@ function officeView(file, lookAddress, views, toolbar, body) {
       return;
     }
     fill(toolbar);
-    fill(body, hint("Quick Look is drawing the file…"));
+    fill(body, hint(t("filepanel.quickLookIsDrawingThe")));
     drawing ??= api.get(lookAddress);
     turns += 1;
     const turn = turns;
@@ -339,17 +340,17 @@ function officeView(file, lookAddress, views, toolbar, body) {
     const frame = el("iframe", { class: "file-look", sandbox: "allow-scripts", referrerpolicy: "no-referrer" });
     const open = (page) => {
       frame.src = page.url;
-      frame.title = page.name === "" ? `${file.name} as Quick Look draws it` : `${page.name}, a sheet of ${file.name}, as Quick Look draws it`;
+      frame.title = page.name === "" ? t("filepanel.nameAsQuickLookDraws", { name: file.name }) : t("filepanel.nameASheetOfName2", { name: page.name, name2: file.name });
     };
     fill(toolbar);
     if (pages.length > 1) {
       const sheets = segmented(
-        pages.map((page, index) => ({ id: String(index), label: page.name, hint: `The sheet ${page.name}` })),
+        pages.map((page, index) => ({ id: String(index), label: page.name, hint: t("filepanel.theSheetName", { name: page.name }) })),
         "0",
         (id) => open(pages[Number(id)]),
       );
       sheets.element.classList.add("file-tabs");
-      sheets.element.setAttribute("aria-label", "Sheets");
+      sheets.element.setAttribute("aria-label", t("filepanel.sheets"));
       fill(toolbar, sheets.element);
     }
     open(pages[0]);
@@ -357,14 +358,14 @@ function officeView(file, lookAddress, views, toolbar, body) {
   };
   const switcher = segmented(
     [
-      { id: "drawn", label: "As drawn", hint: "Show the file as Quick Look draws it, as the Mac shows it" },
-      { id: "contents", label: "Contents", hint: "Show the text and values Dot reads of the file" },
+      { id: "drawn", label: t("filepanel.asDrawn"), hint: t("filepanel.showTheFileAsQuick") },
+      { id: "contents", label: t("filepanel.contents"), hint: t("filepanel.showTheTextAndValues") },
     ],
     "drawn",
     show,
   );
   switcher.element.classList.add("file-tabs");
-  switcher.element.setAttribute("aria-label", "View");
+  switcher.element.setAttribute("aria-label", t("filepanel.view"));
   fill(views, switcher.element);
   views.hidden = false;
   show("drawn");
@@ -438,7 +439,7 @@ function codeView(file, toolbar, body, cut) {
       ),
     );
   }
-  fill(body, el("pre", { class: "file-text file-code-editor", "aria-label": `${language} source code` }, code), cut);
+  fill(body, el("pre", { class: "file-text file-code-editor", "aria-label": t("filepanel.languageSourceCode", { language }) }, code), cut);
 }
 
 // A web page, by its extension (item 1077).
@@ -460,33 +461,33 @@ function webPageView(file, views, toolbar, body, cut) {
       return;
     }
     fill(toolbar);
-    fill(body, hint("Loading the page…"));
+    fill(body, hint(t("filepanel.loadingThePage")));
     page ??= api.get(`/files/web-page${query({ path: file.path })}`);
     page.then(
       (look) => {
         if (chosen === "drawn") {
-          const frame = el("iframe", { class: "file-look", sandbox: "", referrerpolicy: "no-referrer", title: `${file.name} as a page` });
+          const frame = el("iframe", { class: "file-look", sandbox: "", referrerpolicy: "no-referrer", title: t("filepanel.nameAsAPage", { name: file.name }) });
           frame.src = look.pages[0].url;
           fill(body, frame);
         }
       },
       (error) => {
         if (chosen === "drawn") {
-          fill(body, note("warn", `The page cannot be shown: ${error.message}.`));
+          fill(body, note("warn", t("filepanel.thePageCannotBeShown", { message: error.message })));
         }
       },
     );
   };
   const switcher = segmented(
     [
-      { id: "drawn", label: "Page", hint: "Show the page as a browser draws it" },
-      { id: "source", label: "Source", hint: "Show the page's HTML" },
+      { id: "drawn", label: t("filepanel.page"), hint: t("filepanel.showThePageAsA") },
+      { id: "source", label: t("filepanel.source"), hint: t("filepanel.showThePageSHtml") },
     ],
     "drawn",
     show,
   );
   switcher.element.classList.add("file-tabs");
-  switcher.element.setAttribute("aria-label", "View");
+  switcher.element.setAttribute("aria-label", t("filepanel.view"));
   fill(views, switcher.element);
   views.hidden = false;
   show("drawn");
@@ -495,7 +496,7 @@ function webPageView(file, views, toolbar, body, cut) {
 /** A text as text; a Markdown file formatted as an answer is, its HTML never drawn, with its source a click away; a
  * web page drawn as one (item 1077); a source file as code. */
 function textView(file, views, toolbar, body) {
-  const cut = file.preview.cut ? hint("The file is longer than this; open it on the Mac to read it all.") : null;
+  const cut = file.preview.cut ? hint(t("filepanel.theFileIsLongerThan")) : null;
   if (WEB_PAGE_NAME.test(file.name)) {
     webPageView(file, views, toolbar, body, cut);
     return;
@@ -512,14 +513,14 @@ function textView(file, views, toolbar, body) {
   const show = (id) => fill(body, id === "formatted" ? el("div", { class: "file-markdown" }, prose(file.preview.text)) : source(), cut);
   const tabs = segmented(
     [
-      { id: "formatted", label: "Formatted", hint: "Show the Markdown formatted" },
-      { id: "source", label: "Source", hint: "Show the Markdown as it is written" },
+      { id: "formatted", label: t("filepanel.formatted"), hint: t("filepanel.showTheMarkdownFormatted") },
+      { id: "source", label: t("filepanel.source"), hint: t("filepanel.showTheMarkdownAsIt") },
     ],
     "formatted",
     show,
   ).element;
   tabs.classList.add("file-tabs");
-  tabs.setAttribute("aria-label", "View");
+  tabs.setAttribute("aria-label", t("filepanel.view"));
   fill(toolbar, tabs);
   show("formatted");
 }
@@ -536,7 +537,7 @@ function pageWidth(widths, pixels) {
  */
 function pdfView(file, preview, scroller, keep, cleanups) {
   if (preview.pages.length === 0) {
-    return hint("The PDF has no pages.");
+    return hint(t("filepanel.thePdfHasNoPages"));
   }
   const count = preview.pages.length;
   const draw = (figure) => {
@@ -549,7 +550,7 @@ function pdfView(file, preview, scroller, keep, cleanups) {
           figure.dataset.drawn = "true";
         }
       },
-      (error) => figure.replaceChildren(note("warn", `Page ${number} could not be drawn: ${error.message}`)),
+      (error) => figure.replaceChildren(note("warn", t("filepanel.pageNumberCouldNotBe", { number, message: error.message }))),
     );
   };
   const observer = new IntersectionObserver(
@@ -565,7 +566,7 @@ function pdfView(file, preview, scroller, keep, cleanups) {
   );
   cleanups.push(() => observer.disconnect());
   const pages = preview.pages.map((page, index) => {
-    const figure = el("figure", { class: "file-page", dataset: { page: String(index + 1) } }, el("img", { alt: `Page ${index + 1} of ${count}`, decoding: "async" }));
+    const figure = el("figure", { class: "file-page", dataset: { page: String(index + 1) } }, el("img", { alt: t("filepanel.pageValueOfCount", { value: index + 1, count }), decoding: "async" }));
     figure.style.aspectRatio = `${page.width} / ${page.height}`;
     observer.observe(figure);
     return figure;
@@ -582,8 +583,8 @@ function imageView(file, keep) {
     {
       class: "file-picture",
       type: "button",
-      title: "Show the picture at full size",
-      "aria-label": `${file.name}, show at full size`,
+      title: t("filepanel.showThePictureAtFull"),
+      "aria-label": t("filepanel.nameShowAtFullSize", { name: file.name }),
     },
     image,
   );
@@ -598,7 +599,7 @@ function imageView(file, keep) {
       holder.disabled = true;
       holder.removeAttribute("aria-label");
       holder.removeAttribute("title");
-      holder.replaceChildren(note("warn", `The image could not be loaded: ${error.message}`));
+      holder.replaceChildren(note("warn", t("filepanel.theImageCouldNotBe", { message: error.message })));
     },
   );
   return holder;
@@ -626,9 +627,9 @@ function textIn(preview) {
         : preview.slides
             .map((slide, index) =>
               [
-                `Slide ${index + 1}${slide.title === "" ? "" : `: ${slide.title}`}`,
+                slide.title === "" ? t("filepanel.slideNumber", { value: index + 1 }) : t("filepanel.slideNumberTitled", { value: index + 1, title: slide.title }),
                 ...slide.parts.map((part) => (part.kind === "text" ? part.lines.map((line) => line.text).join("\n") : part.kind === "table" ? tabbed(part.rows) : "")),
-                slide.notes === "" ? "" : `Notes: ${slide.notes}`,
+                slide.notes === "" ? "" : t("filepanel.notesNotes", { notes: slide.notes }),
               ]
                 .filter((text) => text !== "")
                 .join("\n"),
@@ -663,7 +664,7 @@ export function fileView(source, onClose) {
   };
   const label = source.name ?? baseName(source.path);
   const title = el("strong", { class: "file-name" }, label);
-  const facts = el("span", { class: "small muted" }, "Loading…");
+  const facts = el("span", { class: "small muted" }, t("filepanel.loading"));
   let path = null;
   const openButton = el(
     "button",
@@ -671,25 +672,25 @@ export function fileView(source, onClose) {
       class: "btn sm",
       type: "button",
       hidden: true,
-      title: "Open the file in its application on the Mac",
+      title: t("filepanel.openTheFileInIts"),
       onclick: () =>
         api.post("/files/open", { path }).then(
-          () => toast("ok", `Opened ${title.textContent} on the Mac`),
-          (error) => toast("error", `Could not open the file: ${error.message}`),
+          () => toast("ok", t("filepanel.openedTextcontentOnTheMac", { textContent: title.textContent })),
+          (error) => toast("error", t("filepanel.couldNotOpenTheFile", { message: error.message })),
         ),
     },
     icon("external"),
-    el("span", null, "Open on the Mac"),
+    el("span", null, t("filepanel.openOnTheMac")),
   );
-  const closeButton = el("button", { class: "btn ghost sm icon-only", type: "button", title: "Close", "aria-label": "Close the file", onclick: onClose }, icon("x"));
+  const closeButton = el("button", { class: "btn ghost sm icon-only", type: "button", title: t("filepanel.close"), "aria-label": t("filepanel.closeTheFile"), onclick: onClose }, icon("x"));
   // The text of the file, a press away (item 403): what the panel reads of a text, a Markdown file, a PDF, a Word
   // document or a presentation; a workbook, a picture or a file not read here have none.
   let textOfFile = null;
-  const copy = copyButton(() => textOfFile ?? "", "Copy the text");
+  const copy = copyButton(() => textOfFile ?? "", t("filepanel.copyTheText"));
   copy.hidden = true;
   const views = el("div", { class: "file-views", hidden: true });
   const toolbar = el("div", { class: "file-toolbar" });
-  const body = el("div", { class: "file-body" }, hint("Loading…"));
+  const body = el("div", { class: "file-body" }, hint(t("filepanel.loading")));
   const element = el(
     "section",
     { class: "file-view", tabindex: "-1", "aria-label": label },
@@ -707,11 +708,11 @@ export function fileView(source, onClose) {
     title.title = file.path;
     element.setAttribute("aria-label", file.name);
     element.dataset.kind = kind;
-    facts.textContent = `${kind === "text" && WEB_PAGE_NAME.test(file.name) ? "Web page" : KINDS[kind]}, ${sizeLabel(file.size)}`;
+    facts.textContent = `${kind === "text" && WEB_PAGE_NAME.test(file.name) ? t("filepanel.webPage") : KINDS[kind]}, ${sizeLabel(file.size)}`;
     openButton.hidden = !file.opens;
     textOfFile = textOf(file.preview);
     copy.hidden = textOfFile === null;
-    copy.title = file.preview.cut ? "Copy the text shown (the file holds more)" : "Copy the text";
+    copy.title = file.preview.cut ? t("filepanel.copyTheTextShownThe") : t("filepanel.copyTheText");
     switch (kind) {
       case "pdf":
         body.replaceChildren(pdfView(file, file.preview, body, keep, cleanups));
@@ -731,7 +732,7 @@ export function fileView(source, onClose) {
         textView(file, views, toolbar, body);
         break;
       default:
-        fill(body, note(null, `This file is not shown here: ${file.preview.reason}.`), file.opens ? hint("Open it on the Mac to see it.") : null);
+        fill(body, note(null, t("filepanel.thisFileIsNotShown", { reason: file.preview.reason })), file.opens ? hint(t("filepanel.openItOnTheMac")) : null);
     }
   }
 
@@ -745,7 +746,7 @@ export function fileView(source, onClose) {
     (error) => {
       if (!disposed) {
         facts.textContent = source.path ?? "";
-        body.replaceChildren(note("warn", `This file cannot be shown: ${error.message}.`));
+        body.replaceChildren(note("warn", t("filepanel.thisFileCannotBeShown", { message: error.message })));
       }
     },
   );

@@ -10,6 +10,7 @@ import { paletteTokens } from "../appearance/tokens.js";
 import { el } from "../dom.js";
 import { foldGroup, segmented } from "../panels.js";
 import { endPreview, previewTokens, shownScheme } from "../theme.js";
+import { t } from "../i18n.js";
 
 const NAME_UNITS = 48;
 // The colours the guided fields hold, which the families leave out.
@@ -24,7 +25,7 @@ function colourField(label, hint, onChange) {
     maxlength: "64",
     spellcheck: "false",
     autocomplete: "off",
-    "aria-label": `${label}, as hex`,
+    "aria-label": t("views.themeEditor.labelAsHex", { label }),
   });
   swatch.addEventListener("input", () => {
     text.value = swatch.value;
@@ -66,22 +67,22 @@ function sample() {
   return el(
     "div",
     { class: "theme-sample", "aria-hidden": "true" },
-    el("div", { class: "bubble user" }, el("div", { class: "prose" }, el("p", { class: "para" }, "Plan a weekend by the coast"))),
+    el("div", { class: "bubble user" }, el("div", { class: "prose" }, el("p", { class: "para" }, t("views.themeEditor.planAWeekendByThe")))),
     el(
       "div",
       { class: "prose" },
-      el("p", { class: "para" }, "Two days by train: the harbour and the old town on Saturday, the cliff path on Sunday."),
+      el("p", { class: "para" }, t("views.themeEditor.twoDaysByTrainThe")),
     ),
-    el("div", { class: "muted" }, "Worked for 12s"),
+    el("div", { class: "muted" }, t("views.themeEditor.workedFor12s")),
     el(
       "div",
       { class: "row wrap" },
-      el("span", { class: "badge s-done" }, "done"),
-      el("span", { class: "badge s-blocked" }, "waiting"),
-      el("span", { class: "badge s-failed" }, "failed"),
+      el("span", { class: "badge s-done" }, t("views.themeEditor.stateDone")),
+      el("span", { class: "badge s-blocked" }, t("views.themeEditor.stateWaiting")),
+      el("span", { class: "badge s-failed" }, t("views.themeEditor.stateFailed")),
       el("span", { class: "grow" }),
-      el("button", { class: "btn sm", type: "button", tabindex: "-1" }, "Cancel"),
-      el("button", { class: "btn primary sm", type: "button", tabindex: "-1" }, "Send"),
+      el("button", { class: "btn sm", type: "button", tabindex: "-1" }, t("views.themeEditor.cancel")),
+      el("button", { class: "btn primary sm", type: "button", tabindex: "-1" }, t("views.themeEditor.send")),
     ),
   );
 }
@@ -131,20 +132,20 @@ export function themeEditor({ name, palettes, actions, tuned, onSave, onCancel }
     class: "input",
     type: "text",
     maxlength: String(NAME_UNITS),
-    "aria-label": "Theme name",
+    "aria-label": t("views.themeEditor.themeName"),
     value: name,
   });
-  const background = colourField("Background", "The page; the surfaces, lines and text are made from it.", (colour) => {
+  const background = colourField(t("views.themeEditor.background"), t("views.themeEditor.thePageTheSurfacesLines"), (colour) => {
     state.seeds[state.editing].canvas = colour;
     regenerate();
     paint();
   });
-  const accent = colourField("Accent", "Tints the surfaces and marks what is picked.", (colour) => {
+  const accent = colourField(t("views.themeEditor.accent"), t("views.themeEditor.tintsTheSurfacesAndMarks"), (colour) => {
     state.seeds[state.editing].accent = colour;
     regenerate();
     paint();
   });
-  const action = colourField("Action", "Buttons, switches and the send button.", (colour) => {
+  const action = colourField(t("views.themeEditor.action"), t("views.themeEditor.buttonsSwitchesAndTheSend"), (colour) => {
     state.actions[state.editing] = colour;
     state.palettes[state.editing] = withFamily(state.palettes[state.editing], "messageAction", colour);
     paint();
@@ -159,8 +160,8 @@ export function themeEditor({ name, palettes, actions, tuned, onSave, onCancel }
   }));
   const which = segmented(
     [
-      { id: "light", label: "Light", hint: "The palette of the light scheme." },
-      { id: "dark", label: "Dark", hint: "The palette of the dark scheme." },
+      { id: "light", label: t("views.themeEditor.light"), hint: t("views.themeEditor.thePaletteOfTheLight") },
+      { id: "dark", label: t("views.themeEditor.dark"), hint: t("views.themeEditor.thePaletteOfTheDark") },
     ],
     state.editing,
     (scheme) => {
@@ -168,10 +169,10 @@ export function themeEditor({ name, palettes, actions, tuned, onSave, onCancel }
       paint();
     },
   );
-  which.element.setAttribute("aria-label", "Palette");
+  which.element.setAttribute("aria-label", t("views.themeEditor.palette"));
   const alert = el("div", { class: "alert-line", role: "alert", hidden: true });
-  const save = el("button", { class: "btn primary", type: "button" }, "Save theme");
-  const cancel = el("button", { class: "btn", type: "button", onclick: onCancel }, "Cancel");
+  const save = el("button", { class: "btn primary", type: "button" }, t("views.themeEditor.saveTheme"));
+  const cancel = el("button", { class: "btn", type: "button", onclick: onCancel }, t("views.themeEditor.cancel"));
 
   function paint() {
     const palette = state.palettes[state.editing];
@@ -187,7 +188,7 @@ export function themeEditor({ name, palettes, actions, tuned, onSave, onCancel }
   save.addEventListener("click", async () => {
     const named = nameField.value.trim();
     if (named === "") {
-      alert.textContent = "Name the theme first.";
+      alert.textContent = t("views.themeEditor.nameTheThemeFirst");
       alert.hidden = false;
       nameField.focus();
       return;
@@ -214,21 +215,21 @@ export function themeEditor({ name, palettes, actions, tuned, onSave, onCancel }
     el(
       "div",
       { class: "stack" },
-      el("label", { class: "field" }, el("span", { class: "field-label" }, "Name"), nameField),
-      schemes.length === 2 ? el("div", { class: "row" }, el("span", { class: "grow" }, "Palette"), which.element) : null,
+      el("label", { class: "field" }, el("span", { class: "field-label" }, t("views.themeEditor.name")), nameField),
+      schemes.length === 2 ? el("div", { class: "row" }, el("span", { class: "grow" }, t("views.themeEditor.palette")), which.element) : null,
       background.element,
       accent.element,
       action.element,
       foldGroup({
         id: "theme-families",
-        head: el("span", null, "Colour families"),
+        head: el("span", null, t("views.themeEditor.colourFamilies")),
         body: el(
           "div",
           { class: "stack" },
           el(
             "div",
             { class: "hint" },
-            "Each changes its colour and the ones that go with it. A new background or accent makes the palette again and undoes these.",
+            t("views.themeEditor.eachChangesItsColourAnd"),
           ),
           ...families.map((family) => family.field.element),
         ),

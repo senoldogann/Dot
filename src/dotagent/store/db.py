@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Concatenate, Literal, cast, get_args
 
 import aiosqlite
-from pydantic import JsonValue, TypeAdapter
+from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from dotagent.core.errors import InvalidValueError, JsonParseError, NotFoundError, RunConflict, StoreError
 from dotagent.core.ids import new_id
@@ -49,6 +49,7 @@ from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
 from dotagent.store.costs import uses_by_day, uses_of_family, uses_of_runs
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.failed import failed_result_sql
+from dotagent.store.kinds import KindBy, MemoryKind, rule_kind
 from dotagent.store.models import (
     NO_PICKS,
     OBJECTIVE_MOVES,
@@ -149,6 +150,7 @@ from dotagent.store.models import (
     WorkOrderRecord,
     WorkOrderStatus,
 )
+from dotagent.store.perf import PerfTable, PerfWindow, read_perf
 from dotagent.store.provenance import note_origin
 from dotagent.store.revisions import COUNTER_KEY as REVISION_COUNTER_KEY
 from dotagent.store.revisions import DELETED_END, DELETED_PREFIX, bump_statements, revision_statements
@@ -1157,6 +1159,7 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
         created_at=row["created_at"],
         follow_up=None if follow_up is None else FollowUpOf.model_validate_json(follow_up),
         answers=row["answers"],
+        carried_from=row["carried_from"],
     )
 
 
@@ -1215,7 +1218,29 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         proposed=_proposed_change(row),
         subject=row["subject"],
         origin=row["origin"],
+        kind=_memory_kind(row["kind"], row["id"]),
+        kind_by=_kind_by(row["kind_by"], row["id"]),
     )
+
+
+_KIND: TypeAdapter[MemoryKind | None] = TypeAdapter(MemoryKind | None)
+_KIND_BY: TypeAdapter[KindBy | None] = TypeAdapter(KindBy | None)
+
+
+def _memory_kind(value: str | None, memory_id: str) -> MemoryKind | None:
+    """A note's stored kind; a value that is no kind (written by a newer Dot or by hand) is an error."""
+    try:
+        return _KIND.validate_python(value)
+    except ValidationError as error:
+        raise StoreError("a note's kind is not one of the kinds", {"memory_id": memory_id, "kind": value}) from error
+
+
+def _kind_by(value: str | None, memory_id: str) -> KindBy | None:
+    """Who told a note's stored kind; a value that is none of them is an error."""
+    try:
+        return _KIND_BY.validate_python(value)
+    except ValidationError as error:
+        raise StoreError("who told a note's kind is unknown", {"memory_id": memory_id, "kind_by": value}) from error
 
 
 def _proposed_change(row: aiosqlite.Row) -> ProposedChange | None:
@@ -1411,6 +1436,10 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     # Where the note came from (item 1864, :mod:`dotagent.store.provenance`). Filled once, as the column is added, for
     # the notes whose run is still stored; NULL for the others.
     ("origin", "TEXT"),
+    # What the note is and who told it (item 1975): filled once by version 5 (``_tell_kinds``) for the notes there
+    # were, by the store as it writes a new note, and by the fast model's pass for what the rules cannot tell.
+    ("kind", "TEXT"),
+    ("kind_by", "TEXT"),
 )
 # The kv key of the lessons ``auto`` saved lately (item 1713), a JSON list of ``LessonSave``.
 _LESSON_SAVES_KEY: str = "lessons.saved"
@@ -1466,6 +1495,8 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("follow_up", "TEXT"),
     # The question card a message answers (item 1984; NULL for any other message).
     ("answers", "TEXT"),
+    # The run whose words a message the router queued is carried from (item 2012; NULL for any other message).
+    ("carried_from", "TEXT"),
 )
 # Columns of ``harness_probes`` added later (item 589): the approvals the attempt's run asked, and how many of the
 # task's checks held of how many; an attempt recorded before holds none of the three.
@@ -1624,7 +1655,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
 # or renamed, data rewritten) is a step of ``_MIGRATIONS`` under the next version, and raises this. A database below
 # the version is copied first; one of a later version (a newer Dot wrote it) is refused, so that this one never writes
 # what it does not know. test_store_schema.py pins the tables of the version.
-SCHEMA_VERSION: int = 4
+SCHEMA_VERSION: int = 5
 
 
 async def _drop_trading_tables(connection: aiosqlite.Connection) -> None:
@@ -1718,12 +1749,27 @@ async def _make_chat_index(connection: aiosqlite.Connection) -> None:
         await connection.execute(statement)
 
 
+async def _tell_kinds(connection: aiosqlite.Connection) -> None:
+    """Version 5 (item 1975): give every note there was the kind the fixed rules tell (:func:`rule_kind`), once,
+    recorded as the rules'; a note they cannot tell keeps none, for the fast model's pass. The kind columns are added
+    by the additive layer first; the copy made before the upgrade keeps the notes as they were."""
+    async with connection.execute("SELECT id, content, tags FROM memories WHERE kind IS NULL") as cursor:
+        rows = await cursor.fetchall()
+    told: list[tuple[str, str]] = []
+    for row in rows:
+        kind: MemoryKind | None = rule_kind(str(row["content"]), [tag for tag in str(row["tags"]).split(",") if tag])
+        if kind is not None:
+            told.append((kind, str(row["id"])))
+    await connection.executemany("UPDATE memories SET kind = ?, kind_by = 'rule' WHERE id = ?", told)
+
+
 # The steps after the additive layer, each under the version it brings the database to, in order. Version 1 is the
 # additive layer itself, which every open applies: no step.
 _MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = (
     (2, _drop_trading_tables),
     (3, _make_run_ledger),
     (4, _make_chat_index),
+    (5, _tell_kinds),
 )
 # Where the copy made before a migration goes, beside the database, in a folder of the version it was copied from,
 # which keeps its newest two (``_copy_before_upgrade``); runs neither read nor change them (``runtime._guarded_files``),
@@ -1946,6 +1992,20 @@ _MOVING_SQL: str = ", ".join(f"'{status}'" for status in sorted(get_args(Working
 _OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATUSES))
 # Whether the run of the bound id works (item 1047).
 _RUN_WORKS_SQL: str = f"EXISTS (SELECT 1 FROM runs WHERE runs.id = ? AND runs.status IN ({_WORKING_SQL}))"
+
+
+# How long a lane with no run yet counts as a task at work (item 2012): its first run starts within moments of it, and a
+# lane a crash left without one stops taking a place of its chat's after this.
+LANE_START_GRACE_S: float = 60.0
+# How many tasks of a chat work (items 1984 and 2012): the chat and each of its lanes with a run of its own (not a
+# helper's) at work, and a lane made in the last LANE_START_GRACE_S with no run yet. Its marks: the chat twice, then
+# the time before which an empty lane no longer counts.
+_CHAT_TASKS_AT_WORK_SQL: str = (
+    "SELECT COUNT(*) FROM threads AS t WHERE (t.id = ? OR t.lane_of = ?) AND ("
+    " EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id AND runs.parent_run_id IS NULL"
+    f" AND runs.status IN ({_WORKING_SQL}))"
+    " OR (t.lane_of IS NOT NULL AND t.created_at > ? AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id)))"
+)
 
 
 def _thread_summaries_sql(where: str, order: str) -> str:
@@ -2854,11 +2914,7 @@ class Store:
         cursor: aiosqlite.Cursor = await self._db.execute(
             "INSERT INTO threads(id, title, source, created_at, updated_at, team_id, agent_id, lane_of)"
             " SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE ("
-            " SELECT COUNT(*) FROM threads AS t WHERE (t.id = ? OR t.lane_of = ?) AND ("
-            " EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id AND runs.parent_run_id IS NULL"
-            f" AND runs.status IN ({_WORKING_SQL}))"
-            " OR (t.lane_of IS NOT NULL AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = t.id)))"
-            ") < ?",
+            f" {_CHAT_TASKS_AT_WORK_SQL}) < ?",
             (
                 record.id,
                 record.title,
@@ -2870,6 +2926,7 @@ class Store:
                 record.lane_of,
                 chat_id,
                 chat_id,
+                now - LANE_START_GRACE_S,
                 cap,
             ),
         )
@@ -2886,6 +2943,24 @@ class Store:
             (lane_id,),
         )
         await self._db.commit()
+
+    async def chat_tasks_at_work(self, chat_id: str) -> int:
+        """How many tasks of the chat ``chat_id`` work now, as :meth:`create_lane` counts them (item 2012)."""
+        row: aiosqlite.Row | None = await self._one(
+            f"SELECT ({_CHAT_TASKS_AT_WORK_SQL}) AS working", (chat_id, chat_id, time.time() - LANE_START_GRACE_S)
+        )
+        return 0 if row is None else int(row["working"])
+
+    async def left_questions(self, thread_id: str) -> list[ApprovalRecord]:
+        """The question cards the runs of the thread ``thread_id`` left and nobody answered yet, oldest first (item
+        2012): the questions its task waits on."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT approvals.* FROM approvals JOIN runs ON runs.id = approvals.run_id"
+            " WHERE approvals.status = 'left' AND approvals.kept_until IS NULL AND runs.thread_id = ?"
+            " ORDER BY approvals.created_at",
+            (thread_id,),
+        )
+        return [_approval(row) for row in rows]
 
     async def lanes_of(self, chat_id: str) -> list[str]:
         """The lanes of the chat ``chat_id`` (item 1984), oldest first."""
@@ -3490,20 +3565,64 @@ class Store:
         now: float = time.time()
 
         async def statements() -> None:
-            await self._db.execute(
-                "INSERT INTO message_archive(thread_id, version, seq, body)"
-                " SELECT m.thread_id, t.history_version, m.seq, m.body FROM messages AS m JOIN threads AS t"
-                " ON t.id = m.thread_id WHERE m.thread_id = ? AND m.seq < (SELECT MAX(history_seq) FROM runs"
-                " WHERE thread_id = ? AND history_version = t.history_version AND rewound_at IS NULL)",
-                (thread_id, thread_id),
+            await self._write_anew(thread_id, bodies, now)
+
+        await self._unit(statements)
+
+    async def _write_anew(self, thread_id: str, bodies: Sequence[str], now: float) -> None:
+        """The statements of :meth:`replace_messages`, inside the caller's unit."""
+        await self._db.execute(
+            "INSERT INTO message_archive(thread_id, version, seq, body)"
+            " SELECT m.thread_id, t.history_version, m.seq, m.body FROM messages AS m JOIN threads AS t"
+            " ON t.id = m.thread_id WHERE m.thread_id = ? AND m.seq < (SELECT MAX(history_seq) FROM runs"
+            " WHERE thread_id = ? AND history_version = t.history_version AND rewound_at IS NULL)",
+            (thread_id, thread_id),
+        )
+        await self._db.execute("UPDATE threads SET history_version = history_version + 1 WHERE id = ?", (thread_id,))
+        await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
+        await self._db.executemany(
+            "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
+            [(thread_id, index, body) for index, body in enumerate(bodies)],
+        )
+        await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
+
+    async def rewrite_messages(self, thread_id: str, before: Sequence[Message], after: Sequence[Message]) -> None:
+        """Store ``after`` as the thread's history, ``before`` being the history as it is stored, writing only the
+        messages that changed (item 2005): a run's context past 60 % of its budget shortens one old tool result
+        a step, and writing the whole history anew for it took seconds a step on a long chat (every message deleted,
+        put back and indexed for the chat search again, the part before the run copied aside), holding every other
+        run's writes meanwhile. A rewind keeps the messages before the place it goes back to as they are stored in
+        the history's version, so a message is changed in place only at or after the place the newest run of that
+        version started; a change before it, or a history of another length, writes the history anew
+        (:meth:`replace_messages`), which keeps the old one aside for the rewind."""
+        changed: list[int] = (
+            [index for index, (old, new) in enumerate(zip(before, after, strict=True)) if old != new]
+            if len(before) == len(after)
+            else []
+        )
+        if len(before) == len(after) and not changed:
+            return
+        encoded: list[str] = await asyncio.to_thread(self._encoded, [after[index] for index in changed])
+        now: float = time.time()
+
+        async def statements() -> None:
+            row: aiosqlite.Row | None = await self._one(
+                "SELECT MAX(runs.history_seq) AS floor FROM runs JOIN threads ON threads.id = runs.thread_id"
+                " WHERE runs.thread_id = ? AND runs.history_version = threads.history_version"
+                " AND runs.rewound_at IS NULL",
+                (thread_id,),
             )
-            await self._db.execute(
-                "UPDATE threads SET history_version = history_version + 1 WHERE id = ?", (thread_id,)
+            floor: int = 0 if row is None or row["floor"] is None else int(row["floor"])
+            if len(before) != len(after) or min(changed) < floor:
+                await self._write_anew(thread_id, await asyncio.to_thread(self._encoded, after), now)
+                return
+            # Deleted and inserted, not updated: the chat search's index follows a message by those two triggers.
+            await self._db.executemany(
+                "DELETE FROM messages WHERE thread_id = ? AND seq = ?", [(thread_id, index) for index in changed]
             )
-            await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
             await self._db.executemany(
                 "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
-                [(thread_id, index, body) for index, body in enumerate(bodies)],
+                [(thread_id, index, body) for index, body in zip(changed, encoded, strict=True)],
             )
             await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
 
@@ -4894,6 +5013,11 @@ class Store:
         self._run_counts[model] = {run_id: (events[run_id], one) for run_id, one in counts.items()}
         return profile_of(model, recent, counts)
 
+    async def perf(self, window: PerfWindow) -> PerfTable:
+        """Where the runs' seconds went in the last ``window``, stage by stage (item 2003), read on a read-only
+        connection."""
+        return await asyncio.to_thread(read_perf, self._database, window, time.time())
+
     async def context_evidence(self, model: str, days: int) -> ContextEvidence:
         """What the runs of ``model`` created in the last ``days`` days say about its context size (item 250), read on a
         read-only connection."""
@@ -6106,12 +6230,57 @@ class Store:
         await self._db.commit()
         return record
 
+    @_writing
+    async def add_queued_carried(
+        self,
+        thread_id: str,
+        text: str,
+        attachments: Sequence[str],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        source: str,
+        carried_from: str,
+    ) -> QueuedMessage:
+        """Put a message the router sent to a task (item 2012) at the end of that task's queue, carried from the run
+        ``carried_from``: it starts the task's next run as carried words, not as the owner's own message."""
+        row = await self._one(
+            "SELECT COALESCE(MAX(position), 0) AS top FROM queued_messages WHERE thread_id = ?", (thread_id,)
+        )
+        record: QueuedMessage = QueuedMessage(
+            id=new_id("que"),
+            thread_id=thread_id,
+            position=(0 if row is None else int(row["top"])) + 1,
+            text=text,
+            attachments=tuple(attachments),
+            mode=mode,
+            model=model,
+            effort=effort,
+            speed=speed,
+            once=None,
+            picks=NO_PICKS,
+            approvals=approvals,
+            goal_mode=goal_mode,
+            agent_id=None,
+            source=source,
+            created_at=time.time(),
+            follow_up=None,
+            answers=None,
+            carried_from=carried_from,
+        )
+        await self._insert_queued(record)
+        await self._db.commit()
+        return record
+
     async def _insert_queued(self, record: QueuedMessage) -> None:
         """Store ``record`` in its chat's queue; the caller commits."""
         await self._db.execute(
             "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, speed, once,"
-            " picks, approvals, goal_mode, agent_id, source, created_at, follow_up, answers)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " picks, approvals, goal_mode, agent_id, source, created_at, follow_up, answers, carried_from)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -6131,6 +6300,7 @@ class Store:
                 record.created_at,
                 None if record.follow_up is None else record.follow_up.model_dump_json(),
                 record.answers,
+                record.carried_from,
             ),
         )
 
@@ -6296,10 +6466,13 @@ class Store:
     @_writing
     async def hold_queue(self, thread_id: str, reason: str = "owner") -> None:
         """Keep a chat's queue from starting its next message until :meth:`release_queue`. ``reason`` is ``owner``
-        (the owner resumes it) or ``crash`` (the run that goes on from a cut-off releases it when that run ends
-        done). A queue already held keeps the reason it has."""
-        if reason not in ("owner", "crash"):
-            raise InvalidValueError("a queue is held for the owner or for a crash", {"reason": reason})
+        (the owner resumes it), ``crash`` (the run that goes on from a cut-off releases it when that run ends
+        done) or ``tasks`` (its chat has as many tasks at work as it may, item 2012: one ending releases it). A queue
+        already held keeps the reason it has."""
+        if reason not in ("owner", "crash", "tasks"):
+            raise InvalidValueError(
+                "a queue is held for the owner, for a crash or for a free task of its chat", {"reason": reason}
+            )
         await self._db.execute(
             "INSERT OR IGNORE INTO queue_holds(thread_id, held_at, reason) VALUES(?, ?, ?)",
             (thread_id, time.time(), reason),
@@ -6651,6 +6824,37 @@ class Store:
 
         return await self._unit(statements)
 
+    async def memories_without_kind(self, limit: int) -> list[MemoryRecord]:
+        """The most recently changed notes whose kind neither the rules nor the fast model told (item 1975), of those
+        that may still be handed: a note merged into another or replaced by a newer one is no longer asked about."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE kind IS NULL AND merged_into IS NULL AND replaced_by IS NULL"
+            " ORDER BY updated_at DESC LIMIT ?",
+            (limit,),
+        )
+        return [_memory(row) for row in rows]
+
+    @_writing
+    async def tell_untold_kind(self, memory_id: str, kind: MemoryKind, by: KindBy) -> bool:
+        """Record ``kind`` as told by ``by`` on the note ``memory_id`` while it has none; whether it was recorded (a
+        note forgotten meanwhile, or told by a run or the owner meanwhile, is left as it is)."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE memories SET kind = ?, kind_by = ? WHERE id = ? AND kind IS NULL", (kind, by, memory_id)
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
+    async def set_memory_kind(self, memory_id: str, kind: MemoryKind, by: KindBy) -> None:
+        """Record ``kind`` as told by ``by`` (a run that saved the note, or the owner) on the note ``memory_id``,
+        whatever kind it had. A note that is gone raises."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE memories SET kind = ?, kind_by = ? WHERE id = ?", (kind, by, memory_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("memory not found", {"memory_id": memory_id})
+
     async def origin_of_run(self, run_id: str) -> MemoryOrigin | None:
         """The origin the notes run ``run_id`` saves now would have (item 1864): ``None`` for a run the store does not
         hold."""
@@ -6676,9 +6880,11 @@ class Store:
         tainted: bool,
     ) -> MemoryRecord:
         """The statements that add a note, in the caller's transaction; its origin is read from ``source_run``
-        (:func:`note_origin`)."""
+        (:func:`note_origin`), and its kind is the one the fixed rules tell (:func:`rule_kind`, item 1975), none when
+        they cannot."""
         now: float = time.time()
         origin: MemoryOrigin | None = await self._note_origin(source_run)
+        kind: MemoryKind | None = rule_kind(content, tags)
         record: MemoryRecord = MemoryRecord(
             id=new_id("mem"),
             content=content,
@@ -6693,12 +6899,27 @@ class Store:
             replaced_by=None,
             tainted=tainted,
             origin=origin,
+            kind=kind,
+            kind_by=None if kind is None else "rule",
         )
         tag_text: str = ",".join(record.tags)
         await self._db.execute(
             "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at,"
-            " tainted, origin) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (record.id, content, tag_text, now, now, source_run, agent_id, expires_at, int(tainted), origin),
+            " tainted, origin, kind, kind_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                content,
+                tag_text,
+                now,
+                now,
+                source_run,
+                agent_id,
+                expires_at,
+                int(tainted),
+                origin,
+                kind,
+                record.kind_by,
+            ),
         )
         await self._db.execute(
             "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
@@ -7141,8 +7362,8 @@ class Store:
             tag_text: str = ",".join(tags)
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at,"
-                " tainted, used_count, last_used_at, merged_from, origin)"
-                " VALUES(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)",
+                " tainted, used_count, last_used_at, merged_from, origin, kind, kind_by)"
+                " VALUES(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     merged_id,
                     kept.content,
@@ -7156,6 +7377,9 @@ class Store:
                     max(used) if used else None,
                     _MERGED_SOURCES.dump_json(tuple(_merged_source(note) for note in ordered)).decode(),
                     kept.origin,
+                    # The merged note is the kept note's words, so it is of the kept note's kind (item 1975).
+                    kept.kind,
+                    kept.kind_by,
                 ),
             )
             await self._db.execute(
@@ -7271,7 +7495,8 @@ class Store:
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
                 " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at,"
-                " edited_by, subject, origin) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?, ?)",
+                " edited_by, subject, origin, kind, kind_by)"
+                " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?, ?, ?, ?)",
                 (
                     record.id,
                     record.content,
@@ -7289,6 +7514,8 @@ class Store:
                     record.edited_by,
                     record.subject,
                     record.origin,
+                    record.kind,
+                    record.kind_by,
                 ),
             )
             await self._db.execute(

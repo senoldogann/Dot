@@ -431,6 +431,28 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   that run has ended. `POST /api/threads/{id}/stop` stops every task of the chat (a lane names its chat), each as its
   own Stop would, so each holds its queue, and a request the fast model was still being asked about starts nothing.
   Deleting a chat deletes its lanes. With `chat_tasks = 1` all of this is as before.
+- Where a message goes in a chat with several tasks (item 2012, slice 2): with `chat_tasks` above 1, a message sent
+  to a chat (or one of its lanes) of Dot's own with the owner, with no agent, one-message level or picks, goes where
+  it belongs, in this order. A message that is only a stop (*dur*, *durdur*, *stop*) while a task works stops every
+  task of the chat; quoting one task's message, that task alone, and nothing when that task does not work. A quote of a task's message (the Quote of the pages
+  and the phone) goes to that task, found by the quoted words: steered into its run at work, else its next message.
+  `/new <words>` starts a new task. With no task at work and none waiting on the owner (a question card left
+  unanswered, or a reply ending with a question within the last day), it goes to the thread it was sent to, as
+  before. Otherwise the fast model is asked which open task it belongs to, or whether it is a new one, shown the
+  owner's own words of each task and a task's question only when the run that asked read nothing a third party
+  wrote. The thread it was sent to takes it as before; another task at work gets it in its queue (the model never
+  steers a run), as words carried from that task's run, which start its next run carried when they start; another
+  task that ended asking starts its next run with the words carried from its last run. Either way the run starts as
+  tainted as that run ended and the words clear nothing a thread kept marked; a new one starts a lane. A doubt, a model that
+  fails or 12 seconds without a verdict queues it where it was sent. A task that would start while the chat has
+  `chat_tasks` at work, by any of these ways or where it was sent, waits in that thread's queue, held for a free
+  task, and starts when one of the chat's tasks
+  ends; a Stop of the chat turns that hold into the owner's. The queue's answer says where the message went
+  (`routed`). **Move** (`POST /api/queue/{id}/move`, and `POST /api/runs/{id}/move` for a task's run at work, which
+  is stopped first) sends a message to another task of the same chat, as the owner's own word, or to a new task
+  (`to_thread_id: null`). It is checked as a queued message is before anything moves; a message with picks, for one
+  level, for an agent, following a reaction, or answering a question card stays where it is. After a restart of the
+  daemon a queue held for a free task waits for the owner's **Resume**.
 - A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a

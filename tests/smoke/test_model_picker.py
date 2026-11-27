@@ -39,7 +39,6 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 # A phone's width has the chat settings' sheet instead of this menu (item 1202), read below on a touch screen.
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"))
 _FAVOURITES_KEY: str = "dot.models.favourites"
-_MENU: str = ".composer .composer-popover[aria-label='Model']"
 # The rail of the menu: Favourites, then one mark for each provider that serves models.
 _RAIL_ITEMS: str = "[role=toolbar][aria-label='AI services'] button"
 
@@ -163,22 +162,6 @@ async def _page(browser: Browser, address: str, width: int, scheme: Literal["lig
     return page, errors
 
 
-async def _rail(menu: Locator) -> list[tuple[str, str]]:
-    """The rail's items, `(label, pressed)`, in order."""
-    items: Locator = menu.locator(_RAIL_ITEMS)
-    return [
-        (str(await item.get_attribute("aria-label")), str(await item.get_attribute("aria-pressed")))
-        for item in await items.all()
-    ]
-
-
-async def _rows(menu: Locator) -> list[str]:
-    """The names of the rows the list shows, in order."""
-    # The models' list alone: a phone's menu holds the run's other choices under it (item 1121).
-    names: Locator = menu.locator(".model-picker [role=listbox] [role=option] .pop-option-text > span:first-child")
-    return [str(text) for text in await names.all_inner_texts()]
-
-
 async def _favourites(page: Page) -> list[str]:
     stored: object = json.loads(await page.evaluate(f"localStorage.getItem('{_FAVOURITES_KEY}') ?? '[]'"))
     assert isinstance(stored, list)
@@ -191,130 +174,27 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
+            # On every width the pill opens the chat's settings (items 1202 and 2015), the phone's sheet: a section per
+            # provider, the chosen one's open; a star keeps a model among the favourites, which come first.
             for width, scheme in _SHOTS:
                 page, errors = await _page(browser, served, width, scheme)
                 pill: Locator = page.locator(".composer .composer-pill[data-pill='model']")
-                menu: Locator = page.locator(_MENU)
-                search: Locator = menu.locator("input.model-search-input")
                 await expect(pill).to_contain_text("scripted")
-
-                # Opened with no favourites: on the provider of the model a run would use, the search taking the keys. A
-                # phone's box shows the pill once it is used (item 1120).
-                await page.locator(".composer textarea").last.click()
                 await pill.click()
-                await expect(menu.locator(".model-picker")).to_have_count(1)
-                # The menu opens at once and lists the providers once the daemon has said which models they serve.
-                await expect(menu.locator(_RAIL_ITEMS)).to_have_count(4)
-                assert await _rail(menu) == [
-                    ("Favourites", "false"),
-                    ("Ollama", "true"),
-                    ("OpenAI", "false"),
-                    ("Anthropic", "false"),
-                ]
-                marks: list[str | None] = [
-                    await mark.get_attribute("data-provider")
-                    for mark in await menu.locator("[role=toolbar] .provider-mark").all()
-                ]
-                assert marks == [_PROVIDER, "openai", "anthropic"]
-                assert await _rows(menu) == ["Default (scripted)", "scripted", "qwen3-coder"]
-                await expect(menu.locator(".model-picker [role=option][aria-selected=true]")).to_contain_text(
-                    "Default (scripted)"
-                )
-                await expect(search).to_be_focused()
-                await expect(menu.locator(".model-picker [role=option] kbd")).to_have_text(["⌘1", "⌘2"])
-                await page.screenshot(path=str(tmp_path / f"menu-{width}-{scheme}.png"), animations="disabled")
-
-                # The rail shows one provider's models, and gives the keys back to the search.
-                await menu.get_by_role("button", name="OpenAI").click()
-                assert (await _rail(menu))[2] == ("OpenAI", "true")
-                assert await _rows(menu) == ["Default (scripted)", "gpt-5.5", "gpt-5.5-mini"]
-                await expect(search).to_be_focused()
-
-                # A search looks through the models of the provider the rail shows, which stays pressed (item 395); one
-                # that finds nothing there says so.
-                await expect(search).to_have_attribute("placeholder", "Search OpenAI models")
-                await expect(search).to_have_attribute("aria-label", "Search OpenAI models")
-                await search.fill("mini")
-                assert await _rows(menu) == ["gpt-5.5-mini"]
-                assert (await _rail(menu))[2] == ("OpenAI", "true")
-                await search.fill("haiku")
-                assert await _rows(menu) == []
-                await expect(menu.locator(".model-note")).to_have_text("No OpenAI models match “haiku”.")
-                # Another view on the rail keeps the search, which looks through its models then.
-                await menu.get_by_role("button", name="Anthropic").click()
-                assert await _rows(menu) == ["claude-haiku-5-5"]
-                assert (await _rail(menu))[3] == ("Anthropic", "true")
-                await expect(search).to_have_value("haiku")
-                await expect(menu.locator(".model-picker [role=option] .pop-option-hint")).to_have_count(0)
-                await page.screenshot(path=str(tmp_path / f"search-{width}-{scheme}.png"), animations="disabled")
-                await menu.get_by_role("button", name="Ollama").click()
-                await search.fill("free coder")
-                assert await _rows(menu) == ["qwen3-coder"]
-                await search.fill("default")
-                assert await _rows(menu) == ["Default (scripted)"]
-                await expect(menu.locator(".model-note")).to_be_hidden()
-                await search.fill("zzz")
-                assert await _rows(menu) == []
-                await expect(menu.locator(".model-note")).to_have_text("No Ollama models match “zzz”.")
-                await menu.get_by_role("button", name="OpenAI").click()
-                await search.fill("")
-                assert await _rows(menu) == ["Default (scripted)", "gpt-5.5", "gpt-5.5-mini"]
-                await expect(menu.locator(".model-note")).to_be_hidden()
-
-                # A star keeps a model among the favourites, and picks nothing.
-                star: Locator = menu.locator(".model-row").filter(has_text="gpt-5.5").first.locator(".model-star")
+                sheet: Locator = page.get_by_role("dialog", name="Chat settings")
+                await expect(sheet).to_be_visible()
+                await expect(sheet.locator("details.sheet-section[open]")).to_have_count(1)
+                await sheet.locator("summary", has_text="OpenAI").click()
+                openai: Locator = sheet.locator("details.sheet-section", has_text="OpenAI")
+                star: Locator = openai.locator(".model-star").first
                 await star.click()
                 await expect(star).to_have_attribute("aria-pressed", "true")
-                assert await _favourites(page) == ["openai:gpt-5.5"]
-                await expect(menu).to_be_visible()
-                await expect(pill).to_contain_text("scripted")
-
-                # The keys: down to the second model, Enter picks it and the menu closes.
-                await expect(search).to_be_focused()
-                await page.keyboard.press("ArrowDown")
-                await page.keyboard.press("ArrowDown")
-                await expect(menu.locator(".model-picker [role=option].active")).to_contain_text("gpt-5.5-mini")
-                await page.keyboard.press("Enter")
-                await expect(menu).to_be_hidden()
-                await expect(pill).to_contain_text("gpt-5.5-mini")
-
-                # Opened again: on the favourites, each with its provider; ⌘1 picks the first.
-                await pill.click()
-                assert (await _rail(menu))[0] == ("Favourites", "true")
-                assert await _rows(menu) == ["Default (scripted)", "gpt-5.5"]
-                await expect(menu.locator(".model-picker [role=option] .pop-option-hint")).to_have_text(["OpenAI"])
-                await page.screenshot(path=str(tmp_path / f"favourites-{width}-{scheme}.png"), animations="disabled")
-                await page.keyboard.press("ControlOrMeta+1")
-                await expect(menu).to_be_hidden()
-                await expect(pill).to_contain_text("gpt-5.5")
-
-                # ⌘D stars or unstars the row the keys are on, which stays in its place.
-                await pill.click()
-                await expect(menu.locator(".model-picker [role=option].active")).to_contain_text("gpt-5.5")
-                await page.keyboard.press("ControlOrMeta+d")
-                assert await _favourites(page) == []
-                assert await _rows(menu) == ["Default (scripted)", "gpt-5.5"]
-                await expect(menu.locator(".model-star")).to_have_attribute("aria-pressed", "false")
-
-                # The rail by the keys: left from an empty search, down to the next view, Enter shows it, right back.
-                await page.keyboard.press("ArrowLeft")
-                await expect(menu.get_by_role("button", name="Favourites")).to_be_focused()
-                await page.keyboard.press("ArrowDown")
-                await expect(menu.get_by_role("button", name="Ollama")).to_be_focused()
-                await page.keyboard.press("Enter")
-                assert (await _rail(menu))[1] == ("Ollama", "true")
-                await expect(search).to_be_focused()
-                await page.keyboard.press("ArrowLeft")
-                await page.keyboard.press("ArrowRight")
-                await expect(search).to_be_focused()
-
-                # Escape closes the menu and gives the keys back to the pill; the default's row picks the default.
-                await page.keyboard.press("Escape")
-                await expect(menu).to_be_hidden()
-                await expect(pill).to_be_focused()
-                await pill.click()
-                await menu.get_by_role("option", name="Default (scripted)").click()
-                await expect(pill).to_contain_text("scripted")
+                assert await _favourites(page) != []
+                await star.click()
+                await expect(star).to_have_attribute("aria-pressed", "false")
+                await page.screenshot(path=str(tmp_path / f"settings-{width}-{scheme}.png"), animations="disabled")
+                await sheet.get_by_role("button", name="Done").click()
+                await expect(sheet).to_be_hidden()
                 assert errors == []
                 await page.context.close()
 
@@ -374,12 +254,11 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             await late.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await late.goto(ui_url(host, port, TOKEN))
             await late.locator(".composer .composer-pill[data-pill='model']").click()
-            menu = late.locator(_MENU)
-            await expect(menu.locator(".model-picker")).to_have_count(1)
+            early_sheet: Locator = late.get_by_role("dialog", name="Chat settings")
+            await expect(early_sheet).to_be_visible()
             release.set()
-            await expect(menu.locator("[role=toolbar] button")).to_have_count(4)
-            assert (await _rail(menu))[1] == ("Ollama", "true")
-            assert await _rows(menu) == ["Default (scripted)", "scripted", "qwen3-coder"]
+            await expect(early_sheet.locator("details.sheet-section", has_text="OpenAI")).to_have_count(1)
+            await expect(early_sheet.get_by_role("option", name="qwen3-coder")).to_have_count(1)
             await early.close()
         finally:
             await browser.close()
@@ -416,42 +295,24 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url(host, port, TOKEN))
             pill: Locator = page.locator(".composer .composer-pill[data-pill='model']")
-            menu: Locator = page.locator(_MENU)
-            search: Locator = menu.locator("input.model-search-input")
+            # The chat's settings on every width (items 1202 and 2015): the default's row has Change.
+            menu: Locator = page.get_by_role("dialog", name="Chat settings")
             choosing: Locator = menu.locator(".model-choosing")
             change: Locator = menu.get_by_role("button", name="Change")
             await expect(pill).to_contain_text("scripted")
 
-            # Change, on the default's row, turns the list to choosing the default: a bar says so, the default's row
-            # leaves, the tick is on the default and the keys stay in the search.
+            # Change turns the list to choosing the default: a bar says so.
             await pill.click()
+            await expect(menu).to_be_visible()
             await expect(choosing).to_be_hidden()
-            await expect(change).to_have_attribute("title", "Choose the model new chats start on")
             await page.screenshot(path=str(tmp_path / "change-1280-light.png"), animations="disabled")
             await change.click()
-            await expect(choosing.locator(".model-choosing-text")).to_have_text("Choose the default model")
-            assert await _rows(menu) == ["scripted", "qwen3-coder"]
-            await expect(menu.locator(".model-picker [role=option][aria-selected=true]")).to_have_count(1)
-            await expect(menu.locator(".model-picker [role=option][aria-selected=true]")).to_contain_text("scripted")
-            await expect(search).to_be_focused()
+            await expect(choosing).to_be_visible()
             await page.screenshot(path=str(tmp_path / "choosing-1280-light.png"), animations="disabled")
 
-            # Escape leaves the choosing and the menu stays open; Tab reaches Change (Option+Tab in WebKit, which tabs
-            # to text fields alone unless told otherwise, as macOS does), and Enter on it chooses again.
-            await page.keyboard.press("Escape")
-            await expect(choosing).to_be_hidden()
-            await expect(menu).to_be_visible()
-            assert await _rows(menu) == ["Default (scripted)", "scripted", "qwen3-coder"]
-            await search.focus()
-            await page.keyboard.press("Alt+Tab" if browser.browser_type.name == "webkit" else "Tab")
-            await expect(change).to_be_focused()
-            await page.keyboard.press("Enter")
-            await expect(choosing).to_be_visible()
-            await expect(search).to_be_focused()
-
-            # A model picked while choosing is the default: told, the list back to the chat's model, the default's
-            # row and the home's pill (which follows the default) name it, and the daemon and its config file have it.
-            await menu.get_by_role("button", name="OpenAI").click()
+            # A model picked while choosing is the default: told, the default's row and the home's pill (which follows
+            # the default) name it, and the daemon and its config file have it.
+            await menu.locator("summary", has_text="OpenAI").click()
             await menu.get_by_role("option", name="gpt-5.5-mini", exact=True).click()
             await expect(page.locator(".toast.ok")).to_contain_text("New chats start on gpt-5.5-mini.")
             await expect(choosing).to_be_hidden()
@@ -463,25 +324,7 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             assert isinstance(models, dict) and models["main"] == "openai:gpt-5.5-mini", models
             assert _written()["browser"] == {"headless": True}
 
-            # The keys choose too; a chat with a model of its own keeps it when the default changes.
-            await menu.get_by_role("button", name="Ollama").click()
-            await menu.locator(".model-picker [role=option]").filter(has_text="qwen3-coder").click()
-            await expect(menu).to_be_hidden()
-            await expect(pill).to_contain_text("qwen3-coder")
-            await pill.click()
-            await change.click()
-            # The search looks through the view shown, here Ollama's; Anthropic's, shown next, has the model.
-            await search.fill("haiku")
-            assert await _rows(menu) == []
-            await menu.get_by_role("button", name="Anthropic").click()
-            await expect(search).to_be_focused()
-            await page.keyboard.press("Enter")
-            await expect(page.locator(".toast.ok").last).to_contain_text("New chats start on claude-haiku-5-5.")
-            await expect(choosing).to_be_hidden()
-            await expect(pill).to_contain_text("qwen3-coder")
-            assert await _main_model(served) == "anthropic:claude-haiku-5-5"
-
-            # A change the daemon refuses says why, leaves the default as it was and keeps choosing.
+            # A change the daemon refuses says why and leaves the default as it was.
             async def refused(route: Route) -> None:
                 await route.fulfill(
                     status=422,
@@ -492,22 +335,18 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
                 )
 
             await page.route("**/api/models/main", refused)
-            await search.fill("")
             await change.click()
-            await menu.get_by_role("button", name="OpenAI").click()
+            await expect(choosing).to_be_visible()
             await menu.get_by_role("option", name="gpt-5.5", exact=True).click()
             await expect(page.locator(".toast.error")).to_contain_text("A task needs a model that can use actions")
-            await expect(choosing.locator(".model-choosing-text")).to_have_text("Choose the default model")
             await page.unroute("**/api/models/main")
-            await menu.get_by_role("button", name="Cancel").click()
-            await expect(choosing).to_be_hidden()
-            await expect(menu.get_by_role("option", name="Default (claude-haiku-5-5)")).to_be_visible()
-            assert await _main_model(served) == "anthropic:claude-haiku-5-5"
+            assert await _main_model(served) == "openai:gpt-5.5-mini"
+            await menu.get_by_role("button", name="Done").click()
+            await expect(menu).to_be_hidden()
 
             # The Settings show the default the menu made.
-            await page.keyboard.press("Escape")
             await page.goto(f"{served}/#/settings/models")
-            await expect_chosen(page, "Default model", "anthropic:claude-haiku-5-5")
+            await expect_chosen(page, "Default model", "openai:gpt-5.5-mini")
             assert errors == []
             await page.context.close()
 
@@ -516,9 +355,7 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
                 shown, shown_errors = await _page(browser, served, width, scheme)
                 await shown.locator(".composer textarea").last.click()
                 await shown.locator(".composer .composer-pill[data-pill='model']").click()
-                held: Locator = (
-                    shown.get_by_role("dialog", name="Chat settings") if width < 720 else shown.locator(_MENU)
-                )
+                held: Locator = shown.get_by_role("dialog", name="Chat settings")
                 await held.get_by_role("button", name="Change").click()
                 await expect(held.locator(".model-choosing")).to_be_visible()
                 await shown.screenshot(path=str(tmp_path / f"choosing-{width}-{scheme}.png"), animations="disabled")

@@ -22,6 +22,7 @@ import {
   segmented,
   statusBadge,
 } from "../panels.js";
+import { t } from "../i18n.js";
 
 const FACE_STATES = ["idle", "working", "waiting", "done", "failed"];
 const RUN_STATUSES = ["queued", "running", "blocked", "ending", "done", "failed", "cancelled"];
@@ -63,7 +64,7 @@ const FAKE_COSTS = {
 };
 
 function fakeApproval(severity, tool, summary) {
-  return { id: `demo-${severity}`, runId: "demo", tool, summary, severity, args: { kind: "write", target: "~/notes.txt", question: summary, options: ["Blue", "Green"] }, status: "pending", note: "" };
+  return { id: `demo-${severity}`, runId: "demo", tool, summary, severity, args: { kind: "write", target: "~/notes.txt", question: summary, options: [t("views.controls.blue"), t("views.controls.green")] }, status: "pending", note: "" };
 }
 
 // A question with options as ask_user offers them (item 192): described, one recommended, one or several to choose.
@@ -91,13 +92,13 @@ function characters() {
   const element = el(
     "div",
     { class: "stack" },
-    el("span", { class: "small muted" }, "Shapes"),
+    el("span", { class: "small muted" }, t("views.controls.shapes")),
     shapes.element,
-    el("span", { class: "small muted" }, "Expressions"),
+    el("span", { class: "small muted" }, t("views.controls.expressions")),
     expressions.element,
-    el("span", { class: "small muted" }, "Colours"),
+    el("span", { class: "small muted" }, t("views.controls.colours")),
     colours.element,
-    el("span", { class: "small muted" }, "Animations, moving"),
+    el("span", { class: "small muted" }, t("views.controls.animationsMoving")),
     states.element,
   );
   const handles = [...shapes.handles, ...expressions.handles, ...colours.handles, ...states.handles];
@@ -120,13 +121,13 @@ export function mount(root, _ctx) {
   );
   const faces = row(...FACE_STATES.map((state) => el("div", { class: "stack tight center" }, dotFace(state), el("span", { class: "small muted" }, state))));
   const buttons = row(
-    el("button", { class: "btn primary", type: "button" }, icon("plus"), "Primary"),
-    el("button", { class: "btn", type: "button" }, "Default"),
-    el("button", { class: "btn ghost", type: "button" }, "Ghost"),
-    el("button", { class: "btn danger", type: "button" }, icon("stop"), "Danger"),
-    el("button", { class: "btn sm", type: "button" }, "Small"),
-    el("button", { class: "btn sm icon-only", type: "button", "aria-label": "Icon only" }, icon("trash")),
-    el("button", { class: "btn", type: "button", disabled: true }, "Disabled"),
+    el("button", { class: "btn primary", type: "button" }, icon("plus"), t("views.controls.primary")),
+    el("button", { class: "btn", type: "button" }, t("views.controls.default")),
+    el("button", { class: "btn ghost", type: "button" }, t("views.controls.ghost")),
+    el("button", { class: "btn danger", type: "button" }, icon("stop"), t("views.controls.danger")),
+    el("button", { class: "btn sm", type: "button" }, t("views.controls.small")),
+    el("button", { class: "btn sm icon-only", type: "button", "aria-label": t("views.controls.iconOnly") }, icon("trash")),
+    el("button", { class: "btn", type: "button", disabled: true }, t("views.controls.disabled")),
   );
   const badges = row(
     ...RUN_STATUSES.map(statusBadge),
@@ -140,13 +141,13 @@ export function mount(root, _ctx) {
     el("span", { class: "live-dot live" }),
     el("span", { class: "spinner" }),
   );
-  const yolo = segmented([{ id: "ask", label: "Ask", hint: "" }, { id: "auto", label: "Auto", hint: "" }, { id: "yolo", label: "Pay or send", hint: "" }], "yolo", () => {});
+  const yolo = segmented([{ id: "ask", label: t("views.controls.ask"), hint: "" }, { id: "auto", label: t("views.controls.auto"), hint: "" }, { id: "yolo", label: t("views.controls.payOrSend"), hint: "" }], "yolo", () => {});
   yolo.element.dataset.mode = "yolo";
   // The range (item 127), as Settings › Appearance draws its contrast, its slide and its sizes.
   let ranged = 40;
   const range = rangeSetting({
-    label: "Range",
-    hint: "A number on a scale, its value beside its label.",
+    label: t("views.controls.range"),
+    hint: t("views.controls.aNumberOnAScale"),
     min: 0,
     max: 100,
     step: 5,
@@ -159,33 +160,33 @@ export function mount(root, _ctx) {
   const inputs = el(
     "div",
     { class: "form-grid" },
-    field("Text", el("input", { class: "input", type: "text", placeholder: "Placeholder", "aria-label": "Text" }), "A hint under the field."),
-    field("Mono", el("input", { class: "input mono", type: "text", value: "^git (status|diff)", "aria-label": "Mono" }), ""),
-    field("Select", el("select", { class: "select", "aria-label": "Select" }, el("option", null, "One"), el("option", null, "Two")), ""),
-    field("Small select", el("select", { class: "select sm", "aria-label": "Small select" }, el("option", null, "Medium"), el("option", null, "High")), ""),
-    field("Textarea", el("textarea", { class: "textarea", rows: "2", placeholder: "A longer text", "aria-label": "Textarea" }), ""),
-    el("div", { class: "field" }, el("span", { class: "field-label" }, "Switches"), row(el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "true", "aria-label": "On" }), el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Off" }))),
-    el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Segmented"), row(segmented([{ id: "a", label: "One", hint: "" }, { id: "b", label: "Two", hint: "" }, { id: "c", label: "Three", hint: "" }], "a", () => {}).element, yolo.element)),
+    field(t("views.controls.text"), el("input", { class: "input", type: "text", placeholder: t("views.controls.placeholder"), "aria-label": t("views.controls.text") }), t("views.controls.aHintUnderTheField")),
+    field(t("views.controls.mono"), el("input", { class: "input mono", type: "text", value: "^git (status|diff)", "aria-label": t("views.controls.mono") }), ""),
+    field(t("views.controls.select"), el("select", { class: "select", "aria-label": t("views.controls.select") }, el("option", null, t("views.controls.one")), el("option", null, t("views.controls.two"))), ""),
+    field(t("views.controls.smallSelect"), el("select", { class: "select sm", "aria-label": t("views.controls.smallSelect") }, el("option", null, t("views.controls.medium")), el("option", null, t("views.controls.high"))), ""),
+    field(t("views.controls.textarea"), el("textarea", { class: "textarea", rows: "2", placeholder: t("views.controls.aLongerText"), "aria-label": t("views.controls.textarea") }), ""),
+    el("div", { class: "field" }, el("span", { class: "field-label" }, t("views.controls.switches")), row(el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "true", "aria-label": t("views.controls.on") }), el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": t("views.controls.off") }))),
+    el("div", { class: "field wide" }, el("span", { class: "field-label" }, t("views.controls.segmented")), row(segmented([{ id: "a", label: t("views.controls.one"), hint: "" }, { id: "b", label: t("views.controls.two"), hint: "" }, { id: "c", label: t("views.controls.three"), hint: "" }], "a", () => {}).element, yolo.element)),
     el("div", { class: "field wide", "data-control": "range" }, range.element),
   );
   const notes = el(
     "div",
     { class: "stack" },
-    el("div", { class: "note" }, icon("shield"), el("span", null, "A note: quiet, beside the thing it is about.")),
-    el("div", { class: "note warn" }, icon("alert"), el("span", null, "A warning note.")),
-    el("div", { class: "banner", role: "alert" }, icon("alert"), el("span", { class: "grow" }, "A banner across the page."), el("button", { class: "btn sm", type: "button" }, "Release")),
+    el("div", { class: "note" }, icon("shield"), el("span", null, t("views.controls.aNoteQuietBesideThe"))),
+    el("div", { class: "note warn" }, icon("alert"), el("span", null, t("views.controls.aWarningNote"))),
+    el("div", { class: "banner", role: "alert" }, icon("alert"), el("span", { class: "grow" }, t("views.controls.aBannerAcrossThePage")), el("button", { class: "btn sm", type: "button" }, t("views.controls.release"))),
   );
   const cards = el(
     "div",
     { class: "stack" },
-    approvalCard({ approval: fakeApproval("question", "ask_user", "Which colour?"), heading: null, onSettled: () => {}, leftNote: "", onUseHere: null }).node,
+    approvalCard({ approval: fakeApproval("question", "ask_user", t("views.controls.whichColour")), heading: null, onSettled: () => {}, leftNote: "", onUseHere: null }).node,
     approvalCard({
       approval: fakeQuestion(
         "choice",
-        "Which colour should the buttons be?",
+        t("views.controls.whichColourShouldTheButtons"),
         [
-          { label: "Blue", description: "The colour of the rest of the site.", recommended: true },
-          { label: "Green", description: "Stands out more, and matches the logo.", recommended: false },
+          { label: t("views.controls.blue"), description: t("views.controls.theColourOfTheRest"), recommended: true },
+          { label: t("views.controls.green"), description: t("views.controls.standsOutMoreAndMatches"), recommended: false },
         ],
         false,
       ),
@@ -197,11 +198,11 @@ export function mount(root, _ctx) {
     approvalCard({
       approval: fakeQuestion(
         "choices",
-        "Which pages should get the new buttons?",
+        t("views.controls.whichPagesShouldGetThe"),
         [
-          { label: "Home", description: "", recommended: true },
-          { label: "Settings", description: "", recommended: true },
-          { label: "Runs", description: "Its buttons sit close together; they may need more room.", recommended: false },
+          { label: t("views.controls.home"), description: "", recommended: true },
+          { label: t("views.controls.settings"), description: "", recommended: true },
+          { label: t("views.controls.runs"), description: t("views.controls.itsButtonsSitCloseTogether"), recommended: false },
         ],
         true,
       ),
@@ -216,37 +217,37 @@ export function mount(root, _ctx) {
   const bubbles = el(
     "div",
     { class: "stack" },
-    el("div", { class: "bubble user" }, "Your message, on the raised surface."),
-    el("div", { class: "bubble", role: "article" }, el("div", { class: "prose" }, el("p", null, "Dot's answer, in the voice of the look. "), el("code", { class: "mono" }, "code"))),
+    el("div", { class: "bubble user" }, t("views.controls.yourMessageOnTheRaised")),
+    el("div", { class: "bubble", role: "article" }, el("div", { class: "prose" }, el("p", null, t("views.controls.dotSAnswerInThe")), el("code", { class: "mono" }, "code"))),
   );
   const costSample = createCostCard();
   costSample.paint(FAKE_COSTS);
-  const panels = el("div", { class: "stack" }, loadingPanel(), emptyPanel("circleDashed", "Nothing here yet", "An empty panel with its hint."), errorPanel(new Error("Something went wrong"), () => {}));
+  const panels = el("div", { class: "stack" }, loadingPanel(), emptyPanel("circleDashed", t("views.controls.nothingHereYet"), t("views.controls.anEmptyPanelWithIts")), errorPanel(new Error("Something went wrong"), () => {}));
   const type = el(
     "div",
     { class: "stack tight" },
-    ...[["text-2xl", "The home's greeting"], ["text-xl", "Page title"], ["text-lg", "Section title"], ["text-md", "Prose and the composer"], ["text-ui", "The interface: sidebar, buttons, labels"], ["text-sm", "Meta and hints"], ["text-xs", "Badges and chips"]].map(([token, words]) =>
+    ...[["text-2xl", t("views.controls.theHomeSGreeting")], ["text-xl", t("views.controls.pageTitle")], ["text-lg", t("views.controls.sectionTitle")], ["text-md", t("views.controls.proseAndTheComposer")], ["text-ui", t("views.controls.theInterfaceSidebarButtonsLabels")], ["text-sm", t("views.controls.metaAndHints")], ["text-xs", t("views.controls.badgesAndChips")]].map(([token, words]) =>
       el("div", { class: `row type-sample ${token}` }, el("span", { class: "grow" }, words), el("code", { class: "mono small muted" }, `--${token}`)),
     ),
   );
   root.replaceChildren(
-    pageHead("Controls", "Every control on the tokens of the visual system: colour, type, shape, spacing, and the state marks.", null),
+    pageHead(t("views.controls.controls"), t("views.controls.everyControlOnTheTokens"), null),
     el(
       "div",
       { class: "stack" },
-      section("Colour", swatches),
-      section("Type", type),
-      section("Faces", faces),
-      section("Characters", cast.element),
-      section("Buttons", buttons),
-      section("Badges", badges),
-      section("Marks", marks),
-      section("Inputs", inputs),
-      section("Notes", notes),
-      section("Cards", cards),
-      section("Cost", costSample.element),
-      section("Bubbles", bubbles),
-      section("Panels", panels),
+      section(t("views.controls.colour"), swatches),
+      section(t("views.controls.type"), type),
+      section(t("views.controls.faces"), faces),
+      section(t("views.controls.characters"), cast.element),
+      section(t("views.controls.buttons"), buttons),
+      section(t("views.controls.badges"), badges),
+      section(t("views.controls.marks"), marks),
+      section(t("views.controls.inputs"), inputs),
+      section(t("views.controls.notes"), notes),
+      section(t("views.controls.cards"), cards),
+      section(t("views.controls.cost"), costSample.element),
+      section(t("views.controls.bubbles"), bubbles),
+      section(t("views.controls.panels"), panels),
     ),
   );
   return cast.dispose;

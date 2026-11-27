@@ -9,6 +9,7 @@
 import { api } from "./api.js";
 import { onLifecycle, onStreamLive } from "./state.js";
 import { toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 // How long a page with no box waits to be brought to the front before it leaves the capture to the box made next.
@@ -138,7 +139,7 @@ function wire() {
         });
       }
     } else if (event.kind === "snapshot_failed") {
-      toast("error", `Snapshots: ${event.data.reason}.`);
+      toast("error", t("snapshots.snapshotsReason", { reason: event.data.reason }));
     }
   });
 }

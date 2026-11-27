@@ -311,3 +311,72 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                 await wordy.close()
             finally:
                 await browser.close()
+
+
+async def test_the_speed_page_shows_each_stage_of_the_runs_with_its_percentiles(login_env: dict[str, str]) -> None:
+    """Settings › Maintenance › Speed (item 2003): a run's recorded events read as the table `dotx perf` prints,
+    one card a stage, wide and light and on a phone in the dark, the slow counts in the bad colour; the 7 days read the
+    same run, and a window the API does not know is refused."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env) as (runtime, address), async_playwright() as playwright:
+            # The events of one run, as the loop records them: its start, its reads, two steps and a tool between.
+            await runtime.store.add_event("run_speed", "run_started", {"model": "m:x"})
+            await runtime.store.add_event("run_speed", "start_reads", {"seconds": {"notes": 0.4, "skills": 0.2}})
+            await runtime.store.add_event(
+                "run_speed",
+                "model_call",
+                {"purpose": "step", "model": "m:x", "seconds": 0.0, "first_token_seconds": None},
+            )
+            await runtime.store.add_event("run_speed", "tool_result", {"tool": "shell", "seconds": 4.5, "ran_s": 4.5})
+            await runtime.store.add_event(
+                "run_speed",
+                "model_call",
+                {"purpose": "step", "model": "m:x", "seconds": 0.0, "first_token_seconds": None},
+            )
+            async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+                week = (await client.get("/api/diagnostics/speed", params={"window": "7d"})).json()
+                assert week["runs"] == 1 and week["window"] == "7d"
+                assert {(row["stage"], row["name"]) for row in week["rows"]} >= {
+                    ("start", "start → first model call"),
+                    ("start_read", "notes"),
+                    ("gap", "between steps"),
+                    ("tool", "shell"),
+                }
+                assert (await client.get("/api/diagnostics/speed", params={"window": "1y"})).status_code == 422
+            host, port = "127.0.0.1", int(address.rpartition(":")[2])
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width, scheme in _SHOTS:
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+                    )
+                    await page.goto(ui_url(host, port, TOKEN))
+                    await page.goto(f"{address}/#/settings/speed")
+                    cards: Locator = page.locator("section.card")
+                    await expect(cards.locator(".card-head")).to_have_text(
+                        [
+                            "Start of a run, to its first model call",
+                            "What a run's start reads",
+                            "Between two steps",
+                            "Between two steps, Dot's own time (less the model calls in between)",
+                            "Model calls, by model and purpose",
+                            "Tool calls, their running time",
+                        ]
+                    )
+                    shell: Locator = cards.last.locator("tr", has=page.locator("td", has_text="shell"))
+                    await expect(shell.locator("td")).to_have_text(["shell", "1", "4.5", "4.5", "4.5", "4.5", "1"])
+                    bad: str = await shell.locator("td.speed-slow").evaluate("(cell) => getComputedStyle(cell).color")
+                    ink: str = await shell.locator("td").first.evaluate("(cell) => getComputedStyle(cell).color")
+                    assert bad != ink
+                    await page.get_by_role("button", name="Last 7 days").click()
+                    await expect(page.locator("p.small.muted")).to_have_text(
+                        "1 run in the last 7 days. Times are in seconds."
+                    )
+                    # Nothing on the page is wider than the window: a table scrolls in its own box.
+                    wide: bool = await page.evaluate(
+                        "() => document.documentElement.scrollWidth > document.documentElement.clientWidth"
+                    )
+                    assert not wide, width
+                    await page.close()
+            finally:
+                await browser.close()

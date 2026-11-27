@@ -3,55 +3,62 @@
 // (tests/js/flagwords.test.js). The program's own names (`message_send`) stay as the tooltip of a chip.
 
 // What each flag of policy/types.py says of an action, as a phrase that follows "It counts as:".
+import { t } from "./i18n.js";
+
 const FLAG_WORDS = {
-  destructive: "deletes or overwrites something",
-  financial: "involves money",
-  credential: "involves a password or a key",
-  system_settings: "changes a setting of the Mac",
-  privilege: "needs administrator rights",
-  external_send: "sends something out of this Mac",
-  message_send: "sends a message for you",
-  public_post: "posts in public",
-  social: "acts on social media",
-  install: "installs software",
-  secret_access: "reaches a secret",
-  protected_read: "may read protected data",
-  exfiltration: "sends data out",
-  outside_workspace: "reaches outside Dot's own folder",
-  persistence: "leaves something that stays after the task",
-  upload: "uploads a file",
-  self_change: "changes Dot's own files or a file git runs by itself",
-  vault_fill: "fills in a login of your vault or password manager, or makes one",
-  release: "puts a project's change live",
+  destructive: t("flagwords.deletesOrOverwritesSomething"),
+  financial: t("flagwords.involvesMoney"),
+  credential: t("flagwords.involvesAPasswordOrA"),
+  system_settings: t("flagwords.changesASettingOfThe"),
+  privilege: t("flagwords.needsAdministratorRights"),
+  external_send: t("flagwords.sendsSomethingOutOfThis"),
+  message_send: t("flagwords.sendsAMessageForYou"),
+  public_post: t("flagwords.postsInPublic"),
+  social: t("flagwords.actsOnSocialMedia"),
+  install: t("flagwords.installsSoftware"),
+  secret_access: t("flagwords.reachesASecret"),
+  protected_read: t("flagwords.mayReadProtectedData"),
+  exfiltration: t("flagwords.sendsDataOut"),
+  outside_workspace: t("flagwords.reachesOutsideDotSOwn"),
+  persistence: t("flagwords.leavesSomethingThatStaysAfter"),
+  upload: t("flagwords.uploadsAFile"),
+  self_change: t("flagwords.changesDotSOwnFiles"),
+  vault_fill: t("flagwords.fillsInALoginOf"),
+  release: t("flagwords.putsAProjectSChange"),
 };
 
 // What each kind of action says of what Dot is about to do, as a chip's words.
 const KIND_WORDS = {
-  read: "reads a file",
-  write: "writes a file",
-  shell: "runs a command",
-  network: "uses the web",
-  browser_read: "reads a web page",
-  browser_navigate: "opens a web page",
-  browser_input: "types in a web page",
-  browser_click: "clicks in a web page",
-  desktop_observe: "looks at the screen",
-  desktop_input: "types or clicks on the Mac",
-  app_control: "controls an app",
-  message: "writes a message",
-  schedule: "changes a schedule",
-  memory_read: "reads its memory",
-  memory_write: "saves to its memory",
-  notes_write: "writes its notes",
-  delegate: "hands work to a helper",
-  meta: "is part of Dot's own work",
-  mcp: "uses a connected app",
-  mcp_read: "reads from a connected app",
+  read: t("flagwords.readsAFile"),
+  write: t("flagwords.writesAFile"),
+  shell: t("flagwords.runsACommand"),
+  network: t("flagwords.usesTheWeb"),
+  browser_read: t("flagwords.readsAWebPage"),
+  browser_navigate: t("flagwords.opensAWebPage"),
+  browser_input: t("flagwords.typesInAWebPage"),
+  browser_click: t("flagwords.clicksInAWebPage"),
+  desktop_observe: t("flagwords.looksAtTheScreen"),
+  desktop_input: t("flagwords.typesOrClicksOnThe"),
+  app_control: t("flagwords.controlsAnApp"),
+  message: t("flagwords.writesAMessage"),
+  schedule: t("flagwords.changesASchedule"),
+  memory_read: t("flagwords.readsItsMemory"),
+  memory_write: t("flagwords.savesToItsMemory"),
+  notes_write: t("flagwords.writesItsNotes"),
+  delegate: t("flagwords.handsWorkToAHelper"),
+  meta: t("flagwords.isPartOfDotS"),
+  mcp: t("flagwords.usesAConnectedApp"),
+  mcp_read: t("flagwords.readsFromAConnectedApp"),
 };
 
 /** A name as words when no phrase is known for it: `new_thing` reads "new thing". */
 function spoken(name) {
   return String(name).replace(/_/g, " ");
+}
+
+/** Whether the policy's flag has a phrase of its own (not one made from its name). */
+export function knownFlag(flag) {
+  return Object.hasOwn(FLAG_WORDS, flag);
 }
 
 /** What `flag` says of an action: "sends a message for you". */

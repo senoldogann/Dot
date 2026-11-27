@@ -67,9 +67,9 @@ task that did not run on the plan records none), and `top_runs`, the five runs o
 task. **Caps** under it sets the caps of what the runs spend, in millions of tokens, with today's tokens in all and by
 source (item 1731, [Limits](limits.md)). Beside the tokens of each day, of the week and of each costliest task, and
 on a task's Cost card (its own tokens, and with its helpers beside its cap), stands **an estimate in dollars** (item
-1856): see [What a run costs in dollars](#what-a-run-costs-in-dollars). Each role's box opens the composer's
-model menu (item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed,
-starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model
+1856): see [What a run costs in dollars](#what-a-run-costs-in-dollars). Each role's box opens a model menu
+(item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed, starred as
+in the composer's Chat settings (whose favourites are the same). A role's menu offers only the models that can do its work: the fast and the vision model
 offer no model of an agent program of its own (OpenCode's free models, the Claude plan), and the own work model none
 of OpenCode's free models, whose provider stays on the rail and says why, while the default model, the review model
 and the night's roles offer the Claude plan's too. A cloud model that Ollama's service retired stays in Ollama's own
@@ -141,7 +141,7 @@ refusal after that note, or of a task with no such grounds (one Dot began itself
 the run at once: failed, with the model's own words under "The model declined this task" (`dotx stats` counts it as
 "the model declined the task", and no schedule tries it again). Dot does not argue with it, does not word the model's
 answer for it and does not move to another model on its own. The run's page offers one action over the box,
-**Restart on…**: the model menu of the box, without the model that declined, and the model you pick starts the same
+**Restart on…**: a model menu (the rail of the Settings' role boxes), without the model that declined, and the model you pick starts the same
 task in the same chat (`POST /api/runs/{id}/restart`), as a message of yours, with the old run's approvals, goal mode,
 and its reasoning level and speed as near as the new model offers them; the old run records that you chose it. A
 refused run of a schedule or a delegated part restarts so too, as your own task in its chat. A message the
@@ -598,7 +598,7 @@ works](runs.md#how-a-run-works)); without a model it shows `[models] main`.
 **Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped
 to one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model
 that offers fewer than two has no choice to make, and its picker stays hidden. `models.effort` is the default; one run
-picks another with `dotx run --effort high`, with the Reasoning menu of the composer in the web UI, or with `effort` in
+picks another with `dotx run --effort high`, with the Reasoning row of the composer's Chat settings in the web UI, or with `effort` in
 `POST /api/runs`. The run keeps the level it was started with (the facts under the side panel's More show it). A level
 the model does not offer is refused (a 422 over HTTP); the configured default, which is not tied to one model, is
 rounded to the nearest
@@ -610,8 +610,7 @@ the Start, Build and Scale usage tiers, with a rate limit of its own and no acce
 a research preview that Anthropic lets an organization into from a waitlist. It is not for the Batch API or a Priority
 Tier commitment. The Models API does not say which models have it, so Dot names them from Anthropic's page
 (`FAST_MODE_MODELS` in `llm/anthropic.py`); Settings › Models marks them `fast mode` (`fast_mode` in `GET /api/models`).
-The Reasoning menu of the composer has Speed, Standard or Fast, for such a model, off at first; the pill then reads
-`High · Fast`. A chat keeps it with its choices, a new chat's box in this browser, and the run it starts keeps it as its
+The Reasoning row of the composer's Chat settings has Speed, Standard or Fast, for such a model, off at first; the model's pill then says `High · Fast` in grey after its name. A chat keeps it with its choices, a new chat's box in this browser, and the run it starts keeps it as its
 model and level (`speed` in `POST /api/runs` and in the queue; the facts under the side panel's More say so). Each step
 of such a run on a model with fast mode asks for it (`speed: "fast"` with the beta `fast-mode-2026-02-01`, which the
 preview models need
@@ -623,7 +622,7 @@ have it too, which Claude Code runs off on a plan without extra usage: there the
 run goes at the standard speed and its answer says so (item 1014, above). Fast mode for a
 model without it is refused (a 422 over HTTP). Switching the speed of a chat starts the prompt cache again.
 
-**Ultrathink and Ultracode.** The Reasoning menu has two choices for one message, under This message only (item 251).
+**Ultrathink and Ultracode.** The Reasoning row has two choices for one message, under This message only (item 251).
 Ultrathink, for a model that offers `max`, asks it for Max for this message. Ultracode, for a model that offers `xhigh`,
 asks it for Extra high and tells the run, in its instructions, to split the goal: each part that needs no other part's
 result goes to a helper of its own (a `delegate`, several in one turn, each with its plan step), and the run does itself

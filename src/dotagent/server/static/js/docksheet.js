@@ -71,7 +71,7 @@ export function createDockSheets() {
     let mark = null;
     let signature = "";
     if (spec.adopt !== undefined) {
-      mark = document.createComment("a pane that stands in its sheet");
+      mark = document.createComment(t("docksheet.aPaneThatStandsIn"));
       spec.adopt.replaceWith(mark);
       body.replaceChildren(spec.adopt);
     } else if (spec.build !== undefined) {

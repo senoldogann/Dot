@@ -13,6 +13,7 @@
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { MAX_SCALE, MIN_SCALE, clamped, pinchedScale, zoomedAbout } from "./viewmath.js";
+import { t } from "./i18n.js";
 
 // The event a page's frame full screen is sent for a pinch on the page (item 1056, pageframe.js): `{ phase, ratio, x, y }`.
 export const ZOOM_EVENT = "dot:zoom";
@@ -35,10 +36,10 @@ const SWIPE_CLOSE_PX = 110;
  */
 export function openViewer({ title, content, page, onClose }) {
   const level = el("span", { class: "viewer-level", "aria-live": "polite" }, "100%");
-  const out = el("button", { class: "viewer-tool", type: "button", "aria-label": "Zoom out", title: "Zoom out" }, icon("minus"));
-  const into = el("button", { class: "viewer-tool", type: "button", "aria-label": "Zoom in", title: "Zoom in" }, icon("plus"));
-  const fit = el("button", { class: "viewer-tool viewer-fit", type: "button", "aria-label": "Fit", title: "Fit" }, "Fit");
-  const close = el("button", { class: "viewer-tool viewer-close", type: "button", "aria-label": "Close", title: "Close" }, icon("x"));
+  const out = el("button", { class: "viewer-tool", type: "button", "aria-label": t("viewer.zoomOut"), title: t("viewer.zoomOut") }, icon("minus"));
+  const into = el("button", { class: "viewer-tool", type: "button", "aria-label": t("viewer.zoomIn"), title: t("viewer.zoomIn") }, icon("plus"));
+  const fit = el("button", { class: "viewer-tool viewer-fit", type: "button", "aria-label": t("viewer.fit"), title: t("viewer.fit") }, t("viewer.fit"));
+  const close = el("button", { class: "viewer-tool viewer-close", type: "button", "aria-label": t("viewer.close"), title: t("viewer.close") }, icon("x"));
   // What a zoomed page is covered with, so that the gestures reach the viewer and not the page.
   // A picture has none: a tap on it must reach it, and only one beside it closes the viewer.
   const glass = page ? el("div", { class: "viewer-glass", hidden: true }) : null;

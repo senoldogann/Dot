@@ -7,14 +7,15 @@ import { api } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { attempt, toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 /** The card's line under its name: when the check-in is written, or that it is off. */
 function summaryOf(view) {
   if (!view.enabled) {
-    return "Off: at the end of the day, what got done, what waits for you and the next step";
+    return t("checkincard.offAtTheEndOf");
   }
   // When it fires next is in the list of schedules above, where its schedule is.
-  return `${view.days === "weekdays" ? "Weekdays" : "Every day"} at ${view.time}`;
+  return `${view.days === "weekdays" ? t("checkincard.weekdays") : t("checkincard.everyDay")} at ${view.time}`;
 }
 
 /**
@@ -29,9 +30,9 @@ export function mountCheckin(onSaved) {
   // Grows with every read, so a slow answer never overwrites a newer one.
   let ticket = 0;
 
-  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Evening check-in on", disabled: true });
-  const time = el("input", { class: "input checkin-time", type: "time", "aria-label": "Check-in at", required: true, disabled: true });
-  const summary = el("div", { class: "hint brief-summary" }, "Reading the check-in…");
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": t("checkincard.eveningCheckInOn"), disabled: true });
+  const time = el("input", { class: "input checkin-time", type: "time", "aria-label": t("checkincard.checkInAt"), required: true, disabled: true });
+  const summary = el("div", { class: "hint brief-summary" }, t("checkincard.readingTheCheckIn"));
   const element = el(
     "section",
     { class: "card card-pad stack brief-card", dataset: { checkin: "" } },
@@ -39,7 +40,7 @@ export function mountCheckin(onSaved) {
       "div",
       { class: "brief-head" },
       el("span", { class: "brief-mark", "aria-hidden": "true" }, icon("moon")),
-      el("div", { class: "grow" }, el("h2", { class: "panel-title" }, "Evening check-in"), summary),
+      el("div", { class: "grow" }, el("h2", { class: "panel-title" }, t("checkincard.eveningCheckIn")), summary),
       time,
       toggle,
     ),
@@ -89,9 +90,9 @@ export function mountCheckin(onSaved) {
   }
 
   toggle.addEventListener("click", () =>
-    attempt(() => put(toggle.getAttribute("aria-checked") !== "true", (saved) => (saved.enabled ? `Evening check-in on, ${saved.time}.` : "Evening check-in switched off."))),
+    attempt(() => put(toggle.getAttribute("aria-checked") !== "true", (saved) => (saved.enabled ? t("checkincard.eveningCheckInOnTime", { time: saved.time }) : t("checkincard.eveningCheckInSwitchedOff")))),
   );
-  time.addEventListener("change", () => attempt(() => put(view?.enabled === true, (saved) => `Evening check-in at ${saved.time}.`)));
+  time.addEventListener("change", () => attempt(() => put(view?.enabled === true, (saved) => t("checkincard.eveningCheckInAtTime", { time: saved.time }))));
   attempt(reload);
 
   return {

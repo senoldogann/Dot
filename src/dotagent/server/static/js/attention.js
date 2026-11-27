@@ -9,6 +9,7 @@ import { faceDataUrl, overallState } from "./face.js";
 import { goTo } from "./hop.js";
 import { readPref, writePref } from "./prefs.js";
 import { getSnapshot, onChange, onLifecycle } from "./state.js";
+import { t } from "./i18n.js";
 
 const NOTIFY_KEY = "dot.notify";
 // Whether to tell about a run even while its page is in view (item 75); off until switched on.
@@ -16,9 +17,9 @@ const ALWAYS_KEY = "dot.notify.always";
 // Whether this browser is subscribed to the daemon's web push: then the pushes tell, and the page itself stays quiet.
 const PUSH_KEY = "dot.push";
 const BODY_CHARS = 140;
-const FINISHED_TITLE = { done: "A task is done", failed: "A task failed", cancelled: "A task was stopped" };
-const ASKING_TITLE = { question: "Dot has a question", handoff: "Dot needs your help" };
-const DRAFT_TITLE = { mail: "Dot drafted an email", message: "Dot drafted a message" };
+const FINISHED_TITLE = { done: t("attention.aTaskIsDone"), failed: t("attention.aTaskFailed"), cancelled: t("attention.aTaskWasStopped") };
+const ASKING_TITLE = { question: t("attention.dotHasAQuestion"), handoff: t("attention.dotNeedsYourHelp") };
+const DRAFT_TITLE = { mail: t("attention.dotDraftedAnEmail"), message: t("attention.dotDraftedAMessage") };
 
 const FINISHED_FACE = { done: "done", failed: "failed" };
 // The line breaks of Python's str.splitlines, so that the first line of a result is the one the push shows.
@@ -181,7 +182,7 @@ function tell({ title, body, tag, route, state, counted }) {
 function tellAboutApproval(event) {
   const { approval_id: id, severity, summary, args } = event.data;
   const text = severity === "question" && typeof args.question === "string" ? args.question : summary;
-  tell({ title: ASKING_TITLE[severity] ?? "Dot asks for approval", body: shorten(text), tag: `approval-${id}`, route: `#/runs/${event.run_id}`, state: "waiting", counted: false });
+  tell({ title: ASKING_TITLE[severity] ?? t("attention.dotAsksForApproval"), body: shorten(text), tag: `approval-${id}`, route: `#/runs/${event.run_id}`, state: "waiting", counted: false });
 }
 
 /** The first line of `text` that is not blank; nothing when there is none. */
@@ -192,7 +193,7 @@ function firstLine(text) {
 /** The notification of a run's end: how it ended and the first line of its answer. */
 function endNote(runId, status, result) {
   return {
-    title: FINISHED_TITLE[status] ?? "A task has ended",
+    title: FINISHED_TITLE[status] ?? t("attention.aTaskHasEnded"),
     body: shorten(firstLine(typeof result === "string" ? result : "")),
     tag: `run-${runId}`,
     route: `#/runs/${runId}`,
@@ -216,7 +217,7 @@ async function tellAboutEnd(event) {
 function tellAboutDraft(event) {
   const { id, channel, to, subject, body } = event.data;
   tell({
-    title: DRAFT_TITLE[channel] ?? "Dot drafted a message",
+    title: DRAFT_TITLE[channel] ?? t("attention.dotDraftedAMessage"),
     body: shorten(`To ${to.join(", ")}: ${channel === "mail" ? subject : body}`),
     tag: `draft-${id}`,
     route: `#/runs/${event.run_id}`,
@@ -229,7 +230,7 @@ function tellAboutCampaign(event) {
   const { campaign_id: id, title, status, note } = event.data;
   const achieved = status === "achieved";
   tell({
-    title: achieved ? "A campaign is achieved" : "A campaign stopped",
+    title: achieved ? t("attention.aCampaignIsAchieved") : t("attention.aCampaignStopped"),
     body: shorten(`${title}: ${note}`),
     tag: `campaign-${id}`,
     route: `#/campaigns/${id}`,
@@ -240,7 +241,7 @@ function tellAboutCampaign(event) {
 
 function tellAboutMissedFiring(event) {
   const { schedule_id: id, name, status } = event.data;
-  tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed", counted: false });
+  tell({ title: t("attention.aScheduleDidNotRun"), body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed", counted: false });
 }
 
 /** The end of a schedule's run that its level tells (item 461), in the words of every run's end. */
@@ -255,8 +256,8 @@ function tellAboutScheduledEnd(event) {
 function tellAboutStoppedSchedule(event) {
   const { schedule_id: id, name, failures } = event.data;
   tell({
-    title: "A schedule was switched off",
-    body: shorten(`${name}: its last ${failures} tasks failed`),
+    title: t("attention.aScheduleWasSwitchedOff"),
+    body: shorten(t("attention.nameItsLastFailuresTasks", { name, failures })),
     tag: `schedule-${id}`,
     route: "#/settings/schedules",
     state: "failed",
@@ -271,7 +272,7 @@ function tellAboutOwner(event) {
 }
 
 function tellAboutLearningStalled(event) {
-  tell({ title: "Dot's learning has stopped", body: shorten(event.data.reason), tag: "learning-stalled", route: "#/settings/memory", state: "failed", counted: false });
+  tell({ title: t("attention.dotSLearningHasStopped"), body: shorten(event.data.reason), tag: "learning-stalled", route: "#/settings/memory", state: "failed", counted: false });
 }
 
 /** What a failure to notify costs: nothing but a line in the console, so it never stops the page from updating. */
