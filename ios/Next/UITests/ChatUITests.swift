@@ -491,6 +491,10 @@ final class ChatUITests: XCTestCase {
         for _ in 0..<4 where !thought.exists { app.swipeUp() }
         XCTAssertTrue(thought.waitForExistence(timeout: 10), "the steps show first")
         app.buttons["Changes and files"].tap()
+        // The sections of This chat start folded (item 2017).
+        let messages: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == 'inspector.section' AND label BEGINSWITH 'Messages,'")).firstMatch
+        XCTAssertTrue(messages.waitForExistence(timeout: 5))
+        messages.tap()
         let toggle: XCUIElement = app.switches["inspector.showSteps"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "1")

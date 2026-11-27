@@ -591,7 +591,9 @@ public struct FileChange: Codable, Sendable, Hashable {
     public let gone: Bool
     public let added: Int
     public let removed: Int
+    /// The unified diff's hunks; "" when there is none, and `note` says why (a binary file, one too large, one gone).
     public let diff: String
+    public let note: String?
 }
 
 public struct RunChanges: Codable, Sendable, Hashable {
