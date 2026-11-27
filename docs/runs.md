@@ -966,14 +966,17 @@ sessions whose program runs (3; 0 removes the tools); one whose program ended do
 exit status with it, until a read or `terminal_close` closes it (item 1990). Each is closed after `terminal_idle_s`
 without use (30 minutes) and all of them when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
-**A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
-answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the
-checks are pending, and it runs no `gh pr checks` loop, no `sleep` and no `wait_until` on them. Over a week on the
-owner's Mac, 382 shell calls of that kind took 9.3 of the 29 hours of the helpers' shell time, in 37 of 76 helper
-runs, and each poll of a Claude Code helper read its whole context again. The parent, which has a chat, starts
-`gh pr checks <number> --watch` with `terminal_open` and `background` (the shell's and the delegate tool's descriptions
-say so) and ends its run or goes on; the chat is told when the command ends, and a run reads the checks then, as for
-any command in the background. This asks the owner nothing and changes no policy: it is words in two prompts.
+**A helper can hand off its pull request checks (items 1953 and 2046).** Once the PR is pushed and open, the helper
+calls `terminal_open` with `background: true` and a single `gh pr checks <number or GitHub PR URL> --watch` command.
+Add `--fail-fast` to report the first failing check. The watch starts in the helper's working directory and sandbox
+and appears in the top-level chat that delegated the work, where it can be stopped. The helper can finish as soon as it has
+the session ID. It reports the PR URL and whether it started a watch. If it could not start one, the parent can
+register the watch in its chat.
+
+The daemon waits in the background terminal, with zero model turns while it polls. The chat receives the terminal
+session ID and exit status once the command ends, including an error contacting GitHub. The check output is available
+through `terminal_read`. The daemon's usual rules for background commands apply, including stop behavior and delivery
+to a run already at work in the chat. This handoff is available to delegated runs in the daemon, outside campaigns.
 
 `wait_until` (item 887, after OpenMausBot's waits) waits for something to happen, checked in code, with no model turn
 spent on the wait. It names one condition:

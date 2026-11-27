@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2046](2046.md) | done | 2026-11-27 | A coding helper hands its pull request checks to the chat's background watcher |
 | [2045](2045.md) | done | 2026-11-27 | Measure the character line against the injection evals |
 | [2035](2035.md) | done | 2026-11-27 | An agent's work lists as the phone's bot profile lists it: a Work section, pages of its own, hand-offs newest first |
 | [2034](2034.md) | done | 2026-11-27 | The web says "routine", as the phone does |

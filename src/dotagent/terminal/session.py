@@ -374,6 +374,7 @@ class Terminals:
         self._idle_s: float = idle_s
         self._env: dict[str, str] = {**env, **_TERMINAL_ENV}
         self._sessions: dict[str, dict[str, TerminalSession]] = {}
+        self._opening: asyncio.Lock = asyncio.Lock()
         self._opened: int = 0
         self._reaper: asyncio.Task[None] | None = None
         # What waits for the end of each session's program, by session.
@@ -393,9 +394,51 @@ class Terminals:
         self, thread_id: str, command: str, confinement: tuple[str, ...], cwd: Path, background: bool, run_id: str
     ) -> TerminalSession:
         """Start ``command`` in zsh on a terminal of its own, started by ``confinement`` (the words of the run's
-        sandbox, or none), for the run ``run_id``, whose group is written down until the session closes
-        (:mod:`dotagent.process_groups`); ``background`` for a command the run leaves to run on its own (item 229),
-        which a process that tells no chat of its end (a ``dotx`` command, which ends with its run) refuses."""
+        sandbox, or none), with the secrets the owner gave this chat on a card, by their names."""
+        held: dict[str, str] = await asyncio.to_thread(held_values, thread_id)
+        return await self._open(thread_id, command, confinement, cwd, background, run_id, {**self._env, **held})
+
+    async def open_pr_watch(
+        self, thread_id: str, command: str, confinement: tuple[str, ...], cwd: Path, run_id: str
+    ) -> TerminalSession:
+        """Start a helper's PR watch in the receiving chat without loading per-chat secrets."""
+        return await self._open(thread_id, command, confinement, cwd, True, run_id, self._env)
+
+    async def _open(
+        self,
+        thread_id: str,
+        command: str,
+        confinement: tuple[str, ...],
+        cwd: Path,
+        background: bool,
+        run_id: str,
+        env: dict[str, str],
+    ) -> TerminalSession:
+        # A helper can open a watch in the same chat while its parent opens a terminal.
+        async with self._opening:
+            session: TerminalSession = await self._start_session(
+                thread_id, command, confinement, cwd, background, run_id, env
+            )
+        log.info(
+            "terminal_opened",
+            thread_id=thread_id,
+            session=session.id,
+            command=await _loggable(command),
+            background=background,
+        )
+        await self._changed(thread_id)
+        return session
+
+    async def _start_session(
+        self,
+        thread_id: str,
+        command: str,
+        confinement: tuple[str, ...],
+        cwd: Path,
+        background: bool,
+        run_id: str,
+        env: dict[str, str],
+    ) -> TerminalSession:
         if background and self._watcher is None:
             raise ToolInputError(
                 "This process tells no chat when a command ends (a dotx command ends with its run): run it with shell, "
@@ -422,8 +465,7 @@ class Terminals:
                 stdout=follower,
                 stderr=follower,
                 cwd=str(cwd),
-                # The secrets the owner gave this chat on a card (item 857), by their names.
-                env={**self._env, **await asyncio.to_thread(held_values, thread_id)},
+                env=env,
                 start_new_session=True,
                 preexec_fn=_controlling_terminal,
             )
@@ -445,14 +487,6 @@ class Terminals:
         self._follows[session.id] = asyncio.create_task(self._follow(thread_id, session))
         if self._reaper is None:
             self._reaper = asyncio.create_task(self._reap())
-        log.info(
-            "terminal_opened",
-            thread_id=thread_id,
-            session=session.id,
-            command=await _loggable(command),
-            background=background,
-        )
-        await self._changed(thread_id)
         return session
 
     def sessions(self, thread_id: str) -> list[TerminalSession]:
