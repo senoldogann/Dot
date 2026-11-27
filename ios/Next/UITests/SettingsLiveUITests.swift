@@ -120,6 +120,38 @@ final class SettingsLiveUITests: XCTestCase {
         words.typeText(" Edited.")
         app.buttons["Save"].tap()
         sleep(2)
+
+        // A new note with a tag, pinned, forgotten, and brought back from the trash.
+        app.buttons["New note"].tap()
+        let fresh: XCUIElement = app.textFields["What should Dot remember?"]
+        XCTAssertTrue(fresh.waitForExistence(timeout: 5), "the new note's field")
+        fresh.tap()
+        fresh.typeText("Phone note about the invoices.")
+        let freshTags: XCUIElement = app.textFields["Tags"]
+        freshTags.tap()
+        freshTags.typeText("phone, e2e")
+        app.buttons["Save"].tap()
+        let added: XCUIElement = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Phone note about the invoices")).firstMatch
+        XCTAssertTrue(added.waitForExistence(timeout: 10), "the new note is listed")
+        added.tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Pin")).firstMatch.tap()
+        let pinned: XCUIElement = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Phone note about the invoices", "Pinned")).firstMatch
+        XCTAssertTrue(pinned.waitForExistence(timeout: 10), "the note shows it is pinned")
+        pinned.tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Forget")).firstMatch.tap()
+        let forgetNow: XCUIElement = app.sheets.buttons["Forget"].exists ? app.sheets.buttons["Forget"] : app.buttons.matching(NSPredicate(format: "label == %@", "Forget")).element(boundBy: 1)
+        XCTAssertTrue(forgetNow.waitForExistence(timeout: 5), "the confirmation of forgetting")
+        forgetNow.tap()
+        XCTAssertTrue(app.staticTexts["Phone note about the invoices."].waitForNonExistence(timeout: 10), "the forgotten note leaves the list")
+        let trash: XCUIElement = app.buttons.matching(NSPredicate(format: "label == %@", "Trash")).firstMatch
+        for _ in 0..<6 where !trash.isHittable { app.swipeUp() }
+        trash.tap()
+        let forgotten: XCUIElement = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Phone note about the invoices")).firstMatch
+        XCTAssertTrue(forgotten.waitForExistence(timeout: 10), "the forgotten note is in the trash")
+        forgotten.tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Restore")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["The trash is empty"].waitForExistence(timeout: 10), "the note left the trash")
+        back(app)
         back(app)
 
         // Agents: a chat with the seeded agent, which greets the owner in its first one.

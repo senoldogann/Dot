@@ -51,6 +51,24 @@ extension DaemonAPI {
     /// `DELETE /api/memories/{id}`: the note goes to the trash, which the Mac's Memory page empties or restores.
     public func forgetMemory(_ id: String) async throws(DaemonRequestError) -> MemoryNote { try await send("DELETE", "/api/memories/\(id)", body: nil) }
 
+    /// `POST /api/memories`: a note the owner writes, whose words they vouch for.
+    public func addMemory(_ note: MemoryWrite) async throws(DaemonRequestError) -> SavedNote {
+        try await send("POST", "/api/memories", body: Self.json(note))
+    }
+
+    /// `PUT /api/memories/{id}/pin`: pins a note (it never rests) or takes the pin off.
+    public func pinMemory(_ id: String, pinned: Bool) async throws(DaemonRequestError) -> MemoryNote {
+        try await send("PUT", "/api/memories/\(id)/pin", body: Self.json(NotePinBody(pinned: pinned)))
+    }
+
+    /// `GET /api/memories/trash`: the notes the owner forgot, the newest first.
+    public func memoryTrash() async throws(DaemonRequestError) -> MemoryTrash { try await get("/api/memories/trash", query: []) }
+
+    /// `POST /api/memories/trash/{id}/restore`: brings a forgotten note back, awake.
+    public func restoreMemory(_ id: String) async throws(DaemonRequestError) -> MemoryNote {
+        try await send("POST", "/api/memories/trash/\(id)/restore", body: nil)
+    }
+
     // MARK: Agents (item 1774)
 
     public func agentList() async throws(DaemonRequestError) -> [AgentListItem] { try await get("/api/agents", query: []) }
@@ -67,3 +85,6 @@ extension DaemonAPI {
         try await send("POST", "/api/agents/\(id)/welcome", body: Self.json(welcome))
     }
 }
+
+/// The body of `PUT /api/memories/{id}/pin`.
+private struct NotePinBody: Encodable { let pinned: Bool }

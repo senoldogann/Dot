@@ -47,6 +47,56 @@ public struct MemoryWrite: Codable, Sendable, Hashable {
     }
 }
 
+/// `POST /api/memories`: the note, and whether it is new (`false`: Dot already held a note with these words, and this is it).
+public struct SavedNote: Codable, Sendable, Hashable {
+    public let record: MemoryNote
+    public let created: Bool
+
+    public init(record: MemoryNote, created: Bool) {
+        self.record = record
+        self.created = created
+    }
+}
+
+/// A note in the trash: when it went there and when the nightly reflection deletes it for good.
+public struct TrashedNote: Codable, Sendable, Hashable, Identifiable {
+    public let record: MemoryNote
+    public let trashedAt: Double
+    public let purgedAt: Double
+
+    public var id: String { record.id }
+
+    public init(record: MemoryNote, trashedAt: Double, purgedAt: Double) {
+        self.record = record
+        self.trashedAt = trashedAt
+        self.purgedAt = purgedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case record
+        case trashedAt = "trashed_at"
+        case purgedAt = "purged_at"
+    }
+}
+
+/// `GET /api/memories/trash`: the newest forgotten notes (at most 200), how many the trash holds, and how many days one waits.
+public struct MemoryTrash: Codable, Sendable, Hashable {
+    public let items: [TrashedNote]
+    public let total: Int
+    public let trashDays: Int
+
+    public init(items: [TrashedNote], total: Int, trashDays: Int) {
+        self.items = items
+        self.total = total
+        self.trashDays = trashDays
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case items, total
+        case trashDays = "trash_days"
+    }
+}
+
 // MARK: Agents (item 1774)
 
 /// An agent's face (item 102): kept as it is when the phone writes the agent back.
