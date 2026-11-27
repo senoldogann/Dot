@@ -782,7 +782,7 @@ danger colour with a square) and cancels it; a word typed turns it back into the
 send does (item 1320): while the run works a message waits in the chat's queue, **After this
 task**, where its **Steer** sends it into the run at once (see [How a run works](runs.md#how-a-run-works)), unless
 Settings › General › Messages has it steer the run now, **Add to task**; the send, its tooltip, its name to a screen
-reader and the box's placeholder say which. The run's choices (its model, reasoning and options) shown from the
+reader and the box's placeholder say which. A message that starts the chat's next run (the run before it ended) is in the chat the moment it is sent (item 1999, as the iPhone app does it): its words leave the box, its bubble stands under the conversation with a quiet **Pending** at its right edge, and under it the agent's typing dots say **Starting…** until the page of the new run is open; a send Dot refuses takes the bubble away and gives the words back to the box. The run's choices (its model, reasoning and options) shown from the
 button beside the "+" stand at the right, by the microphone and the send, on every page. Where one way alone is open (a held run, a campaign's
 session, a run a Terminal command drives) the send names that way. A message queued waits above the box: a sheet whose head (Queued
 and the count) folds it, with a row per message: an up and a down arrow that move it a place (32 px with a pointer, 44 px on a phone,
@@ -805,7 +805,7 @@ part closes it. It does not say what the run does now, which the conversation sh
 the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for subagents, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
-divided by hairlines and each at least 44 px tall: the run's status (**Working · 36 s**, **Waiting for you**,
+divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Reconnecting…**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone

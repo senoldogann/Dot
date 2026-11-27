@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1999](1999.md) | done | 2026-11-27 | A message sent in a chat is in it at once, with a quiet "Pending" and "Starting…", as DotNext does it |
 | [1998](1998.md) | in progress | 2026-11-27 | The web chat takes DotNext's decisions: what it already has, what differs, what is missing |
 | [1997](1997.md) | done | 2026-11-27 | The pre-push hook measures the first step's budget when the prompt surface changes |
 | [1996](1996.md) | done | 2026-11-27 | DotNext: Show steps off hides every step, an answer the finish says again stands once, the live caption speaks as the work log, no Plan in This chat |
