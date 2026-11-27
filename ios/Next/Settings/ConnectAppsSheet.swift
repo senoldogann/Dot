@@ -142,7 +142,7 @@ struct ConnectAppsSheet: View {
                 EmptyState(
                     title: words.isEmpty
                         ? String(localized: "No apps here", comment: "Connect apps: a chip lists nothing")
-                        : String(localized: "No results for “\(words)”", comment: "Connect apps: a search found nothing; the argument is the query"),
+                        : String(localized: "No results for “\(words)”", comment: "Search: nothing matches the words; the argument is what was searched"),
                     systemImage: "magnifyingglass",
                     detail: String(localized: "Try another word or another section.", comment: "Connect apps: the search empty state's line"),
                     actionTitle: String(localized: "Clear search", comment: "Connect apps: clears the search and the filters")

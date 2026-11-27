@@ -2,10 +2,12 @@ import DotEngine
 import SwiftUI
 
 /// The chat's settings (PLAN §24, owner-refs/ref-model-picker-1/2.png), opened from the composer's model chip and
-/// before a new chat's first message: the providers as groups that fold (their mark, a count when folded), each model a
-/// row with a "Default" badge, a ✓ on the chosen one and a ☆ favourite (favourites float up); a floating "Find a model"
-/// search with a filter button; Options (reasoning level, fast mode, approval mode, plan first); Catalog (manage hidden
-/// models). ✕ leaves the chat's picks as they were; ✓ keeps them (the stars and hidden models are the phone's, kept
+/// before a new chat's first message, as inset groups the way iOS draws its settings (the owner's report of
+/// 2026-11-27): the recent models, Options (reasoning level as a menu, fast mode only for a model that has it, approval
+/// mode, plan first), the providers as groups that fold (their mark, a count when folded), each model a row with its
+/// provider's mark, "Default" under the daemon's main, a ✓ on the chosen one and a quiet ★ on a favourite (a long press
+/// stars it; favourites float up); a floating "Find a model" search with a filter button; the switch to manage hidden
+/// models. ✕ leaves the chat's picks as they were; ✓ keeps them (the stars and hidden models are the phone's, kept
 /// at once).
 struct ChatSettingsSheet: View {
     let initial: ChatSettingsDraft
@@ -43,7 +45,7 @@ struct ChatSettingsSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: Space.groupedGutter) {
+                LazyVStack(alignment: .leading, spacing: Space.xl) {
                     ModelCatalog(
                         providers: providers, defaultRef: defaults?.model, chosenRef: chosenRef, query: query, filter: filter,
                         managesHidden: managesHidden, marks: $marks, pick: { draft.choices = picking($0, in: draft.choices) }, problem: problem, retry: retry
@@ -88,32 +90,28 @@ struct ChatSettingsSheet: View {
 
     // MARK: Options and catalog
 
+    /// The options as one inset group (the owner's report of 2026-11-27): only what the chosen model has. The level is a
+    /// menu of its own levels in full words; fast mode shows only for a model that has it; the approvals open their page;
+    /// plan first is a switch with what it does under it.
     @ViewBuilder private var options: some View {
-        PlainSection(header: String(localized: "Options", comment: "Chat settings section: reasoning, fast mode, approvals, plan first")) {
+        InsetSection(header: String(localized: "Options", comment: "Chat settings section: reasoning, fast mode, approvals, plan first")) {
             if let chosen, chosen.efforts.count >= 2 {
-                VStack(alignment: .leading, spacing: Space.xs) {
-                    Text(String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level")).textRole(.body).foregroundStyle(Tone.text)
-                    Picker(String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level"), selection: effortBinding(chosen)) {
-                        Text(String(localized: "Default level", comment: "Chat settings: the reasoning segment that leaves the level to the model's default")).tag(String?.none)
-                    ForEach(chosen.efforts, id: \.self) { effort in Text(effortTitle(effort)).tag(String?.some(effort)) }
-                    }
-                    .pickerStyle(.segmented)
+                MenuPickerRow(
+                    title: String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level"),
+                    choices: [MenuChoice(value: String?.none, title: defaultLevelWords(chosen))]
+                        + chosen.efforts.map { MenuChoice(value: String?.some($0), title: effortTitle($0)) },
+                    selection: effortBinding(chosen))
                     .accessibilityIdentifier("chatSettings.reasoning")
-                }
-                .padding(.horizontal, Space.groupedGutter)
-                .padding(.vertical, Space.s)
             } else if chosen == nil, let effort = draft.choices.effort {
                 // The models could not be read: the level held is shown, to change once they are.
                 ListRow(systemImage: nil, title: String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level"), description: nil, accessory: .detail(effortTitle(effort)))
             }
-            ToggleRow(
-                systemImage: nil, title: String(localized: "Fast mode", comment: "Chat settings row: the model's fast mode"),
-                // Said only of a model known to lack it, not while the models could not be read.
-                description: chosen.map { $0.fastMode == true } == false
-                    ? String(localized: "This model has no fast mode.", comment: "Chat settings: fast mode is off for a model without it") : nil,
-                isOn: Binding(get: { draft.choices.speed == "fast" }, set: { draft.choices = draft.choices.with(speed: $0 ? "fast" : "standard") }))
-                .disabled(chosen?.fastMode != true)
-                .accessibilityIdentifier("chatSettings.fast")
+            if chosen?.fastMode == true {
+                ToggleRow(
+                    systemImage: nil, title: String(localized: "Fast mode", comment: "Chat settings row: the model's fast mode"), description: nil,
+                    isOn: Binding(get: { draft.choices.speed == "fast" }, set: { draft.choices = draft.choices.with(speed: $0 ? "fast" : "standard") }))
+                    .accessibilityIdentifier("chatSettings.fast")
+            }
             NavigationLink {
                 approvalsPage
             } label: {
@@ -132,7 +130,7 @@ struct ChatSettingsSheet: View {
     }
 
     @ViewBuilder private var catalog: some View {
-        PlainSection(header: String(localized: "Catalog", comment: "Chat settings section: hidden models")) {
+        InsetSection(header: nil) {
             ToggleRow(
                 systemImage: nil, title: String(localized: "Manage hidden models", comment: "Chat settings row: shows every model with a switch to hide it"),
                 description: managesHidden
@@ -141,6 +139,14 @@ struct ChatSettingsSheet: View {
                 isOn: $managesHidden)
                 .accessibilityIdentifier("chatSettings.manageHidden")
         }
+    }
+
+    /// The level left to the model: its own default named when the daemon says it ("Default (High)").
+    private func defaultLevelWords(_ option: ModelOption) -> String {
+        guard let level = option.defaultEffort else {
+            return String(localized: "Default level", comment: "Chat settings: the reasoning segment that leaves the level to the model's default")
+        }
+        return String(localized: "Default (\(effortTitle(level)))", comment: "Chat settings: the reasoning choice that leaves the level to the model; the argument is the model's own level")
     }
 
     /// The chosen model's level: the one picked, or `nil` for Default level (the configured level on it).

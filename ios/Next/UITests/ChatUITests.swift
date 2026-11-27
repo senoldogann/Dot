@@ -117,6 +117,32 @@ final class ChatUITests: XCTestCase {
         XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
     }
 
+    /// The owner's report of 2026-11-27: the capsule says "Waiting on N helpers" only while the main run has stopped for
+    /// them (`n2-helpers`: its step's one open call is a delegate); while it works beside its helper (`n2-chat`) it says
+    /// "Working". No spinner on either, and the status takes only its words' width, so that Stop, the plan and the helpers
+    /// keep their room.
+    func testTheCapsuleSaysWaitingOnlyWhileTheRunWaitsAndSpinsNothing() {
+        for (scene, words) in [("n2-helpers", "Waiting on 1 helper"), ("n2-chat", "Working, ")] {
+            let app: XCUIApplication = launch(scene)
+            let status: XCUIElement = app.buttons["capsule.status"]
+            XCTAssertTrue(status.waitForExistence(timeout: 10), scene)
+            XCTAssertTrue(status.label.hasPrefix(words), "\(scene): \(status.label)")
+            let stop: XCUIElement = app.buttons["capsule.stop"]
+            let people: XCUIElement = app.buttons["capsule.helpers"]
+            XCTAssertTrue(stop.exists && people.exists, scene)
+            let spinners: [XCUIElement] = app.activityIndicators.allElementsBoundByIndex.filter { $0.frame.intersects(status.frame) }
+            XCTAssertTrue(spinners.isEmpty, "\(scene): no spinner in the capsule: \(spinners.map { $0.frame })")
+            print("capsule \(scene): status \(status.frame) stop \(stop.frame) helpers \(people.frame)")
+            XCTAssertLessThanOrEqual(status.frame.width, 180, "\(scene): the status keeps to its words: \(status.frame)")
+            XCTAssertLessThanOrEqual(stop.frame.minX - status.frame.maxX, 2, "\(scene): Stop follows at once: \(status.frame) \(stop.frame)")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "capsule-\(scene)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
     /// The element's label once it differs from `label`, read every 100 ms (an `XCTNSPredicateExpectation` reads it about
     /// once a second, so a tick could be seen a second late, past the wait on a slow runner); the last label read when
     /// nothing changed within `seconds`.
@@ -281,6 +307,24 @@ final class ChatUITests: XCTestCase {
         sheet.name = "helper-chat"
         sheet.lifetime = .keepAlways
         add(sheet)
+    }
+
+    /// Owner 2026-11-27: an empty state is in the app's own type, so Settings › Appearance's text size reaches it (the
+    /// system's empty-state view kept its own larger title), and its glyph is still (no dotted circle like a spinner).
+    func testAnEmptyStateFollowsTheChosenTextSize() {
+        var heights: [CGFloat] = []
+        for size in ["xSmall", "xxxLarge"] {
+            let app: XCUIApplication = launch("n2-offline", defaults: ["-textSize", size])
+            let title: XCUIElement = app.staticTexts["Can't reach your Mac"]
+            XCTAssertTrue(title.waitForExistence(timeout: 10))
+            heights.append(title.frame.height)
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "empty-state-\(size)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+        XCTAssertGreaterThan(heights[1], heights[0] * 1.3, "the title grows with the chosen text size: \(heights)")
     }
 
     /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
@@ -525,13 +569,17 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
-    /// Item 1931: with no link, the pill says Offline in the status's place (after the second that keeps a blip from
-    /// flickering), and offers no Stop.
+    /// Item 1931 and the owner's report of 2026-11-27: with no link, the capsule says Offline in the status's place once
+    /// it lasted a few seconds, and offers no Stop; the header keeps the bot's face and name, no link words.
     func testThePillSaysOfflineWithoutALink() {
         let app: XCUIApplication = launch("n2-offline-saved")
         let link: XCUIElement = app.buttons["capsule.link"]
-        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        XCTAssertTrue(link.waitForExistence(timeout: 15))
         XCTAssertEqual(link.label, "Offline")
+        for words in ["Syncing", "Reconnecting", "Offline ·"] {
+            XCTAssertFalse(
+                app.navigationBars.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", words)).firstMatch.exists, "no link words in the header: \(words)")
+        }
         XCTAssertFalse(app.buttons["capsule.stop"].exists, "nothing to stop over no link")
         let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         shot.name = "pill-offline"

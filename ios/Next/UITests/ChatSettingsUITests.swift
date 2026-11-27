@@ -23,16 +23,23 @@ final class ChatSettingsUITests: XCTestCase {
         chip.tap()
         XCTAssertTrue(app.navigationBars["Chat settings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Claude Code"].exists, "providers by the web's names")
-        XCTAssertTrue(app.staticTexts["Default"].exists, "the daemon's main model wears the badge")
-        XCTAssertTrue(app.buttons["Approvals"].exists || any(app, "chatSettings.approvals").firstMatch.exists)
-
-        // The chat's model (Opus) is on top among the recent ones, and its provider's group is open; a star is kept.
         let models: XCUIElementQuery = any(app, "modelCatalog.model")
+        XCTAssertTrue(
+            models.matching(NSPredicate(format: "label CONTAINS %@", ", Default")).firstMatch.exists,
+            "the daemon's main model says Default under its name")
+        XCTAssertTrue(app.buttons["Approvals"].exists || any(app, "chatSettings.approvals").firstMatch.exists)
+        XCTAssertFalse(app.buttons["Add Sonnet 5.5 to favourites"].exists, "no column of empty stars")
+
+        // The chat's model (Opus) is on top among the recent ones, and its provider's group is open; a long press stars a
+        // model, and the star is kept.
         XCTAssertTrue(models.element(boundBy: 0).label.hasPrefix("Opus 5.5"), "the current model first: \(models.element(boundBy: 0).label)")
+        let sonnet: XCUIElement = models.matching(NSPredicate(format: "label BEGINSWITH %@", "Sonnet 5.5")).firstMatch
+        sonnet.press(forDuration: 1.0)
         let star: XCUIElement = app.buttons["Add Sonnet 5.5 to favourites"].firstMatch
-        XCTAssertTrue(star.exists)
+        XCTAssertTrue(star.waitForExistence(timeout: 3), "the long press offers the star")
         star.tap()
-        XCTAssertTrue(app.buttons["Remove Sonnet 5.5 from favourites"].firstMatch.waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            models.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "Sonnet 5.5", "Favourite")).firstMatch.waitForExistence(timeout: 3))
 
         // The other providers start folded with their count, and open with a tap.
         XCTAssertTrue(app.staticTexts["2"].exists, "folded, Ollama says how many models it holds")
@@ -163,22 +170,30 @@ final class ChatSettingsUITests: XCTestCase {
         add(bigShot)
     }
 
-    func testFastModeFollowsTheModelAndTheLevelAndApprovalsArePicked() {
+    /// The owner's report of 2026-11-27: fast mode shows only for a model that has it (no greyed switch), the level is a
+    /// menu of the chosen model's own levels in full words, the approvals open their page.
+    func testFastModeShowsOnlyForAModelWithItAndTheLevelAndApprovalsArePicked() {
         let app: XCUIApplication = launch("n2-model")
         XCTAssertTrue(app.navigationBars["Chat settings"].waitForExistence(timeout: 10))
         let fast: XCUIElement = any(app, "chatSettings.fast").firstMatch
         let sonnet: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == 'modelCatalog.model' AND label BEGINSWITH %@", "Sonnet 5.5")).firstMatch
         for _ in 0..<4 where !sonnet.isHittable { app.swipeUp() }
         sonnet.tap()
-        XCTAssertTrue(fast.waitForExistence(timeout: 3))
-        XCTAssertFalse(fast.isEnabled, "Sonnet has no fast mode")
+        XCTAssertFalse(fast.waitForExistence(timeout: 2), "Sonnet has no fast mode: the row is not there")
+        XCTAssertFalse(app.staticTexts["This model has no fast mode."].exists)
         app.buttons.matching(NSPredicate(format: "identifier == 'modelCatalog.model' AND label BEGINSWITH %@", "Opus 5.5")).firstMatch.tap()
-        XCTAssertTrue(fast.isEnabled, "Opus has it")
+        for _ in 0..<4 where !fast.exists { app.swipeDown() }
+        XCTAssertTrue(fast.waitForExistence(timeout: 3), "Opus has it")
+        XCTAssertTrue(fast.isEnabled)
 
-        // The level is one tap on the chosen model's own levels.
-        for _ in 0..<4 where !app.buttons["High"].isHittable { app.swipeDown() }
-        app.buttons["High"].tap()
-        XCTAssertTrue(app.buttons["High"].isSelected)
+        // The level is a menu of the chosen model's own levels, each in full words.
+        let reasoning: XCUIElement = any(app, "chatSettings.reasoning").firstMatch
+        for _ in 0..<4 where !reasoning.isHittable { app.swipeDown() }
+        reasoning.tap()
+        let high: XCUIElement = app.buttons["High"].firstMatch
+        XCTAssertTrue(high.waitForExistence(timeout: 3), "the menu of levels opened")
+        high.tap()
+        XCTAssertEqual(reasoning.value as? String, "High", "the row says the level picked")
 
         let approvals: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Approvals")).firstMatch
         for _ in 0..<3 where !approvals.isHittable { app.swipeDown() }
@@ -190,28 +205,61 @@ final class ChatSettingsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chatSettings.done"].isEnabled)
     }
 
-    /// The design bar (SETTINGS-NATIVE.md): rows of one kind are identical, every star sits centred on its row, the
-    /// sheet's left and right insets are equal, every tap target is 44 pt or more. Measured from the elements' frames;
-    /// a difference over 1 pt fails. The numbers go to the log for the report.
+    /// No word of the level is cut, at the default size and at the largest accessibility size: the row and every choice of
+    /// its menu lie whole inside the window, one menu item per level with the full word. Shots of each, light and dark,
+    /// go to the result bundle for the report.
+    func testNoLevelIsCutAtTheDefaultSizeOrAtAX3() {
+        for (name, extra) in [
+            ("default", [String]()), ("dark", ["-AppleInterfaceStyle", "Dark"]),
+            ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]),
+        ] {
+            let app: XCUIApplication = XCUIApplication()
+            app.launchArguments =
+                ["-DotNextScene", "n2-model", "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-models.favourites", "()", "-models.hidden", "()"] + extra
+            app.launch()
+            XCTAssertTrue(app.navigationBars["Chat settings"].waitForExistence(timeout: 10), name)
+            let window: CGRect = app.windows.firstMatch.frame
+            let reasoning: XCUIElement = any(app, "chatSettings.reasoning").firstMatch
+            for _ in 0..<6 where !reasoning.isHittable { app.swipeUp() }
+            XCTAssertTrue(reasoning.isHittable, "\(name): the level row")
+            XCTAssertGreaterThanOrEqual(reasoning.frame.height, 44, name)
+            XCTAssertTrue(window.contains(reasoning.frame), "\(name): the row lies inside the window: \(reasoning.frame)")
+            let page: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            page.name = "chat-settings-\(name)"
+            page.lifetime = .keepAlways
+            add(page)
+            reasoning.tap()
+            for level in ["Low", "Medium", "High", "Extra high", "Max"] {
+                let item: XCUIElement = app.buttons[level].firstMatch
+                XCTAssertTrue(item.waitForExistence(timeout: 3), "\(name): \(level) in the menu")
+                XCTAssertEqual(item.label, level, "\(name): the full word")
+                XCTAssertTrue(window.contains(item.frame), "\(name): \(level) lies whole inside the window: \(item.frame)")
+            }
+            let menu: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            menu.name = "chat-settings-levels-\(name)"
+            menu.lifetime = .keepAlways
+            add(menu)
+            app.terminate()
+        }
+    }
+
+    /// The design bar (SETTINGS-NATIVE.md): rows of one kind are identical, the sheet's cards keep equal left and right
+    /// insets, every tap target is 44 pt or more. Measured from the elements' frames; a difference over 1 pt fails. The
+    /// numbers go to the log for the report.
     func testTheSheetMeasuresToTheDesignBar() {
         let app: XCUIApplication = launch("n2-model")
         XCTAssertTrue(app.navigationBars["Chat settings"].waitForExistence(timeout: 10))
         let window: CGRect = app.windows.firstMatch.frame
-        let rows: [XCUIElement] = any(app, "modelCatalog.model").allElementsBoundByIndex.filter { $0.isHittable }
-        let stars: [XCUIElement] = any(app, "modelCatalog.star").allElementsBoundByIndex.filter { $0.isHittable }
+        let rows: [XCUIElement] = any(app, "modelCatalog.model").allElementsBoundByIndex.filter { $0.isHittable && !$0.label.contains(", Default") }
         XCTAssertGreaterThanOrEqual(rows.count, 2)
         let heights: [CGFloat] = rows.map { $0.frame.height }
-        print("design-bar model rows: heights \(heights) minX \(rows.map { $0.frame.minX })")
+        print("design-bar model rows: heights \(heights) minX \(rows.map { $0.frame.minX }) maxX \(rows.map { $0.frame.maxX })")
         XCTAssertLessThanOrEqual((heights.max() ?? 0) - (heights.min() ?? 0), 1, "rows of one kind are identical")
         XCTAssertGreaterThanOrEqual(heights.min() ?? 0, 44)
-        for (row, star) in zip(rows, stars) {
-            XCTAssertLessThanOrEqual(abs(row.frame.midY - star.frame.midY), 1, "the star is centred on its row: \(row.frame) \(star.frame)")
-            XCTAssertGreaterThanOrEqual(star.frame.width, 44)
-            XCTAssertGreaterThanOrEqual(star.frame.height, 44)
-        }
         let left: CGFloat = (rows.map { $0.frame.minX }.min() ?? 0) - window.minX
-        let right: CGFloat = window.maxX - (stars.map { $0.frame.maxX }.max() ?? 0)
+        let right: CGFloat = window.maxX - (rows.map { $0.frame.maxX }.max() ?? 0)
         print("design-bar sheet insets: left \(left) right \(right)")
+        XCTAssertLessThanOrEqual(abs(left - right), 1, "equal insets left and right")
         let search: XCUIElement = app.textFields["modelCatalog.search"]
         let filter: XCUIElement = app.buttons["modelCatalog.filter"]
         print("design-bar search: \(search.frame) filter \(filter.frame)")

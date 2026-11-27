@@ -171,7 +171,7 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    (`GET /api/runs/{id}/events?tail=400`; an older Dot answers with the run's first events and no
    `X-Dot-Events-Tail` header, and the app then reads the pages as before) and says that some steps are not shown. One
    thin line under the status bar says when the phone has no link (*Offline — showing saved chats · last updated 3 min
-   ago*, or *Offline — 2 waiting to send*), when Dot cannot be reached for more than a moment (*Reconnecting…*) and when
+   ago*, or *Offline — 2 waiting to send*), when Dot cannot be reached for more than a moment (*Can't reach Dot*) and when
    the phone's key was refused; it never covers what is read. **What is done with no link is kept and sent when it
    returns, once and in order**: a message shows at once under the chat as *Waiting to send* (with *Retry now* and
    *Edit*) and goes with the key Dot starts a message once by (`POST /api/threads/{id}/queue` sent again after an answer
@@ -362,7 +362,7 @@ on the helpers, the queue, the loops and the commands at work, five panes one up
 capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
 never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Reconnecting…**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
+**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
 "Working") and at 320 px, with everything to say, takes a second line that keeps the status and the Stop in words, never
@@ -397,8 +397,9 @@ reasoning level in small words, not the approvals, which the owner read as a par
 long name gives way to an ellipsis and the level stays whole. A tap on it opens the chat's settings (item 1202), a
 sheet from the foot of the screen with Close, the title and Done at its head: the default's row with Change, the
 favourites, then a section per provider that opens and folds (the chosen model's open, the others saying how many
-models they hold), each model with a tick and a star; under them the Options, Reasoning, Mode and Approvals as rows
-that say their value and open in place, and How Dot works with its switches; the search of the models stays at the
+models they hold), each model with a tick and a star; under them the Options as one card in the iPhone app's order and
+words: Reasoning (the model's own levels in full words, opening in place), Fast mode as a switch only for a model that
+has it, Approvals, and Plan first as a switch; then Mode, and How Dot works with its switches; the search of the models stays at the
 sheet's foot. A pick keeps the sheet open; Done, Close, a tap on the dim above it or a drag of its head down puts it
 away. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
@@ -612,11 +613,11 @@ for a lost link would hold what the owner sends.
   not its run), so that it goes in order with what else was done there. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
   could not reach Dot and the words stay in the box.
 - **The line (item 1524).** One thin line stands under the bar, and has no height while nothing is said. The states that
-  last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Reconnecting…*
+  last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Can't reach Dot*
   floats over the room the conversation leaves under the bar, as the notes of a lost stream always did (item 328), so that
   what is read never moves when it comes or goes: *Offline: showing saved chats, last updated 3 min ago*
   (the copy a chat is drawn from, and how old it is, kept true by a clock that runs only while it is shown), *Offline: 2
-  waiting to send* (what the outbox holds, which says more than the copy does), *Reconnecting…* (Dot not reached for more
+  waiting to send* (what the outbox holds, which says more than the copy does), *Can't reach Dot* (Dot not reached for more
   than a moment on a link that is there; a break that mends at once says nothing), and *This phone's key was refused*
   with **Pair again**, on the sign-in screen the refused key leads to, which takes the owner to the field where the code
   of Settings › Phone is typed. What it says is one pure function of the facts (`js/linewords.js`, English and Turkish),
@@ -1052,8 +1053,8 @@ The card is drawn from the last read, kept in the same file, before the network 
 ### The Activity tab of Dot Next (item 1826)
 
 The iPhone app's Activity tab shows what the owner needs away from the Mac to watch, answer or direct Dot's own work;
-the setup of it (the brief's time, a watcher's choices, the model that looks for work) stays on the Mac. The tab shows all of Dot's. The screen can also be limited to one agent (`ActivityScreen(agent:)`), for the agents'
-profiles the app is to get (no screen opens it so limited yet): it then lists that agent's runs and rows alone (by the
+the setup of it (the brief's time, a watcher's choices, the model that looks for work) stays on the Mac. The tab shows all of Dot's, and so does Dot's profile › Activity. An agent's profile › Activity opens the screen
+limited to that agent (`ActivityScreen(agent:)`, item 2022): it then lists that agent's runs and rows alone (by the
 row's `actor_id` and the run's `agent_id`), leaves out what belongs to Dot as a whole and Mark as read, never marks the
 moment, and counts that agent's runs among the fifty newest the daemon lists, so in a busy week the counts can be lower
 than what it did. Each part is

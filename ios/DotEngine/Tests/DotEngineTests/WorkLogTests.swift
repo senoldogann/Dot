@@ -277,4 +277,46 @@ final class WorkLogTests: XCTestCase {
         XCTAssertEqual(fold.items.map(\.id), ["th:run_a:1", "t:r1"], "the thought and the successful read are in it")
         XCTAssertEqual(transcript(of: finished, pending: [], mode: .zen, streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"], "Zen: the answer alone")
     }
+
+    // MARK: Working or waiting on helpers (the owner's report of 2026-11-27)
+
+    private func delegate(_ id: Int, _ call: String, wait: Bool?) -> EventRecord {
+        var args: [String: JSONValue] = ["goal": .string("part \(call)")]
+        if let wait { args["wait"] = .bool(wait) }
+        return event(id, "tool_call", ["call_id": .string(call), "tool": .string("delegate"), "args": .object(args)])
+    }
+
+    /// The capsule says "Waiting on N helpers" only while the main run has stopped for them: every open call of its newest
+    /// step waits on a helper. While another call of that step runs, while it thinks or writes, or once the waits were
+    /// answered, the run works.
+    func testTheRunWaitsOnHelpersOnlyWhileEveryOpenCallIsAWaitOnOne() {
+        let step: EventRecord = event(10, "assistant", ["text": .string(""), "step": .int(1)])
+        let waits: ChatProjection = chat([run("run_a", status: "running")], [step, delegate(11, "d1", wait: nil), delegate(12, "d2", wait: true)])
+        XCTAssertTrue(waitsOnHelpers(of: waits, run: "run_a"), "two delegates open, nothing else: it waits")
+
+        let beside: ChatProjection = chat([run("run_a", status: "running")], [step, delegate(11, "d1", wait: nil), call(12, "sh", "shell")])
+        XCTAssertFalse(waitsOnHelpers(of: beside, run: "run_a"), "a command of the same step still runs: it works")
+
+        let shellDone: ChatProjection = chat(
+            [run("run_a", status: "running")], [step, delegate(11, "d1", wait: nil), call(12, "sh", "shell"), result(13, "sh", ok: true)])
+        XCTAssertTrue(waitsOnHelpers(of: shellDone, run: "run_a"), "the command ended, the delegate is left: it waits")
+
+        let noWait: ChatProjection = chat([run("run_a", status: "running")], [step, delegate(11, "d1", wait: false)])
+        XCTAssertFalse(waitsOnHelpers(of: noWait, run: "run_a"), "a helper it asked not to wait for holds nothing")
+
+        let answered: ChatProjection = chat(
+            [run("run_a", status: "running")],
+            [step, delegate(11, "d1", wait: nil), result(12, "d1", ok: true), event(13, "assistant", ["text": .string("Next"), "step": .int(2)])])
+        XCTAssertFalse(waitsOnHelpers(of: answered, run: "run_a"), "the report came and a new step began: it works")
+
+        var thinking: ChatProjection = waits
+        thinking.writing["run_a"] = "Reading the reports"
+        XCTAssertFalse(waitsOnHelpers(of: thinking, run: "run_a"), "words streaming: it works")
+
+        let idle: ChatProjection = chat([run("run_a", status: "running")], [step])
+        XCTAssertFalse(waitsOnHelpers(of: idle, run: "run_a"), "no open call: the model works on its next step")
+
+        let ended: ChatProjection = chat([run("run_a", status: "done")], [step, delegate(11, "d1", wait: nil), event(12, "run_finished", [:])])
+        XCTAssertFalse(waitsOnHelpers(of: ended, run: "run_a"))
+    }
 }
