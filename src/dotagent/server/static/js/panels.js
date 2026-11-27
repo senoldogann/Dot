@@ -7,8 +7,9 @@ import { explain } from "./errors.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
 import { attempt, detailsFold } from "./ui.js";
+import { t } from "./i18n.js";
 
-const STATUS_LABEL = { blocked: "waiting", ending: "saving the end" };
+const STATUS_LABEL = { blocked: "waiting", ending: t("panels.savingTheEnd") };
 const FOLD_KEY_PREFIX = "dot.fold.";
 
 // The settings page that holds a page of its own (views/settings.js, item 1336): its head is the settings' own, so the
@@ -32,7 +33,7 @@ export function pageHead(title, subtitle, actions) {
     host.say(title, subtitle);
     return paneHead(null, actions);
   }
-  const about = subtitle === "" ? null : aboutToggle(subtitle, `About ${title}`, "grow page-sub");
+  const about = subtitle === "" ? null : aboutToggle(subtitle, t("panels.aboutTitle", { title }), "grow page-sub");
   setStageTitle(el("h1", { class: "stage-h1" }, title), about?.button ?? null);
   return paneHead(about?.note ?? null, actions);
 }
@@ -146,7 +147,7 @@ export function markOpener(button, label) {
 
 /** A spinner for a place that is still loading, to sit inside a card. */
 export function inlineLoading() {
-  return el("div", { class: "empty", role: "status", "aria-label": "Loading" }, el("div", { class: "spinner" }));
+  return el("div", { class: "empty", role: "status", "aria-label": t("panels.loading") }, el("div", { class: "spinner" }));
 }
 
 /** A failed load, with the reason and, when `retry` is given, a way to try again, to sit inside a card. */
@@ -156,10 +157,10 @@ export function inlineError(error, retry) {
     "div",
     { class: "empty" },
     icon("alert"),
-    el("div", { class: "row-title" }, "This could not be loaded"),
+    el("div", { class: "row-title" }, t("panels.thisCouldNotBeLoaded")),
     el("div", null, text),
     detailsFold(details),
-    typeof retry === "function" ? el("div", { class: "cluster" }, el("button", { class: "btn", type: "button", onclick: retry }, icon("refresh"), "Try again")) : null,
+    typeof retry === "function" ? el("div", { class: "cluster" }, el("button", { class: "btn", type: "button", onclick: retry }, icon("refresh"), t("panels.tryAgain"))) : null,
   );
 }
 
@@ -172,7 +173,7 @@ export function loadingPanel() {
 export function chatLoading() {
   return el(
     "div",
-    { class: "chat-loading", role: "status", "aria-label": "Opening this chat" },
+    { class: "chat-loading", role: "status", "aria-label": t("panels.openingThisChat") },
     el("span", { class: "chat-loading-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
   );
 }
@@ -369,7 +370,7 @@ export function foldGroup({ id, head, body, openByDefault }) {
  * its Advanced (item 622) and takes its styles. A tab that draws itself again keeps the fold as the reader left it by
  * giving `open` and taking `onToggle(open)`.
  */
-export function advancedFold({ title = "Advanced", lead, body, open = false, onToggle = null }) {
+export function advancedFold({ title = t("panels.advanced"), lead, body, open = false, onToggle = null }) {
   const fold = el(
     "details",
     { class: "set-card rule-advanced", open },

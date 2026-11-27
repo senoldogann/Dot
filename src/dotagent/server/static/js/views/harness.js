@@ -5,17 +5,18 @@
 // 938), and how it is set.
 
 import { api } from "../api.js";
-import { clip, dateTime, el, joined, nextNight, plural } from "../dom.js";
+import { clip, dateTime, el, joined, nextNight, } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, foldCard, loadingPanel, setCard, setRow, setSection } from "../panels.js";
 import { readFailed } from "../state.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 import { poolNightWords } from "../harnessnight.js";
 import { codeText } from "./memory.js";
+import { t, tCount } from "../i18n.js";
 
 const STATE_TONE = { adopted: "b-ok", probed: "b-warn", candidate: "b-info", retired: "b-muted" };
 // A version's state and a night's outcome in the words of the page; the API's own words stay in the docs.
-const STATE_WORDS = { adopted: "in use", probed: "tried", candidate: "new", retired: "set aside" };
+const STATE_WORDS = { adopted: t("views.harness.inUse"), probed: "tried", candidate: "new", retired: t("views.harness.setAside") };
 const STEP_TONE = {
   done: "b-ok",
   keep: "b-muted",
@@ -28,11 +29,11 @@ const STEP_TONE = {
 // that went on without a model's answer it could not use after asking three times (item 1015).
 const STEP_WORDS = {
   done: "done",
-  keep: "no change",
+  keep: t("views.harness.noChange"),
   skipped: "skipped",
   failed: "failed",
-  calibrating: "trying tasks",
-  unusable: "answer unusable",
+  calibrating: t("views.harness.tryingTasks"),
+  unusable: t("views.harness.answerUnusable"),
 };
 // The nights the strip of the overview shows, the newest at its right end.
 const STRIP_STEPS = 14;
@@ -46,7 +47,7 @@ const STRIP_KIND = {
   calibrating: "quiet",
   unusable: "unusable",
 };
-const MADE_BY = { owner: "written by you", proposer: "proposed by Dot", composer: "combined by Dot" };
+const MADE_BY = { owner: t("views.harness.writtenByYou"), proposer: t("views.harness.proposedByDot"), composer: t("views.harness.combinedByDot") };
 const SUMMARY_CHARS = 200;
 // How many versions the list shows at first and each time **Show older versions** is pressed (the daemon pages them).
 const VERSIONS_PAGE = 50;
@@ -55,15 +56,15 @@ const MOST_VERSIONS = 500;
 // The keys of a version's notes the page reads out, in this order, each with its words.
 const NOTE_WORDS = {
   scope: "about",
-  moments: "what in the task it answers",
-  contrast: "in the test, against the version before",
-  confirmation: "in the test played again, before Dot used it itself",
+  moments: t("views.harness.whatInTheTaskIt"),
+  contrast: t("views.harness.inTheTestAgainstThe"),
+  confirmation: t("views.harness.inTheTestPlayedAgain"),
   decisions: "decisions",
-  retired: "set aside",
-  from_run: "learned from task",
-  composed_of: "combined from",
-  tainted: "read content others wrote",
-  tainted_by: "what it read",
+  retired: t("views.harness.setAside"),
+  from_run: t("views.harness.learnedFromTask"),
+  composed_of: t("views.harness.combinedFrom"),
+  tainted: t("views.harness.readContentOthersWrote"),
+  tainted_by: t("views.harness.whatItRead"),
 };
 
 function capital(text) {
@@ -83,15 +84,15 @@ function outsidePill(reasons) {
     "span",
     {
       class: "badge b-warn",
-      title: `A line in this version may come from content others can write: ${reasons.join("; ")}.`,
+      title: t("views.harness.aLineInThisVersion", { join: reasons.join("; ") }),
     },
-    "From outside content",
+    t("views.harness.fromOutsideContent"),
   );
 }
 
 /** The pill of a version whose text the daemon's checks refuse now: it is not put in use, and a run never takes it. */
 function refusedPill(refusal) {
-  return el("span", { class: "badge b-bad", title: `${capital(refusal)}. A version like this is not put in use.` }, "Refused");
+  return el("span", { class: "badge b-bad", title: t("views.harness.capitalAVersionLikeThis", { capital: capital(refusal) }) }, t("views.harness.refused"));
 }
 
 /** A pill with the name of a state or an outcome: green for what is in use or done, red for a failure, grey for the rest. */
@@ -100,7 +101,7 @@ function pill(tones, words, state) {
 }
 
 function textBlock(text) {
-  return text === "" ? el("pre", { class: "harness-text empty" }, "nothing") : el("pre", { class: "harness-text" }, text);
+  return text === "" ? el("pre", { class: "harness-text empty" }, t("views.harness.nothing")) : el("pre", { class: "harness-text" }, text);
 }
 
 /** The points of a text of a version: a line a point, without the dash it starts with. */
@@ -116,7 +117,7 @@ function pointsOf(text) {
 function bulletList(text) {
   const lines = pointsOf(text);
   if (lines.length === 0) {
-    return el("p", { class: "follow-none" }, "nothing");
+    return el("p", { class: "follow-none" }, t("views.harness.nothing"));
   }
   return el("ul", { class: "follow-list" }, lines.map((line) => el("li", null, codeText(line))));
 }
@@ -131,10 +132,10 @@ function noteLines(notes) {
   } catch (error) {
     // Dot writes the notes as JSON; ones that are not are a fault, shown as they are and said so.
     console.error("a version's notes could not be read", error);
-    return [el("div", { class: "row-text muted" }, `These notes could not be read: ${notes}`)];
+    return [el("div", { class: "row-text muted" }, t("views.harness.theseNotesCouldNotBe", { notes }))];
   }
   if (parsed === null || typeof parsed !== "object") {
-    return [el("div", { class: "row-text muted" }, `These notes are not in the form Dot expects: ${notes}`)];
+    return [el("div", { class: "row-text muted" }, t("views.harness.theseNotesAreNotIn", { notes }))];
   }
   return Object.entries(NOTE_WORDS)
     .filter(([key]) => key in parsed)
@@ -143,7 +144,7 @@ function noteLines(notes) {
       let text;
       if (key === "tainted") {
         // A candidate written from a run that read what others can author is said so, for the owner to weigh.
-        text = value ? "yes: the task read a page or a message others can write; weigh the change" : "no";
+        text = value ? t("views.harness.yesTheTaskReadA") : "no";
       } else if (Array.isArray(value)) {
         text = value.map((item) => (typeof item === "string" ? item : JSON.stringify(item))).join("; ");
       } else {
@@ -161,11 +162,11 @@ function versionRow(version, handlers) {
   const refusal = handlers.refusal(version);
   // A version the checks refuse is not offered for use: set it aside and write another.
   if (version.state !== "adopted" && refusal === "") {
-    buttons.push(el("button", { class: "btn sm", type: "button", onclick: () => handlers.onAdopt(version) }, "Use"));
+    buttons.push(el("button", { class: "btn sm", type: "button", onclick: () => handlers.onAdopt(version) }, t("views.harness.use")));
   }
   // The version in use is set aside from What Dot follows now, above; a set-aside one has nothing left to set aside.
   if (version.state === "candidate" || version.state === "probed") {
-    buttons.push(el("button", { class: "btn ghost sm", type: "button", onclick: () => handlers.onRetire(version) }, "Set aside"));
+    buttons.push(el("button", { class: "btn ghost sm", type: "button", onclick: () => handlers.onRetire(version) }, t("views.harness.setAside2")));
   }
   const details = el(
     "div",
@@ -174,19 +175,19 @@ function versionRow(version, handlers) {
       "div",
       { class: "version-facts" },
       ...joined([
-        el("span", { class: "mono", title: "The version's ID" }, version.id),
+        el("span", { class: "mono", title: t("views.harness.theVersionSId") }, version.id),
         MADE_BY[version.made_by] ?? `by ${version.made_by}`,
         dateTime(version.created_at),
       ]),
     ),
-    refusal === "" ? null : el("div", { class: "row-text" }, el("span", { class: "muted" }, "Refused: "), `${refusal}. Set it aside and write another.`),
-    el("div", { class: "version-label" }, "Habits"),
+    refusal === "" ? null : el("div", { class: "row-text" }, el("span", { class: "muted" }, t("views.harness.refused2")), t("views.harness.refusalSetItAsideAnd", { refusal })),
+    el("div", { class: "version-label" }, t("views.harness.habits")),
     textBlock(version.habits),
-    el("div", { class: "version-label" }, "Tips"),
+    el("div", { class: "version-label" }, t("views.harness.tips")),
     textBlock(version.tool_guidance),
     ...noteLines(version.notes),
   );
-  const toggle = el("button", { class: "version-toggle", type: "button", "aria-expanded": "false", "aria-controls": details.id }, "Full text and notes");
+  const toggle = el("button", { class: "version-toggle", type: "button", "aria-expanded": "false", "aria-controls": details.id }, t("views.harness.fullTextAndNotes"));
   toggle.addEventListener("click", () => {
     details.hidden = !details.hidden;
     toggle.setAttribute("aria-expanded", String(!details.hidden));
@@ -220,25 +221,25 @@ function stepFacts(step) {
   } catch (error) {
     // Dot writes the record as JSON; one that is not is a fault, said in the row, never a blank.
     console.error("a step's record could not be read", step.id, error);
-    return { unreadable: `This step's record could not be read: ${error.message}` };
+    return { unreadable: t("views.harness.thisStepSRecordCould", { message: error.message }) };
   }
 }
 
 /** What a night's row says under its date: what it read and how many versions it proposed. */
 function stepMeta(step, facts, candidates, digest) {
   if (digest) {
-    return ["a digest of the day's real runs"];
+    return [t("views.harness.aDigestOfTheDay")];
   }
   return [
     // A night that only worked on the pool (its record names what has headroom) takes no task, whatever it came
     // to: tried, failed or nothing left to learn, and the words say which (items 719, 762).
     // A night with nothing to tell a better text from luck (item 931) took no run either: it is left for later.
     facts.no_signal === true
-      ? "nothing to tell a better text from luck"
+      ? t("views.harness.nothingToTellABetter")
       : step.from_run === null
-        ? (poolNightWords(step.state, facts) ?? "no task to learn from")
-        : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
-    `${plural(candidates, "version", "versions")} proposed`,
+        ? (poolNightWords(step.state, facts) ?? t("views.harness.noTaskToLearnFrom"))
+        : el("a", { href: `#/runs/${step.from_run}` }, t("views.harness.theTaskItLearnedFrom")),
+    t("views.harness.partProposed", { part: tCount(candidates, "views.harness.countVersion", "views.harness.countVersions") }),
   ];
 }
 
@@ -273,7 +274,7 @@ function stepRow(step) {
           .filter((why) => typeof why === "string" && why !== facts.week)
           .map((why) => el("div", { class: "harness-said" }, capital(why))),
         // The test the night made of the owner's run (item 904): the one it kept, or why it kept none.
-        typeof facts.task === "string" ? el("div", { class: "harness-said muted" }, `Own test: ${facts.task}`) : null,
+        typeof facts.task === "string" ? el("div", { class: "harness-said muted" }, t("views.harness.ownTestTask", { task: facts.task })) : null,
       ),
     ),
   );
@@ -286,7 +287,7 @@ function experienceRow(experience) {
     el(
       "div",
       { class: "harness-line top" },
-      el("span", { class: "harness-mark" }, el("span", { class: "chip", title: "How sure Dot was" }, experience.confidence)),
+      el("span", { class: "harness-mark" }, el("span", { class: "chip", title: t("views.harness.howSureDotWas") }, experience.confidence)),
       el(
         "div",
         { class: "harness-main" },
@@ -294,7 +295,7 @@ function experienceRow(experience) {
         el("div", { class: "harness-said" }, experience.lesson),
         el("div", { class: "harness-meta" }, experience.evidence),
         experience.tainted
-          ? el("div", { class: "harness-meta" }, "Learned from a task that read content others wrote, so Dot never reads it when it suggests a change.")
+          ? el("div", { class: "harness-meta" }, t("views.harness.learnedFromATaskThat"))
           : null,
       ),
     ),
@@ -324,7 +325,7 @@ function nightStrip(steps) {
       "aria-label": `${dateTime(step.started_at)}: ${STEP_WORDS[step.state] ?? step.state}`,
     }),
   );
-  return el("span", { class: "night-strip", role: "group", "aria-label": `The newest ${plural(shown.length, "night", "nights")} of learning` }, cells);
+  return el("span", { class: "night-strip", role: "group", "aria-label": t("views.harness.theNewestPartOfLearning", { part: tCount(shown.length, "views.harness.countNight", "views.harness.countNights") }) }, cells);
 }
 
 /** What the cells of the strip mean: it stands over the list of the nights, which names each night's outcome in words. */
@@ -334,8 +335,8 @@ function nightLegend() {
     "div",
     { class: "night-legend" },
     key("done", "a change"),
-    key("quiet", "no change"),
-    key("unusable", "an answer unusable"),
+    key("quiet", t("views.harness.noChange")),
+    key("unusable", t("views.harness.anAnswerUnusable")),
     key("failed", "failed"),
   );
 }
@@ -352,28 +353,28 @@ function overview(view, steps) {
   const nights =
     lastNight === undefined
       ? view.step_time === "off"
-        ? "The nightly learning is off"
-        : `Next at ${view.step_time}`
-      : `Last: ${dateTime(lastNight.started_at)} · ${STEP_WORDS[lastNight.state] ?? lastNight.state}`;
+        ? t("views.harness.theNightlyLearningIsOff")
+        : t("views.harness.nextAtStepTime", { step_time: view.step_time })
+      : t("views.harness.lastDatetimeValue", { dateTime: dateTime(lastNight.started_at), value: STEP_WORDS[lastNight.state] ?? lastNight.state });
   const tiles = [
     statTile({
-      label: "In use",
+      label: t("views.harness.inUse2"),
       value: view.adopted === null ? "Built-in" : "A version",
-      sub: view.adopted === null ? "Dot's own instructions alone" : "Not the built-in instructions",
-      hover: view.adopted === null ? "Dot's own instructions alone" : view.adopted.summary,
+      sub: view.adopted === null ? t("views.harness.dotSOwnInstructionsAlone") : t("views.harness.notTheBuiltInInstructions"),
+      hover: view.adopted === null ? t("views.harness.dotSOwnInstructionsAlone") : view.adopted.summary,
     }),
-    statTile({ label: "Versions", value: String(view.versions_total), sub: breakdown === "" ? "None yet" : breakdown }),
-    statTile({ label: "Learning nights", value: String(view.steps_total), extra: steps.length === 0 ? null : nightStrip(steps), sub: nights }),
+    statTile({ label: t("views.harness.versions"), value: String(view.versions_total), sub: breakdown === "" ? t("views.harness.noneYet") : breakdown }),
+    statTile({ label: t("views.harness.learningNights"), value: String(view.steps_total), extra: steps.length === 0 ? null : nightStrip(steps), sub: nights }),
     statTile({
-      label: "Lessons kept",
+      label: t("views.harness.lessonsKept"),
       value: String(view.experiences_total),
-      sub: view.experiences_total === 0 ? "None until a test is clear" : "From the nights' tests",
+      sub: view.experiences_total === 0 ? t("views.harness.noneUntilATestIs") : t("views.harness.fromTheNightsTests"),
     }),
   ];
   const card = setCard(...tiles);
   card.classList.add("stat-card");
   card.setAttribute("role", "group");
-  card.setAttribute("aria-label", "Overview");
+  card.setAttribute("aria-label", t("views.harness.overview"));
   return card;
 }
 
@@ -386,8 +387,8 @@ function followBody(view, handlers, textsOpen, onTexts) {
   if (adopted === null) {
     return setCard(
       setRow({
-        title: "Dot's built-in instructions alone: no version is in use.",
-        lead: "Versions appear below when you write one, or when a step run by hand proposes one.",
+        title: t("views.harness.dotSBuiltInInstructions"),
+        lead: t("views.harness.versionsAppearBelowWhenYou"),
       }),
     );
   }
@@ -402,14 +403,14 @@ function followBody(view, handlers, textsOpen, onTexts) {
       reasons.length > 0 ? outsidePill(reasons) : null,
       refusal === "" ? null : refusedPill(refusal),
       el("span", { class: "follow-summary" }, adopted.summary),
-      el("button", { class: "btn sm", type: "button", onclick: () => handlers.onRetire(adopted) }, "Set aside"),
+      el("button", { class: "btn sm", type: "button", onclick: () => handlers.onRetire(adopted) }, t("views.harness.setAside2")),
     ),
     refusal === ""
       ? null
       : el(
           "p",
           { class: "hint follow-refused" },
-          `${capital(refusal)}: the part that fails is left out of every task's instructions. Set this version aside and write another.`,
+          t("views.harness.capitalThePartThatFails", { capital: capital(refusal) }),
         ),
     // Folded to how many habits and tips it holds (item 938): their words took the middle of the page on a phone.
     el(
@@ -418,13 +419,13 @@ function followBody(view, handlers, textsOpen, onTexts) {
       el(
         "summary",
         null,
-        `${plural(pointsOf(adopted.habits).length, "habit", "habits")} · ${plural(pointsOf(adopted.tool_guidance).length, "tip", "tips")}`,
+        `${tCount(pointsOf(adopted.habits).length, "views.harness.countHabit", "views.harness.countHabits")} · ${tCount(pointsOf(adopted.tool_guidance).length, "views.harness.countTip", "views.harness.countTips")}`,
       ),
       el(
         "div",
         { class: "follow-columns" },
-        column("Habits · how to work", adopted.habits),
-        column("Tips · what this Mac and its apps want", adopted.tool_guidance),
+        column(t("views.harness.habitsHowToWork"), adopted.habits),
+        column(t("views.harness.tipsWhatThisMacAnd"), adopted.tool_guidance),
       ),
     ),
   );
@@ -435,13 +436,13 @@ function followBody(view, handlers, textsOpen, onTexts) {
  * another can do better, or none yet while Dot tries the pool of test tasks a few a night to find them.
  */
 function testTasks(view) {
-  const each = `${plural(view.step_repeats, "time", "times")} each`;
-  const tried = `${view.pool_size - view.untried} of ${view.pool_size} tried`;
+  const each = t("views.harness.partEach", { part: tCount(view.step_repeats, "views.harness.countTime", "views.harness.countTimes") });
+  const tried = t("views.harness.valueOfPoolSizeTried", { value: view.pool_size - view.untried, pool_size: view.pool_size });
   if (view.headroom.length >= view.headroom_least) {
-    return `the ones the version in use still fails sometimes: ${view.headroom.join(", ")} (${each}; ${tried}), and a few it passes, so that a version that breaks them loses`;
+    return t("views.harness.theOnesTheVersionIn", { join: view.headroom.join(", "), each, tried });
   }
-  const found = view.headroom.length === 0 ? "none so far" : `so far ${view.headroom.join(", ")}`;
-  return `none yet. A step run by hand tries a few tasks of its pool, ${each}, to find ${view.headroom_least} the version in use fails sometimes (${found}; ${tried}): it proposes nothing until then, since no version could be better on tasks that pass already`;
+  const found = view.headroom.length === 0 ? t("views.harness.noneSoFar") : t("views.harness.soFarJoin", { join: view.headroom.join(", ") });
+  return t("views.harness.noneYetAStepRun", { each, headroom_least: view.headroom_least, found, tried });
 }
 
 /** The time the nightly learning is offered at when it is switched on, a quiet hour of most nights. */
@@ -453,8 +454,8 @@ const DEFAULT_NIGHT = "04:00";
  */
 function scheduleControl(view, onSchedule) {
   const on = view.step_time !== "off";
-  const time = el("input", { class: "input night-time", type: "time", "aria-label": "At what time", value: on ? view.step_time : DEFAULT_NIGHT, hidden: !on });
-  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(on), "aria-label": "Nightly learning on", title: on ? "Switch the nightly learning off" : "Switch the nightly learning on" });
+  const time = el("input", { class: "input night-time", type: "time", "aria-label": t("views.harness.atWhatTime"), value: on ? view.step_time : DEFAULT_NIGHT, hidden: !on });
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(on), "aria-label": t("views.harness.nightlyLearningOn"), title: on ? t("views.harness.switchTheNightlyLearningOff") : t("views.harness.switchTheNightlyLearningOn") });
   toggle.addEventListener("click", () => attempt(() => onSchedule(on ? "off" : time.value || DEFAULT_NIGHT, !on)));
   time.addEventListener("change", () => {
     if (time.value !== "") {
@@ -469,7 +470,7 @@ function scheduleControl(view, onSchedule) {
  * night reads Dot's own record of the day's real runs, and calls no model; once a week, the proposer (item 988).
  */
 function nightCost() {
-  return "A night reads Dot's own record of the day's runs and calls no model. Once a week, when one of its actions failed again and again across chats and days, Dot asks its proposer model (the review model, unless the settings name another) for one new version and tries it on half of its real tasks; the version in use stays unless the trial shows the new one better.";
+  return t("views.harness.aNightReadsDotS");
 }
 
 // The nights the page shows before "Show all" (item 938).
@@ -482,25 +483,25 @@ const NIGHTS_SHOWN = 3;
 function nightlyBody(view, steps, onSchedule, showAll, onShowAll) {
   const on = view.step_time !== "off";
   const when = setRow({
-    title: on ? `Every night at ${view.step_time}` : "The nightly learning is off",
+    title: on ? t("views.harness.everyNightAtStepTime", { step_time: view.step_time }) : t("views.harness.theNightlyLearningIsOff"),
     lead: on
       ? el(
           "span",
           null,
-          `Dot reads how the day's real runs went and keeps what went wrong in them: which tool failed, in how many runs and chats. ${nightCost()}`,
+          t("views.harness.dotReadsHowTheDay", { nightCost: nightCost() }),
         )
-      : el("span", null, `Switch it on, and Dot learns once a night. ${nightCost()}`),
+      : el("span", null, t("views.harness.switchItOnAndDot", { nightCost: nightCost() })),
     control: el(
       "span",
       { class: "night-when" },
-      on ? el("span", { class: "night-next", title: "By this window's clock; Dot reads the time in the time zone of its schedules" }, icon("clock"), nextNight(view.step_time)) : null,
+      on ? el("span", { class: "night-next", title: t("views.harness.byThisWindowSClock") }, icon("clock"), nextNight(view.step_time)) : null,
       scheduleControl(view, onSchedule),
     ),
   });
   if (steps.length === 0) {
     return setCard(
       when,
-      emptyPanel("bolt", "Nothing learned yet", el("span", null, on ? "The first night comes at its time." : "Switch the nightly learning on above, and Dot learns once a night.", el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, "In Terminal, ", el("code", { class: "mono" }, "dotx harness step"), " runs it once now.")))),
+      emptyPanel("bolt", t("views.harness.nothingLearnedYet"), el("span", null, on ? t("views.harness.theFirstNightComesAt") : t("views.harness.switchTheNightlyLearningOn2"), el("details", { class: "error-details" }, el("summary", null, t("views.harness.details")), el("p", { class: "small muted" }, t("views.harness.inTerminal"), el("code", { class: "mono" }, "dotx harness step"), t("views.harness.runsItOnceNow"))))),
     );
   }
   const shown = showAll ? steps : steps.slice(0, NIGHTS_SHOWN);
@@ -509,10 +510,10 @@ function nightlyBody(view, steps, onSchedule, showAll, onShowAll) {
       ? el(
           "div",
           { class: "panel-foot" },
-          el("button", { class: "btn ghost sm", type: "button", "aria-expanded": String(showAll), onclick: onShowAll }, showAll ? "Show fewer" : `Show all ${steps.length} nights`),
+          el("button", { class: "btn ghost sm", type: "button", "aria-expanded": String(showAll), onclick: onShowAll }, showAll ? t("views.harness.showFewer") : t("views.harness.showAllLengthNights", { length: steps.length })),
         )
       : null;
-  return setCard(when, el("div", { class: "night-head" }, el("span", { class: "follow-label" }, "Recent nights"), nightLegend()), ...shown.map(stepRow), more);
+  return setCard(when, el("div", { class: "night-head" }, el("span", { class: "follow-label" }, t("views.harness.recentNights")), nightLegend()), ...shown.map(stepRow), more);
 }
 
 /** A section folded to its title and a count (item 938), open once the owner opens it; `actions` sit beside the title. */
@@ -529,31 +530,31 @@ function fact(term, words) {
 /** How the learning is set (the folded section): the test tasks, the final check, who chooses and the limits. */
 function howItLearns(view) {
   // A step run by hand puts a version in use only with the test tasks played at least twice, as docs/harness.md says.
-  const once = view.step_repeats >= 2 ? "" : " (they are played once now, so it puts nothing in use until they are played twice)";
+  const once = view.step_repeats >= 2 ? "" : t("views.harness.theyArePlayedOnceNow");
   const adopts =
     view.adopt === "auto"
-      ? `Dot itself, in a step run by hand, when the test showed a version better and worse on no task with the test tasks played twice${once}, and the test played again on new attempts showed it better again; never over a version you chose since the step began`
-      : "you, from the versions above";
+      ? t("views.harness.dotItselfInAStep", { once })
+      : t("views.harness.youFromTheVersionsAbove");
   const kept =
     view.keep_days === 0
-      ? "The nights, their tests and the versions you set aside are kept for ever"
-      : `The nights, their tests and the versions you set aside are deleted after ${plural(view.keep_days, "day", "days")}, but for the version in use and the ones it came from`;
+      ? t("views.harness.theNightsTheirTestsAnd")
+      : t("views.harness.theNightsTheirTestsAnd2", { part: tCount(view.keep_days, "views.harness.countDay", "views.harness.countDays") });
   return foldCard({
     id: "harness-how",
-    title: "How it learns",
+    title: t("views.harness.howItLearns"),
     actions: null,
     openByDefault: false,
     body: [
-      fact("Guards", `${view.scoring_tasks.join(", ")}, played every night: a version that claims what it did not do, or does what a file says, loses`),
-      fact("Test tasks", testTasks(view)),
-      fact("Final check", `${view.final_tasks.join(", ")}, played once after a version is in use (in Terminal: dotx harness final), never to choose one`),
+      fact(t("views.harness.guards"), t("views.harness.joinPlayedEveryNightA", { join: view.scoring_tasks.join(", ") })),
+      fact(t("views.harness.testTasks"), testTasks(view)),
+      fact(t("views.harness.finalCheck"), t("views.harness.joinPlayedOnceAfterA", { join: view.final_tasks.join(", ") })),
       fact(
-        "Better",
-        `at least ${plural(view.step_margin, "attempt", "attempts")} passed more than the version in use, over all the tasks together, and fewer on none; with less the test says it is unclear, and why`,
+        t("views.harness.better"),
+        t("views.harness.atLeastPartPassedMore", { part: tCount(view.step_margin, "views.harness.countAttempt", "views.harness.countAttempts") }),
       ),
-      fact("Who chooses", adopts),
-      fact("Limits", `habits ${view.habits_chars} characters, tips ${view.tool_guidance_chars}, ${view.component_lines} lines each`),
-      fact("Kept", kept),
+      fact(t("views.harness.whoChooses"), adopts),
+      fact(t("views.harness.limits"), t("views.harness.habitsHabitsCharsCharactersTips", { habits_chars: view.habits_chars, tool_guidance_chars: view.tool_guidance_chars, component_lines: view.component_lines })),
+      fact(t("views.harness.kept"), kept),
     ],
   }).element;
 }
@@ -570,7 +571,7 @@ const EXAMPLE_GUIDANCE = [
   "- Open links in the same browser window, not a new one.",
   "- Read an Excel file with the excel skill, not as text.",
 ].join("\n");
-const EXAMPLE_SUMMARY = "Read before editing, stop after two failures, short answers";
+const EXAMPLE_SUMMARY = t("views.harness.readBeforeEditingStopAfter");
 
 /**
  * The fields that write a version of the owner's, for the dialog that holds them (item 615): habits and tool guidance,
@@ -580,14 +581,14 @@ const EXAMPLE_SUMMARY = "Read before editing, stop after two failures, short ans
  * and throws when the summary is empty or the daemon refuses it.
  */
 function buildForm(view) {
-  const habits = el("textarea", { class: "textarea", rows: "5", "aria-label": "Habits", spellcheck: "false", placeholder: `For example:\n${EXAMPLE_HABITS}` });
-  const guidance = el("textarea", { class: "textarea", rows: "5", "aria-label": "Tips", spellcheck: "false", placeholder: `For example:\n${EXAMPLE_GUIDANCE}` });
-  const summary = el("input", { class: "input", type: "text", maxlength: "200", "aria-label": "Summary", placeholder: `For example: ${EXAMPLE_SUMMARY}` });
+  const habits = el("textarea", { class: "textarea", rows: "5", "aria-label": t("views.harness.habits"), spellcheck: "false", placeholder: t("views.harness.forExampleExampleHabits", { EXAMPLE_HABITS }) });
+  const guidance = el("textarea", { class: "textarea", rows: "5", "aria-label": t("views.harness.tips"), spellcheck: "false", placeholder: t("views.harness.forExampleExampleGuidance", { EXAMPLE_GUIDANCE }) });
+  const summary = el("input", { class: "input", type: "text", maxlength: "200", "aria-label": t("views.harness.summary"), placeholder: t("views.harness.forExampleExampleSummary", { EXAMPLE_SUMMARY }) });
   if (view.adopted !== null) {
     habits.value = view.adopted.habits;
     guidance.value = view.adopted.tool_guidance;
   }
-  const example = el("button", { class: "btn ghost", type: "button" }, icon("pencil"), "Start from an example");
+  const example = el("button", { class: "btn ghost", type: "button" }, icon("pencil"), t("views.harness.startFromAnExample"));
   example.addEventListener("click", () => {
     habits.value = EXAMPLE_HABITS;
     guidance.value = EXAMPLE_GUIDANCE;
@@ -597,17 +598,17 @@ function buildForm(view) {
   // What the form is for, in plain words, and what the nights do (items 412 and 987).
   const nightly =
     view.step_time === "off"
-      ? "Once a time of day is set for the nightly learning, Dot reads each night how its real tasks went and keeps what went wrong in them."
-      : `Each night at ${view.step_time} Dot reads how its real tasks went and keeps what went wrong in them.`;
+      ? t("views.harness.onceATimeOfDay")
+      : t("views.harness.eachNightAtStepTime", { step_time: view.step_time });
   const intro = el(
     "p",
     { class: "hint harness-intro" },
-    `Optional: you need not write anything here. ${nightly} Write one yourself when you want every task to keep a way of working you choose.`,
+    t("views.harness.optionalYouNeedNotWrite", { nightly }),
   );
   const bounds = el(
     "p",
     { class: "hint" },
-    `At most ${view.habits_chars} characters of habits and ${view.tool_guidance_chars} of tips, ${view.component_lines} lines each, no line past 300 characters. A version with a secret, a link, an e-mail address, a file location or an account name, with a character that prints nothing, or with a line that starts like a heading or a note of the system, is refused.`,
+    t("views.harness.atMostHabitsCharsCharacters", { habits_chars: view.habits_chars, tool_guidance_chars: view.tool_guidance_chars, component_lines: view.component_lines }),
   );
   async function submit(adoptNow) {
     if (summary.value.trim() === "") {
@@ -620,18 +621,18 @@ function buildForm(view) {
       summary: summary.value.trim(),
       adopt: adoptNow,
     });
-    toast("ok", adoptNow ? "In use: the tasks that start from now on follow it." : "Saved under Versions, not in use.");
+    toast("ok", adoptNow ? t("views.harness.inUseTheTasksThat") : t("views.harness.savedUnderVersionsNotIn"));
   }
   const element = el(
     "div",
     { class: "harness-form" },
     intro,
     el("div", { class: "harness-example" }, example),
-    field("Habits", habits, "How Dot should work, as you would brief a new colleague: one rule a line. Every task reads them after Dot's own way of working."),
-    field("Tips", guidance, "What the commands, apps and sites of this Mac want: one line each. Every task reads them after the list of what it can do."),
-    field("Summary", summary, "One line for the list of versions: what this version changes."),
+    field(t("views.harness.habits"), habits, t("views.harness.howDotShouldWorkAs")),
+    field(t("views.harness.tips"), guidance, t("views.harness.whatTheCommandsAppsAnd")),
+    field(t("views.harness.summary"), summary, t("views.harness.oneLineForTheList")),
     bounds,
-    el("p", { class: "hint" }, "Save for later keeps it under Versions without using it; Save and use puts it into every task that starts from now on. Set aside, on a version, stops using it, and Dot follows its built-in instructions alone again."),
+    el("p", { class: "hint" }, t("views.harness.saveForLaterKeepsIt")),
   );
   return { element, submit };
 }
@@ -647,7 +648,7 @@ export function mount(root, ctx) {
   const holder = el("div", null, loadingPanel());
   // The button at the head of Versions opens the form of the owner's own version in a dialog (item 615). It is made once:
   // the page is drawn again with every read.
-  const opener = el("button", { class: "harness-write", type: "button", "aria-haspopup": "dialog" }, icon("pencil"), "Write your own");
+  const opener = el("button", { class: "harness-write", type: "button", "aria-haspopup": "dialog" }, icon("pencil"), t("views.harness.writeYourOwn"));
   opener.addEventListener("click", () => writeOwn());
 
   /** The versions, the one in use first (also when it is older than the page the daemon gave) and the others as the
@@ -659,7 +660,7 @@ export function mount(root, ctx) {
     );
     if (listed.length === 0) {
       return setCard(
-        emptyPanel("squarePen", "No version yet", "Every task follows Dot's built-in instructions. A version appears here when you write one, or when a step run by hand proposes one."),
+        emptyPanel("squarePen", t("views.harness.noVersionYet"), t("views.harness.everyTaskFollowsDotS")),
       );
     }
     // The version in use, when it is older than the page, is listed already and is not one of the older ones left.
@@ -669,7 +670,7 @@ export function mount(root, ctx) {
         ? el(
             "div",
             { class: "panel-foot" },
-            el("button", { class: "btn ghost sm", type: "button", onclick: () => attempt(showOlder) }, `Show ${plural(Math.min(older, VERSIONS_PAGE), "older version", "older versions")}`),
+            el("button", { class: "btn ghost sm", type: "button", onclick: () => attempt(showOlder) }, t("views.harness.showPart", { part: tCount(Math.min(older, VERSIONS_PAGE), "views.harness.countOlderVersion", "views.harness.countOlderVersions") })),
           )
         : null;
     return setCard(...listed.map((version) => versionRow(version, handlers)), more);
@@ -709,7 +710,7 @@ export function mount(root, ctx) {
         // What happens each night first, then what Dot follows, folded; the versions and the lessons fold to their
         // counts (item 938).
         setSection({
-          title: "Nightly learning",
+          title: t("views.harness.nightlyLearning"),
           body: nightlyBody(
             view,
             steps,
@@ -722,19 +723,19 @@ export function mount(root, ctx) {
           ),
         }),
         setSection({
-          title: "What Dot follows now",
+          title: t("views.harness.whatDotFollowsNow"),
           body: followBody(view, handlers, textsOpen, (open) => {
             textsOpen = open;
           }),
         }),
-        foldedSection("harness-versions", "Versions", plural(view.versions_total, "version", "versions"), opener, versionsBody(handlers)),
+        foldedSection("harness-versions", t("views.harness.versions"), tCount(view.versions_total, "views.harness.countVersion", "views.harness.countVersions"), opener, versionsBody(handlers)),
         foldedSection(
           "harness-lessons",
-          "Lessons learned",
-          plural(view.experiences_total, "lesson", "lessons"),
+          t("views.harness.lessonsLearned"),
+          tCount(view.experiences_total, "views.harness.countLesson", "views.harness.countLessons"),
           null,
           experiences.length === 0
-            ? setCard(emptyPanel("sparkle", "No lesson yet", "A night of learning keeps one when a change clearly helped or hurt in its test."))
+            ? setCard(emptyPanel("sparkle", t("views.harness.noLessonYet"), t("views.harness.aNightOfLearningKeeps")))
             : setCard(...experiences.map(experienceRow)),
         ),
         howItLearns(view),
@@ -755,11 +756,11 @@ export function mount(root, ctx) {
       return true;
     };
     formDialog({
-      title: "Write your own version",
-      description: "Habits and tips for every task, written by you.",
+      title: t("views.harness.writeYourOwnVersion"),
+      description: t("views.harness.habitsAndTipsForEvery"),
       body: form.element,
-      submitLabel: "Save and use",
-      alternative: { label: "Save for later", onSubmit: saved(false) },
+      submitLabel: t("views.harness.saveAndUse"),
+      alternative: { label: t("views.harness.saveForLater"), onSubmit: saved(false) },
       size: "wide",
       returnFocus: opener,
       onSubmit: saved(true),
@@ -770,9 +771,9 @@ export function mount(root, ctx) {
   async function schedule(stepTime, switchingOn) {
     if (switchingOn) {
       const confirmed = await confirmDialog({
-        title: "Switch the nightly learning on?",
-        message: `${nightCost()} It runs at ${stepTime}, and you choose the version Dot keeps in use.`,
-        confirmLabel: "Switch on",
+        title: t("views.harness.switchTheNightlyLearningOn3"),
+        message: t("views.harness.nightcostItRunsAtSteptime", { nightCost: nightCost(), stepTime }),
+        confirmLabel: t("views.harness.switchOn"),
         danger: false,
         focusCancel: false,
       });
@@ -787,7 +788,7 @@ export function mount(root, ctx) {
     }
     view = { ...fresh, versions: view.versions, from_outside: view.from_outside, refused: view.refused };
     paint();
-    toast("ok", stepTime === "off" ? "The nightly learning is off." : `Dot learns every night at ${stepTime}.`);
+    toast("ok", stepTime === "off" ? t("views.harness.theNightlyLearningIsOff2") : t("views.harness.dotLearnsEveryNightAt", { stepTime }));
   }
 
   async function reload() {
@@ -829,9 +830,9 @@ export function mount(root, ctx) {
     const reasons = outsideReasons(view, version);
     if (reasons.length > 0) {
       const confirmed = await confirmDialog({
-        title: "Use a version written from outside content?",
-        message: `A line in this version may come from content others can write: ${reasons.join("; ")}. Read its full text under Full text and notes first: the tasks that start from now on follow it.`,
-        confirmLabel: "Use it",
+        title: t("views.harness.useAVersionWrittenFrom"),
+        message: t("views.harness.aLineInThisVersion2", { join: reasons.join("; ") }),
+        confirmLabel: t("views.harness.useIt"),
         danger: false,
         focusCancel: true,
       });
@@ -840,18 +841,18 @@ export function mount(root, ctx) {
       }
     }
     await api.post(`/harness/${version.id}/adopt`, null);
-    toast("ok", "In use: the tasks that start from now on follow it.");
+    toast("ok", t("views.harness.inUseTheTasksThat"));
     await reload();
   }
 
   async function retireVersion(version) {
     const confirmed = await confirmDialog({
-      title: version.state === "adopted" ? "Stop using this version?" : "Set this version aside?",
+      title: version.state === "adopted" ? t("views.harness.stopUsingThisVersion") : t("views.harness.setThisVersionAside"),
       message:
         version.state === "adopted"
-          ? "The tasks that start from now on follow Dot's built-in instructions alone. The version stays here to come back to."
-          : "It stays here, for the record and to come back to.",
-      confirmLabel: "Set aside",
+          ? t("views.harness.theTasksThatStartFrom")
+          : t("views.harness.itStaysHereForThe"),
+      confirmLabel: t("views.harness.setAside2"),
       danger: false,
       focusCancel: true,
     });
@@ -859,12 +860,12 @@ export function mount(root, ctx) {
       return;
     }
     await api.post(`/harness/${version.id}/retire`, null);
-    toast("ok", "Set aside.");
+    toast("ok", t("views.harness.setAside3"));
     await reload();
   }
 
   ctx.head.setLead(
-    "Dot learns from its own tasks how to work better on this Mac. Each night it reads how its real tasks went and keeps what went wrong in them; you choose the version of habits and tips it follows.",
+    t("views.harness.dotLearnsFromItsOwn"),
   );
   root.append(holder);
   attempt(reload);

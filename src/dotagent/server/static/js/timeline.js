@@ -1129,7 +1129,19 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       const needs = typeof record.data.needs === "string" ? record.data.needs.trim() : "";
       const isRoot = scope.runId === rootRunId;
       settleGroups(scope, record.ts);
+      // The words a stopped run had streamed and not finished stay as its answer, with a note that it was stopped
+      // (item 23 of the 2026-11-26 review): the bubble that held them goes for the answer, which says them again.
+      const stoppedWords = isRoot && status === "cancelled" && scope.live !== null ? scope.live.text.trim() : "";
       closeLive(scope);
+      if (stoppedWords !== "") {
+        scope.replies = scope.replies.filter((reply) => {
+          if (reply.text.trim() !== stoppedWords) {
+            return true;
+          }
+          reply.node.remove();
+          return false;
+        });
+      }
       // A reply that streamed the same words was read as they came: the bubble that held them goes for the answer.
       dropRepeatedReply(scope, result, record.data.restated ?? []);
       const answer = answerMessage({
@@ -1146,6 +1158,8 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         // The reactions on the page's own run (item 586); a delegated run's answer is read in the row that holds it.
         reactions: isRoot ? reactions : null,
         runId: scope.runId,
+        stoppedWords,
+        errored: typeof record.data.error === "object" && record.data.error !== null,
       });
       showSources(answer, scope.reads);
       place(scope, answer, record.ts);
@@ -1621,7 +1635,7 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       const data = record.data;
       // A program Dot ended itself after it failed has no exit of its own: what it said, else that Dot ended it.
       const noExit = data.said || t("timeline.programEndedByDot");
-      const how = data.signal ? `${data.signal} (${data.returncode})` : data.returncode === null ? noExit : `code ${data.returncode}`;
+      const how = data.signal ? `${data.signal} (${data.returncode})` : data.returncode === null ? noExit : t("timeline.codeReturncode", { returncode: data.returncode });
       const details = t("timeline.programCut", { how, steps: data.steps, silent: data.silent_s });
       const words = data.fresh_session ? "timeline.programContinuedFresh" : "timeline.programContinued";
       note(scope, record.ts, "bolt", t(words, { at: data.cut_at }), "warn", details);

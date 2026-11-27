@@ -9,6 +9,7 @@ import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { errorPanel, loadingPanel, setCard, setRow, setSection } from "../panels.js";
 import { attempt, toast } from "../ui.js";
+import { t } from "../i18n.js";
 
 /** The order of the engines that are on, as the view gives them. */
 function orderOf(view) {
@@ -39,15 +40,15 @@ export function mount(root, ctx) {
     const said = tried.get(engine.engine);
     const parts = [
       engine.ready
-        ? el("span", { class: "websearch-ready" }, icon("check"), " Ready")
-        : el("span", { class: "websearch-needs" }, icon("alert"), ` Needs ${engine.needs}`),
+        ? el("span", { class: "websearch-ready" }, icon("check"), t("views.websearch.ready"))
+        : el("span", { class: "websearch-needs" }, icon("alert"), t("views.websearch.needsNeeds", { needs: engine.needs })),
     ];
     if (said !== undefined) {
       parts.push(
         el(
           "span",
           { class: said.ok ? "websearch-tried" : "websearch-tried bad" },
-          said.ok ? ` · Tried: ${said.titles.length} results in ${said.seconds} s` : ` · Tried: ${said.error}`,
+          said.ok ? t("views.websearch.triedLengthResultsInSeconds", { length: said.titles.length, seconds: said.seconds }) : t("views.websearch.triedError", { error: said.error }),
         ),
       );
     }
@@ -60,7 +61,7 @@ export function mount(root, ctx) {
       return null;
     }
     if (engine.key_source !== null) {
-      const where = engine.key_saved ? "Saved in Dot" : engine.key_source === "environment" ? "From the environment" : "From the Keychain";
+      const where = engine.key_saved ? t("views.websearch.savedInDot") : engine.key_source === "environment" ? t("views.websearch.fromTheEnvironment") : t("views.websearch.fromTheKeychain");
       return el(
         "div",
         { class: "websearch-key" },
@@ -77,7 +78,7 @@ export function mount(root, ctx) {
                     paint();
                   }),
               },
-              "Remove",
+              t("views.websearch.remove"),
             )
           : null,
       );
@@ -88,7 +89,7 @@ export function mount(root, ctx) {
       autocomplete: "off",
       spellcheck: "false",
       placeholder: engine.key_name,
-      "aria-label": `${engine.label} key`,
+      "aria-label": t("views.keys.keyOfLabel", { label: engine.label }),
     });
     const save = el(
       "button",
@@ -103,11 +104,11 @@ export function mount(root, ctx) {
             }
             view = await api.post(`/web/search/keys/${engine.engine}`, { value });
             input.value = "";
-            toast(`${engine.label}'s key is saved.`);
+            toast(t("views.websearch.labelSKeyIsSaved", { label: engine.label }));
             paint();
           }),
       },
-      "Save",
+      t("views.websearch.save"),
     );
     return el("div", { class: "websearch-key" }, input, save);
   }
@@ -119,7 +120,7 @@ export function mount(root, ctx) {
       controls.push(
         el(
           "button",
-          { class: "icon-btn", type: "button", title: "Ask it earlier", "aria-label": `Move ${engine.label} up`, disabled: index === 0, onclick: () => attempt(() => setOrder(moved(order, index, -1))) },
+          { class: "icon-btn", type: "button", title: t("views.websearch.askItEarlier"), "aria-label": t("views.websearch.moveLabelUp", { label: engine.label }), disabled: index === 0, onclick: () => attempt(() => setOrder(moved(order, index, -1))) },
           icon("arrowUp"),
         ),
         el(
@@ -127,8 +128,8 @@ export function mount(root, ctx) {
           {
             class: "icon-btn",
             type: "button",
-            title: "Ask it later",
-            "aria-label": `Move ${engine.label} down`,
+            title: t("views.websearch.askItLater"),
+            "aria-label": t("views.websearch.moveLabelDown", { label: engine.label }),
             disabled: index === order.length - 1,
             onclick: () => attempt(() => setOrder(moved(order, index, 1))),
           },
@@ -143,14 +144,14 @@ export function mount(root, ctx) {
           {
             class: "btn sm",
             type: "button",
-            title: "Ask it one search now (a search API counts it)",
+            title: t("views.websearch.askItOneSearchNow"),
             onclick: () =>
               attempt(async () => {
                 tried.set(engine.engine, await api.post(`/web/search/try/${engine.engine}`, {}));
                 paint();
               }),
           },
-          "Try",
+          t("views.websearch.try"),
         ),
       );
     }
@@ -162,12 +163,12 @@ export function mount(root, ctx) {
               class: "btn sm",
               type: "button",
               disabled: order.length === 1,
-              title: order.length === 1 ? "A search needs one engine at least" : "Ask it no more",
+              title: order.length === 1 ? t("views.websearch.aSearchNeedsOneEngine") : t("views.websearch.askItNoMore"),
               onclick: () => attempt(() => setOrder(order.filter((name) => name !== engine.engine))),
             },
-            "Turn off",
+            t("views.websearch.turnOff"),
           )
-        : el("button", { class: "btn sm", type: "button", onclick: () => attempt(() => setOrder([...order, engine.engine])) }, "Add"),
+        : el("button", { class: "btn sm", type: "button", onclick: () => attempt(() => setOrder([...order, engine.engine])) }, t("views.websearch.add")),
     );
     const title = on ? `${index + 1}. ${engine.label}` : engine.label;
     const row = setRow({
@@ -190,15 +191,15 @@ export function mount(root, ctx) {
     holder.replaceChildren(
       el(
         "div",
-        { class: "set-sections websearch", role: "region", "aria-label": "Web search" },
+        { class: "set-sections websearch", role: "region", "aria-label": t("views.websearch.webSearch") },
         setSection({
-          title: "Asked in turn",
+          title: t("views.websearch.askedInTurn"),
           lead: view.saved
-            ? "Your order: the first that answers gives the results, and one that fails or is out of its allowance passes the search on."
-            : "Dot's order until you change one: the services whose keys are set first, then those with no key.",
+            ? t("views.websearch.yourOrderTheFirstThat")
+            : t("views.websearch.dotSOrderUntilYou"),
           body: setCard(...on.map((engine, index) => engineRow(engine, index, order))),
         }),
-        off.length === 0 ? null : setSection({ title: "Not asked", lead: "Add one to ask it after the others.", body: setCard(...off.map((engine) => engineRow(engine, -1, order))) }),
+        off.length === 0 ? null : setSection({ title: t("views.websearch.notAsked"), lead: t("views.websearch.addOneToAskIt"), body: setCard(...off.map((engine) => engineRow(engine, -1, order))) }),
       ),
     );
   }
@@ -215,7 +216,7 @@ export function mount(root, ctx) {
     paint();
   }
 
-  ctx.head.setLead("Where Dot searches the web: the services it asks, in your order, and their keys.");
+  ctx.head.setLead(t("views.websearch.whereDotSearchesTheWeb"));
   root.append(holder);
   attempt(load);
   return () => {

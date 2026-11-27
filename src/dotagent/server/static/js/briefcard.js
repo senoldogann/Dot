@@ -10,32 +10,33 @@ import { clip, el, joined } from "./dom.js";
 import { icon } from "./icons.js";
 import { field, inlineError, segmented } from "./panels.js";
 import { attempt, formDialog, toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 const DAYS = [
-  { id: "every", label: "Every day", hint: "The brief is written each morning" },
-  { id: "weekdays", label: "Weekdays", hint: "Monday to Friday" },
+  { id: "every", label: t("briefcard.everyDay"), hint: t("briefcard.theBriefIsWrittenEach") },
+  { id: "weekdays", label: t("briefcard.weekdays"), hint: t("briefcard.mondayToFriday") },
 ];
-const LINES_PLACEHOLDER = "One thing a line: the roof repair, anything from the visa office";
+const LINES_PLACEHOLDER = t("briefcard.oneThingALineThe");
 const LAST_STATUS_CHARS = 60;
 
 /** The card's line under its name (item 609): when the brief is written, or that it is off. A schedule set elsewhere at
  * times the card cannot show (`custom`) is said so, not given the card's time, which is not its own. */
 function briefSummary(view) {
   if (!view.enabled) {
-    return "Off";
+    return t("briefcard.off");
   }
   if (view.custom) {
-    return "On, at times this card cannot show: open its settings to see";
+    return t("briefcard.onAtTimesThisCard");
   }
-  return `${view.days === "weekdays" ? "Weekdays" : "Every day"} at ${view.time}`;
+  return `${view.days === "weekdays" ? t("briefcard.weekdays") : t("briefcard.everyDay")} at ${view.time}`;
 }
 
 /** The words that say what a saved brief does: "on, 08:00 every day". */
 function saidAbout(view) {
   if (!view.enabled) {
-    return "Morning brief switched off.";
+    return t("briefcard.morningBriefSwitchedOff");
   }
-  return `Morning brief on, ${view.time} ${view.days === "weekdays" ? "on weekdays" : "every day"}.`;
+  return t("briefcard.morningBriefOnAt", { time: view.time, days: view.days === "weekdays" ? t("briefcard.onWeekdays") : t("briefcard.everyDay2") });
 }
 
 /**
@@ -55,31 +56,31 @@ export function mountBrief(ctx, onSaved) {
   /** The dialog of the settings while it is open. */
   let dialog = null;
 
-  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Morning brief on", disabled: true });
-  const time = el("input", { class: "input", type: "time", "aria-label": "Time", required: true });
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": t("briefcard.morningBriefOn"), disabled: true });
+  const time = el("input", { class: "input", type: "time", "aria-label": t("briefcard.time"), required: true });
   const days = segmented(DAYS, "every", () => {
     dirty = true;
   });
-  days.element.setAttribute("aria-label", "Days");
-  const lines = el("textarea", { class: "textarea", rows: "3", placeholder: LINES_PLACEHOLDER, "aria-label": "Also tell me about", maxlength: "6200" });
+  days.element.setAttribute("aria-label", t("briefcard.days"));
+  const lines = el("textarea", { class: "textarea", rows: "3", placeholder: LINES_PLACEHOLDER, "aria-label": t("briefcard.alsoTellMeAbout"), maxlength: "6200" });
   const zone = el("span", { class: "hint" });
   const customNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span"));
-  const status = el("div", { class: "hint brief-status", role: "status" }, "Reading the brief…");
-  const summary = el("div", { class: "hint brief-summary" }, "Reading the brief…");
+  const status = el("div", { class: "hint brief-status", role: "status" }, t("briefcard.readingTheBrief"));
+  const summary = el("div", { class: "hint brief-summary" }, t("briefcard.readingTheBrief"));
   const settingsButton = el(
     "button",
     {
       class: "btn sm brief-opener",
       type: "button",
       "aria-haspopup": "dialog",
-      "aria-label": "Morning brief settings",
-      title: "The time, the days and your own lines",
+      "aria-label": t("briefcard.morningBriefSettings"),
+      title: t("briefcard.theTimeTheDaysAnd"),
       disabled: true,
     },
     icon("sliders"),
-    el("span", { class: "label" }, "Settings"),
+    el("span", { class: "label" }, t("briefcard.settings")),
   );
-  const now = el("button", { class: "btn", type: "button", disabled: true, title: "Write a brief now: it reads, as at its time" }, icon("play"), "Write one now");
+  const now = el("button", { class: "btn", type: "button", disabled: true, title: t("briefcard.writeABriefNowIt") }, icon("play"), t("briefcard.writeOneNow"));
   // The fields of the dialog, made once: they hold the saved brief while the dialog is shut and what is typed while it is
   // open.
   const settings = el(
@@ -88,10 +89,10 @@ export function mountBrief(ctx, onSaved) {
     el(
       "div",
       { class: "form-grid brief-form" },
-      el("div", { class: "field" }, el("span", { class: "field-label" }, "Time"), time, zone),
-      el("div", { class: "field" }, el("span", { class: "field-label" }, "Days"), days.element),
+      el("div", { class: "field" }, el("span", { class: "field-label" }, t("briefcard.time")), time, zone),
+      el("div", { class: "field" }, el("span", { class: "field-label" }, t("briefcard.days")), days.element),
       (() => {
-        const wide = field("Also tell me about…", lines, "Your own lines for the brief, one thing a line. Dot adds what it knows of itself, your calendar and your mail.");
+        const wide = field(t("briefcard.alsoTellMeAbout2"), lines, t("briefcard.yourOwnLinesForThe"));
         wide.classList.add("wide");
         return wide;
       })(),
@@ -106,7 +107,7 @@ export function mountBrief(ctx, onSaved) {
       "div",
       { class: "brief-head" },
       el("span", { class: "brief-mark", "aria-hidden": "true" }, icon("sun")),
-      el("div", { class: "grow" }, el("h2", { class: "panel-title" }, "Morning brief"), summary),
+      el("div", { class: "grow" }, el("h2", { class: "panel-title" }, t("briefcard.morningBrief")), summary),
       toggle,
       settingsButton,
     ),
@@ -128,19 +129,19 @@ export function mountBrief(ctx, onSaved) {
     const parts = [];
     if (view.custom) {
       customNote.hidden = false;
-      customNote.querySelector("span").textContent = `Its schedule runs at a time this card cannot show (${view.cron}). Saving here sets it to the time and days above.`;
+      customNote.querySelector("span").textContent = t("briefcard.itsScheduleRunsAtA", { cron: view.cron });
     } else {
       customNote.hidden = true;
     }
-    parts.push(view.enabled ? (view.next_local === null ? "Will not run again" : `Next ${view.next_local}`) : "Switched off");
+    parts.push(view.enabled ? (view.next_local === null ? t("briefcard.willNotRunAgain") : t("briefcard.nextNextLocal", { next_local: view.next_local })) : t("briefcard.switchedOff"));
     if (view.last_local !== null) {
-      parts.push(`Last ${view.last_local}${view.last_status === "" ? "" : `: ${clip(view.last_status, LAST_STATUS_CHARS)}`}`);
+      parts.push(view.last_status === "" ? t("briefcard.lastAt", { at: view.last_local }) : t("briefcard.lastAtWith", { at: view.last_local, status: clip(view.last_status, LAST_STATUS_CHARS) }));
     }
     if (view.last_run_id !== null) {
-      parts.push(el("a", { href: `#/runs/${view.last_run_id}` }, "Open the last brief"));
+      parts.push(el("a", { href: `#/runs/${view.last_run_id}` }, t("briefcard.openTheLastBrief")));
     }
     if (view.accounts === 0) {
-      parts.push(el("span", null, "No mail or calendar account is signed in: the brief covers what Dot knows of itself. ", el("a", { href: "#/settings/connectors" }, "Add one")));
+      parts.push(el("span", null, t("briefcard.noMailOrCalendarAccount"), el("a", { href: "#/settings/connectors" }, t("briefcard.addOne"))));
     }
     status.replaceChildren(...joined(parts));
   }
@@ -150,7 +151,7 @@ export function mountBrief(ctx, onSaved) {
     view = fresh;
     toggle.setAttribute("aria-checked", String(view.enabled));
     summary.textContent = briefSummary(view);
-    zone.textContent = `Read in ${view.zone}, the time zone of your schedules.`;
+    zone.textContent = t("briefcard.readInZoneTheTime", { zone: view.zone });
     if (force || !dirty) {
       time.value = view.time;
       days.set(view.days);
@@ -186,8 +187,8 @@ export function mountBrief(ctx, onSaved) {
   }
 
   async function retry() {
-    summary.replaceChildren("Reading the brief…");
-    status.replaceChildren("Reading the brief…");
+    summary.replaceChildren(t("briefcard.readingTheBrief"));
+    status.replaceChildren(t("briefcard.readingTheBrief"));
     await reload();
   }
 
@@ -233,7 +234,7 @@ export function mountBrief(ctx, onSaved) {
         return;
       }
       const run = await api.post(`/schedules/${view.schedule_id}/run`, null);
-      toast("ok", "Writing a brief now.");
+      toast("ok", t("briefcard.writingABriefNow"));
       ctx.navigate(`/runs/${run.id}`);
     } catch (error) {
       // The dialog is over the page, and a toast would stand under it: the reason is shown in the dialog.
@@ -253,10 +254,10 @@ export function mountBrief(ctx, onSaved) {
     }
     paint(view, true);
     const opened = formDialog({
-      title: "Morning brief",
-      description: "Dot writes it at the time you set and sends the first line to your phone. It only reads: it never acts.",
+      title: t("briefcard.morningBrief"),
+      description: t("briefcard.dotWritesItAtThe"),
       body: settings,
-      submitLabel: "Save",
+      submitLabel: t("briefcard.save"),
       leading: [now],
       returnFocus: settingsButton,
       onSubmit: () => put(view?.enabled === true),

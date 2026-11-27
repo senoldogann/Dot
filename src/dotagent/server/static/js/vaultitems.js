@@ -2,8 +2,9 @@
 // answers a search, and what an import did in the words the page shows. Pure; tried without a browser
 // (tests/js/vaultitems.test.js).
 
-import { foldSearch, plural } from "./dom.js";
+import { foldSearch, } from "./dom.js";
 import { BRAND_NAMES } from "./vaultcard.js";
+import { t, tCount } from "./i18n.js";
 
 // The details of a contact in the order a row says them.
 const ADDRESS_ORDER = ["name", "address", "address2", "city", "region", "postal_code", "country", "phone", "email"];
@@ -16,11 +17,11 @@ const DETAILS_IN_A_ROW = 3;
  */
 export function rowWords(item) {
   if (item.kind === "login") {
-    return { title: item.label, sub: item.username ?? "No username" };
+    return { title: item.label, sub: item.username ?? t("vaultitems.noUsername") };
   }
   if (item.kind === "card") {
     const card = `${BRAND_NAMES[item.brand ?? "other"] ?? BRAND_NAMES.other} •••• ${item.last4}`;
-    return item.nickname ? { title: item.nickname, sub: card } : { title: card, sub: "Card" };
+    return item.nickname ? { title: item.nickname, sub: card } : { title: card, sub: t("vaultitems.card") };
   }
   const details = ADDRESS_ORDER.map((name) => item.fields[name]).filter((value) => value !== undefined && value !== "");
   return { title: item.label, sub: details.slice(0, DETAILS_IN_A_ROW).join(" · ") };
@@ -48,25 +49,25 @@ export function itemMatches(item, words) {
  * @param {{ format: string, rows: number, imported: number, updated?: number, updated_logins?: string[], skipped: Array<{ reason: string, count: number }>, notes_left_out: number, stopped: string | null }} report
  */
 export function reportWords(report) {
-  const lines = [`Imported ${plural(report.imported, "login", "logins")} from ${report.format}'s file.`];
+  const lines = [t("vaultitems.importedPartFromFormatS", { part: tCount(report.imported, "vaultitems.countLogin", "vaultitems.countLogins"), format: report.format })];
   // Logins already saved whose password the file changed (item 791).
   const updated = report.updated ?? 0;
   if (updated > 0) {
     const named = (report.updated_logins ?? []).join(", ");
     lines.push(
-      `Updated the password of ${plural(updated, "login", "logins")} already in the vault${named ? `: ${named}` : ""}. The password each had before is kept in its notes, in case the file's was the older one.`,
+      t("vaultitems.updatedThePasswordOfPart", { part: tCount(updated, "vaultitems.countLogin", "vaultitems.countLogins"), value: named ? `: ${named}` : "" }),
     );
   }
   const skipped = report.skipped.reduce((sum, one) => sum + one.count, 0);
   if (skipped > 0) {
-    lines.push(`Left out ${skipped} of ${report.rows} rows: ${report.skipped.map((one) => `${one.reason} (${one.count})`).join(", ")}.`);
+    lines.push(t("vaultitems.leftOutSkippedOfRows", { skipped, rows: report.rows, join: report.skipped.map((one) => `${one.reason} (${one.count})`).join(", ") }));
   }
   if (report.notes_left_out > 0) {
-    lines.push(`${plural(report.notes_left_out, "login", "logins")} came without notes, which were too long to keep.`);
+    lines.push(t("vaultitems.partCameWithoutNotesWhich", { part: tCount(report.notes_left_out, "vaultitems.countLogin", "vaultitems.countLogins") }));
   }
   if (report.stopped !== null) {
-    lines.push(`The import stopped: ${report.stopped}. The ones before it are kept; import the file again to add the rest.`);
+    lines.push(t("vaultitems.theImportStoppedStoppedThe", { stopped: report.stopped }));
   }
-  lines.push("Delete the CSV file now: it holds your passwords in plain text. Empty the Trash too.");
+  lines.push(t("vaultitems.deleteTheCsvFileNow"));
   return lines;
 }

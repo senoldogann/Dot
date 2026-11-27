@@ -4,8 +4,8 @@
 
 import { api } from "./api.js";
 import { changeFormat, changeLayout, highlightLines, prettyJSON } from "./diffview.js";
-import { el, plural, requestFile } from "./dom.js";
-import { t } from "./i18n.js";
+import { el, requestFile } from "./dom.js";
+import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { panelSection, segmented } from "./panels.js";
 import { prose } from "./prose.js";
@@ -167,8 +167,8 @@ function previewButton(path, name) {
     {
       class: "btn ghost sm icon-only change-preview",
       type: "button",
-      title: `Show ${name} as it is now`,
-      "aria-label": `Show ${name} as it is now`,
+      title: t("changes.showNameAsItIs", { name }),
+      "aria-label": t("changes.showNameAsItIs", { name }),
       dataset: { path },
       onclick: (event) => {
         event.preventDefault();
@@ -235,7 +235,7 @@ function fileRow(file, open) {
 export function changesSection({ runId, onCount, onFiles, head = null }) {
   const body = el("div", { class: "changes" });
   // `head` stands over the files: the line of what the run changed and its Undo (item 841, runchanges.js).
-  const section = panelSection({ id: "run-changes", title: "Changes", actions: null, body: el("div", { class: "changes-holder" }, head, body) });
+  const section = panelSection({ id: "run-changes", title: t("changes.changes"), actions: null, body: el("div", { class: "changes-holder" }, head, body) });
   // What the section was last drawn from: the same changes read again are not drawn again.
   let drawn = null;
 
@@ -246,7 +246,7 @@ export function changesSection({ runId, onCount, onFiles, head = null }) {
       view = await api.get(`/runs/${runId}/changes`);
     } catch (error) {
       drawn = null;
-      body.replaceChildren(el("div", { class: "note bad" }, icon("alert"), el("span", null, `The changes could not be read: ${error.message}`)));
+      body.replaceChildren(el("div", { class: "note bad" }, icon("alert"), el("span", null, t("changes.theChangesCouldNotBe", { message: error.message }))));
       return;
     }
     const read = JSON.stringify(view);
@@ -255,11 +255,11 @@ export function changesSection({ runId, onCount, onFiles, head = null }) {
     }
     drawn = read;
     section.setSummary(
-      view.files.length === 0 ? null : el("span", { class: "changes-total" }, plural(view.files.length, "file", "files"), counts(view.added, view.removed)),
+      view.files.length === 0 ? null : el("span", { class: "changes-total" }, tCount(view.files.length, "changes.countFile", "changes.countFiles"), counts(view.added, view.removed)),
     );
     body.replaceChildren(
       ...(view.files.length === 0
-        ? [el("div", { class: "small muted" }, "No file was written in this chat yet: the files its tasks write or edit show here.")]
+        ? [el("div", { class: "small muted" }, t("changes.noFileWasWrittenIn"))]
         : view.files.map((file) => fileRow(file, opened.has(file.path)))),
     );
     onCount(view.files.length);

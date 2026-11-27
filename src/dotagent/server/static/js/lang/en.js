@@ -1,7 +1,10 @@
 // The interface's own words in English (i18n.js): one key per sentence or label, `{name}` where a value goes in. A
 // key stands for one thing on every screen it is used on. The Turkish catalogue (tr.js) has the same keys.
 
-export const EN = {
+import { EN_APP } from "./en-app.js";
+import { EN_VIEWS } from "./en-views.js";
+
+const CORE = {
   // The line of what a run does now (workstatus.js).
   "work.typing": "Typing",
   "work.thinking": "Thinking",
@@ -840,6 +843,7 @@ export const EN = {
   "outcome.failedAlert": "The task failed",
   "outcome.cancelled": "Stopped",
   "outcome.cancelledEmpty": "The task was stopped before it wrote an answer.",
+  "outcome.cutOffEmpty": "The task was cut off because Dot shut down or the command that drove it ended.",
   "outcome.waiting": "Waiting on you",
   "outcome.waitingEmpty": "The task stopped for something only you can give.",
   "outcome.needs": "What Dot needs from you",
@@ -1001,3 +1005,6 @@ export const EN = {
   "change.view": "View",
   "change.noDiff": "This file has no diff to show.",
 };
+
+/** Every English key: the core words here, those of the screens in views/ and those of the other modules. */
+export const EN = { ...CORE, ...EN_VIEWS, ...EN_APP };

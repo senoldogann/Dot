@@ -9,6 +9,7 @@ import { clip, el } from "./dom.js";
 import { icon } from "./icons.js";
 import { markOf, proposalEffects, proposalTitle, stepsSummary } from "./skilldiff.js";
 import { toast } from "./ui.js";
+import { t, listAnd } from "./i18n.js";
 
 const REASON_CHARS = 160;
 
@@ -18,7 +19,7 @@ function lineItem({ sign, text }) {
     "li",
     { class: `version-step ${sign === "+" ? "added" : sign === "-" ? "dropped" : "kept"}` },
     el("span", { class: "version-sign", "aria-hidden": "true" }, sign === " " ? "" : sign),
-    sign === " " ? null : el("span", { class: "visually-hidden" }, sign === "+" ? "Added: " : "Dropped: "),
+    sign === " " ? null : el("span", { class: "visually-hidden" }, sign === "+" ? t("skillproposals.added") : t("skillproposals.dropped")),
     text,
   );
 }
@@ -29,7 +30,7 @@ function fieldBlock(field) {
   return el(
     "div",
     { class: "proposal-field", dataset: { field: field.field, changed: String(field.changed) } },
-    el("div", { class: "proposal-field-label" }, field.label, settled ? el("span", { class: "hint" }, " (unchanged)") : null),
+    el("div", { class: "proposal-field-label" }, field.label, settled ? el("span", { class: "hint" }, t("skillproposals.unchanged")) : null),
     field.lines.length > 0 ? el("ul", { class: "version-steps" }, field.lines.map(lineItem)) : el("p", { class: "hint proposal-none" }, "none"),
   );
 }
@@ -57,8 +58,8 @@ function fieldsDiff(view) {
 export function proposalCard(view, { onAccepted, onDismissed }) {
   const { proposal } = view;
   const id = encodeURIComponent(proposal.id);
-  const yes = el("button", { class: "btn primary sm", type: "button" }, icon("check"), proposal.kind === "merge" ? "Merge" : "Change it");
-  const no = el("button", { class: "btn ghost sm", type: "button", title: proposal.kind === "merge" ? "Keep them apart: they are not proposed again until one of them changes." : "Leave the skill as it is." }, view.stale === null ? "No" : "Dismiss");
+  const yes = el("button", { class: "btn primary sm", type: "button" }, icon("check"), proposal.kind === "merge" ? t("skillproposals.merge") : t("skillproposals.changeIt"));
+  const no = el("button", { class: "btn ghost sm", type: "button", title: proposal.kind === "merge" ? t("skillproposals.keepThemApartTheyAre") : t("skillproposals.leaveTheSkillAsIt") }, view.stale === null ? t("skillproposals.no") : t("skillproposals.dismiss"));
   const buttons = [yes, no];
   for (const button of buttons) {
     button.addEventListener("click", async () => {
@@ -68,7 +69,7 @@ export function proposalCard(view, { onAccepted, onDismissed }) {
       try {
         if (button === yes) {
           const page = await api.post(`/skills/proposals/${id}/accept`, {});
-          toast("ok", proposal.kind === "merge" ? `Merged ${proposal.names.join(" and ")}.` : `Changed ${proposal.names[0]}.`);
+          toast("ok", proposal.kind === "merge" ? t("skillproposals.mergedNames", { names: listAnd(proposal.names) }) : t("skillproposals.changedValue", { value: proposal.names[0] }));
           onAccepted(page.items);
         } else {
           onDismissed(await api.del(`/skills/proposals/${id}`));
@@ -90,11 +91,11 @@ export function proposalCard(view, { onAccepted, onDismissed }) {
       "div",
       { class: "skill-main" },
       el("div", { class: "skill-head" }, el("div", { class: "skill-name" }, proposalTitle(proposal))),
-      el("div", { class: "skill-does" }, proposal.kind === "merge" ? `Why: ${clip(proposal.reason, REASON_CHARS)}` : `You asked: ${clip(proposal.words ?? proposal.reason, REASON_CHARS)}`),
+      el("div", { class: "skill-does" }, proposal.kind === "merge" ? t("skillproposals.whyClip", { clip: clip(proposal.reason, REASON_CHARS) }) : t("skillproposals.youAskedClip", { clip: clip(proposal.words ?? proposal.reason, REASON_CHARS) })),
       marked === null
         ? null
-        : el("div", { class: "row-meta" }, el("span", { class: "badge b-warn", title: "Tasks are offered the new steps with addresses, commands and file names withheld." }, icon("alert"), marked)),
-      view.stale === null ? fieldsDiff(view) : el("p", { class: "hint proposal-stale", role: "note" }, `It cannot be applied now: ${view.stale}.`),
+        : el("div", { class: "row-meta" }, el("span", { class: "badge b-warn", title: t("skillproposals.tasksAreOfferedTheNew") }, icon("alert"), marked)),
+      view.stale === null ? fieldsDiff(view) : el("p", { class: "hint proposal-stale", role: "note" }, t("skillproposals.itCannotBeAppliedNow", { stale: view.stale })),
       view.stale === null ? el("ul", { class: "proposal-effects" }, proposalEffects(proposal).map((line) => el("li", null, line))) : null,
       el("div", { class: "skill-actions" }, view.stale === null ? yes : null, no),
     ),

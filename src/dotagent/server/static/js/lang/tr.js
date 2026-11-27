@@ -1,8 +1,10 @@
 // The interface's own words in Turkish (i18n.js): the keys of the English catalogue (en.js), each written for a Turkish
 // reader rather than word for word. `tsc` refuses a key missing here or one en.js does not have.
 
-/** @type {Record<keyof typeof import("./en.js").EN, string>} */
-export const TR = {
+import { TR_APP } from "./tr-app.js";
+import { TR_VIEWS } from "./tr-views.js";
+
+const CORE = {
   "work.typing": "Yazıyor",
   "work.thinking": "Düşünüyor",
   "work.command": "Komut çalıştırıyor",
@@ -824,6 +826,7 @@ export const TR = {
   "outcome.failedAlert": "Görev başarısız oldu",
   "outcome.cancelled": "Durduruldu",
   "outcome.cancelledEmpty": "Görev bir yanıt yazmadan önce durduruldu.",
+  "outcome.cutOffEmpty": "Görev, Dot kapandığı ya da onu yürüten komut sona erdiği için yarıda kesildi.",
   "outcome.waiting": "Sizi bekliyor",
   "outcome.waitingEmpty": "Görev yalnızca sizin verebileceğiniz bir şey için durdu.",
   "outcome.needs": "Dot'un sizden istedikleri",
@@ -976,3 +979,6 @@ export const TR = {
   "change.view": "Görünüm",
   "change.noDiff": "Bu dosyanın gösterilecek bir farkı yok.",
 };
+
+/** @type {Record<keyof typeof import("./en.js").EN, string>} */
+export const TR = { ...CORE, ...TR_VIEWS, ...TR_APP };

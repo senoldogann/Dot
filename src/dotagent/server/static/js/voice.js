@@ -10,6 +10,8 @@
 
 // How long a dictation waits for its first word before it stops by itself, saying it heard nothing; and, once it heard
 // one, how long a pause may last before it ends by itself with what it heard (item 605): long enough to think.
+import { t } from "./i18n.js";
+
 export const SILENCE_MS = 6000;
 export const PAUSE_MS = 15000;
 // The most characters of an answer one utterance holds: some browsers stop a long one in the middle.
@@ -75,9 +77,9 @@ export function dictated(base, final, interim) {
 // The way to speak while the microphone cannot: macOS's own dictation types into any box, Dot's in its app too, and a
 // phone's keyboard has a microphone of its own.
 const DICTATION = {
-  app: "macOS Dictation types into the box meanwhile: the Dictation key, or Fn twice.",
-  mac: "macOS Dictation types into the box meanwhile: the Dictation key, or Fn twice.",
-  other: "The keyboard's own microphone types into the box meanwhile.",
+  app: t("voice.macosDictationTypesIntoThe"),
+  mac: t("voice.macosDictationTypesIntoThe"),
+  other: t("voice.theKeyboardSOwnMicrophone"),
 };
 
 /**
@@ -121,7 +123,7 @@ export function listeningWay({ recognition, recording, mac }) {
 // Safari there hears the first dictation after the page loads, and at times a later one opens the microphone and hears
 // nothing at all, whatever is said (WebKit bugs 317741 and 321436); a new page hears again.
 const DEAF_AGAIN =
-  "Safari heard nothing this time. On an iPhone or an iPad it at times hears only the first dictation after the page loads: reload the page and press the microphone again, or use the keyboard's microphone.";
+  t("voice.safariHeardNothingThisTime");
 
 /**
  * What the owner may do to have the Mac write down what is said, which hears every time, when it cannot yet: the one
@@ -130,7 +132,7 @@ const DEAF_AGAIN =
  * @param {{ transcribe: boolean, why: string | null } | null} mac
  */
 export function macOffer(mac) {
-  return mac?.why ? `A Mac that writes down what you say hears every time. ${mac.why}.` : "";
+  return mac?.why ? t("voice.aMacThatWritesDown", { why: mac.why }) : "";
 }
 
 /**
@@ -160,31 +162,31 @@ const CAPTURE_REFUSED = new Set(["NotAllowedError", "PermissionDeniedError", "Se
  */
 export function problemWords(code, place) {
   const app = place === "app";
-  const who = app ? "Dot" : "the browser";
+  const who = app ? "Dot" : t("voice.theBrowser");
   const onMac = place !== "other";
   if (RECOGNITION_REFUSED.has(code)) {
     if (app) {
-      return `macOS has not given Dot the microphone or its speech recognition. Allow Dot in System Settings › Privacy & Security › Microphone and Speech Recognition; a Dot that is not listed there is an older Dot.app, which cannot ask for them. ${DICTATION.app}`;
+      return t("voice.macosHasNotGivenDot2", { app: DICTATION.app });
     }
     return onMac
-      ? `The browser has not allowed the microphone, or its speech recognition, on this page. Allow it for this address in the browser, and the browser in System Settings › Privacy & Security › Microphone. ${DICTATION.mac}`
-      : `The browser has not allowed the microphone, or its speech recognition, on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. ${DICTATION.other}`;
+      ? t("voice.theBrowserHasNotAllowed", { mac: DICTATION.mac })
+      : t("voice.theBrowserHasNotAllowed2", { other: DICTATION.other });
   }
   switch (code) {
     case "no-speech":
       return onMac
-        ? `Nothing was heard. Check that ${who} may use the microphone in System Settings › Privacy & Security › Microphone, the input in System Settings › Sound, and the language in Settings › General › Voice.`
-        : "Nothing was heard. Check that the browser may use the microphone, in its settings and the device's, and the language in Settings › General › Voice.";
+        ? t("voice.nothingWasHeardCheckThat", { who })
+        : t("voice.nothingWasHeardCheckThat2");
     case "audio-capture":
-      return onMac ? "No microphone was found: check the input in System Settings › Sound." : "No microphone was found.";
+      return onMac ? t("voice.noMicrophoneWasFoundCheck") : t("voice.noMicrophoneWasFound");
     case "network":
-      return `The speech recognition ${app ? "macOS" : "the browser"} uses could not be reached: it needs the network.`;
+      return t(app ? "voice.recognitionUnreachableMac" : "voice.recognitionUnreachableBrowser");
     case "language-not-supported":
-      return `${app ? "macOS" : "The browser"} does not recognize that language: choose another in Settings › General › Voice.`;
+      return t(app ? "voice.languageNotSupportedMac" : "voice.languageNotSupportedBrowser");
     case "aborted":
       return null;
     default:
-      return `Speech recognition stopped: ${code}.`;
+      return t("voice.speechRecognitionStoppedCode", { code });
   }
 }
 
@@ -198,11 +200,11 @@ export function problemWords(code, place) {
 export function captureProblem(error, place) {
   if (CAPTURE_REFUSED.has(error?.name)) {
     if (place === "app") {
-      return `macOS has not given Dot the microphone. Allow Dot in System Settings › Privacy & Security › Microphone. ${DICTATION.app}`;
+      return t("voice.macosHasNotGivenDot", { app: DICTATION.app });
     }
     return place === "mac"
-      ? `The browser has not allowed the microphone on this page. Allow it for this address in the browser, and the browser in System Settings › Privacy & Security › Microphone. ${DICTATION.mac}`
-      : `The browser has not allowed the microphone on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. ${DICTATION.other}`;
+      ? t("voice.theBrowserHasNotAllowed3", { mac: DICTATION.mac })
+      : t("voice.theBrowserHasNotAllowed4", { other: DICTATION.other });
   }
   switch (error?.name) {
     case "NotFoundError":
@@ -210,11 +212,11 @@ export function captureProblem(error, place) {
       return problemWords("audio-capture", place);
     case "NotReadableError":
     case "AbortError":
-      return "The microphone could not be opened: another app may be using it.";
+      return t("voice.theMicrophoneCouldNotBe");
     case "InvalidStateError":
-      return "The browser would not start the sound for the microphone. Press the microphone again; if that does not help, reload the page.";
+      return t("voice.theBrowserWouldNotStart");
     default:
-      return `The microphone could not start: ${error?.message ?? "the browser gave no reason"}`;
+      return t("voice.theMicrophoneCouldNotStart2", { value: error?.message ?? t("voice.theBrowserGaveNoReason") });
   }
 }
 
@@ -253,7 +255,7 @@ export function captureOffer(error, place) {
 // What the toast says when the Dot.app that runs was built before Dot asked macOS for the microphone: macOS gives it none,
 // whatever System Settings shows, and only a newer one does (item 636).
 const OLD_APP =
-  "This Dot.app was built before Dot asked macOS for the microphone, so macOS gives it none, whatever System Settings shows. The next Dot.app asks for it, and Dot offers it as soon as it is out.";
+  t("voice.thisDotAppWasBuilt");
 
 /**
  * The toast for the answer to the ask that the Mac show System Settings at the pane where Dot is allowed (item 636,
@@ -269,8 +271,8 @@ export function allowToast(answer, pane) {
     return { kind: "error", words: `${OLD_APP} ${DICTATION.app}` };
   }
   if (answer?.opened === true) {
-    const [here, other] = pane === "speech" ? ["Speech Recognition", "Microphone"] : ["Microphone", "Speech Recognition"];
-    return { kind: "ok", words: `System Settings is open at ${here}: switch Dot on there, and under ${other} too. ${DICTATION.app}` };
+    const [here, other] = pane === "speech" ? [t("voice.speechRecognition"), t("voice.microphone")] : [t("voice.microphone"), t("voice.speechRecognition")];
+    return { kind: "ok", words: t("voice.systemSettingsIsOpenAt", { here, other, app: DICTATION.app }) };
   }
   return null;
 }
@@ -287,15 +289,15 @@ const MAC_SAYS = new Set(["unavailable", "unsupported-language", "busy", "too-lo
  */
 export function sendProblem(error) {
   if (error?.status === 0) {
-    return "The Mac could not be reached, so what you said was not written down. Check that Dot is running on it and that this device still reaches it, then try again.";
+    return t("voice.theMacCouldNotBe");
   }
   if (error?.context?.code === "unsupported-language") {
-    return "The Mac cannot write down this language. Choose another in Settings › General › Voice.";
+    return t("voice.theMacCannotWriteDown");
   }
   if (MAC_SAYS.has(error?.context?.code ?? "") && typeof error?.message === "string" && error.message !== "") {
     return error.message;
   }
-  return "The Mac could not write down what you said.";
+  return t("voice.theMacCouldNotWrite");
 }
 
 /**
@@ -448,7 +450,7 @@ export function createDictation({ language, text, show, settled, state, problem,
       engine.start();
     } catch (error) {
       recognition = null;
-      problem(`The microphone could not start: ${error.message}`);
+      problem(t("voice.theMicrophoneCouldNotStart", { message: error.message }));
       return;
     }
     // The button shows it on at once; the silence is counted from the engine's `start`.
@@ -716,8 +718,8 @@ export function readAloud(markdown, lang, onEnd, problem) {
         told = true;
         problem(
           event.error === "not-allowed"
-            ? "The browser keeps its voice quiet until you touch the page: press the speaker on the answer."
-            : `The browser could not read the answer aloud: ${event.error}.`,
+            ? t("voice.theBrowserKeepsItsVoice")
+            : t("voice.theBrowserCouldNotRead", { error: event.error }),
         );
       }
       handle.stop();

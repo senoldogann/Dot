@@ -8,6 +8,7 @@
 import { clip, duration, el, modelName, setText } from "./dom.js";
 import { levelLabel } from "./efforts.js";
 import { providerMark, providerOf } from "./providers.js";
+import { t } from "./i18n.js";
 
 const FINE_POINTER = window.matchMedia("(hover: hover) and (pointer: fine)");
 // The pointer rests this long on a row before its card shows, so that a pass over the rows shows none.
@@ -18,12 +19,12 @@ const EDGE_PX = 8;
 const GOAL_CHARS = 400;
 // A helper's state, in a word.
 const STATE_WORDS = {
-  queued: "Queued",
-  running: "Running",
-  blocked: "Waiting for you",
-  done: "Done",
-  failed: "Failed",
-  cancelled: "Stopped",
+  queued: t("helpercard.queued"),
+  running: t("helpercard.running"),
+  blocked: t("helpercard.waitingForYou"),
+  done: t("helpercard.done"),
+  failed: t("helpercard.failed"),
+  cancelled: t("helpercard.stopped"),
 };
 
 let cards = 0;
@@ -40,7 +41,7 @@ function modelLine(helper) {
     parts.push(levelLabel(helper.effort));
   }
   if (helper.speed === "fast") {
-    parts.push("Fast");
+    parts.push(t("helpercard.fast"));
   }
   return parts.join(" · ");
 }
@@ -49,12 +50,12 @@ function modelLine(helper) {
  * last call. `null` when there is nothing to say. The side panel's list of agents says it too (item 296). */
 export function actionLine(helper) {
   if (helper.ended !== null) {
-    return helper.action === null ? null : ["Last", helper.action];
+    return helper.action === null ? null : [t("helpercard.last"), helper.action];
   }
   if (helper.calls > 0 && helper.action !== null) {
-    return ["Now", helper.action];
+    return [t("helpercard.now"), helper.action];
   }
-  return helper.action === null ? ["Now", "Starting"] : ["Now", "Thinking"];
+  return helper.action === null ? [t("helpercard.now"), t("helpercard.starting")] : [t("helpercard.now"), t("helpercard.thinking")];
 }
 
 /**
