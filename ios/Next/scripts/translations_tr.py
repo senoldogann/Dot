@@ -1701,3 +1701,6 @@ TR.update(
         "Check the spelling or try a new search.": "Yazımı kontrol edin ya da yeni bir arama deneyin.",
     }
 )
+
+# A new chat's first send opens the one chat screen (item 2025).
+TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})

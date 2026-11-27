@@ -201,6 +201,13 @@ struct ChatScreen: View {
                 if edit == nil { model.keep(draft: draft, of: thread) }
                 if let topVisible = reading.topVisible { ChatScrollMemory.anchors[thread] = topVisible }
             }
+            // A new chat keeps this screen when the daemon names it (item 2025): the outbox key's opening is closed and the
+            // named thread opened, so its stream and its answer reach the screen; the words typed meanwhile go with it.
+            .onChange(of: thread) { old, new in
+                model.close(old)
+                model.open(new)
+                if edit == nil { model.keep(draft: draft, of: new) }
+            }
             .onChange(of: draft) { _, words in if edit == nil { model.keep(draft: words, of: thread) } }
             .onChange(of: dock) { _, entries in shownAsks = entries }
             .onChange(of: activeRun?.id) { _, run in if run == nil { stopping = false } }
@@ -500,7 +507,9 @@ struct ChatScreen: View {
                     text: edit == nil ? $draft : Binding(get: { edit?.text ?? "" }, set: { edit?.text = $0 }),
                     attachments: $attachments,
                     quote: $quoted,
-                    placeholder: activeRun == nil && startingSince == nil
+                    placeholder: model.startingChats[thread] != nil
+                        ? String(localized: "Starting the chat…", comment: "Placeholder of the composer while a new chat waits for the Mac to name it")
+                        : activeRun == nil && startingSince == nil
                         ? botChat.map { askPlaceholder($0.record.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer")
                         : followUp == .queue
                             ? String(localized: "Queue a message", comment: "Placeholder of the composer while a run works and follow-ups queue")
