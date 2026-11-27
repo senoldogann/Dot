@@ -500,6 +500,14 @@ async def seed_work(runtime: Runtime) -> None:
         ObjectiveWorkflow(next_step="Draft this Friday's note"),
         False,
     )
+    finished = await store.add_objective(
+        "Choose the note's topics well",
+        "Three topics keep the note short.",
+        "Three topics a week, one line each.",
+        ObjectiveWorkflow(next_step=""),
+        False,
+    )
+    await store.update_objective(finished.id, "done", None, None)
     chat: ThreadRecord = await store.create_thread("Weekly note", "ui")
     lead: RunRecord = await store.create_run(
         chat.id,
@@ -534,7 +542,7 @@ async def seed_work(runtime: Runtime) -> None:
         "Pick the note's topics",
         "Choose three topics.",
         "Three topics, one line each.",
-        None,
+        finished.id,
         None,
         lead.id,
         chat.id,
