@@ -1221,6 +1221,9 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "User input needed": "Senden bir cevap bekleniyor",
+        "%lld / %lld": "%lld / %lld",
+        "Submit answers": "Yanıtları gönder",
         "Default (%@)": "Varsayılan (%@)",
         "Favourite": "Favori",
         "Can't reach %@": "%@ cihazına ulaşılamıyor",
@@ -1623,7 +1626,6 @@ TR.update(
     {
         "%lld min": "%lld dk",
         "%lld s": "%lld sn",
-        "Looking at %@": "%@ inceleniyor",
         "Looking into it…": "Bakıyorum…",
     }
 )
@@ -1731,3 +1733,6 @@ TR.update(
         "Shows the whole message": "Mesajın tamamını gösterir",
     }
 )
+
+# A new chat's first send opens the one chat screen (item 2025).
+TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})

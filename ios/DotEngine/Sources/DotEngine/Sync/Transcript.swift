@@ -201,9 +201,6 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     /// The model's thinking of a step: `live` while it is being written.
     case thought(id: String, text: String, live: Bool)
     case tool(ToolEntry)
-    /// A call the run told as one of Dot's short messages, which its step's own words did not tell (a `narration` event,
-    /// item 1976): drawn in the conversation of "Show steps" off alone, in the words of the live line for that call.
-    case narration(id: String, step: HelperStep)
     /// The message a routine sent into the chat (a schedule's, a watcher's or a hook's run, owner 2026-11-27): one compact
     /// row, "Routine · <its title>", whose chevron shows the whole `prompt`; never an owner's bubble.
     case automation(id: String, title: String, prompt: String)
@@ -225,7 +222,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .owner(let id, _, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
-            .limit(let id, _), .narration(let id, _), .automation(let id, _, _), .firstWords(let id, _):
+            .limit(let id, _), .automation(let id, _, _), .firstWords(let id, _):
             id
         case .tool(let entry): entry.id
         case .decision(let anchor): anchor.id
@@ -283,9 +280,9 @@ private func builtRuns(of chat: ChatProjection, streaming: Bool, context: Transc
 }
 
 /// The transcript of "Show steps" off (items 1915 and 1976): the chat told as a conversation, as Grok Bot tells its work.
-/// The owner's words, Dot's words (those on the way to its calls too, which stay where they were said), the lines of the
-/// calls its words did not tell (`narration`), the asks, the helpers and how runs ended; a run at work's steps and
-/// thoughts are left out, a failed call too, its live line saying what it does. A finished run's steps, thoughts and
+/// The owner's words, Dot's words (those on the way to its calls too, which stay where they were said), the asks, the
+/// helpers and how runs ended; a run at work's steps and thoughts are left out, a failed call too, and a call is never
+/// a line of its own (owner 2026-11-27): the one live line says what the run does. A finished run's steps, thoughts and
 /// plan are one fold, "Worked for 2m", before its answer, drawn folded even with a failed step in it: a tap there shows
 /// them, so nothing is lost. Pure.
 public func conversation(of chat: ChatProjection, pending: [PendingMessage], streaming: Bool, context: TranscriptContext) -> [TranscriptItem] {
@@ -353,7 +350,6 @@ enum Category: Equatable {
     case thought
     case decision
     case runEnd
-    case narration
     case firstWords
 }
 
@@ -411,8 +407,6 @@ private func runItems(
     var calls: [String: Int] = [:]
     var asks: [String: Int] = [:]
     var planAt: Int?
-    // Whether the newest step wrote words, which tell its calls: no line of a call stands beside them (item 1976).
-    var said: Bool = false
     // The step each of Dot's words came from, by its row's id: the run's end names the steps its answer restates.
     var stepOf: [String: Int] = [:]
     let events: [EventRecord] = timeline?.events ?? []
@@ -427,11 +421,6 @@ private func runItems(
             } else {
                 items.append(row)
             }
-        case "narration":
-            guard !said, let tool: String = event.data["tool"]?.string else { continue }
-            let about: String = event.data["args"]?.object?.values.compactMap(\.string).first ?? ""
-            let step: HelperStep = HelperStep(tool: tool, target: about, line: "", at: event.ts)
-            items.append(Built(item: .narration(id: "n:\(event.id)", step: step), category: .narration, start: event.ts, end: event.ts))
         case "assistant":
             let thought: String = event.data["thinking"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !thought.isEmpty {
@@ -439,7 +428,6 @@ private func runItems(
                 items.append(Built(item: .thought(id: "th:\(run.id):\(step)", text: thought, live: false), category: .thought, start: event.ts, end: event.ts))
             }
             let text: String = event.data["text"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            said = !text.isEmpty
             guard !text.isEmpty else { continue }
             if let step: Int = event.data["step"]?.int { stepOf["a:\(event.id)"] = step }
             items.append(Built(item: .answer(id: "a:\(event.id)", text: text, writing: false, endedAt: nil), category: .answer(final: false), start: event.ts, end: event.ts))
@@ -634,8 +622,6 @@ private func firstLine(_ text: String) -> String {
 /// Whether a row of `category` shows in `mode` (the table on `ToolCallMode`).
 func shows(_ category: Category, mode: ToolCallMode) -> Bool {
     switch (mode, category) {
-    // A call's line is the conversation's alone (`conversation`), never beside the steps it tells.
-    case (_, .narration): false
     // Dot's first words are its words, in every mode.
     case (_, .firstWords): true
     case (.showAll, _): true

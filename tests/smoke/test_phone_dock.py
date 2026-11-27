@@ -110,7 +110,7 @@ async def test_a_phones_dock_is_one_capsule_of_segments_over_the_composer_and_ea
                 await expect(bar).to_be_visible()
                 # The segments the run has something to say of, named for a screen reader whatever the room.
                 await expect(_segment(page, "status")).to_contain_text(re.compile(r"\d"))
-                await expect(_segment(page, "status")).to_have_attribute("aria-label", re.compile(r"^Working · \d"))
+                await expect(_segment(page, "status")).to_have_attribute("aria-label", "Waiting on 2 helpers")
                 await expect(_segment(page, "stop")).to_have_attribute("aria-label", "Stop the task")
                 await expect(_segment(page, "helpers")).to_have_attribute(
                     "aria-label", "2 helpers. Waiting on 2 helpers"
@@ -394,7 +394,7 @@ async def test_the_helpers_sheet_says_what_the_task_waits_on_and_has_the_details
             # Details opens the Agents tab, and the sheet gives way to it.
             await sheet.get_by_role("button", name="Details").tap()
             await expect(_open_sheet(page)).to_have_count(0)
-            await expect(page.get_by_role("tab", name=re.compile("^Agents"))).to_have_attribute("aria-selected", "true")
+            await expect(page.get_by_role("tab", name=re.compile("^Bots"))).to_have_attribute("aria-selected", "true")
             await expect(_segment(page, "status")).to_have_attribute("aria-expanded", "true")
             await page.keyboard.press("Escape")
             await expect(_segment(page, "status")).to_have_attribute("aria-expanded", "false")
@@ -461,7 +461,7 @@ async def test_a_chat_at_rest_has_no_capsule_and_a_lost_stream_is_said_in_it(log
         browser = await playwright.webkit.launch(headless=True)
         try:
             page = await _page(browser, sc, 390, 844, "light")
-            await expect(_segment(page, "status")).to_contain_text("Working")
+            await expect(_segment(page, "status")).to_contain_text("Waiting on 2 helpers")
             # The daemon goes away: the page lost its stream and says so once, in the capsule.
             sc.stop_serving()
             await expect(_segment(page, "status")).to_have_text("Can't reach Dot", use_inner_text=True, timeout=30000)

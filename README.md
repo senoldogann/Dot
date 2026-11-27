@@ -183,7 +183,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Memory and schedules](docs/memory-and-schedules.md)
 - [Dot comes to you](docs/proactive.md): the morning brief and the watchers
 - [Hooks](docs/hooks.md): a signed call from a service starts a schedule or an agent
-- [Agents and campaigns](docs/agents-and-campaigns.md)
+- [Bots and campaigns](docs/agents-and-campaigns.md)
 - [Watching videos](docs/video.md): a video file or a link, seen in frames and heard in a transcript, for any model
 - [Making pictures](docs/image-generation.md): a logo, diagram or card drawn by Dot's browser, or a photo from Google's picture model
 - [Meetings](docs/meetings.md): your Google Meet calls: Dot answers in them and takes notes; a task's post asks you

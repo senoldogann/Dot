@@ -66,6 +66,36 @@ final class StreamingLiveUITests: XCTestCase {
         XCTAssertTrue(tile.waitForExistence(timeout: 10), "back in the chat")
     }
 
+    /// Item 2025, the owner's report of 2026-11-27: a new chat's first message opens the one chat screen, not a bare
+    /// screen of its own: the bot's header pill, the message, the composer and the stream's motion at once, and the
+    /// swap to the daemon's chat keeps that screen (nothing pushed over it).
+    func testANewChatsFirstSendIsTheNormalChatScreen() throws {
+        let app: XCUIApplication = try launch(scene: "home")
+        let dot: XCUIElement = app.buttons["home.bot.dot"]
+        XCTAssertTrue(dot.waitForExistence(timeout: 60))
+        dot.tap()
+        let more: XCUIElement = app.buttons["More"]
+        XCTAssertTrue(more.waitForExistence(timeout: 15))
+        more.tap()
+        let newChat: XCUIElement = app.buttons["New chat"].firstMatch
+        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
+        newChat.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["botNewChat"].waitForExistence(timeout: 10), "the new chat")
+        let bars: Int = app.navigationBars.count
+        type(app, "Say hello from a new chat")
+        let mine: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "You: Say hello")).firstMatch
+        XCTAssertTrue(mine.waitForExistence(timeout: 10), "the message in the chat")
+        XCTAssertTrue(app.buttons["botChat.pill"].exists, "the bot's header pill from the first send")
+        let field: XCUIElement = app.textFields["composer.field"].exists ? app.textFields["composer.field"] : app.textViews["composer.field"]
+        XCTAssertTrue(field.exists, "the composer stays")
+        shot(app, "new-chat-first-send")
+        let answer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Echo: Say hello")).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 30), "the run's answer in the same screen")
+        XCTAssertTrue(mine.exists && app.buttons["botChat.pill"].exists, "still the one chat screen")
+        XCTAssertEqual(app.navigationBars.count, bars, "no screen pushed over it")
+        shot(app, "new-chat-named")
+    }
+
     func testANewChatStaysOpenAndBecomesTheRealChat() throws {
         let app: XCUIApplication = try launch(scene: "chats")
         let pencil: XCUIElement = app.buttons["New chat"]

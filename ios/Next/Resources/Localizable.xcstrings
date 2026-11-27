@@ -265,6 +265,17 @@
         }
       }
     },
+    "%lld / %lld": {
+      "comment": "Ask dock: which ask is shown, \"1 / 3\"; the arguments are its place and the count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld"
+          }
+        }
+      }
+    },
     "%lld actions": {
       "comment": "Agents: a number of tools",
       "localizations": {
@@ -539,7 +550,7 @@
       }
     },
     "%lld min": {
-      "comment": "Work line: how long the run has worked, in whole minutes",
+      "comment": "A short span of time: minutes\nWork line: how long the run has worked, in whole minutes",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -590,7 +601,7 @@
       }
     },
     "%lld of %lld": {
-      "comment": "Ask dock: which ask is shown; the arguments are its place and the count\nFind in chat: which find is shown of how many",
+      "comment": "Find in chat: which find is shown of how many",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -860,7 +871,7 @@
       }
     },
     "%lld tries": {
-      "comment": "Own initiative: how many times Dot tried a thing",
+      "comment": "Own initiative: how many times Dot tried a thing\nWork order: how many attempts it has had",
       "localizations": {
         "en": {
           "variations": {
@@ -2799,7 +2810,7 @@
       }
     },
     "Close": {
-      "comment": "Sheet toolbar: closes an inspector sheet\nSheet toolbar: closes the sheet",
+      "comment": "Sheet toolbar: closes an inspector sheet\nSheet toolbar: closes the sheet\nVoiceOver: closes the full-screen video",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6863,7 +6874,7 @@
       }
     },
     "Let go": {
-      "comment": "Own initiative: a thing taken off the list",
+      "comment": "Objective: the owner and Dot let it go\nOwn initiative: a thing taken off the list",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7045,17 +7056,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekrana baktı"
-          }
-        }
-      }
-    },
-    "Looking at %@": {
-      "comment": "Chat message of Dot's: a page it looks at; the argument is its site",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ inceleniyor"
           }
         }
       }
@@ -7355,7 +7355,7 @@
       }
     },
     "Message": {
-      "comment": "Draft: an iMessage",
+      "comment": "Draft: an iMessage\nHand-off: what was asked",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8176,7 +8176,7 @@
       }
     },
     "None": {
-      "comment": "Find in chat: no block holds the words\nMaintenance › Performance: no hang, no crash",
+      "comment": "Bot profile: nothing in a group of its work\nFind in chat: no block holds the words\nMaintenance › Performance: no hang, no crash",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9001,7 +9001,7 @@
       }
     },
     "Open": {
-      "comment": "VoiceOver: an open provider group",
+      "comment": "VoiceOver: an open provider group\nWork orders: the section of those not over",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9750,7 +9750,7 @@
       }
     },
     "Progress": {
-      "comment": "Campaign note: progress",
+      "comment": "Campaign note: progress\nObjective: its dated lines of progress",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -12275,6 +12275,17 @@
         }
       }
     },
+    "Starting the chat…": {
+      "comment": "Placeholder of the composer while a new chat waits for the Mac to name it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet başlatılıyor…"
+          }
+        }
+      }
+    },
     "Starts a task": {
       "comment": "Watcher: it starts a task of the owner's goal for what came in",
       "localizations": {
@@ -12517,17 +12528,6 @@
         }
       }
     },
-    "Submit %lld answers": {
-      "comment": "Ask dock: sends the answers of several questions; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld yanıtı gönder"
-          }
-        }
-      }
-    },
     "Submit answer": {
       "comment": "Ask dock: sends the answer of the question",
       "localizations": {
@@ -12535,6 +12535,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtı gönder"
+          }
+        }
+      }
+    },
+    "Submit answers": {
+      "comment": "Ask dock: sends the answers of every question at once",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtları gönder"
           }
         }
       }
@@ -13927,7 +13938,7 @@
       }
     },
     "To": {
-      "comment": "Draft card: the recipients",
+      "comment": "Draft card: the recipients\nHand-off: who it was sent to",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14235,7 +14246,7 @@
       }
     },
     "Typing": {
-      "comment": "Live caption: the run types\nWork line: the run waits for its model to answer",
+      "comment": "Work line: the run waits for its model to answer",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14553,6 +14564,17 @@
         }
       }
     },
+    "User input needed": {
+      "comment": "Ask dock header: Dot waits for the owner's answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senden bir cevap bekleniyor"
+          }
+        }
+      }
+    },
     "Using the page from the phone is off on your Mac: Settings › Browser › Use the page from the screen while I hold the task.": {
       "comment": "Takeover refused: [browser] remote_input is off on the Mac",
       "localizations": {
@@ -14785,7 +14807,7 @@
       }
     },
     "Waiting for you": {
-      "comment": "Campaign section: questions that wait\nWork line: an approval or a question waits for the owner",
+      "comment": "Campaign section: questions that wait\nWork line: an approval or a question waits for the owner\nWork order: it waits for the owner's decision",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -15364,7 +15386,7 @@
       }
     },
     "Work orders": {
-      "comment": "Tool row of Dot's own tool: the agents' work orders",
+      "comment": "Bot profile: the work the lead handed to the bot\nTool row of Dot's own tool: the agents' work orders",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -15898,17 +15920,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtın telefon çevrimiçi olunca gider"
-          }
-        }
-      }
-    },
-    "Your answer is needed": {
-      "comment": "Ask dock header",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yanıtın gerekiyor"
           }
         }
       }
