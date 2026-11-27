@@ -453,6 +453,20 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
+    /// Item 1931: with no link, the pill says Offline in the status's place (after the second that keeps a blip from
+    /// flickering), and offers no Stop.
+    func testThePillSaysOfflineWithoutALink() {
+        let app: XCUIApplication = launch("n2-offline-saved")
+        let link: XCUIElement = app.buttons["capsule.link"]
+        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        XCTAssertEqual(link.label, "Offline")
+        XCTAssertFalse(app.buttons["capsule.stop"].exists, "nothing to stop over no link")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "pill-offline"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
         let app: XCUIApplication = launch("n2-asks")
         XCTAssertTrue(app.staticTexts["Your answer is needed"].waitForExistence(timeout: 10))

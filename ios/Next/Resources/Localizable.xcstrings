@@ -9669,6 +9669,17 @@
         }
       }
     },
+    "Reconnecting to %@…": {
+      "comment": "Chat pill: the link to the Mac broke and is being opened again; the argument is the Mac's name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ cihazına yeniden bağlanılıyor…"
+          }
+        }
+      }
+    },
     "Reconnecting…": {
       "comment": "Chat subtitle: the link to the Mac broke and is being opened again\nLive picture status: the stream broke and is tried again",
       "localizations": {
@@ -11851,6 +11862,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eşitlenen klasör"
+          }
+        }
+      }
+    },
+    "Syncing messages…": {
+      "comment": "Chat pill: the chat is being brought up to date",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajlar eşitleniyor…"
           }
         }
       }
@@ -15844,6 +15866,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "· sormadan"
+          }
+        }
+      }
+    },
+    "your Mac": {
+      "comment": "The Mac when its name is not known",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac"
           }
         }
       }

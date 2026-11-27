@@ -132,4 +132,17 @@ final class ChatWordsTests: XCTestCase {
         let options: [ProviderModels] = [ProviderModels(provider: "claude_code", models: [], error: nil)]
         XCTAssertEqual(engineLine(helper("a", "done", 0, 1), models: options), "Claude Code · opus · " + effortTitle("high"), "the model's id when the list does not hold it")
     }
+
+    /// Item 1931: the pill's link line comes from the transport alone: a healthy stream never says Reconnecting.
+    func testThePillsLinkLineIsTheTransportsRealState() {
+        XCTAssertEqual(linkLine(transport: .offline, freshness: .cached, mac: "MacBook Air"), .offline)
+        XCTAssertEqual(linkLine(transport: .reconnecting(attempt: 2), freshness: .cached, mac: "MacBook Air"), .reconnecting(mac: "MacBook Air"))
+        XCTAssertEqual(linkLine(transport: .up, freshness: .syncing, mac: "MacBook Air"), .syncing)
+        XCTAssertNil(linkLine(transport: .up, freshness: .live, mac: "MacBook Air"), "a live chat on a healthy stream says nothing")
+        XCTAssertNil(linkLine(transport: .keyRefused, freshness: .cached, mac: "MacBook Air"), "a refused key is the subtitle's")
+        XCTAssertEqual(linkLine(transport: .up, freshness: nil, mac: "MacBook Air"), .syncing, "a chat not loaded yet is brought up to date")
+        XCTAssertNil(linkLine(transport: .up, freshness: .deleted, mac: "MacBook Air"), "a deleted chat says so itself")
+        XCTAssertEqual(linkLine(transport: .connecting, freshness: .cached, mac: "MacBook Air"), .syncing, "the first connection brings it up to date")
+        XCTAssertTrue(LinkLine.reconnecting(mac: "MacBook Air").words.contains("MacBook Air"), "the paired Mac by its name, in the phone's language")
+    }
 }

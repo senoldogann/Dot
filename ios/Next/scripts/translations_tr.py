@@ -1196,6 +1196,10 @@ TR: dict[str, str] = {
     # D2: an owner's message not yet taken by the Mac (item 1927).
     "Pending": "Bekliyor",
 
+    # D2: the link in the chat's pill (item 1931).
+    "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
+    "Syncing messages…": "Mesajlar eşitleniyor…",
+    "your Mac": "Mac",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
