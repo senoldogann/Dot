@@ -112,7 +112,7 @@ async def test_the_line_says_how_the_link_stands_and_covers_nothing(login_env: d
                     tag: str = f"{width}x{height}-{scheme}"
                     context: BrowserContext = await phone(chromium, playwright, width, height, scheme)
                     page: Page = await open_chat(context, working.address, working.token, working.run.id)
-                    # The scene's run waits on its helpers: its capsule says so rather than Working (item 2023).
+                    # The run works, then stops for its helpers: Working, then Waiting on them (item 2023).
                     await expect(page.locator(".capsule")).to_contain_text(
                         re.compile(r"Working|Waiting on"), timeout=20_000
                     )

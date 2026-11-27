@@ -461,7 +461,7 @@ async def test_a_chat_at_rest_has_no_capsule_and_a_lost_stream_is_said_in_it(log
         browser = await playwright.webkit.launch(headless=True)
         try:
             page = await _page(browser, sc, 390, 844, "light")
-            # The scene's run waits on its helpers: its status says so rather than Working (item 2023).
+            # The run works, then stops for its helpers: Working, then Waiting on them (item 2023).
             await expect(_segment(page, "status")).to_contain_text(re.compile(r"Working|Waiting on"))
             # The daemon goes away: the page lost its stream and says so once, in the capsule.
             sc.stop_serving()
