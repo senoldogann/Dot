@@ -45,7 +45,7 @@ struct RunInspector: View {
                     ToggleRow(
                         systemImage: "list.bullet.indent", title: String(localized: "Show steps", comment: "Settings switch: a chat shows its runs' tool calls and thoughts (item 1915)"),
                         description: String(localized: "For this chat; Settings › Chat sets it for every chat.", comment: "This chat sheet: the Show steps switch is this chat's own (item 1915)"),
-                        isOn: Binding(get: { model.stepsOverrides[thread] ?? showStepsEverywhere }, set: { model.stepsOverrides[thread] = $0 }))
+                        isOn: Binding(get: { model.showsSteps(of: thread, everywhere: showStepsEverywhere) }, set: { model.stepsOverrides[thread] = $0 }))
                     .accessibilityIdentifier("inspector.showSteps")
                 }
                 if let run {

@@ -82,7 +82,7 @@ struct ChatScreen: View {
     /// The link line the pill shows, once a state lasted a second (item 1931: a blip does not flicker).
     @State private var shownLink: LinkLine?
     /// The helper whose chat a row of the stream opened (item 1909).
-    @State private var openedHelper: String?
+    @State private var openedHelper: HelperChatRef?
     /// The answer of a side question (`/btw`), shown in an alert.
     @State private var aside: SideAnswer?
     /// This chat's changed files, for the `#` picker.
@@ -111,8 +111,9 @@ struct ChatScreen: View {
     }
     /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
     private var chosenMode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .hideAll }
-    /// "Show steps" for this chat: its own where its This chat sheet set it, else Settings › Chat's (item 1915).
-    private var showsSteps: Bool { model.stepsOverrides[thread] ?? showStepsEverywhere }
+    /// "Show steps" for this chat: its own where its This chat sheet set it, else the chat that started it (a helper's),
+    /// else Settings › Chat's (item 1915).
+    private var showsSteps: Bool { model.showsSteps(of: thread, everywhere: showStepsEverywhere) }
     /// Whether the steps are hidden, so that the live line says the work (items 1769 and 1915).
     private var linesTheWork: Bool { !showsSteps || chosenMode == .hideAll || chosenMode == .zen }
     private var mode: DotEngine.ToolCallMode { stepsShown && linesTheWork ? .showAll : chosenMode }
@@ -163,9 +164,7 @@ struct ChatScreen: View {
             .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? "")
             .navigationSubtitle(botChat == nil ? subtitle : "")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(item: $openedHelper) { helperThread in
-                ChatScreen(thread: helperThread, initialPanel: nil, editsFirstQueued: false)
-            }
+            .modifier(HelperChats(thread: thread, helpers: helpers.map(\.threadId), opened: $openedHelper))
             .overlay(alignment: .topLeading) {
                 if RenderMeter.shown {
                     Text(verbatim: "\(drawings)").font(.system(size: 1)).opacity(0.01).accessibilityIdentifier("debug.renders")
@@ -410,15 +409,12 @@ struct ChatScreen: View {
             ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
-        case .narration(_, let step):
-            // One of Dot's short messages, drawn as its words are (item 1976).
-            AnswerBody(markdown: narrationWords(step), writing: false)
         case .helpers(_, _, let list):
             // The run's helpers as one row where it started them, a tap away from a card of each (item 1957); the
             // capsule's people segment keeps them a tap away too.
             HelperGroupRow(
                 lines: list.map { HelperEntry(helper: $0, engine: engineLine($0, models: model.models)) },
-                open: { openedHelper = $0 })
+                open: { openedHelper = HelperChatRef(thread: $0) })
         case .plan:
             // The plan is the chip beside the capsule (item 1880), never a card in the stream.
             EmptyView()
@@ -874,5 +870,21 @@ private struct ComposerLists: ViewModifier {
             } message: { answer in
                 Text(verbatim: answer.question + "\n\n" + answer.answer)
             }
+    }
+}
+
+/// A chat's helpers (owner 2026-11-27): one opened from the stream shows as the bottom sheet, as from the Agents sheet,
+/// and each is noted as this chat's, so that its chat shows its steps as this one does. A modifier of its own: the
+/// screen's chain of modifiers is at the edge of what the compiler checks in time.
+private struct HelperChats: ViewModifier {
+    let thread: String
+    let helpers: [String]
+    @Binding var opened: HelperChatRef?
+    @Environment(AppModel.self) private var model: AppModel
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $opened) { helper in HelperChatSheet(thread: helper.thread, close: { opened = nil }) }
+            .onChange(of: helpers, initial: true) { _, threads in model.noteHelpers(threads, of: thread) }
     }
 }

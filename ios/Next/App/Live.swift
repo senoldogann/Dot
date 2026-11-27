@@ -794,6 +794,35 @@ struct LiveAgentsSheet: View {
     }
 }
 
+/// A helper's chat to open as a sheet, by its thread.
+struct HelperChatRef: Identifiable, Hashable {
+    let thread: String
+    var id: String { thread }
+}
+
+/// A helper's chat as the bottom sheet (owner 2026-11-27): the same sheet the Agents sheet opens a helper in, from the
+/// helpers row of the stream too, with ✕ where the Agents sheet has its back.
+struct HelperChatSheet: View {
+    let thread: String
+    let close: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
+                            .accessibilityIdentifier("helperChat.close")
+                    }
+                }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Tone.sheet)
+        .tint(Tone.text)
+    }
+}
+
 /// Debug builds: measures send → first event on screen (the e2e record). `-DotNextProbe <thread>` makes the chat send
 /// a numbered message on each tap of the probe; the time from the send to the first transcript item of the run it
 /// started is appended to `Library/Caches/dotnext-latency.txt`.

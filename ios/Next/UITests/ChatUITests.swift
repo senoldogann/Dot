@@ -304,6 +304,34 @@ final class ChatUITests: XCTestCase {
         XCTAssertGreaterThan(heights[1], heights[0] * 1.3, "the title grows with the chosen text size: \(heights)")
     }
 
+    /// Owner 2026-11-27: a helper of the stream's helpers row opens its chat as the bottom sheet (as from the Agents
+    /// sheet), with ✕; the helper's chat shows its steps as the chat that started it does unless it chose itself.
+    func testAHelperOfTheStreamOpensAsASheetAndShowsItsStepsAsItsParent() {
+        for parentShows in [false, true] {
+            let overrides: String = "<dict><key>thr_fixture</key><\(parentShows)/></dict>"
+            let app: XCUIApplication = launch("n2-chat", defaults: ["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", overrides])
+            let group: XCUIElement = app.buttons["helpers.group"]
+            XCTAssertTrue(group.waitForExistence(timeout: 10))
+            group.tap()
+            let row: XCUIElement = app.buttons.matching(identifier: "helper.row").matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            row.tap()
+            let close: XCUIElement = app.buttons["helperChat.close"]
+            XCTAssertTrue(close.waitForExistence(timeout: 5), "the helper's chat is a sheet with ✕, not a pushed chat")
+            XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5))
+            let step: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "dentist.example")).firstMatch
+            XCTAssertEqual(step.waitForExistence(timeout: 2), parentShows, "the helper's steps follow its parent's Show steps (\(parentShows))")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "helper-sheet-steps-\(parentShows)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            close.tap()
+            let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: close)
+            XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed, "✕ closes the sheet")
+            app.terminate()
+        }
+    }
+
     /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// does; a tap shows the steps and a second folds them back.
     func testTheLiveLineSaysTheWorkAndATapShowsTheSteps() {

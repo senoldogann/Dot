@@ -28,7 +28,6 @@ const CORE = {
   "work.stopping": "Durduruluyor",
   "work.showSteps": "Adımları göster",
   "work.hideSteps": "Adımları gizle",
-  "work.lookingAt": "{what} inceleniyor",
   "work.forSeconds": "{count} sn",
   "work.forMinutes": "{count} dk",
   "capsule.label": "Görevin durumu",
