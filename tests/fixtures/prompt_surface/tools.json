@@ -1043,7 +1043,7 @@
           "type": "string"
         },
         "goal": {
-          "description": "A complete instruction for the delegated agent: what to do, every concrete input it needs (paths, URLs, values) and what its final answer must contain. Ask it to end with a `Verification:` section that gives the command or check it ran and the answer; it cannot see this conversation.",
+          "description": "A complete instruction for the delegated agent: what to do, every concrete input it needs (paths, URLs, values) and what its final answer must contain. For work in a browser: the direct address of the page to start on, when to stop, and what to report. Ask it to end with a `Verification:` section that gives the command or check it ran and the answer; it cannot see this conversation.",
           "minLength": 1,
           "type": "string"
         },

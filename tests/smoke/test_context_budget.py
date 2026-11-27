@@ -138,7 +138,13 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # newlines that ripgrep refused, each refusal a turn): 33,732 measured on the gate's runner.
 # Raised by 1,050 for `show_cards` (item 1967): the schema of the five card kinds the model fills in, in the `pages`
 # group, its bounds left to the tool (34,696 measured here).
-BUDGET_TOKENS: int = 34_850
+# Raised by 50 for the Browser section's line and `delegate`'s goal words of item 2008 (the owner's ask of 2026-11-27:
+# the browser as the last resort): start on the page's direct address, one tab, no snapshot after an act for what its
+# result showed, and a helper's browser brief names where to start, when to stop and what to report. A week of the
+# owner's runs held 52 new tabs, 56 tab switches, 33 pages opened again and 16 snapshots right after an act, each a model
+# turn of thousands of tokens. On main of 2026-11-27 13:00: 34,844 measured here (system 9,313, tools 25,361), the rest
+# room for the gate's runner's longer paths.
+BUDGET_TOKENS: int = 34_900
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -155,7 +161,8 @@ BUDGET_TOKENS: int = 34_850
 # Raised by 50 for the Desktop section's batch line of item 1960, put back by item 1974: the result of a batch is the
 # run's look, which took the tool eval's "no look after a change the result shows" from 3/10 to 13/20 on the owner's
 # model, each look saved being a model turn of thousands of tokens (system 9,234 measured here, on main of item 1931).
-SYSTEM_BUDGET_TOKENS: int = 9_250
+# Raised by 100 for the Browser section's line of item 2008 above (system 9,313 measured here).
+SYSTEM_BUDGET_TOKENS: int = 9_350
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).

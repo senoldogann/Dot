@@ -15,6 +15,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2011](2011.md) | done | 2026-11-27 | The web says "helper" ("yardımcı") where it said "subagent" ("alt ajan"), as the iPhone app does |
 | [2010](2010.md) | done | 2026-11-27 | A chat's row says when its run waits on its helpers, and what works for it while it rests, as DotNext's rows do |
 | [2009](2009.md) | in progress | 2026-11-27 | A bot's work lists the same on the phone and the web: handed-out time, judged by, finished objectives, hand-offs with their faces |
+| [2008](2008.md) | done | 2026-11-27 | The browser as the last resort: what a week of browser use was, and a run told to go straight to its page |
 | [2007](2007.md) | built | 2026-11-27 | A background driver for the desktop's steps, a trial: cua-driver sends them to the window, the Mac's pointer left alone |
 | [2005](2005.md) | done | 2026-11-27 | A step writes only the message it shortened, not the whole history |
 | [2004](2004.md) | done | 2026-11-27 | A run's start no longer reads every skill again, nor waits minutes for an embedding |

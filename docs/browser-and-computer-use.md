@@ -5,6 +5,12 @@
 Dot works in Chrome in one of two ways, set by `[browser] mode`: in a Chrome of its own (`own`, the default) or in new
 tabs of the Chrome you already have open (`attach`, see below).
 
+The browser is the channel after the shell, the APIs, the MCP tools and `web_fetch`: Dot's prompt names it for a page
+that needs JavaScript, a log-in or clicking. In it, a run starts on the page the work is on, by the direct address it
+was given or found (never a guessed one), works in one tab (a new tab only for a page kept beside another, a page
+already open not opened again), and takes a snapshot after `browser_act` only for what the act's result did not show. A
+helper given browser work is given the address to start on, when to stop and what to report (the `goal` of `delegate`).
+
 **`own`** starts a Chrome of Dot's own on the profile in use (Default, `<home>/browser-profile`, unless Settings ›
 Browser chose another; see Profiles below). It cannot drive your daily profile that way: since version 136 Chrome
 refuses remote debugging on its default data directory, and it locks a profile while it runs. There are two ways to open
