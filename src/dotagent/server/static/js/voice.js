@@ -59,7 +59,10 @@ export const NOTHING_HEARD = Object.freeze({ kept: [], settled: [] });
  * still change. A recognition keeps every result of its session in `results`, the ones it settled with `isFinal`, and a
  * settled one never changes. A list whose settled results are not those of the one before began again (a browser that
  * hands each utterance after a pause in a list of its own): the settled words of the old list stay, in `kept`, and the
- * new list's words come after them. A pause never takes a word away.
+ * new list's words come after them. A pause never takes a word away. What it cannot see: a list that began again while
+ * the old one had no settled result (its unsettled words go), and one whose first settled words are those of the old one
+ * (the same words said again after a pause are taken for the old ones). No browser measured does either: Chrome keeps
+ * one list for the session, and WebKit settles each utterance a pause ends.
  * @param {Heard} before
  * @param {{ readonly length: number, [index: number]: SpeechRecognitionResultLike }} results
  * @returns {{ heard: Heard, final: string, interim: string }}
