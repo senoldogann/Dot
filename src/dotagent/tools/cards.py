@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated, Literal, Self
 
 from PIL import Image
-from pydantic import Field, StringConstraints, model_validator
+from pydantic import Field, StringConstraints, WithJsonSchema, model_validator
 
 from dotagent.agent.held_secrets import all_held_values
 from dotagent.core.errors import ToolInputError
@@ -30,16 +30,26 @@ MAX_IMAGE_PIXELS: int = 8_000_000
 _MAX_MARKS: int = 60
 _MEDIA: dict[str, str] = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp", "GIF": "image/gif"}
 
-type Label = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
-type PostText = Annotated[str, StringConstraints(min_length=1, max_length=5000, pattern=r"\S")]
-type Cell = Annotated[str, StringConstraints(max_length=240)]
+# The model reads the schema with every request of every run that has the tool, so the bounds of a text and of a number
+# are checked here and left out of it (`WithJsonSchema`): the description of the tool says the sizes that matter.
+type Label = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120), WithJsonSchema({"type": "string"})
+]
+type PostText = Annotated[
+    str, StringConstraints(min_length=1, max_length=5000, pattern=r"\S"), WithJsonSchema({"type": "string"})
+]
+type Cell = Annotated[str, StringConstraints(max_length=240), WithJsonSchema({"type": "string"})]
 type Row = Annotated[tuple[Cell, ...], Field(min_length=1, max_length=8)]
-type Number = Annotated[float, Field(strict=True, ge=-1e12, le=1e12, allow_inf_nan=False)]
-type ChoiceText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)]
+type Number = Annotated[
+    float, Field(strict=True, ge=-1e12, le=1e12, allow_inf_nan=False), WithJsonSchema({"type": "number"})
+]
+type ChoiceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240), WithJsonSchema({"type": "string"})
+]
 
 
 class WorkspaceImage(FrozenModel):
-    path: Annotated[str, StringConstraints(min_length=1, max_length=500)] = Field(
+    path: Annotated[str, StringConstraints(min_length=1, max_length=500), WithJsonSchema({"type": "string"})] = Field(
         description="Raster file in the workspace."
     )
     alt: Label
@@ -236,6 +246,7 @@ def build_cards_tool() -> RegisteredTool:
             "Group draft alternatives in one call. Post drafts are previews only. "
             "Use draft_message for sendable email and iMessage drafts. "
             "Images must be raster files you made in the workspace. "
+            "Titles and labels take up to 120 characters, a post 5,000, a table cell 240. "
             "The web UI draws cards; the phone's app and the channels do not yet, so say what matters in your answer."
         ),
         args_model=ShowCardsArgs,
