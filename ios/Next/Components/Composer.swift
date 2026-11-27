@@ -592,19 +592,18 @@ struct DocumentScanner: UIViewControllerRepresentable {
     }
 }
 
-/// How the link to the Mac stands in the pill while the chat is not live (item 1931, after another coding agent's app).
+/// A lasting problem with the link to the Mac, said quietly in the capsule's status place (item 1931; the owner's report
+/// of 2026-11-27: a blip, a reconnection that mends or a chat being brought up to date shows nowhere, and the header
+/// always keeps the bot's face and name).
 enum LinkLine: Equatable, Sendable {
-    /// The link broke and is being opened again, to the paired Mac by its name.
-    case reconnecting(mac: String)
-    /// The link is up and the chat is being brought up to date.
-    case syncing
+    /// The link broke and has not come back, to the paired Mac by its name.
+    case unreachable(mac: String)
     /// The phone has no link.
     case offline
 
     var words: String {
         switch self {
-        case .reconnecting(let mac): String(localized: "Reconnecting to \(mac)…", comment: "Chat pill: the link to the Mac broke and is being opened again; the argument is the Mac's name")
-        case .syncing: String(localized: "Syncing messages…", comment: "Chat pill: the chat is being brought up to date")
+        case .unreachable(let mac): String(localized: "Can't reach \(mac)", comment: "Chat capsule: the link to the Mac broke a while ago and has not come back; the argument is the Mac's name")
         case .offline: String(localized: "Offline", comment: "Chat subtitle: the phone has no link")
         }
     }
@@ -615,7 +614,7 @@ struct WorkingSummary: Equatable, Sendable {
     /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
     /// transcript's live line says).
     let status: ChatStatus?
-    /// "Waiting on 2 helpers" in the status's place while the main run only waits for its helpers; `nil` while it takes
+    /// "Waiting for 2 helpers" in the status's place while the main run only waits for its helpers; `nil` while it takes
     /// a step of its own ("Working" and the turn's clock).
     let activity: String?
     /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not; `nil`
@@ -640,10 +639,10 @@ struct WorkingSummary: Equatable, Sendable {
 
 /// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
 /// The capsule is one pill for everything about the chat's work, thin dividers between its segments (item 1880, the
-/// owner's reference app): "Working 1m 50s" or "Waiting on 2 helpers" | Stop | Plan 1/5 | queued | helpers done/total.
+/// owner's reference app): "Working 1m 50s" or "Waiting for 2 helpers" | Stop | Plan 1/5 | queued | helpers done/total.
 /// Each segment is its own button, at least 44 pt each way. It stays one line at the default text size: in words where
-/// they fit, else Stop, the plan and the queue as their glyphs with the numbers and "Working" as its spinner before the
-/// clock (the smallest iPhone with every segment shown). At the accessibility sizes the segments stack, as glyphs.
+/// they fit, else Stop, the plan and the queue as their glyphs with the numbers and "Working" as its clock alone (the
+/// smallest iPhone with every segment shown). No segment spins: the ticking clock says the run works. At the accessibility sizes the segments stack, as glyphs.
 struct FloatingWorkingControl: View {
     let summary: WorkingSummary
     let showsScrollToBottom: Bool
@@ -663,7 +662,7 @@ struct FloatingWorkingControl: View {
                         capsule(glyphs: true)
                     } else {
                         // One line always: in words where they fit, else Stop, the plan and the queue as their glyphs and
-                        // the status as its spinner and clock (the smallest iPhone with every segment shown).
+                        // the status as its clock (the smallest iPhone with every segment shown).
                         ViewThatFits(in: .horizontal) {
                             capsule(glyphs: false)
                             capsule(glyphs: true)
@@ -687,21 +686,19 @@ struct FloatingWorkingControl: View {
 
     private var compact: Bool { dynamicTypeSize.isAccessibilitySize }
 
-    /// The pill; with `glyphs`, Stop, the plan and the queue are their glyphs with the numbers, "Working" is its spinner
-    /// before the clock, and the segments sit closer.
+    /// The pill; with `glyphs`, Stop, the plan and the queue are their glyphs with the numbers, "Working" is its clock
+    /// alone, and the segments sit closer.
     private func capsule(glyphs: Bool) -> some View {
         let inset: CGFloat = glyphs ? Space.xs : Space.s
         let layout: AnyLayout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
             if let link = summary.link {
-                // The link's state in the status's place while it is not live (item 1931): the spinner while it comes
-                // back, a quiet glyph while there is none.
+                // The link's state in the status's place while it is not live (item 1931): its words while it comes
+                // back, a quiet glyph before them while there is none.
                 segment(action: openStatus, label: link.words, inset: inset) {
                     HStack(spacing: Space.xxs + 1) {
                         if link == .offline {
                             Image(systemName: "wifi.slash").textRole(.label).foregroundStyle(Tone.tertiary)
-                        } else {
-                            ProgressView().controlSize(.mini).tint(Tone.secondary)
                         }
                         Text(link.words).textRole(.label).fontWeight(.medium).foregroundStyle(Tone.secondary).lineLimit(1)
                     }
@@ -715,11 +712,15 @@ struct FloatingWorkingControl: View {
                 TimelineView(.periodic(from: summary.since ?? .distantPast, by: 1)) { context in
                     let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
                     segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", "), inset: inset) {
+                        // No spinner (the owner's report of 2026-11-27): the words and the ticking clock say the run
+                        // works; a status that is not work (asks, failed) keeps its mark.
                         HStack(spacing: Space.xxs + 1) {
                             if let activity = summary.activity {
                                 ActivityWord(text: activity)
-                            } else if glyphs, clock != nil, status == .working {
-                                ProgressView().controlSize(.mini).tint(Tone.secondary)
+                            } else if status == .working || status == .starting {
+                                if !(glyphs && clock != nil) {
+                                    Text(status.word).textRole(.label).fontWeight(.medium).foregroundStyle(status.tone.color).lineLimit(1).fixedSize()
+                                }
                             } else {
                                 StatusWord(status: status)
                             }
@@ -808,17 +809,14 @@ struct FloatingWorkingControl: View {
     }
 }
 
-/// What a run does now, as the capsule's status word: the working spinner and one short line.
+/// What a run does now, as the capsule's status word ("Waiting for 2 helpers"): its own width and no more, so that Stop,
+/// the plan and the helpers keep their room, and no spinner (the owner's report of 2026-11-27).
 struct ActivityWord: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: Space.xxs + 1) {
-            ProgressView().controlSize(.mini).tint(Tone.secondary)
-            Text(text).textRole(.label).fontWeight(.medium).lineLimit(1).truncationMode(.tail).frame(maxWidth: 200, alignment: .leading)
-        }
-        .foregroundStyle(ChatStatus.working.tone.color)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(text)
+        Text(text).textRole(.label).fontWeight(.medium).lineLimit(1).fixedSize()
+            .foregroundStyle(ChatStatus.working.tone.color)
+            .accessibilityLabel(text)
     }
 }

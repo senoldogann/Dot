@@ -176,7 +176,7 @@ from dotagent.agent.refusal import (
     refusal_grounds,
 )
 from dotagent.agent.restating import restates
-from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT, Resumption, resumed_event_data
+from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT, Resumption, origin_source, resumed_event_data
 from dotagent.agent.review import (
     CheckpointJudge,
     CheckpointRequest,
@@ -237,7 +237,6 @@ from dotagent.core.errors import (
     DotError,
     InvalidValueError,
     MissingSecretError,
-    NotFoundError,
     ProviderCreditError,
     ProviderEmptyError,
     ProviderError,
@@ -1580,8 +1579,6 @@ def _improve_note(reason: str) -> str:
 
 # The start of a follow-up's goal the goal check reads (item 675), enough to tell what it picks up.
 _FOLLOW_UP_GOAL_CHARS: int = 300
-# How many runs back the goal check follows a resumed run to the firing it goes on from.
-_RESUMES_FOLLOWED: int = 20
 
 
 def scheduled_goal_end(reason: str, ended: RunOutcome) -> RunOutcome:
@@ -2066,18 +2063,7 @@ async def _ask_checker(
 async def _is_firing(runtime: Runtime, run: RunRecord) -> bool:
     """Whether the run is a schedule's firing, or goes on from one by Resume (item 553: the scheduler keeps such a run
     as the firing's), however many times it was resumed."""
-    for _ in range(_RESUMES_FOLLOWED):
-        if run.source != RESUME_SOURCE:
-            return run.source == SCHEDULE_SOURCE
-        resumed: EventRecord | None = await runtime.store.last_event(run.id, RESUMED_EVENT)
-        origin: object = None if resumed is None else resumed.data.get("from_run_id")
-        if not isinstance(origin, str):
-            return False
-        try:
-            run = await runtime.store.get_run(origin)
-        except NotFoundError:
-            return False
-    return False
+    return await origin_source(runtime, run) == SCHEDULE_SOURCE
 
 
 async def follow_ups_of(runtime: Runtime, run: RunRecord) -> str:
@@ -3272,6 +3258,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         shows_outside_lessons=True,
         # The loop reads the inbox between steps: an owner's message in it ends a wait of the step (item 1685).
         owner_words=agent.inbox,
+        # Whether nobody started the run, as the manager decided as it launched it (item 2016).
+        unattended=agent.gate.unattended,
     )
     checker: GoalChecker | None = (
         goal_checker_for_run(

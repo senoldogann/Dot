@@ -260,9 +260,15 @@
                     #"{"path":"/Users/owner/Desktop/ci-notes.md","name":"ci-notes.md","size":2150,"modified":\#(now - 600),"opens":true,"preview":{"kind":"text","text":"CI notes\n\nNode 22 is pinned on CI.\n","cut":false}}"#
                 )
             case ("POST", "/api/files/open"): return (204, "")
+            // What a chat's runs changed (item 2017): a new Python file, a file changed in two hunks, a new Markdown
+            // file, a new JSON file on one line and a picture, which has no diff.
+            case ("GET", let route) where route.hasPrefix("/api/runs/") && route.hasSuffix("/changes"): return (200, Self.runChanges)
             default: return CampaignFixture.answer(method: method, path: path) ?? (404, #"{"detail":"Not Found"}"#)
             }
         }
+
+        /// The changes the "This chat" sheet shows in its fixture (`GET /api/runs/{id}/changes`).
+        static let runChanges: String = #"{"files": [{"path": "/Users/owner/Library/Application Support/Dot/workspace/mem_prune_lib.py", "created": true, "gone": false, "added": 24, "removed": 0, "diff": "@@ -0,0 +1,24 @@\n+import json, os, re\n+\n+WS = os.path.expanduser(\"~/Library/Application Support/Dot/workspace\")\n+NOTES = json.load(open(os.path.join(WS, \"memory-dump-2026-11-27.json\")))\n+\n+\n+def parse_plan(path):\n+    \"\"\"The ids each part of the plan names.\"\"\"\n+    plan = {}\n+    current = None\n+    ids = re.compile(r\"\\b[0-9a-f]{6}\\b\")\n+    for line in open(os.path.join(WS, path)).read().splitlines():\n+        match = re.match(r\"^## ([A-D])\\.\", line)\n+        if match:\n+            current = match.group(1)\n+            plan.setdefault(current, [])\n+            continue\n+        if current is not None:\n+            plan[current].extend(ids.findall(line))  # every id on the line\n+    return plan\n+\n+\n+if __name__ == \"__main__\":\n+    print(len(parse_plan(\"memory-prune-2026-11-27-v2.md\")), 42)\n", "note": null, "changes": 1, "changed_at": 1}, {"path": "/Users/owner/Projects/site/app.py", "created": false, "gone": false, "added": 3, "removed": 2, "diff": "@@ -3,7 +3,8 @@ import sys\n \n \n def main() -> int:\n-    count = 1\n+    count = 2\n+    print(\"pruned\", count)\n     return count\n \n \n@@ -40,4 +41,4 @@ def report(notes):\n     for note in notes:\n-        print(note)\n+        print(note[\"id\"], note[\"title\"])\n     return len(notes)\n", "note": null, "changes": 2, "changed_at": 2}, {"path": "/Users/owner/Library/Application Support/Dot/workspace/memory-prune-2026-11-27.md", "created": true, "gone": false, "added": 12, "removed": 0, "diff": "@@ -0,0 +1,12 @@\n+# Memory prune\n+\n+Keep **12** notes, merge 4, delete the rest.\n+\n+## Delete\n+\n+- `a1b2c3` old CI note\n+- `d4e5f6` a duplicate of the deploy note\n+\n+```sh\n+dotx memory trash a1b2c3\n+```\n", "note": null, "changes": 1, "changed_at": 3}, {"path": "/Users/owner/Library/Application Support/Dot/workspace/memprune/doneq.json", "created": true, "gone": false, "added": 1, "removed": 0, "diff": "@@ -0,0 +1 @@\n+{\"done\":[\"a1b2c3\",\"d4e5f6\"],\"left\":12,\"merged\":{\"ci\":[\"0f1e2d\",\"3c4b5a\"]}}\n", "note": null, "changes": 1, "changed_at": 4}, {"path": "/Users/owner/Desktop/prune-chart.png", "created": true, "gone": false, "added": 0, "removed": 0, "diff": "", "note": "a binary file", "changes": 1, "changed_at": 5}], "added": 40, "removed": 2}"#
 
         /// A part of the daemon's real catalogue (`connections/directory.py`): its sections in its order, Featured full.
         private var connectPlugins: String {
@@ -334,7 +340,7 @@
 
         private var models: String {
             let option: (String, String) -> String = { ref, label in
-                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":["low","medium","high"],"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
+                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":\#(ref == "claude_code:opus" ? #"["low","medium","high","xhigh","max"]"# : #"["low","medium","high"]"#),"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
             }
             return "["
                 + #"{"provider":"claude_code","models":[\#(option("claude_code:sonnet", "Sonnet 5.5")),\#(option("claude_code:opus", "Opus 5.5"))],"error":null},"#

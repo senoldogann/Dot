@@ -207,7 +207,7 @@ struct TypingDots: View {
 }
 
 /// The waiting line's words, "Waiting · <on what>", while the run's step waits on something (a wait or a watch); `nil`
-/// for any other step (item 1909, after another coding agent's work log). A wait on helpers is the pill's "Waiting on 2
+/// for any other step (item 1909, after another coding agent's work log). A wait on helpers is the pill's "Waiting for 2
 /// helpers".
 func waitingWords(_ step: HelperStep) -> String? {
     guard ToolKind.of(step.tool) == .wait else { return nil }

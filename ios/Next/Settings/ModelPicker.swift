@@ -52,8 +52,8 @@ struct ModelPick: Identifiable {
 
 /// Settings' model picker (PLAN §24, owner-refs/ref-model-picker-1/2.png) on the app's one model catalog
 /// (`ModelCatalog`, as the chat's settings): the recent models, the providers as folding groups with their marks,
-/// Default, ✓ and ☆, the search with its filter, hidden models; under them the level of reasoning when the choice has
-/// one, the chosen model's own levels as one segmented control. ✕ drops the pick, ✓ writes it to the Mac.
+/// Default, ✓ and ★, the search with its filter, hidden models; under them the level of reasoning when the choice has
+/// one, the chosen model's own levels as a menu. ✕ drops the pick, ✓ writes it to the Mac.
 struct ModelPickerSheet: View {
     let pick: ModelPick
     let defaultRef: String
@@ -69,7 +69,7 @@ struct ModelPickerSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: Space.groupedGutter) {
+                LazyVStack(alignment: .leading, spacing: Space.xl) {
                     if let problem { FailureBanner(failure: problem, macPlace: String(localized: "Settings › Models", comment: "Where on the Mac: the Models page"), retry: nil) }
                     ModelCatalog(
                         providers: pick.candidates, defaultRef: defaultRef.isEmpty ? nil : defaultRef, chosenRef: chosen.isEmpty ? nil : chosen,
@@ -120,7 +120,7 @@ struct ModelPickerSheet: View {
 
     /// The choice of no model of its own, ✓ while it stands.
     private func noneRow(_ title: String) -> some View {
-        PlainSection(header: nil) {
+        InsetSection(header: nil) {
             Button { chosen = "" } label: {
                 HStack(spacing: Space.s) {
                     Text(title).textRole(.body).foregroundStyle(Tone.text)
@@ -138,19 +138,14 @@ struct ModelPickerSheet: View {
         }
     }
 
-    /// The level of reasoning: the chosen model's levels, one tap.
+    /// The level of reasoning: the chosen model's levels as a menu in full words (as the chat's settings).
     private var reasoning: some View {
-        PlainSection(header: String(localized: "Options", comment: "Model picker: the options under the models")) {
-            VStack(alignment: .leading, spacing: Space.xs) {
-                Text(String(localized: "Reasoning", comment: "Model picker: the level of reasoning")).textRole(.body).foregroundStyle(Tone.text)
-                Picker(String(localized: "Reasoning", comment: "Model picker: the level of reasoning"), selection: $effort) {
-                    ForEach(effortChoices(chosen, in: pick.candidates), id: \.self) { level in Text(effortTitle(level)).tag(level) }
-                }
-                .pickerStyle(.segmented)
+        InsetSection(header: String(localized: "Options", comment: "Model picker: the options under the models")) {
+            MenuPickerRow(
+                title: String(localized: "Reasoning", comment: "Model picker: the level of reasoning"),
+                choices: effortChoices(chosen, in: pick.candidates).map { MenuChoice(value: $0, title: effortTitle($0)) },
+                selection: $effort)
                 .accessibilityIdentifier("modelPicker.reasoning")
-            }
-            .padding(.horizontal, Space.groupedGutter)
-            .padding(.vertical, Space.s)
         }
     }
 

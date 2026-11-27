@@ -918,7 +918,7 @@ not asked, so that a skill never teaches a later run to do to Dot what a run did
 which the guard flagged for reaching a secret or the clipboard gives no skill for the same reason; a read, which only
 looks, does not. What none of these reads is not seen: a command that builds a path as it runs, in a way the guard does
 not flag, and an MCP server that takes a path relative to a folder of its own; the sandbox holds the commands outside
-`yolo`, and no sandbox of Dot's holds an MCP server (see [Safety](safety.md)). Your **Save from a chat** is not asked
+`yolo`, and in every mode those of a run nobody started (item 2016), and no sandbox of Dot's holds an MCP server (see [Safety](safety.md)). Your **Save from a chat** is not asked
 whether the steps recur, since you chose, but a chat-mode run and a run that changed Dot itself are refused there too,
 with why.
 

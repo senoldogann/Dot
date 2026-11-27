@@ -67,7 +67,7 @@ struct MemoryPage: View {
             if let hits {
                 LoadedPage(state: hits, macPlace: macPlace, retry: { Task { await search() } }) { found in
                     if found.isEmpty {
-                        ContentUnavailableView.search(text: query)
+                        SearchEmptyState(query: query)
                     } else {
                         GroupedSection(header: String(localized: "\(found.count) notes", comment: "Memory: the number of search hits"), footer: nil) {
                             ForEach(found, id: \.record.id) { hit in noteRow(hit.record) }

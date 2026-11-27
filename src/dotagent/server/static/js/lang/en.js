@@ -51,7 +51,7 @@ const CORE = {
   "capsule.stop": "Stop",
   // The one capsule over a phone's composer and the sheets its segments open (dockbar.js, docksheet.js).
   "dock.working": "Working · {took}",
-  "dock.reconnecting": "Reconnecting…",
+  "dock.reconnecting": "Can't reach Dot",
   "dock.stopLabel": "Stop the task",
   "dock.helperOne": "{count} helper",
   "dock.helperMany": "{count} helpers",
@@ -202,7 +202,7 @@ const CORE = {
   "run.openParent": "Open parent",
   "run.parentWorking": "Part of a task that is working",
   "run.onItsOwn": "Works on its own",
-  "run.connectionLost": "Connection lost. Reconnecting…",
+  "run.connectionLost": "Can't reach Dot",
   "run.plan": "Plan",
   "run.lessonsTitle": "Lessons from this task",
   "run.more": "More",
@@ -278,8 +278,8 @@ const CORE = {
   "line.offline": "Offline",
   "line.offlineCopy": "Offline: showing saved chats, last updated {age}",
   "line.offlineWaiting": "Offline: {count} waiting to send",
-  "line.reconnecting": "Reconnecting…",
-  "line.reconnectingWaiting": "Reconnecting… {count} waiting to send",
+  "line.reconnecting": "Can't reach Dot",
+  "line.reconnectingWaiting": "Can't reach Dot · {count} waiting to send",
   "line.ageNow": "just now",
   "line.ageMinutes": "{count} min ago",
   "line.ageHours": "{count} h ago",
@@ -377,6 +377,8 @@ const CORE = {
   "choices.speed": "Speed",
   "choices.standard": "Standard",
   "choices.fast": "Fast",
+  "choices.fastMode": "Fast mode",
+  "choices.planFirstNext": "The next message writes its plan and asks before it changes anything.",
   "choices.newDefault": "New chats start on {model}.",
   "choices.modelsFailed": "The model list could not be loaded: {problem}",
   // What a group of steps says it did (tools.js), each part a whole clause: "Ran 2 commands and read 1 file".
@@ -716,6 +718,7 @@ const CORE = {
   // The lines of a conversation's messages (messages.js).
   "messages.pending": "Pending",
   "messages.starting": "Starting…",
+  "messages.routine": "Routine",
   "messages.scheduleRepeating": "on a repeating schedule",
   "messages.scheduleLabel": "Schedule made: {name}, {when}. Opens it on the Schedules page.",
   "messages.scheduleLabelBare": "Schedule made: {name}. Opens it on the Schedules page.",
@@ -955,7 +958,7 @@ const CORE = {
   // The indicators over every page (shell.js).
   "shell.connecting": "Connecting",
   "shell.live": "Live",
-  "shell.reconnecting": "Reconnecting",
+  "shell.reconnecting": "Can't reach Dot",
   "shell.waitingHint": "Approvals that wait for you",
   "shell.waiting": "waiting",
   // The side panel's tabs and sections (views/run.js, recap.js).
@@ -997,6 +1000,13 @@ const CORE = {
   "speed.stageModel": "Model calls, by model and purpose",
   "speed.stageFirstToken": "First word of a step's reply",
   "speed.stageTool": "Tool calls, their running time",
+  // A change opened in the Changes tab (changes.js, item 2017).
+  "change.formatted": "Formatted",
+  "change.formattedHint": "Show the Markdown formatted",
+  "change.source": "Source",
+  "change.sourceHint": "Show the Markdown as it is written",
+  "change.view": "View",
+  "change.noDiff": "This file has no diff to show.",
 };
 
 /** Every English key: the core words here, those of the screens in views/ and those of the other modules. */

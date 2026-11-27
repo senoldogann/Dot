@@ -584,13 +584,12 @@ extension AppModel {
     }
 
     func actions(of run: String) async -> RunActions? {
-        guard let engine else { return nil }
-        return try? await engine.api.runActions(run: run)
+        await read { api throws(DaemonRequestError) in try await api.runActions(run: run) }.value
     }
 
+    /// What the chat's runs changed; read through the fixture daemon too, so the screen tests open real changes.
     func changes(of run: String) async -> RunChanges? {
-        guard let engine else { return nil }
-        return try? await engine.api.changes(run: run)
+        await read { api throws(DaemonRequestError) in try await api.changes(run: run) }.value
     }
 
     /// The owner's half-written words of a chat, kept across launches (per-chat drafts).

@@ -821,7 +821,7 @@ the commands at work in the chat, which stand right under it. **On a phone** (a 
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Reconnecting…**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
+**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
 for the secondary segments, then the Stop without its word, then the time without "Working", and at the narrowest a
@@ -1270,7 +1270,9 @@ surface (`--msg-me`, one step off the page: lighter in dark, a shade darker in l
 of room, two of yours in a row on a touch screen joined at a 4 px corner, and what Dot and its agents say, the
 answer and the lines along the way, as plain text beside the face, on no fill, on every width, a phone's too (item 854: a soft bubble until then; item
 1091 gave each a bubble of its own on a phone, and item 1335 took it away again, so that the desktop and the phone have
-one design language and only what you wrote is a box); the group of the steps of a turn is one quiet line, its words
+one design language and only what you wrote is a box); a message a routine sent (a schedule's, a watcher's or a hook's
+run, item 2021) is the one box you did not write: one compact row on the same surface, a pill closed, with the
+calendar-clock mark, "Routine", the routine's title cut at its end and a chevron that unfolds its whole message; the group of the steps of a turn is one quiet line, its words
 in the muted ink with the small icon and the time, a chevron at its end; the
 line under an answer that ended well and under your message shows where the pointer rests or the focus is (a reaction
 that stands, a failure and a stop stay in sight; a screen with no pointer to rest shows only the reactions that stand,
@@ -1455,9 +1457,10 @@ dotx service uninstall   # stop the daemon and remove the job
   home; the database is read through a read-only connection.
 - **A run restarts the daemon with `dotx service restart --when-idle`, never with a launchd job of its own** (item 441;
   the shell tool's description tells the model so). A run that merged a change of Dot's own code wants the daemon
-  restarted once it has ended, and restarting at once would cut the run itself off. A run reaches launchctl only in
-  `yolo` or with `[shell] sandbox` off: the sandbox of the other modes keeps a run's commands from launchctl (see
-  [Safety](safety.md#safety)), and the run then says in its answer that the daemon needs `dotx service restart`. The
+  restarted once it has ended, and restarting at once would cut the run itself off. A run you started reaches
+  launchctl only in `yolo` or with `[shell] sandbox` off; a run nobody started (a schedule's, a watcher's, a hook's, Dot's
+  own initiative's) reaches it in no mode while `[shell] sandbox_unattended` holds (item 2016). The sandbox keeps a
+  run's commands from launchctl (see [Safety](safety.md#safety)), and the run then says in its answer that the daemon needs `dotx service restart`. The
   option loads a one-shot launchd job, `dev.dotagent.restart-when-idle` (its property list is in Dot's home:
   `RunAtLoad`, no `KeepAlive`, `AbandonProcessGroup`), and returns at once. The job runs `python -P -m
   dotagent.restart_when_idle`, which reads the database read-only every 5 seconds until no run is queued, running or
@@ -1565,7 +1568,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PUT /models/standby` (`{"models": ["provider:model", …]}`)                    | the standby models in their order (item 478), kept in `config.toml` as `[models] standby`; `[]` for none (422 for one named twice, one that cannot call tools or one of Zen's free models) |
 | `GET /code-review`, `PUT /code-review` (`{"model", "fallback", "small_model", "small_max_lines", "max_minutes"}`, and `"effort"`, `"fallback_effort"`, kept when left out) | the models of the pre-push review of Dot's own code (item 1663), kept in `config.toml` as `[code_review]`, all written or none; a model newly named must run Dot's tools and use actions, and no fallback may be named twice or be the review model (422); a phone's key reads and changes it too (item 1770) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
-| `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
+| `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether the commands of a run you started outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start); a run nobody started keeps it whatever this says while `[shell] sandbox_unattended` holds (item 2016) |
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (`"review"` for `dotx run --review`, kept under Code reviews; a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170); `/events?tail=N` (1 to 2000) reads a run's newest N events instead of the ones after `after`, oldest first, and says it knew `tail` with the header `X-Dot-Events-Tail: N` (item 1370: a client that was away through a long run reads the end of it; one that finds no header is talking to a daemon that ignores `tail`) |

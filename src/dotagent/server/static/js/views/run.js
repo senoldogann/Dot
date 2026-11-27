@@ -48,7 +48,8 @@ import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.j
 import { splitQuote } from "../quotebutton.js";
 import { createQueue } from "../queue.js";
 import { recapSection } from "../recap.js";
-import { pendingMessage, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
+import { ROUTINE_SOURCES } from "../routinewords.js";
+import { pendingMessage, routineMessage, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
 import { LAST_CHAT_KEY, openingOf, readPref, removePref } from "../prefs.js";
@@ -66,7 +67,7 @@ import { createStageSize } from "../stagesize.js";
 import { RUN_BACK_EVENT } from "../shell.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, breakToldAt, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
-import { waitCounts } from "../waitcounts.js";
+import { waitCounts, waitsOnHelpers } from "../waitcounts.js";
 import { createWorkStatus } from "../workstatus.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { attemptWithFallback } from "../modelrefused.js";
@@ -1462,6 +1463,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       helpers: timeline.helperStatuses(),
       helpersNow: timeline.helperNow(),
       released: timeline.helperReleased(),
+      waits: waitsOnHelpers(timeline.rootOpenCalls()),
       queued: queue.count(),
     });
     // The plan's bubble goes with its part: once the run no longer works, it is not left open over nothing (item 644).
@@ -1489,6 +1491,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       reconnecting,
       plan: steps.length === 0 ? null : { done, total: steps.length },
       helpers: waitCounts(timeline.helperStatuses(), timeline.helperReleased()),
+      waits: waitsOnHelpers(timeline.rootOpenCalls()),
       loops: loopsNow,
       queue: queueNow,
       running: runningNow,
@@ -1891,7 +1894,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         ? backgroundNote(run.goal)
         : run.source === WORK_ORDER_SOURCE
           ? workOrderNote(run.goal)
-          : userMessage({ text: run.goal, sentAt: run.created_at, files: [], editFromHere: ownsMessages && run.rewindable ? () => editFromHere(run) : null });
+          : ROUTINE_SOURCES.has(run.source)
+            ? routineMessage({ goal: run.goal, threadId: run.thread_id })
+            : userMessage({ text: run.goal, sentAt: run.created_at, files: [], editFromHere: ownsMessages && run.rewindable ? () => editFromHere(run) : null });
   const actorName = agent !== null ? agent.name : dotName();
   // The width of the panel (item 109): chosen on Dot's computer or dragged on the handle beside the panel.
   const stage = createStageSize({ layout });

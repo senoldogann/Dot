@@ -843,6 +843,8 @@ class ShellConfig(FrozenModel):
     # At least the longest wait of a terminal read, so that no session is closed while it is read.
     terminal_idle_s: float = Field(ge=60)
     sandbox: bool
+    # The runs nobody started keep the sandbox in every mode, whatever ``sandbox`` says (item 2016).
+    sandbox_unattended: bool
 
     @model_validator(mode="after")
     def _default_within_max(self) -> Self:

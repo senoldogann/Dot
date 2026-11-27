@@ -17,8 +17,8 @@ import { waitCounts } from "./waitcounts.js";
  * whose popover (planbubble.js) opens on its click. Returns `element`, `plan`, `stopping()` (Stop was pressed: the line
  * says the run stops until it no longer works) and `paint({ status, since, now, plan, helpers, queued })`:
  * the run's status and when it began (seconds), the time now, how many of its plan's steps are done of how many
- * (`{ done, total }`, or null), the statuses of its helpers, the statuses of those it stopped waiting for (`released`)
- * and the messages queued.
+ * (`{ done, total }`, or null), the statuses of its helpers, the statuses of those it stopped waiting for (`released`),
+ * whether it has stopped and only waits for its helpers (`waits`) and the messages queued.
  * `status` is null for a run that no longer works.
  */
 export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
@@ -33,14 +33,13 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
   const queued = el("button", { class: "capsule-part capsule-queued", type: "button", onclick: onQueued }, icon("listOrdered"), queuedText);
   // A group, not a live region: its time changes every second, which a screen reader would read out each time.
   const element = el("div", { class: "capsule", role: "group", "aria-label": t("capsule.label"), hidden: true }, work, plan, helpers, queued);
-  // The line over the bar while the run waits for subagents (item 1331), as a developer tool says it: "Waiting on 2
-  // subagents" and what the first of them does now, Details (the Agents tab) and Stop.
+  // The line over the bar while the run waits for its helpers (item 1331): what the first of them does now, Details
+  // (the Agents tab) and Stop; the bar's own part says "Waiting for 2 helpers".
   const waitText = el("span", { class: "wait-line-text" });
   const waitNow = el("span", { class: "wait-line-now" });
   const wait = el(
     "div",
     { class: "wait-line", hidden: true, role: "group", "aria-label": t("capsule.waitLabel") },
-    el("span", { class: "wait-line-mark", "aria-hidden": "true" }, icon("circleDashed")),
     el("span", { class: "wait-line-main" }, waitText, waitNow),
     el("button", { class: "wait-line-button", type: "button", onclick: onHelpers }, t("capsule.details")),
     el("button", { class: "wait-line-button", type: "button", onclick: onStop }, t("capsule.stop")),
@@ -49,7 +48,7 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
   // Stop was pressed and the run has not ended yet.
   let halting = false;
 
-  function paint({ status, since, now, plan: steps = null, helpers: statuses, helpersNow = [], released = [], queued: waiting }) {
+  function paint({ status, since, now, plan: steps = null, helpers: statuses, helpersNow = [], released = [], waits, queued: waiting }) {
     const working = status !== null;
     if (!working) {
       halting = false;
@@ -59,26 +58,36 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
     setText(planText, total === 0 ? "" : t("capsule.plan", { done: steps.done, total }));
     plan.setAttribute("aria-label", total === 0 ? t("capsule.planLabel") : t("capsule.planDone", { done: steps.done, total }));
     const blocked = status === "blocked";
+    const { live, letGo, waitedFor } = waitCounts(statuses, released);
+    // "Waiting on N helpers" only while the run has stopped for them (`waits`, waitsOnHelpers in waitcounts.js); while it
+    // works beside them it says Working, and its helpers keep their own part (the owner's report of 2026-11-27).
+    const waitsNow = waits && waitedFor > 0 && status === "running";
     work.hidden = !working;
     work.dataset.state = blocked ? "waiting" : "working";
+    // No spinner: the words and the ticking time say the run works; only a wait for the owner wears a mark (a bell).
     if (working && markFor !== work.dataset.state) {
       markFor = work.dataset.state;
-      workMark.replaceChildren(icon(blocked ? "bell" : "circleDashed"));
+      workMark.replaceChildren(...(blocked ? [icon("bell")] : []));
     }
     const took = elapsed(now - since);
     setText(
       workText,
-      halting ? t("capsule.stopping") : blocked ? t("work.waitingForYou") : status === "queued" ? t("work.queued") : t("capsule.working", { took }),
+      halting
+        ? t("capsule.stopping")
+        : blocked
+          ? t("work.waitingForYou")
+          : status === "queued"
+            ? t("work.queued")
+            : waitsNow
+              ? tCount(waitedFor, "capsule.waitOne", "capsule.waitMany")
+              : t("capsule.working", { took }),
     );
-    const { live, letGo, waitedFor } = waitCounts(statuses, released);
-    // A helper the run stopped waiting for (the owner wrote to it, or it asked for no wait: item 1351) works in the
-    // background: the line says the run waits only while one of its live helpers is still waited for.
-    wait.hidden = !working || live === 0 || halting;
-    wait.setAttribute("aria-label", t(waitedFor > 0 ? "capsule.waitLabel" : "capsule.backgroundLabel"));
-    setText(
-      waitText,
-      live === 0 ? "" : waitedFor > 0 ? tCount(waitedFor, "capsule.waitOne", "capsule.waitMany") : tCount(letGo, "capsule.backgroundOne", "capsule.backgroundMany"),
-    );
+    // The line over the bar says what the first helper does now while the run waits on them, with Details and Stop; a
+    // helper the run stopped waiting for (the owner wrote to it, or it asked for no wait: item 1351) works in the
+    // background, which the line says while no helper is waited for.
+    wait.hidden = !working || halting || !(waitsNow || (letGo > 0 && waitedFor === 0));
+    wait.setAttribute("aria-label", t(waitsNow ? "capsule.waitLabel" : "capsule.backgroundLabel"));
+    setText(waitText, live === 0 || waitsNow ? "" : tCount(letGo, "capsule.backgroundOne", "capsule.backgroundMany"));
     const first = helpersNow[0];
     setText(waitNow, first === undefined ? "" : `${first.title}: ${first.words}`);
     helpers.hidden = !working || statuses.length === 0;

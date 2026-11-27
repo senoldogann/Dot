@@ -1,7 +1,8 @@
 // The messages of a conversation that more than one view draws: what the user wrote, and how a run ended with Dot's answer.
 
-import { dateTimeFull, duration, el, messageTime } from "./dom.js";
+import { dateTimeFull, duration, el, messageTime, setText } from "./dom.js";
 import { actorFace } from "./actors.js";
+import { api } from "./api.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { copyButton } from "./copybutton.js";
 import { isCutOffResult, isStoppedResult, runFailure } from "./errors.js";
@@ -11,6 +12,7 @@ import { icon } from "./icons.js";
 import { sentPicks } from "./picks.js";
 import { prose } from "./prose.js";
 import { quoteButton } from "./quotebutton.js";
+import { routineTitle, shortTitle } from "./routinewords.js";
 import { readAloudButton } from "./readaloud.js";
 import { loopRhythm, onceAt } from "./rhythm.js";
 
@@ -146,6 +148,43 @@ export function pendingMessage(text) {
       el("span", { class: "work-status-words" }, t("messages.starting")),
     ),
   );
+}
+
+// The automations of each chat, read once per page for the titles of its routines' messages.
+const chatSchedules = new Map();
+
+/** The message a routine sent into the chat `threadId` (owner 2026-11-27, after T3's "Automation" row): one compact row
+ * on your side, the calendar-clock mark, "Routine", the routine's title cut at its end and a chevron that unfolds the
+ * whole message. Never your bubble: you did not write it. The title is the words' first sentence until the chat's
+ * schedules are read, then the schedule's name. */
+export function routineMessage({ goal, threadId }) {
+  const title = el("span", { class: "routine-title" }, shortTitle(goal));
+  const node = el(
+    "details",
+    { class: "routine" },
+    el(
+      "summary",
+      { class: "routine-head" },
+      el("span", { class: "routine-mark", "aria-hidden": "true" }, icon("calendarClock")),
+      el("span", { class: "routine-label" }, t("messages.routine")),
+      title,
+      el("span", { class: "chev" }, icon("chevron")),
+    ),
+    el("div", { class: "routine-prompt" }, prose(goal)),
+  );
+  if (!chatSchedules.has(threadId)) {
+    chatSchedules.set(threadId, api.get(`/threads/${encodeURIComponent(threadId)}/automations`));
+  }
+  chatSchedules
+    .get(threadId)
+    .then((schedules) => setText(title, routineTitle(goal, schedules)))
+    .catch((error) => {
+      // The title stays the words' first sentence, the rule's own last choice; the failed read is logged, and the run
+      // page's Automations panel says it where there is one.
+      chatSchedules.delete(threadId);
+      console.error("the chat's schedules could not be read for a routine's title", { threadId, error });
+    });
+  return el("div", { class: "routine-message" }, node);
 }
 
 /** When a schedule a run made runs, in words: its rhythm from the cron ("on Mondays at 09:00"), a one-time one's time
