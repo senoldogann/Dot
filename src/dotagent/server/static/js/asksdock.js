@@ -81,10 +81,12 @@ export function createAsksDock() {
     previous.disabled = at === 0;
     next.disabled = at >= all.length - 1;
     const asking = questions();
-    title.textContent = current !== null && current.classList.contains("question") ? t("asks.questionTitle") : "";
+    const onQuestion = current !== null && current.classList.contains("question");
+    title.textContent = onQuestion ? t("asks.questionTitle") : "";
     title.hidden = folded || title.textContent === "";
     // One Submit for every question (item 2001), sent once each has an answer.
-    submit.hidden = folded || asking.length === 0;
+    // As the phone's dock: shown while the card in sight is a question.
+    submit.hidden = folded || !onQuestion;
     submit.textContent = asking.length > 1 ? t("asks.submitMany") : t("asks.submitOne");
     submit.disabled = asking.length === 0 || asking.some((question) => question.answer() === "");
     element.toggleAttribute("data-folded", folded);

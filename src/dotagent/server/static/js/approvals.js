@@ -379,7 +379,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     // "Don't ask again in this chat" (item 866): on a question of the policy open now, of a step that may be
     // remembered, in a chat that is not of Dot's own initiative.
     const remember = rememberable(approval, isQuestion || isHandoff || isLeft || isBudget) ? el("input", { type: "checkbox", class: "approval-remember-box" }) : null;
-    // An answer to a question is the options ticked and what was written; it is never empty.
+    // An answer to a question is the options picked and what was written; it is never empty.
     const answerNow = () => chosenAnswer(choices.filter((option) => picked.has(option.label)).map((option) => option.label), note.value);
     const submit = (approve) => {
       const answer = isQuestion && approve ? answerNow() : note.value.trim();

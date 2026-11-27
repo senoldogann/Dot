@@ -1326,9 +1326,11 @@ own initiative, a message, a post or a release waits for your own yes in every m
 but free mode (below).
 A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer (not in free mode, which asks no run's owner anything: item 1563); one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
-what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
-ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are cards, each with
+what it leads to, and the one Dot recommends is marked: a tap picks an option (one, or several when several may be
+chosen; a second tap lets it go), and what you pick is sent with what you write, as one answer. Several questions page
+in one panel ("1 / 3", on the phone and on the web alike), and its one "Submit answers" sends them all once each has an
+answer or was skipped (item 2001). In the terminal you type an option's number (several, separated by
 commas) or your own words. The run reads which option you chose, and whether it was the one it recommended. A line
 typed in the terminal before a prompt for a decision appears (the next message of a chat, typed while the run worked)
 is set aside and answers nothing, and the prompt says so; at a hand-off only Enter or a yes says that you did the step,
