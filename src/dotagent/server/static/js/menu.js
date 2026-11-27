@@ -6,6 +6,7 @@
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
+import { t } from "./i18n.js";
 
 // The menu keeps this far from the window's edges.
 const EDGE_PX = 8;
@@ -195,7 +196,7 @@ function openSheet({ label, items, back, button }) {
     });
     groups[groups.length - 1].push(choice);
   }
-  const cancel = el("button", { class: "sheet-action sheet-cancel", type: "button" }, el("span", null, "Cancel"));
+  const cancel = el("button", { class: "sheet-action sheet-cancel", type: "button" }, el("span", null, t("menu.cancel")));
   cancel.addEventListener("click", () => close(true));
   const sheet = el(
     "dialog",
@@ -315,7 +316,7 @@ export function openOnHold(row, menu) {
 export function moreButton({ name, items }) {
   const button = el(
     "button",
-    { class: "btn ghost sm icon-only row-more", type: "button", title: "More", "aria-label": `More for ${name}`, "aria-haspopup": "menu", "aria-expanded": "false" },
+    { class: "btn ghost sm icon-only row-more", type: "button", title: t("menu.more"), "aria-label": t("menu.moreForName", { name }), "aria-haspopup": "menu", "aria-expanded": "false" },
     icon("ellipsis"),
   );
   button.addEventListener("click", () => {

@@ -5,15 +5,16 @@
 // none); the objectives done or let go stand below the orders.
 
 import { api } from "./api.js";
-import { ago, clip, el, plural } from "./dom.js";
+import { ago, clip, el, } from "./dom.js";
 import { errorPanel, loadingPanel } from "./panels.js";
 import { attempt } from "./ui.js";
 import { attemptWords, dueWords, objectiveState, stateOf } from "./workwords.js";
+import { t, tCount } from "./i18n.js";
 
 const TITLE_CHARS = 140;
 const NOTE_CHARS = 200;
 // Words said of what a run wrote after it read a page or a mail: not the owner's words, whatever they look like.
-const OUTSIDE = "Written after Dot read content from outside";
+const OUTSIDE = t("workorders.writtenAfterDotReadContent");
 
 /**
  * @typedef {import("./workwords.js").WorkOrder} WorkOrder
@@ -41,11 +42,11 @@ function objectiveRow(objective) {
         el("span", { class: "row-title" }, clip(objective.title, TITLE_CHARS)),
       ),
       el("div", { class: "row-text muted" }, clip(objective.why, NOTE_CHARS)),
-      el("div", { class: "row-text muted" }, `Judged by: ${clip(objective.measure, NOTE_CHARS)}`),
+      el("div", { class: "row-text muted" }, t("workorders.judgedByClip", { clip: clip(objective.measure, NOTE_CHARS) })),
       newest === undefined
         ? null
         : el("div", { class: "row-text" }, `${new Date(newest.at * 1000).toLocaleDateString()}: ${clip(newest.text, NOTE_CHARS)}`),
-      next === "" ? null : el("div", { class: "row-text" }, `Next: ${clip(next, NOTE_CHARS)}`),
+      next === "" ? null : el("div", { class: "row-text" }, t("workorders.next", { step: clip(next, NOTE_CHARS) })),
       objective.tainted || objective.workflow.next_step_tainted || objective.notes.some((note) => note.tainted)
         ? el("div", { class: "row-meta" }, el("span", null, OUTSIDE)) : null,
     ),
@@ -68,12 +69,12 @@ function orderRow(view) {
       el(
         "div",
         { class: "row-meta" },
-        view.agent_name === "" ? el("span", null, "An agent that is gone") : el("a", { href: `#/agents/${order.agent_id}` }, view.agent_name),
+        view.agent_name === "" ? el("span", null, t("workorders.anAgentThatIsGone")) : el("a", { href: `#/agents/${order.agent_id}` }, view.agent_name),
         attemptWords(order.attempts) === "" ? null : el("span", null, attemptWords(order.attempts)),
-        el("span", null, `handed out ${ago(order.created_at)}`),
+        el("span", null, t("workorders.handedOutAgo", { ago: ago(order.created_at) })),
         due === "" ? null : el("span", null, due),
-        view.objective_title === null ? null : el("span", null, `for: ${clip(view.objective_title, NOTE_CHARS)}`),
-        last === undefined ? null : el("a", { href: `#/runs/${last}` }, "Its task"),
+        view.objective_title === null ? null : el("span", null, t("workorders.forClip", { clip: clip(view.objective_title, NOTE_CHARS) })),
+        last === undefined ? null : el("a", { href: `#/runs/${last}` }, t("workorders.itsTask")),
       ),
       order.note === "" ? null : el("div", { class: "row-text muted" }, clip(order.note, NOTE_CHARS)),
       order.tainted ? el("div", { class: "row-meta" }, el("span", null, OUTSIDE)) : null,
@@ -104,7 +105,7 @@ export function workOrdersPart() {
       count.textContent = open.length === 0 ? "" : String(open.length);
       if (objectives.length === 0 && orders.length === 0) {
         holder.replaceChildren(
-          el("div", { class: "card empty-teams" }, el("p", { class: "muted" }, "Nothing handed out yet. When Dot gives your agents work as orders, they show here with where each stands.")),
+          el("div", { class: "card empty-teams" }, el("p", { class: "muted" }, t("workorders.nothingHandedOutYetWhen"))),
         );
         return;
       }
@@ -112,11 +113,11 @@ export function workOrdersPart() {
         el(
           "div",
           { class: "card work-card" },
-          active.length === 0 ? null : el("h3", { class: "work-sub" }, plural(active.length, "objective", "objectives")),
+          active.length === 0 ? null : el("h3", { class: "work-sub" }, tCount(active.length, "workorders.countObjective", "workorders.countObjectives")),
           ...active.map(objectiveRow),
-          orders.length === 0 ? null : el("h3", { class: "work-sub" }, "Orders"),
+          orders.length === 0 ? null : el("h3", { class: "work-sub" }, t("workorders.orders")),
           ...orders.map(orderRow),
-          finished.length === 0 ? null : el("h3", { class: "work-sub" }, "Finished objectives"),
+          finished.length === 0 ? null : el("h3", { class: "work-sub" }, t("workorders.finishedObjectives")),
           ...finished.map(objectiveRow),
         ),
       );
@@ -129,8 +130,8 @@ export function workOrdersPart() {
 
   const element = el(
     "section",
-    { class: "agents-part work-part", "aria-label": "Work orders" },
-    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Work orders", count)),
+    { class: "agents-part work-part", "aria-label": t("workorders.workOrders") },
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, t("workorders.workOrders"), count)),
     holder,
   );
   return {

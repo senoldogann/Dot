@@ -12,6 +12,7 @@ import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { advancedFold, errorPanel, loadingPanel, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
 import { attempt, toast } from "../ui.js";
+import { t } from "../i18n.js";
 
 // How often the page reads the channels again while it is open and quiet, so that it follows what macOS is granted.
 const REFRESH_MS = 10_000;
@@ -19,16 +20,16 @@ const REFRESH_MS = 10_000;
 const DATABASE = {
   granted: ["b-ok", "granted"],
   missing: ["b-warn", "missing"],
-  no_database: ["b-warn", "no messages saved yet"],
+  no_database: ["b-warn", t("views.channels.noMessagesSavedYet")],
 };
 // What a paired number or address means (item 595): what it writes to this Mac runs as the owner's command.
-const RUNS_AS_YOU = "Messages from this address run as you";
+const RUNS_AS_YOU = t("views.channels.messagesFromThisAddressRun");
 const AUTOMATION = {
   allowed: ["b-ok", "allowed"],
-  not_asked: ["b-warn", "not asked yet"],
+  not_asked: ["b-warn", t("views.channels.notAskedYet")],
   refused: ["b-warn", "refused"],
-  not_open: ["b-muted", "Messages is not open"],
-  unknown: ["b-muted", "not known"],
+  not_open: ["b-muted", t("views.channels.messagesIsNotOpen")],
+  unknown: ["b-muted", t("views.channels.notKnown")],
 };
 
 function clockTime(seconds) {
@@ -53,8 +54,8 @@ export function mount(root, ctx) {
   const handleField = el("input", {
     class: "input",
     type: "text",
-    placeholder: "+358 40 123 4567, or you@icloud.com",
-    "aria-label": "Your phone number or Apple ID email",
+    placeholder: t("views.channels.358401234567Or"),
+    "aria-label": t("views.channels.yourPhoneNumberOrApple"),
     autocomplete: "off",
     autocapitalize: "off",
     spellcheck: "false",
@@ -64,7 +65,7 @@ export function mount(root, ctx) {
     type: "text",
     inputmode: "numeric",
     placeholder: "123 456",
-    "aria-label": "The code you read on your iPhone",
+    "aria-label": t("views.channels.theCodeYouReadOn"),
     autocomplete: "one-time-code",
     maxlength: "12",
   });
@@ -108,19 +109,19 @@ export function mount(root, ctx) {
       toast(...lookWords(current.imessage, before));
     }
   };
-  const checkButton = offer("Check now", "refresh", checkNow);
+  const checkButton = offer(t("views.channels.checkNow"), "refresh", checkNow);
   // The Advanced fold stays as the reader left it when the tab draws itself again as the channel's state changes.
   let advancedOpen = false;
-  const sendCode = () => post("/channels/imessage/code", { handle: handleField.value }, "A code is on its way to that number or address.");
+  const sendCode = () => post("/channels/imessage/code", { handle: handleField.value }, t("views.channels.aCodeIsOnIts"));
   const confirmCode = async () => {
-    await post("/channels/imessage/confirm", { code: codeField.value }, "Connected. Messages you send to yourself now reach Dot.");
+    await post("/channels/imessage/confirm", { code: codeField.value }, t("views.channels.connectedMessagesYouSendTo"));
     codeField.value = "";
     handleField.value = "";
   };
-  const remove = (handle) => post("/channels/imessage/remove", { handle }, "That number or address is no longer read.");
+  const remove = (handle) => post("/channels/imessage/remove", { handle }, t("views.channels.thatNumberOrAddressIs"));
   const openPane = (pane) => api.post("/desktop/permissions/open", { pane });
-  const sendButton = offer("Send a code", "send", sendCode, "btn sm primary");
-  const confirmButton = offer("Confirm", "check", confirmCode, "btn sm primary");
+  const sendButton = offer(t("views.channels.sendACode"), "send", sendCode, "btn sm primary");
+  const confirmButton = offer(t("views.channels.confirm"), "check", confirmCode, "btn sm primary");
   const handleForm = el(
     "form",
     {
@@ -159,7 +160,7 @@ export function mount(root, ctx) {
           el("span", { class: "mono" }, handle),
           el(
             "button",
-            { class: "icon-btn", type: "button", title: `Stop reading ${handle}`, "aria-label": `Stop reading ${handle}`, onclick: () => attempt(() => remove(handle)) },
+            { class: "icon-btn", type: "button", title: t("views.channels.stopReadingHandle", { handle }), "aria-label": t("views.channels.stopReadingHandle", { handle }), onclick: () => attempt(() => remove(handle)) },
             icon("x"),
           ),
         ),
@@ -171,21 +172,21 @@ export function mount(root, ctx) {
         ? null
         : el(
             "div",
-            { class: "channel-verify", role: "group", "aria-label": "The code sent" },
+            { class: "channel-verify", role: "group", "aria-label": t("views.channels.theCodeSent") },
             el(
               "p",
               { class: "hint" },
-              `A code went to ${view.verifying.handle}. Type what you read on your iPhone before ${clockTime(view.verifying.expires_at)}.`,
+              t("views.channels.aCodeWentToHandle", { handle: view.verifying.handle, clockTime: clockTime(view.verifying.expires_at) }),
             ),
             codeForm,
           );
     return setRow({
-      title: "Your number or Apple ID email",
-      lead: "Connect only your own number or Apple ID email: the conversation with yourself. If your iPhone uses another Apple ID than this Mac, connect the number or address it writes from, which names the conversation on this Mac. Dot does what you write there as your command, and so what that number or address writes to this Mac: connecting someone else's gives them Dot. The code it sends shows only that it reached whoever holds it.",
+      title: t("views.channels.yourNumberOrAppleId"),
+      lead: t("views.channels.connectOnlyYourOwnNumber"),
       body: el(
         "div",
         { class: "channel-body" },
-        paired.length === 0 ? el("p", { class: "hint" }, "None connected yet.") : el("div", { class: "channel-pairings" }, paired),
+        paired.length === 0 ? el("p", { class: "hint" }, t("views.channels.noneConnectedYet")) : el("div", { class: "channel-pairings" }, paired),
         handleForm,
         waiting,
       ),
@@ -194,33 +195,33 @@ export function mount(root, ctx) {
 
   /** What macOS has granted, and the step that sets each right. */
   function permissionRows(view) {
-    const program = view.program ?? "the app that runs Dot";
+    const program = view.program ?? t("views.channels.theAppThatRunsDot");
     const database = DATABASE[view.database];
     const automation = AUTOMATION[view.automation];
     const databaseControl =
       view.database === "granted"
         ? [badge(database)]
         : view.database === "missing"
-          ? [badge(database), offer("Open Full Disk Access", "external", () => openPane("full_disk_access"))]
+          ? [badge(database), offer(t("views.channels.openFullDiskAccess"), "external", () => openPane("full_disk_access"))]
           : [badge(database)];
     const automationControl =
       view.automation === "allowed"
         ? [badge(automation)]
         : view.automation === "refused"
-          ? [badge(automation), offer("Open Automation", "external", () => openPane("automation"))]
-          : [badge(automation), offer("Ask macOS", "hand", () => post("/channels/imessage/check", {}))];
+          ? [badge(automation), offer(t("views.channels.openAutomation"), "external", () => openPane("automation"))]
+          : [badge(automation), offer(t("views.channels.askMacos"), "hand", () => post("/channels/imessage/check", {}))];
     return [
       setRow({
-        title: "Full Disk Access",
+        title: t("views.channels.fullDiskAccess"),
         lead:
           view.database === "no_database"
-            ? "Messages has not saved any messages on this Mac yet: sign in to Messages with your Apple ID."
-            : `Lets ${program} read the messages saved on this Mac. After you switch it on in System Settings, restart Dot (Settings › System).`,
+            ? t("views.channels.messagesHasNotSavedAny")
+            : t("views.channels.letsProgramReadTheMessages", { program }),
         control: databaseControl,
       }),
       setRow({
-        title: "Automation for Messages",
-        lead: `Lets ${program} send Dot's answers through Messages, each starting with an invisible mark.`,
+        title: t("views.channels.automationForMessages"),
+        lead: t("views.channels.letsProgramSendDotS", { program }),
         control: automationControl,
       }),
     ];
@@ -236,8 +237,8 @@ export function mount(root, ctx) {
       [...seenFacts(view.seen), linkFact(view.links, view.links_off)].map(([label, value]) => el("div", null, el("dt", null, label), el("dd", null, value))),
     );
     const row = setRow({
-      title: "What Dot sees in Messages",
-      lead: "Dot looks at Messages' database every few seconds while iMessage is on. Check now looks at once, and reads what is new when iMessage is on.",
+      title: t("views.channels.whatDotSeesInMessages"),
+      lead: t("views.channels.dotLooksAtMessagesDatabase"),
       control: checkButton,
       body: el("div", { class: "channel-body" }, facts),
     });
@@ -248,21 +249,21 @@ export function mount(root, ctx) {
   function imessageSection(view, progressOn) {
     const toggle = switchRowSetting({
       label: "iMessage",
-      hint: "Dot reads your conversation with yourself on this Mac, or the one your iPhone's Apple ID has with this Mac's, and answers in it, and tells you there what it has to say on its own: the morning brief and your watchers. Only what you send from now on is read.",
+      hint: t("views.channels.dotReadsYourConversationWith"),
       read: () => view.on,
       write: async (on) => {
-        await post("/channels/imessage/switch", { on }, on ? "Dot reads your conversation with yourself." : "Dot no longer reads iMessage.");
+        await post("/channels/imessage/switch", { on }, on ? t("views.channels.dotReadsYourConversationWith2") : t("views.channels.dotNoLongerReadsImessage"));
       },
       onToggled: () => toggle.paint(),
     });
     toggle.paint();
     // What a run started from the channel tells while it works (item 618): `[channels] progress`, live.
     const progress = switchRowSetting({
-      label: "Progress messages",
-      hint: "While a task you started from iMessage works, Dot sends a few short lines of what it is doing: the newest things it did and its newest thought, never a command's text. The first after 15 seconds, then at most one a minute and four in all. Off, or for a task that ends sooner, only the answer comes.",
+      label: t("views.channels.progressMessages"),
+      hint: t("views.channels.whileATaskYouStarted"),
       read: () => progressOn,
       write: async (on) => {
-        await post("/channels/progress", { on }, on ? "Dot tells you what a task is doing as it works." : "Dot sends only the answers.");
+        await post("/channels/progress", { on }, on ? t("views.channels.dotTellsYouWhatA") : t("views.channels.dotSendsOnlyTheAnswers"));
       },
       onToggled: () => progress.paint(),
     });
@@ -278,20 +279,20 @@ export function mount(root, ctx) {
     const chat =
       view.chat_run_id === null
         ? null
-        : el("a", { class: "btn sm", href: `#/runs/${view.chat_run_id}` }, icon("message"), el("span", null, "Open the chat"));
+        : el("a", { class: "btn sm", href: `#/runs/${view.chat_run_id}` }, icon("message"), el("span", null, t("views.channels.openTheChat")));
     const card = setCard(toggle.element, progress.element, handlesRow(view), ...permissionRows(view), warning, problem);
     card.setAttribute("role", "group");
     card.setAttribute("aria-label", "iMessage");
     return [
       setSection({
         title: "iMessage",
-        lead: "Message yourself from your iPhone, or write to this Mac's Apple ID from your own. Each answer of Dot comes back in the same conversation.",
+        lead: t("views.channels.messageYourselfFromYourIphone"),
         actions: chat,
         body: card,
       }),
       advancedFold({
-        title: "Advanced",
-        lead: "For troubleshooting: what Dot sees in Messages",
+        title: t("views.channels.advanced"),
+        lead: t("views.channels.forTroubleshootingWhatDotSees"),
         body: seenRow(view),
         open: advancedOpen,
         onToggle: (open) => {
@@ -353,10 +354,10 @@ export function mount(root, ctx) {
 
   ctx.head.setLead(
     holdsPhoneKey()
-      ? "Reach Dot from the Messages app on your iPhone. A phone signed in with a code can look here, but turn the channel on or off and pair or remove a number in Settings › Channels on your Mac."
-      : "Reach Dot from the Messages app on your iPhone, without setting up Tailscale. A message of yours starts a task in a chat of its own and the answer comes back; an approval is answered in Dot, never in a message.",
+      ? t("views.channels.reachDotFromTheMessages")
+      : t("views.channels.reachDotFromTheMessages2"),
   );
-  ctx.head.setActions(offer("Check again", "refresh", load));
+  ctx.head.setActions(offer(t("views.channels.checkAgain"), "refresh", load));
   root.append(holder);
   attempt(load);
   follow();

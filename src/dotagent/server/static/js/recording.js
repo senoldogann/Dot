@@ -22,6 +22,7 @@ import {
 } from "./voice.js";
 import { openStream } from "./voicestream.js";
 import { MAX_RECORDING_S, MAX_SAMPLES, createResampler, loudness } from "./wav.js";
+import { t } from "./i18n.js";
 
 // How loud a block of the microphone's sound is to count as a sound, as the root of its mean square from 0 to 1 (wav.js
 // `loudness`). Measured with the speech of `say` through the page's own capture, a Web Audio stream standing in for the
@@ -189,7 +190,7 @@ export function createRecording({
     if (heard) {
       stop();
     } else {
-      finish("The microphone was taken away while it listened: another app, or a call, may have it. Press it again to go on.");
+      finish(t("recording.theMicrophoneWasTakenAway"));
     }
   }
 

@@ -6,24 +6,25 @@
 // why. Everything is `GET`, `POST`, `PATCH` and `DELETE /api/watchers`, and `POST /api/watchers/<id>/try` (Check now).
 // New watcher and a watcher's Edit open the form in a dialog (item 615).
 
-import { ago, clip, el, joined, plural } from "./dom.js";
+import { ago, clip, el, joined, } from "./dom.js";
 import { api } from "./api.js";
 import { icon } from "./icons.js";
 import { field, inlineError, loadingPanel, markOpener, segmented } from "./panels.js";
 import { onLifecycle } from "./state.js";
 import { attempt, confirmDialog, formDialog, settingFold, toast } from "./ui.js";
 import { countsLine, rowsOf, sumCounts } from "./tellwords.js";
+import { t, tCount } from "./i18n.js";
 
 const KINDS = [
-  { id: "mail", label: "New mail", hint: "A new mail in a Google or Microsoft account you signed in", mark: "mail", what: "new mail" },
-  { id: "calendar", label: "Calendar", hint: "An event about to start", mark: "calendar", what: "an event about to start" },
-  { id: "github", label: "GitHub", hint: "Your GitHub notifications", mark: "branch", what: "a GitHub notification" },
+  { id: "mail", label: t("watcherspanel.newMail"), hint: t("watcherspanel.aNewMailInA"), mark: "mail", what: t("watcherspanel.newMail2") },
+  { id: "calendar", label: t("watcherspanel.calendar"), hint: t("watcherspanel.anEventAboutToStart"), mark: "calendar", what: t("watcherspanel.anEventAboutToStart2") },
+  { id: "github", label: "GitHub", hint: t("watcherspanel.yourGithubNotifications"), mark: "branch", what: t("watcherspanel.aGithubNotification") },
   // Item 1855: the owner's own script in Dot's checks folder, run without a model, is the look.
-  { id: "check", label: "Check", hint: "Your own script, run without a model, says when to wake", mark: "terminal", what: "what your check found" },
+  { id: "check", label: t("watcherspanel.check"), hint: t("watcherspanel.yourOwnScriptRunWithout"), mark: "terminal", what: t("watcherspanel.whatYourCheckFound") },
 ];
 const ACTIONS = [
-  { id: "tell", label: "Tell me", hint: "A push to your phone, and a line kept in the chat Watchers" },
-  { id: "run", label: "Tell me and start a task", hint: "As that, and a task of your goal for what came in" },
+  { id: "tell", label: t("watcherspanel.tellMe"), hint: t("watcherspanel.aPushToYourPhone") },
+  { id: "run", label: t("watcherspanel.tellMeAndStartA"), hint: t("watcherspanel.asThatAndATask") },
 ];
 // The panel reads again this often, so that "Looked 2m ago" and a failure that mended stay true, and when Dot tells you.
 const REFRESH_MS = 30_000;
@@ -37,7 +38,7 @@ function kindOf(id) {
 
 /** What a watcher's minutes mean: how often a mail or GitHub watcher looks, how long before an event a calendar one tells. */
 function minutesText(view) {
-  return view.kind === "calendar" ? `${plural(view.minutes, "minute", "minutes")} before an event` : `every ${plural(view.minutes, "minute", "minutes")}`;
+  return view.kind === "calendar" ? t("watcherspanel.partBeforeAnEvent", { part: tCount(view.minutes, "watcherspanel.countMinute", "watcherspanel.countMinutes") }) : t("watcherspanel.everyPart", { part: tCount(view.minutes, "watcherspanel.countMinute", "watcherspanel.countMinutes") });
 }
 
 /** When something will happen, as words: "now", "in 3m", "in 2h". */
@@ -56,19 +57,19 @@ function soon(ts) {
 function whenLine(view) {
   const parts = [];
   if (view.looked_at !== null) {
-    parts.push(el("span", { title: "When it last looked" }, `Looked ${ago(view.looked_at)}`));
+    parts.push(el("span", { title: t("watcherspanel.whenItLastLooked") }, t("watcherspanel.lookedAgo", { ago: ago(view.looked_at) })));
   } else if (view.error === null) {
-    parts.push(el("span", null, "Has not looked yet"));
+    parts.push(el("span", null, t("watcherspanel.hasNotLookedYet")));
   }
   if (view.enabled && view.next_look_at !== null) {
-    parts.push(el("span", { title: "When it looks next" }, `Next ${soon(view.next_look_at)}`));
+    parts.push(el("span", { title: t("watcherspanel.whenItLooksNext") }, t("watcherspanel.nextSoon", { soon: soon(view.next_look_at) })));
   }
   if (view.last !== "") {
     // What the last look said of itself, its full stop left off: its parts are kept by dots.
     parts.push(el("span", null, view.last.replace(/\.$/, "")));
   }
   if (view.told > 0) {
-    parts.push(el("span", { title: "Tells in the last hour" }, `${view.told} told this hour`));
+    parts.push(el("span", { title: t("watcherspanel.tellsInTheLastHour") }, t("watcherspanel.toldToldThisHour", { told: view.told })));
   }
   return el("div", { class: "row-meta when-line" }, ...joined(parts));
 }
@@ -79,7 +80,7 @@ function reactionLine(view, tells) {
   if (counts.sent === 0) {
     return null;
   }
-  return el("div", { class: "row-meta tell-line", title: "What you did with its tells in the last 30 days: opened or acted on within half an hour, dismissed, or let be" }, countsLine(counts));
+  return el("div", { class: "row-meta tell-line", title: t("watcherspanel.whatYouDidWithIts") }, countsLine(counts));
 }
 
 /** A row of the list. `looking` says that its Check now is at work: the button shows it and takes no second press. */
@@ -90,14 +91,14 @@ function watcherRow(view, handlers, looking, tells) {
     type: "button",
     role: "switch",
     "aria-checked": String(view.enabled),
-    "aria-label": `${view.enabled ? "Switch off" : "Switch on"} ${view.name}`,
-    title: view.enabled ? "Switch this watcher off" : "Switch this watcher on",
+    "aria-label": `${view.enabled ? t("watcherspanel.switchOff") : t("watcherspanel.switchOn")} ${view.name}`,
+    title: view.enabled ? t("watcherspanel.switchThisWatcherOff") : t("watcherspanel.switchThisWatcherOn"),
     onclick: () => handlers.onToggle(view),
   });
   const failure =
     view.error === null
       ? null
-      : el("div", { class: "note bad watcher-error", role: "alert" }, icon("alert"), el("span", null, `${view.looked_at === null ? "It has not looked yet: " : "Its last look failed: "}${clip(view.error, ERROR_CHARS)}`));
+      : el("div", { class: "note bad watcher-error", role: "alert" }, icon("alert"), el("span", null, `${view.looked_at === null ? t("watcherspanel.itHasNotLookedYet") : t("watcherspanel.itsLastLookFailed")}${clip(view.error, ERROR_CHARS)}`));
   const row = el(
     "div",
     { class: "list-row", dataset: { watcher: view.id } },
@@ -111,10 +112,10 @@ function watcherRow(view, handlers, looking, tells) {
         "div",
         { class: "row-meta" },
         // An address longer than the row is cut with an ellipsis, so that it never runs past the row; the title has it whole.
-        view.account === "" ? null : el("span", { class: "chip", title: `The account it looks in: ${view.account}` }, el("span", { class: "chip-text" }, view.account)),
-        view.check === "" ? null : el("span", { class: "chip mono", title: "The check it runs, in Dot's checks folder" }, el("span", { class: "chip-text" }, view.check)),
-        el("span", { class: "chip", title: view.kind === "calendar" ? "How long before an event it tells you" : "How often it looks" }, minutesText(view)),
-        el("span", { class: "chip", title: ACTIONS.find((action) => action.id === view.action)?.hint ?? "" }, view.action === "run" ? "Starts a task" : "Tells you"),
+        view.account === "" ? null : el("span", { class: "chip", title: t("watcherspanel.theAccountItLooksIn", { account: view.account }) }, el("span", { class: "chip-text" }, view.account)),
+        view.check === "" ? null : el("span", { class: "chip mono", title: t("watcherspanel.theCheckItRunsIn") }, el("span", { class: "chip-text" }, view.check)),
+        el("span", { class: "chip", title: view.kind === "calendar" ? t("watcherspanel.howLongBeforeAnEvent") : t("watcherspanel.howOftenItLooks") }, minutesText(view)),
+        el("span", { class: "chip", title: ACTIONS.find((action) => action.id === view.action)?.hint ?? "" }, view.action === "run" ? t("watcherspanel.startsATask") : t("watcherspanel.tellsYou")),
       ),
       view.words === "" ? null : el("div", { class: "row-text muted", title: view.words }, clip(view.words, WORDS_PREVIEW_CHARS)),
       whenLine(view),
@@ -129,8 +130,8 @@ function watcherRow(view, handlers, looking, tells) {
         {
           class: "btn ghost sm icon-only",
           type: "button",
-          title: looking ? "Looking now: a look can take a few minutes" : view.enabled ? "Check now: look at once instead of waiting" : "Switch it on to check it",
-          "aria-label": `Check ${view.name} now`,
+          title: looking ? t("watcherspanel.lookingNowALookCan") : view.enabled ? t("watcherspanel.checkNowLookAtOnce") : t("watcherspanel.switchItOnToCheck"),
+          "aria-label": t("watcherspanel.checkNameNow", { name: view.name }),
           "aria-busy": looking ? "true" : null,
           disabled: !view.enabled || looking,
           onclick: () => handlers.onCheck(view),
@@ -139,10 +140,10 @@ function watcherRow(view, handlers, looking, tells) {
       ),
       el(
         "button",
-        { class: "btn ghost sm icon-only", type: "button", title: "Edit this watcher", "aria-label": `Edit ${view.name}`, "aria-haspopup": "dialog", onclick: () => handlers.onEdit(view) },
+        { class: "btn ghost sm icon-only", type: "button", title: t("watcherspanel.editThisWatcher"), "aria-label": t("watcherspanel.editName", { name: view.name }), "aria-haspopup": "dialog", onclick: () => handlers.onEdit(view) },
         icon("pencil"),
       ),
-      el("button", { class: "btn ghost sm icon-only", type: "button", title: "Delete this watcher", "aria-label": `Delete ${view.name}`, onclick: () => handlers.onDelete(view) }, icon("trash")),
+      el("button", { class: "btn ghost sm icon-only", type: "button", title: t("watcherspanel.deleteThisWatcher"), "aria-label": t("watcherspanel.deleteName", { name: view.name }), onclick: () => handlers.onDelete(view) }, icon("trash")),
     ),
   );
   return row;
@@ -162,34 +163,34 @@ function bodyOf(view, changes) {
  */
 function watcherForm({ view, options }) {
   const editing = view !== null;
-  const name = el("input", { class: "input", type: "text", maxlength: "80", autocomplete: "off", placeholder: "Landlord", "aria-label": "Name" });
-  const account = el("select", { class: "select", "aria-label": "Account" });
-  const check = el("input", { class: "input mono", type: "text", maxlength: "80", autocomplete: "off", spellcheck: "false", placeholder: "price-drop.sh", "aria-label": "Check" });
-  const words = el("textarea", { class: "textarea", rows: "2", "aria-label": "What you want to hear of" });
-  const minutes = el("input", { class: "input", type: "number", min: "1", max: "1440", step: "1", inputmode: "numeric", "aria-label": "Minutes" });
-  const goal = el("textarea", { class: "textarea", rows: "3", placeholder: "Draft a reply in my voice and keep it as a draft.", "aria-label": "Goal of the task" });
+  const name = el("input", { class: "input", type: "text", maxlength: "80", autocomplete: "off", placeholder: "Landlord", "aria-label": t("watcherspanel.name") });
+  const account = el("select", { class: "select", "aria-label": t("watcherspanel.account") });
+  const check = el("input", { class: "input mono", type: "text", maxlength: "80", autocomplete: "off", spellcheck: "false", placeholder: "price-drop.sh", "aria-label": t("watcherspanel.check") });
+  const words = el("textarea", { class: "textarea", rows: "2", "aria-label": t("watcherspanel.whatYouWantToHear") });
+  const minutes = el("input", { class: "input", type: "number", min: "1", max: "1440", step: "1", inputmode: "numeric", "aria-label": t("watcherspanel.minutes") });
+  const goal = el("textarea", { class: "textarea", rows: "3", placeholder: t("watcherspanel.draftAReplyInMy"), "aria-label": t("watcherspanel.goalOfTheTask") });
   let touchedMinutes = editing;
   const kinds = segmented(KINDS, editing ? view.kind : "mail", () => paintKind());
   const actions = segmented(ACTIONS, editing ? view.action : "tell", () => paintAction());
-  kinds.element.setAttribute("aria-label", "Kind");
-  actions.element.setAttribute("aria-label", "What it does");
-  const accountField = field("Account", account, "");
+  kinds.element.setAttribute("aria-label", t("watcherspanel.kind"));
+  actions.element.setAttribute("aria-label", t("watcherspanel.whatItDoes"));
+  const accountField = field(t("watcherspanel.account"), account, "");
   const checkField = field(
-    "Check",
+    t("watcherspanel.check"),
     check,
-    'The file name of an executable script in Dot\'s "checks" folder. Its last line {"wake": true} tells you what it printed before it, {"wake": false} tells nothing, and anything else shows as a failed look.',
+    t("watcherspanel.theFileNameOfAn"),
   );
   // Their label and hint are the kind's, written by `paintKind`.
-  const wordsField = field("What you want to hear of", words, "-");
-  const minutesField = field("Minutes", minutes, "-");
-  const goalField = field("Goal of the task", goal, "");
-  const noAccounts = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "No Google or Microsoft account is signed in. "), el("a", { href: "#/settings/connectors" }, "Add one"));
-  const noGithub = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "GitHub is not connected: add it in Settings › Connectors with a key from GitHub. For notifications the key must be a classic one with the notifications permission; a fine-grained one cannot read them. "), el("a", { href: "#/settings/connectors" }, "Add it"));
+  const wordsField = field(t("watcherspanel.whatYouWantToHear"), words, "-");
+  const minutesField = field(t("watcherspanel.minutes"), minutes, "-");
+  const goalField = field(t("watcherspanel.goalOfTheTask"), goal, "");
+  const noAccounts = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, t("watcherspanel.noGoogleOrMicrosoftAccount")), el("a", { href: "#/settings/connectors" }, t("watcherspanel.addOne")));
+  const noGithub = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, t("watcherspanel.githubIsNotConnectedAdd")), el("a", { href: "#/settings/connectors" }, t("watcherspanel.addIt")));
   const runNote = el(
     "div",
     { class: "note", hidden: true },
     icon("shield"),
-    el("span", null, "What came in was written by someone else, so the task starts marked as untrusted: anything that reaches other people or lasts is asked about first, in the approval mode you chose as the default. At most a few tasks an hour."),
+    el("span", null, t("watcherspanel.whatCameInWasWritten")),
   );
   function paintKind() {
     const kind = kinds.value();
@@ -198,21 +199,21 @@ function watcherForm({ view, options }) {
     noAccounts.hidden = kind === "github" || kind === "check" || options.accounts.length > 0;
     noGithub.hidden = kind !== "github" || options.github;
     const labels = {
-      mail: ["What you want to hear of", "In your own words: my bank, my landlord, anything about the visa. The fast model reads each new mail's sender, subject and first lines against it.", "my bank, my landlord, anything about the visa"],
-      calendar: ["Only events with these words (optional)", "Leave it empty to be told of every timed event; the words are looked for in an event's title, place and notes.", "stand-up"],
-      github: ["Only what you want to hear of (optional)", "Empty: a review asked of you, a mention, an assignment and a failing check of yours. With words, the fast model judges each new notification.", "anything about the visa repository"],
-      check: ["Only what you want to hear of (optional)", "Empty: every time the check says to wake, you are told. With words, the fast model judges what it printed.", "only a drop below 90"],
+      mail: [t("watcherspanel.whatYouWantToHear"), t("watcherspanel.inYourOwnWordsMy"), t("watcherspanel.myBankMyLandlordAnything")],
+      calendar: [t("watcherspanel.onlyEventsWithTheseWords"), t("watcherspanel.leaveItEmptyToBe"), "stand-up"],
+      github: [t("watcherspanel.onlyWhatYouWantTo"), t("watcherspanel.emptyAReviewAskedOf"), t("watcherspanel.anythingAboutTheVisaRepository")],
+      check: [t("watcherspanel.onlyWhatYouWantTo"), t("watcherspanel.emptyEveryTimeTheCheck"), t("watcherspanel.onlyADropBelow90")],
     }[kind];
     wordsField.querySelector(".field-label").textContent = labels[0];
     wordsField.querySelector(".hint").textContent = labels[1];
     words.placeholder = labels[2];
-    minutesField.querySelector(".field-label").textContent = kind === "calendar" ? "Tell me this many minutes before an event" : "Look every this many minutes";
+    minutesField.querySelector(".field-label").textContent = kind === "calendar" ? t("watcherspanel.tellMeThisManyMinutes") : t("watcherspanel.lookEveryThisManyMinutes");
     minutesField.querySelector(".hint").textContent =
       kind === "calendar"
-        ? "It looks at least every five minutes, and again when an event comes inside this."
+        ? t("watcherspanel.itLooksAtLeastEvery")
         : kind === "github"
-          ? "From 1 to 1440. GitHub asks to be looked at no oftener than it says, a minute at least."
-          : "From 1 to 1440.";
+          ? t("watcherspanel.from1To1440Github")
+          : t("watcherspanel.from1To1440");
     if (!touchedMinutes) {
       minutes.value = String(options.minutes[kind]);
     }
@@ -227,7 +228,7 @@ function watcherForm({ view, options }) {
   function paintAccounts() {
     const known = options.accounts.map((choice) => choice.address);
     const keep = editing && view.account !== "" && !known.includes(view.account) ? [view.account] : [];
-    account.replaceChildren(...[...known, ...keep].map((address) => el("option", { value: address }, keep.includes(address) ? `${address} (not signed in now)` : address)));
+    account.replaceChildren(...[...known, ...keep].map((address) => el("option", { value: address }, keep.includes(address) ? t("watcherspanel.addressNotSignedInNow", { address }) : address)));
     account.value = editing && view.account !== "" ? view.account : (known[0] ?? "");
   }
 
@@ -287,10 +288,10 @@ function watcherForm({ view, options }) {
     };
     if (editing) {
       await api.patch(`/watchers/${view.id}`, body);
-      toast("ok", "Watcher saved.");
+      toast("ok", t("watcherspanel.watcherSaved"));
     } else {
       await api.post("/watchers", body);
-      toast("ok", kind === "check" ? "Watcher added: it runs your check at its next look." : "Watcher added: its first look only notes what is there, and it tells what comes after.");
+      toast("ok", kind === "check" ? t("watcherspanel.watcherAddedItRunsYour") : t("watcherspanel.watcherAddedItsFirstLook"));
     }
     return true;
   }
@@ -301,13 +302,13 @@ function watcherForm({ view, options }) {
     el(
       "div",
       { class: "form-grid" },
-      field("Name", name, ""),
-      el("div", { class: "field" }, el("span", { class: "field-label" }, "Kind"), kinds.element),
+      field(t("watcherspanel.name"), name, ""),
+      el("div", { class: "field" }, el("span", { class: "field-label" }, t("watcherspanel.kind")), kinds.element),
       accountField,
       checkField,
       minutesField,
       wordsField,
-      el("div", { class: "field wide" }, el("span", { class: "field-label" }, "What it does"), actions.element),
+      el("div", { class: "field wide" }, el("span", { class: "field-label" }, t("watcherspanel.whatItDoes")), actions.element),
       goalField,
     ),
     noAccounts,
@@ -336,12 +337,12 @@ export function mountWatchers() {
   // The page's one primary button is New schedule: a watcher is made from a quieter one (item 609), and its form opens in
   // a dialog (item 615).
   const addButton = el("button", { class: "btn sm", type: "button" });
-  markOpener(addButton, "New watcher");
-  const lead = el("p", { class: "hint watcher-lead" }, "Dot tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and in the chat Watchers.");
+  markOpener(addButton, t("watcherspanel.newWatcher"));
+  const lead = el("p", { class: "hint watcher-lead" }, t("watcherspanel.dotTellsYouWhenA"));
   const element = el(
     "section",
     { class: "memory-panel notes-panel watcher-panel", dataset: { watchers: "" } },
-    el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "Watchers"), count, el("span", { class: "spacer" }), addButton),
+    el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, t("watcherspanel.watchers")), count, el("span", { class: "spacer" }), addButton),
     lead,
     holder,
   );
@@ -351,7 +352,7 @@ export function mountWatchers() {
       return;
     }
     // With none, the head says so and the panel is its head and its line (item 609): no picture of an empty list.
-    count.textContent = views.length === 0 ? "None yet" : plural(views.length, "watcher", "watchers");
+    count.textContent = views.length === 0 ? t("watcherspanel.noneYet") : tCount(views.length, "watcherspanel.countWatcher", "watcherspanel.countWatchers");
     if (views.length === 0) {
       holder.replaceChildren();
       return;
@@ -377,8 +378,8 @@ export function mountWatchers() {
       tells = told.rows;
       lead.replaceChildren(
         ...(offered.looking
-          ? ["Dot tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and in the chat Watchers."]
-          : ["Watchers are switched off in Dot's settings file: none of them looks.", settingFold("[watchers] enabled")]),
+          ? [t("watcherspanel.dotTellsYouWhenA")]
+          : [t("watcherspanel.watchersAreSwitchedOffIn"), settingFold("[watchers] enabled")]),
       );
       paint();
     } catch (error) {
@@ -412,7 +413,7 @@ export function mountWatchers() {
     try {
       const { outcome } = await api.post(`/watchers/${view.id}/try`, null);
       if (outcome.error !== null) {
-        toast("error", `${view.name} could not look: ${clip(outcome.error, ERROR_CHARS)}`);
+        toast("error", t("watcherspanel.nameCouldNotLookClip", { name: view.name, clip: clip(outcome.error, ERROR_CHARS) }));
       } else {
         toast("ok", `${view.name}: ${outcome.summary}`);
       }
@@ -427,9 +428,9 @@ export function mountWatchers() {
 
   async function remove(view) {
     const confirmed = await confirmDialog({
-      title: "Delete this watcher?",
-      message: `“${clip(view.name, 80)}” will not look again. What it told you stays in the chat Watchers.`,
-      confirmLabel: "Delete",
+      title: t("watcherspanel.deleteThisWatcher2"),
+      message: t("watcherspanel.clipWillNotLookAgain", { clip: clip(view.name, 80) }),
+      confirmLabel: t("watcherspanel.delete"),
       danger: true,
       focusCancel: true,
     });
@@ -437,7 +438,7 @@ export function mountWatchers() {
       return;
     }
     await api.del(`/watchers/${view.id}`);
-    toast("ok", "Watcher deleted.");
+    toast("ok", t("watcherspanel.watcherDeleted"));
     await reload();
   }
 
@@ -449,13 +450,13 @@ export function mountWatchers() {
     }
     const form = watcherForm({ view, options });
     formDialog({
-      title: view === null ? "New watcher" : "Edit watcher",
+      title: view === null ? t("watcherspanel.newWatcher") : t("watcherspanel.editWatcher"),
       description:
         view === null
-          ? "Dot looks every few minutes, and tells you on your phone and in the chat Watchers when what you care about comes."
-          : `Change “${clip(view.name, 60)}”. It looks by the new choices from its next look.`,
+          ? t("watcherspanel.dotLooksEveryFewMinutes")
+          : t("watcherspanel.changeClipItLooksBy", { clip: clip(view.name, 60) }),
       body: form.element,
-      submitLabel: view === null ? "Add watcher" : "Save changes",
+      submitLabel: view === null ? t("watcherspanel.addWatcher") : t("watcherspanel.saveChanges"),
       size: "wide",
       // The rows are painted again once a watcher is saved: its Edit button is found anew.
       returnFocus: () => (view === null ? addButton : holder.querySelector(`[data-watcher="${view.id}"] [aria-label^="Edit "]`)),

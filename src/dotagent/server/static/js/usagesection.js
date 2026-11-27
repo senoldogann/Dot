@@ -24,9 +24,10 @@ import {
   windowName,
   windowShare,
 } from "./usagewords.js";
+import { t } from "./i18n.js";
 
 const DAYS = 7;
-const LEAD = `What your tasks used in the last ${DAYS} days: their time, the words the models read (in) and wrote (out), and how full your Claude plan is. The dollars are an estimate from the public price list of models.dev; a subscription such as your Claude plan has none.`;
+const LEAD = t("usagesection.whatYourTasksUsedIn", { DAYS });
 
 /** A thin bar `share` percent full. */
 function bar(share) {
@@ -38,7 +39,7 @@ function bar(share) {
 /** A window of the plan the tasks last saw: its name, how full it was and when it resets, with a bar when the plan said. */
 function windowRow(window, now) {
   const share = windowShare(window);
-  const row = setRow({ title: `Claude plan · ${windowName(window.kind)}`, lead: windowLine(window, now), body: share === null ? null : bar(share) });
+  const row = setRow({ title: t("usagesection.claudePlanWindowname", { windowName: windowName(window.kind) }), lead: windowLine(window, now), body: share === null ? null : bar(share) });
   row.dataset.usageWindow = window.kind;
   return row;
 }
@@ -52,14 +53,14 @@ function dayRow(day, days, today) {
 
 /** One of the tasks that used the most: the start of its goal, and its source, model, steps and tokens; it opens the task. */
 function topRow(run) {
-  const link = el("a", { href: `#/runs/${encodeURIComponent(run.run_id)}`, class: "usage-top-goal" }, run.goal === "" ? "Untitled task" : run.goal);
+  const link = el("a", { href: `#/runs/${encodeURIComponent(run.run_id)}`, class: "usage-top-goal" }, run.goal === "" ? t("usagesection.untitledTask") : run.goal);
   const row = setRow({ title: link, lead: topRunLine(run) });
   row.dataset.usageTop = run.run_id;
   return row;
 }
 
 const CAPS_LEAD =
-  "Millions of tokens, 0 for no cap. A task past a cap waits and asks you: Continue (as many again) or Stop; no answer stops it. It asks in every mode, Pay or send and free mode too.";
+  t("usagesection.millionsOfTokens0For");
 
 /** The caps of `view` (`GET /api/budget`), a box of millions for each, and today's tokens against them; a box changed is saved. */
 function capRows(view, repaint) {
@@ -67,7 +68,7 @@ function capRows(view, repaint) {
   const today = setRow({ title: todayLine(view), lead: view.by_source.map((entry) => `${sourceName(entry.source)} ${compact(entry.tokens)}`).join(" · ") });
   today.dataset.usageToday = "";
   const rows = CAPS.map(([key, label]) => {
-    const input = el("input", { class: "input", type: "number", min: "0", step: "1", inputmode: "numeric", value: capMillions(view.caps[key]), "aria-label": `${label}, millions of tokens` });
+    const input = el("input", { class: "input", type: "number", min: "0", step: "1", inputmode: "numeric", value: capMillions(view.caps[key]), "aria-label": t("usagesection.labelMillionsOfTokens", { label }) });
     input.addEventListener("change", async () => {
       const tokens = capTokens(input.value);
       if (tokens === null) {
@@ -76,14 +77,14 @@ function capRows(view, repaint) {
       }
       try {
         repaint(await api.put("/budget", { ...view.caps, [key]: tokens }));
-        toast("ok", tokens === 0 ? `${label}: no cap.` : `${label}: ${capMillions(tokens)}M tokens.`);
+        toast("ok", tokens === 0 ? t("usagesection.labelNoCap", { label }) : t("usagesection.labelCapmillionsMTokens", { label, capMillions: capMillions(tokens) }));
       } catch (error) {
         input.value = capMillions(view.caps[key]);
         toastError(error);
       }
     });
     const source = key.endsWith("_day_tokens") ? key.slice(0, -"_day_tokens".length) : null;
-    const used = source === null ? "" : `${compact(spent.get(source) ?? 0)} today`;
+    const used = source === null ? "" : t("usagesection.compactToday", { compact: compact(spent.get(source) ?? 0) });
     const row = setRow({ title: label, lead: used, control: input });
     row.dataset.usageCap = key;
     return row;
@@ -99,11 +100,11 @@ export function buildUsage() {
   const card = setCard(inlineLoading());
   const top = setCard();
   const caps = setCard();
-  const used = setSection({ title: "Usage", lead: LEAD, body: card });
+  const used = setSection({ title: t("usagesection.usage"), lead: LEAD, body: card });
   used.dataset.section = "usage";
-  const costliest = setSection({ title: "Tasks that used the most", lead: `The ${DAYS} days' costliest tasks, each with its own tokens (a helper is a task of its own).`, body: top });
+  const costliest = setSection({ title: t("usagesection.tasksThatUsedTheMost"), lead: t("usagesection.theDaysDaysCostliestTasks", { DAYS }), body: top });
   costliest.dataset.section = "usage-top";
-  const capped = setSection({ title: "Caps", lead: CAPS_LEAD, body: caps });
+  const capped = setSection({ title: t("usagesection.caps"), lead: CAPS_LEAD, body: caps });
   capped.dataset.section = "usage-caps";
   const element = el("div", { class: "set-sections" }, used, costliest, capped);
 
@@ -116,10 +117,10 @@ export function buildUsage() {
     const today = localDay(now);
     // The newest day first: what happened today is what the owner looks for.
     const days = [...usage.days].reverse();
-    const total = setRow({ title: `Last ${DAYS} days`, lead: totalLine(usage.days) });
+    const total = setRow({ title: t("usagesection.lastDaysDays", { DAYS }), lead: totalLine(usage.days) });
     total.dataset.usageTotal = "";
     card.replaceChildren(...usage.windows.map((window) => windowRow(window, now)), total, ...days.map((day) => dayRow(day, usage.days, today)));
-    top.replaceChildren(...(usage.top_runs.length === 0 ? [setRow({ title: "No tasks yet" })] : usage.top_runs.map(topRow)));
+    top.replaceChildren(...(usage.top_runs.length === 0 ? [setRow({ title: t("usagesection.noTasksYet") })] : usage.top_runs.map(topRow)));
   }
 
   async function load() {
