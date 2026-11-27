@@ -626,7 +626,9 @@ on from, since what a stranger wrote set it off: its goal is your own words and 
 a fence. So does every firing of a schedule a run made after it had read outside content (`schedule_create`, item
 899): its goal may hold those words; a change of yours in its form keeps the mark, and a schedule you make is yours.
 `recall` of such a schedule gives its name and goal in a fence and marks the run that reads them, and `schedule_list`
-marks the run when it lists one and names it (item 978). A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`),
+marks the run when it lists one and names it (item 978). A message you send starts a run unmarked, and
+a choice a run shows, in a page or a card, only writes its words into your message box: what a run wrote never goes out as
+your word on a tap (item 1967). A note a run saved while it was marked keeps that origin (`tainted`),
 as does one it saved after your message cleared its mark, since your words clear the run's mark, not the page's
 words a note may quote (item 899; a thing for later, `todo_add`, the same):
 it is never among the notes a run starts with, is handed while it works or in a site's note to a run (item 384), nor

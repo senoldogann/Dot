@@ -11762,6 +11762,17 @@
         }
       }
     },
+    "Show cards": {
+      "comment": "Tool row of Dot's own tool: cards shown in the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kart göster"
+          }
+        }
+      }
+    },
     "Show page": {
       "comment": "Tool row of Dot's own tool: a page shown in the chat",
       "localizations": {
