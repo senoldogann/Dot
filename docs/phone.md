@@ -366,6 +366,8 @@ never a layer over it. Its segments are the run's status with its Stop (**Workin
 **Waiting on 2 helpers** while the run has stopped for them, or **Chat updates interrupted** if only the chat stream
 drops), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**.
 A daemon outage appears in the shared line under the bar. The capsule appears only when it has something to say. A row too narrow says
+**Waiting on 2 helpers** while the run has stopped for them, **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
+each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
 "Working") and at 320 px, with everything to say, takes a second line that keeps the status and the Stop in words, never
 a scroll or a cut. A tap on a segment opens its detail as a sheet from the foot of the screen, one
