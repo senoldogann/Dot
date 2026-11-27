@@ -649,8 +649,8 @@ async def test_the_sidebar_and_the_pages_beside_it_say_what_they_mean(browser: B
         await reader.read("The sidebar while chats are chosen")
         await page.keyboard.press("Escape")
         await reader.go("/campaigns", "Campaigns", "main.page")
-        await reader.go("/agents", "Agents", "main.page")
-        await reader.opens("The form that makes an agent", page.get_by_role("button", name="New agent").first)
+        await reader.go("/agents", "Bots", "main.page")
+        await reader.opens("The form that makes a bot", page.get_by_role("button", name="New bot").first)
         # New team is under the page's "…" (item 1136).
         await page.get_by_role("button", name="More actions").first.click()
         await reader.opens("The form that makes a team", page.get_by_role("menuitem", name="New team"))
@@ -660,7 +660,7 @@ async def test_the_sidebar_and_the_pages_beside_it_say_what_they_mean(browser: B
         await reader.opens("The form of the morning brief", page.get_by_role("button", name="Morning brief settings"))
         # The form that adds a schedule is a page of the settings (item 1337).
         await reader.go(
-            "/settings/schedules/new", "Settings › Scheduled tasks › New schedule", ".settings-pane .set-card"
+            "/settings/schedules/new", "Settings › Scheduled tasks › New routine", ".settings-pane .set-card"
         )
         reader.done()
         await page.context.close()

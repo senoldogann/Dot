@@ -172,7 +172,7 @@ def _pill(page: Page, name: str) -> Locator:
 def _menu(page: Page, label: str) -> Locator:
     """The choices a menu named `label` held: the agent's still in its menu, the others in the chat's settings (item
     2015)."""
-    if label == "Agent":
+    if label == "Bot":
         return page.locator(f".dock .composer-popover[aria-label='{label}']")
     return menu(page, label)
 

@@ -46,8 +46,8 @@ _LOOKS: tuple[tuple[int, int, Literal["light", "dark"], Literal["en", "tr"]], ..
     (390, 844, "dark", "en"),
 )
 _WORDS: dict[str, dict[str, str]] = {
-    "en": {"search": "Search chats", "all": "All", "messages": "Messages", "bots": "Agents", "files": "Files"},
-    "tr": {"search": "Sohbetlerde ara", "all": "Tümü", "messages": "Mesajlar", "bots": "Ajanlar", "files": "Dosyalar"},
+    "en": {"search": "Search chats", "all": "All", "messages": "Messages", "bots": "Bots", "files": "Files"},
+    "tr": {"search": "Sohbetlerde ara", "all": "Tümü", "messages": "Mesajlar", "bots": "Botlar", "files": "Dosyalar"},
 }
 
 

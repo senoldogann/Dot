@@ -213,7 +213,7 @@ async def test_the_subagents_are_one_card_with_a_row_each_and_the_task_says_it_w
                         # Details opens the Agents tab.
                         await wait.get_by_role("button", name="Details").click()
                         await expect(page.locator(".inspector")).to_be_visible()
-                        await expect(page.get_by_role("tab", name=re.compile("^Agents"))).to_have_attribute(
+                        await expect(page.get_by_role("tab", name=re.compile("^Bots"))).to_have_attribute(
                             "aria-selected", "true"
                         )
                         # The Agents tab opens on the Lineage (item 1332): the task that leads, then its subagents
