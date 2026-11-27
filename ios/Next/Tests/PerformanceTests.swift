@@ -91,4 +91,19 @@ final class PerformanceTests: XCTestCase {
         XCTAssertEqual(rows.map(\.id), ["hangs", "crashes", "data", "reconnects"], "a measure the phone has not sent is no row")
         XCTAssertEqual(rows.first { $0.id == "hangs" }?.detail, String(localized: "None", comment: "Maintenance › Performance: no hang, no crash"))
     }
+
+    /// A whole answer is parsed once however often its row is drawn (owner 2026-11-27: scrolling a long chat stuttered
+    /// while each row coming into sight parsed its answer anew), and its blocks are those of the parse.
+    @MainActor func testAWholeAnswerIsParsedOnceHoweverOftenItsRowIsDrawn() {
+        let answer: String = "## Page \(UUID().uuidString)\n\nThe **build** waited.\n\n| Part | Time |\n|---|---|\n| one | 37 ms |\n\n```ts\nload()\n```"
+        let before: Int = PerfCounters.shared.answersParsed
+        let first: [DrawnBlock] = DrawnAnswers.blocks(of: answer)
+        let again: [DrawnBlock] = DrawnAnswers.blocks(of: answer)
+        XCTAssertEqual(PerfCounters.shared.answersParsed - before, 1, "the second drawing parsed nothing")
+        XCTAssertEqual(first.count, 4)
+        XCTAssertEqual(again.count, first.count)
+        guard case .table(let header, let rows, _) = first[2] else { return XCTFail("the third block is the table") }
+        XCTAssertEqual(header.map { String($0.characters) }, ["Part", "Time"])
+        XCTAssertEqual(rows.map { $0.map { String($0.characters) } }, [["one", "37 ms"]])
+    }
 }

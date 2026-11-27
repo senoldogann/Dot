@@ -11,8 +11,12 @@ final class PerfCounters {
 
     private(set) var publishes: Int = 0
     private(set) var revealSteps: Int = 0
+    /// How many whole answers were parsed for drawing (`DrawnAnswers`): once each, however often their rows are drawn.
+    private(set) var answersParsed: Int = 0
 
     func published() { publishes += 1 }
+
+    func parsed() { answersParsed += 1 }
 
     func revealed() { revealSteps += 1 }
 }

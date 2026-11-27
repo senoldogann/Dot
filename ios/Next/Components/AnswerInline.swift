@@ -133,6 +133,13 @@ private func attributedRange(_ range: Range<String.Index>, in words: String, run
     return lower..<upper
 }
 
+/// The size in points that words of `role` are drawn at, at the text size `type` (the environment's, which Settings ›
+/// Appearance may pin), as `TypeRoleModifier` reads it: the size of a reference's mark before them.
+func referenceSide(role: TypeRole, type: DynamicTypeSize) -> CGFloat {
+    let traits: UITraitCollection = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(type))
+    return UIFontMetrics(forTextStyle: role.uiTextStyle).scaledValue(for: role.points.size, compatibleWith: traits)
+}
+
 /// The words of an answer as one `Text`, each reference's mark drawn before it at the size of the words; a site's icon
 /// shows once fetched (`SiteIconBook`), a globe until then.
 struct ReferenceText: View {
@@ -167,10 +174,7 @@ struct ReferenceText: View {
 
     /// The words' size in points at the app's own text size (the environment's, which Settings › Appearance may pin),
     /// as `TypeRoleModifier` reads it.
-    private var side: CGFloat {
-        let traits: UITraitCollection = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
-        return UIFontMetrics(forTextStyle: role.uiTextStyle).scaledValue(for: role.points.size, compatibleWith: traits)
-    }
+    private var side: CGFloat { referenceSide(role: role, type: dynamicTypeSize) }
 
     /// A reference's mark, decorative to VoiceOver (the words after it say what it is).
     private func markText(_ mark: ReferenceMark) -> Text {
@@ -205,8 +209,33 @@ func markStarts(_ text: AttributedString) -> [ReferenceMark?] {
     return starts
 }
 
-/// An image of the app's catalog drawn as a decorative template image `side` points square.
+/// The marks drawn for the references of answers, by kind, name and size: each is drawn once while the app runs, not
+/// on every drawing of the words it stands in (owner 2026-11-27: scrolling a long chat stuttered; each row coming into
+/// sight drew its file and link marks anew). Template images, so one serves every colour and appearance.
+@MainActor private enum DrawnMarks {
+    static var images: [String: Image] = [:]
+
+    static func image(_ key: String, draw: () -> Image) -> Image {
+        if let held: Image = images[key] { return held }
+        let drawn: Image = draw()
+        images[key] = drawn
+        return drawn
+    }
+}
+
+/// An image of the app's catalog as a decorative template image `side` points square (drawn once, `DrawnMarks`).
 @MainActor private func decorativeAsset(_ name: String, side: CGFloat) -> Image {
+    DrawnMarks.image("asset:\(name)@\(side)") { drawAsset(name, side: side) }
+}
+
+/// An SF Symbol as a decorative template image at `side` points (drawn once, `DrawnMarks`): inside a `Text` a symbol
+/// image is read aloud by its name, a decorative image is not.
+@MainActor private func decorativeSymbol(_ name: String, side: CGFloat) -> Image {
+    DrawnMarks.image("symbol:\(name)@\(side)") { drawSymbol(name, side: side) }
+}
+
+/// An image of the app's catalog drawn as a decorative template image `side` points square.
+@MainActor private func drawAsset(_ name: String, side: CGFloat) -> Image {
     guard let asset: UIImage = UIImage(named: name) else { preconditionFailure("an image the app names is not in its catalog: \(name)") }
     let size: CGSize = CGSize(width: side, height: side)
     let image: UIImage = UIGraphicsImageRenderer(size: size).image { _ in asset.withTintColor(.black).draw(in: CGRect(origin: .zero, size: size)) }
@@ -214,9 +243,8 @@ func markStarts(_ text: AttributedString) -> [ReferenceMark?] {
     return Image(decorative: drawn, scale: image.scale).renderingMode(.template)
 }
 
-/// An SF Symbol drawn as a decorative template image at `side` points: inside a `Text` a symbol image is read aloud by
-/// its name, a decorative image is not.
-@MainActor private func decorativeSymbol(_ name: String, side: CGFloat) -> Image {
+/// An SF Symbol drawn as a decorative template image at `side` points.
+@MainActor private func drawSymbol(_ name: String, side: CGFloat) -> Image {
     let configuration: UIImage.SymbolConfiguration = UIImage.SymbolConfiguration(pointSize: side * 0.85, weight: .regular)
     guard let symbol: UIImage = UIImage(systemName: name, withConfiguration: configuration) else {
         preconditionFailure("an SF Symbol the app names does not exist: \(name)")
@@ -236,9 +264,17 @@ func markStarts(_ text: AttributedString) -> [ReferenceMark?] {
     private var drawn: [String: UIImage] = [:]
     @ObservationIgnored private var asked: Set<String> = []
 
+    /// How many of `sites` have their icon drawn at `side`, the size their words draw them at: a table's cells measure
+    /// by it (`TableMeasureKey`), as an icon takes a globe's place.
+    func drawnIcons(of sites: [URL], side: CGFloat) -> Int {
+        sites.filter { site in bareSite(site).map { drawn[iconKey(site: $0, side: side)] != nil } ?? false }.count
+    }
+
+    private func iconKey(site: String, side: CGFloat) -> String { "\(site)@\(Int(side.rounded()))" }
+
     func icon(for url: URL, side: CGFloat, fetches: Bool) -> UIImage? {
         guard let site: String = bareSite(url) else { return nil }
-        let key: String = "\(site)@\(Int(side.rounded()))"
+        let key: String = iconKey(site: site, side: side)
         if let held: UIImage = drawn[key] { return held }
         if fetches, !asked.contains(key), asked.count < Self.siteIconsAsked {
             asked.insert(key)

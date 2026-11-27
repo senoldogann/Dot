@@ -181,6 +181,9 @@ struct ChatScreen: View {
             .toastHost($toast, seconds: 4) { _ in }
             .onAppear {
                 PhaseMeter.enter("chat")
+                #if DEBUG
+                    AutoScroller.start()
+                #endif
                 // A chat the daemon has not named yet has no stream (item 2025): its outbox key is not opened, which the
                 // daemon would answer 404 and the chat would read as deleted; the named thread opens at the swap below.
                 if chatHasStream(thread, starting: model.startingChats) { model.open(thread) }
@@ -319,7 +322,10 @@ struct ChatScreen: View {
         // A row opened or closed by the owner stays where it is: the follow stops (see `disclosureToggled`).
         .environment(\.disclosureToggled, { pinned = false })
         .scrollDismissesKeyboard(.interactively)
-        .onScrollPhaseChange { _, now in ownerScrolls = now == .interacting || now == .decelerating }
+        .onScrollPhaseChange { old, now in
+            ownerScrolls = now == .interacting || now == .decelerating
+            ScrollMeter.phase(from: old, to: now, list: "chat")
+        }
         // Follow new words only while the owner is at the end (plan §13 S5, item 1848): their own scroll away stops it,
         // their scroll back to the end starts it again; words that grow the transcript never stop it.
         .onScrollGeometryChange(for: Bool.self) { geometry in
