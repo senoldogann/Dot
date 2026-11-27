@@ -13,7 +13,8 @@ frameworks or asks the owner's developer tools whether this Mac can write down: 
 ``GET /api/voice``, and answers that the Mac cannot. The tests of the microphone's recording point it at a stand-in.
 
 ``--part k/n`` keeps the files of one part of n (item 944): the gate runs the smoke tests in two parts, on two runners
-at once, the files dealt to the parts in turn by their sorted paths, so that a new file joins a part by itself."""
+at once, the files of the tests' folders dealt to the parts in turn by their sorted paths, so that a new file joins a
+part by itself and a retry of the failed tests alone keeps each in its part."""
 
 import fcntl
 import os
@@ -52,6 +53,15 @@ def files_of_part(files: list[str], part: int, parts: int) -> set[str]:
     return set(sorted(set(files))[part - 1 :: parts])
 
 
+def _test_files_beside(config: pytest.Config, items: list[pytest.Item]) -> list[str]:
+    """Every test file in the folders the collected tests come from, as their node ids name them: the parts are dealt
+    from these rather than from what was collected, so that a run of the failed tests alone (``--last-failed``, the
+    gate's retry) keeps each file in the part it ran in. Dealt from the collected files, a retry of one file of part 2
+    dealt it to part 1, and the retry ran no test and failed (exit 5)."""
+    folders: set[Path] = {item.path.parent for item in items}
+    return [path.relative_to(config.rootpath).as_posix() for folder in folders for path in folder.glob("test_*.py")]
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     said: str | None = config.getoption("--part")
     if said is None:
@@ -59,9 +69,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     part_text, _, parts_text = said.partition("/")
     if not (part_text.isdigit() and parts_text.isdigit()):
         raise pytest.UsageError(f"--part takes k/n, as 1/2, not {said!r}")
-    kept_files: set[str] = files_of_part(
-        [item.nodeid.split("::")[0] for item in items], int(part_text), int(parts_text)
-    )
+    kept_files: set[str] = files_of_part(_test_files_beside(config, items), int(part_text), int(parts_text))
     kept: list[pytest.Item] = [item for item in items if item.nodeid.split("::")[0] in kept_files]
     dropped: list[pytest.Item] = [item for item in items if item.nodeid.split("::")[0] not in kept_files]
     config.hook.pytest_deselected(items=dropped)

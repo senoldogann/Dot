@@ -125,7 +125,9 @@ async def _served(
                 assert not serving.done(), "the server stopped while starting"
                 await asyncio.sleep(0.05)
             headers: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
-            async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}", headers=headers) as client:
+            async with httpx.AsyncClient(
+                base_url=f"http://127.0.0.1:{port}", headers=headers, timeout=WAIT_S
+            ) as client:
                 yield runtime, manager, client
         finally:
             for gate in model.gates.values():
@@ -165,6 +167,18 @@ async def _ended(runtime: Runtime, run_id: str) -> RunRecord:
 
     await _until(done, f"the end of {run_id}")
     return await runtime.store.get_run(run_id)
+
+
+async def _tasks_of(runtime: Runtime, chat_id: str) -> list[str]:
+    """What each task of the chat ``chat_id`` stands as: its runs' goals and statuses, its queue and its hold, for the
+    message of a wait that timed out."""
+    told: list[str] = []
+    for thread_id in (chat_id, *await runtime.store.lanes_of(chat_id)):
+        runs: list[str] = [f"{run.goal!r} {run.status}" for run in await runtime.store.list_runs(5, thread_id)]
+        queued: list[str] = [message.text for message in await runtime.store.list_queued(thread_id)]
+        hold: str | None = await runtime.store.queue_hold_reason(thread_id)
+        told.append(f"{thread_id}: runs {runs}, queued {queued}, held {hold}")
+    return told
 
 
 async def _newest(runtime: Runtime, thread_id: str) -> RunRecord:
@@ -376,7 +390,10 @@ async def test_move_sends_a_message_elsewhere_and_a_task_past_the_cap_waits_for_
         async def took() -> bool:
             return (await _newest(runtime, chat.thread_id)).goal == "Thanks for the report."
 
-        await _until(took, "the task that waited for a free one")
+        try:
+            await _until(took, "the task that waited for a free one")
+        except AssertionError as missed:
+            raise AssertionError(f"{missed}; the chat stands as {await _tasks_of(runtime, chat.thread_id)}") from missed
         assert await runtime.store.queue_hold_reason(chat.thread_id) is None
 
 
