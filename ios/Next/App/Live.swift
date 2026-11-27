@@ -613,6 +613,7 @@ struct BotNewChat: View {
             .padding(.bottom, Space.xs)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("botNewChat")
         .background(Tone.ground)
         .navigationTitle(botChat == nil ? bot?.record.name ?? "" : "")
         .navigationBarTitleDisplayMode(.inline)

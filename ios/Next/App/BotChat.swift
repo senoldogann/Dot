@@ -133,7 +133,10 @@ struct BotChatScreen: View {
 
     @ViewBuilder private func content(_ bot: Bot) -> some View {
         let shown: String? = botChatThread(
-            chosen: chosen, route: route.thread, held: held, latest: bot.latest?.summary.id, deleted: { model.chats[$0]?.freshness == .deleted })
+            chosen: chosen, route: route.thread, held: held, latest: bot.latest?.summary.id,
+            // A chat being deleted is gone from the moment the delete is under way, not once its own stream says so (item
+            // 1985: while twenty chats were deleted, Dot's screen opened the one it held and waited on it, "Syncing…").
+            deleted: { model.goneChats.contains($0) || model.chats[$0]?.freshness == .deleted })
         if let key = shown, model.startingChats[key] != nil {
             StartingChat(key: key)
         } else if let thread = shown {
