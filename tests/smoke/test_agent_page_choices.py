@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from chat_settings import menu, open_for
 from playwright.async_api import Browser, BrowserContext, FloatRect, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -135,7 +136,11 @@ def _pill(page: Page, name: str) -> Locator:
 
 
 def _menu(page: Page, label: str) -> Locator:
-    return page.locator(f".composer-popover[aria-label='{label}']")
+    """The choices a menu named `label` held: the agent's still in its menu, the others in the chat's settings (item
+    2015)."""
+    if label == "Agent":
+        return page.locator(f".composer-popover[aria-label='{label}']")
+    return menu(page, label)
 
 
 async def _run_of(runtime: Runtime, run_id: str) -> RunRecord:
@@ -200,10 +205,10 @@ async def test_the_agents_box_starts_from_the_agents_bounds_and_a_choice_there_s
             # A choice made in its box goes with that message, and the home's choices stay as they were.
             await page.goto(f"{served}/#/agents/{scout}")
             await expect(page.locator(BOX)).to_be_visible()
-            await _pill(page, "options").click()
+            await open_for(page, page, "options")
             await _menu(page, "Options").locator(".pop-option[data-mode='supervised']").click()
             await page.keyboard.press("Escape")
-            await _pill(page, "reasoning").click()
+            await open_for(page, page, "reasoning")
             await _menu(page, "Reasoning").get_by_role("option", name="High").click()
             await page.keyboard.press("Escape")
             second: str = await _sent(page, "Check them against the register")

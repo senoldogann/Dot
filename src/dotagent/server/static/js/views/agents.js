@@ -9,6 +9,7 @@
 // agent under the list's "…". A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
+import { emptyBoxWords } from "../composershape.js";
 import { sendToWork } from "../sendwork.js";
 import { AGENTS_CHANGED_EVENT, api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
@@ -1175,7 +1176,7 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
   const frame = composerFrame({
     label: `Message ${name}`,
     boxLabel: "Message",
-    placeholder: `Message ${name}`,
+    placeholder: emptyBoxWords(name, true),
     maxPx: MAX_GOAL_PX,
     commands: MESSAGE_MODES.map((option) => ({
       label: `/${option.id}`,

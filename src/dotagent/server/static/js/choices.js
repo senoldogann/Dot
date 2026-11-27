@@ -10,8 +10,7 @@ import { el, modelName } from "./dom.js";
 import { t } from "./i18n.js";
 import { allModels, levelLabel, offersChoice, ONE_MESSAGE, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
-import { PHONE } from "./layout.js";
-import { defaultRowText, modelPicker, modelSections } from "./modelpicker.js";
+import { defaultRowText, modelSections } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
 import { providerMark, providerOf } from "./providers.js";
 import { approvalBadge, approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
@@ -335,15 +334,8 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     if (onceFor(selectedInfo()) === null) {
       once = null;
     }
-    // The sheet of a phone stays open after a pick; the menu over a Mac's box closes.
-    const sheet = PHONE.matches;
-    if (!sheet) {
-      modelMenu.close();
-    }
+    // The chat's settings stay open after a pick, on every width (item 2015, as the phone's sheet does).
     paintModel();
-    if (!sheet) {
-      modelPill.element.focus();
-    }
     onChange();
   }
 
@@ -444,8 +436,6 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     return true;
   }
 
-  // The model's menu (item 208): the favourites and the providers on a rail, a search, a star on each model.
-  const picker = modelPicker({ onPick: pickModel, onMakeDefault: makeDefault });
   function modelArgs() {
     const fallback = defaultRefOf(getSnapshot());
     return { groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) };
@@ -506,19 +496,13 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     };
   }
 
+  // The model's pill opens the chat's settings on every width (item 2015, as DotNext's chip does): the same sheet, from
+  // the foot of a phone's screen and over the middle of a wider window's.
   function makeModelMenu() {
-    return PHONE.matches
-      ? phoneSheet({ anchor: modelPill.element, title: t("choices.chatSettings"), build: settingsParts })
-      : anchoredPopover({ anchor: modelPill.element, frame: frame.element, label: t("choices.model"), build: () => picker.build(modelArgs()) });
+    return phoneSheet({ anchor: modelPill.element, title: t("choices.chatSettings"), build: settingsParts });
   }
-  let modelMenu = makeModelMenu();
+  const modelMenu = makeModelMenu();
   repaintSettings = () => modelMenu.repaint();
-  // A window that crosses a phone's width takes the other menu.
-  function onLayout() {
-    modelMenu.dispose();
-    modelMenu = makeModelMenu();
-  }
-  PHONE.addEventListener("change", onLayout);
 
   paintPhonePill = () => {
     const option = modes.find((candidate) => candidate.id === modeId);
@@ -610,7 +594,6 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     },
     dispose: () => {
       unwatch();
-      PHONE.removeEventListener("change", onLayout);
       optionsMenu.dispose();
       modeMenu.dispose();
       modelMenu.dispose();

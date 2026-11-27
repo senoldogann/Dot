@@ -397,7 +397,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.wait_for_timeout(_SETTLE_MS)
             assert await page_ui.locator(".agent-who .home-name").inner_text() == "Scout"
             assert (
-                await page_ui.locator("textarea[aria-label='Message']").get_attribute("placeholder") == "Message Scout"
+                await page_ui.locator("textarea[aria-label='Message']").get_attribute("placeholder") == "Ask Scout"
             )
             # The box starts on Auto, as the home's does (item 513): no mode pill until /task, /chat or /research names
             # one, and /auto goes back.
