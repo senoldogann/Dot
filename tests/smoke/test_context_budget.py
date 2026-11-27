@@ -142,7 +142,7 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # the browser as the last resort): start on the page's direct address, one tab, no snapshot after an act for what its
 # result showed, and a helper's browser brief names where to start, when to stop and what to report. A week of the
 # owner's runs held 52 new tabs, 56 tab switches, 33 pages opened again and 16 snapshots right after an act, each a model
-# turn of thousands of tokens. On main of item 1967: 34,807 measured here (system 9,313, tools 25,323), 50 more being
+# turn of thousands of tokens. On main of 2026-11-27 13:00: 34,844 measured here (system 9,313, tools 25,361), the rest
 # room for the gate's runner's longer paths.
 BUDGET_TOKENS: int = 34_900
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the

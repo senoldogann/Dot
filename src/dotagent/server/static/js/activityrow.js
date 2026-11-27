@@ -7,6 +7,7 @@ import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { icon } from "./icons.js";
 import { statusBadge } from "./panels.js";
+import { t } from "./i18n.js";
 
 export const LIFECYCLE_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback"]);
 
@@ -25,11 +26,11 @@ const KIND_ICON = {
 
 const KIND_WORD = {
   run: "task",
-  delegated: "helper's task",
-  campaign: "campaign session",
+  delegated: t("activityrow.helperSTask"),
+  campaign: t("activityrow.campaignSession"),
   approval: "approval",
   question: "question",
-  takeover: "taken over",
+  takeover: t("activityrow.takenOver"),
   schedule: "schedule",
   reflection: "reflection",
   lesson: "lesson",
@@ -40,11 +41,11 @@ const KIND_WORD = {
 function rowFacts(item) {
   const facts = [KIND_WORD[item.kind] ?? item.kind, item.channel, item.detail].filter((part) => part !== "");
   if (item.steps !== null && item.steps > 0 && item.minutes === null) {
-    facts.push(item.steps === 1 ? "1 step" : `${item.steps} steps`);
+    facts.push(item.steps === 1 ? "1 step" : t("activityrow.stepsSteps", { steps: item.steps }));
   }
   if (item.minutes !== null) {
     // A run that ended: how long it took and what it cost in tokens.
-    facts.push(duration(item.minutes * 60), `usage ${compact(item.tokens)}`);
+    facts.push(duration(item.minutes * 60), t("activityrow.usageCompact", { compact: compact(item.tokens) }));
   }
   return facts;
 }

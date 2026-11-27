@@ -26,7 +26,7 @@ export function recapSection({ runId, earlierRunId = null, signal }) {
   const meta = el("div", { class: "small muted recap-meta" });
   const again = el(
     "button",
-    { class: "icon-btn", type: "button", title: "Write the recap again", "aria-label": "Write the recap again" },
+    { class: "icon-btn", type: "button", title: t("recap.writeTheRecapAgain"), "aria-label": t("recap.writeTheRecapAgain") },
     icon("refresh"),
   );
   const body = el("div", { class: "recap", "aria-live": "polite" }, text, meta);
@@ -65,7 +65,7 @@ export function recapSection({ runId, earlierRunId = null, signal }) {
   function paint(view) {
     section.element.hidden = !view.enabled;
     if (view.recap === null) {
-      text.replaceChildren(el("p", { class: "muted" }, "A recap comes once the task has taken a few steps."));
+      text.replaceChildren(el("p", { class: "muted" }, t("recap.aRecapComesOnceThe")));
       meta.textContent = "";
       earlierRecap().then((before) => {
         // Only while this run still has none: its own, once written, has painted over this.
@@ -73,18 +73,18 @@ export function recapSection({ runId, earlierRunId = null, signal }) {
           return;
         }
         text.replaceChildren(...before.text.split("\n").map((line) => el("p", null, line)));
-        meta.textContent = `From the task before · ${modelName(before.model)} · Updated ${hourMinute(before.written_at)}. This task's own comes once it has taken a few steps.`;
+        meta.textContent = t("recap.fromTheTaskBeforeModelname", { modelName: modelName(before.model), hourMinute: hourMinute(before.written_at) });
       });
       return;
     }
     shown = true;
     text.replaceChildren(...view.recap.text.split("\n").map((line) => el("p", null, line)));
     const behind = view.steps > view.recap.steps ? ` of ${view.steps}` : "";
-    meta.textContent = `As of step ${view.recap.steps}${behind} · ${modelName(view.recap.model)} · Updated ${hourMinute(view.recap.written_at)}`;
+    meta.textContent = t("recap.asOfStepStepsBehind", { steps: view.recap.steps, behind, modelName: modelName(view.recap.model), hourMinute: hourMinute(view.recap.written_at) });
   }
 
   function failed(error) {
-    meta.textContent = `The recap could not be written: ${error.message}`;
+    meta.textContent = t("recap.theRecapCouldNotBe", { message: error.message });
   }
 
   async function write(force) {
@@ -94,7 +94,7 @@ export function recapSection({ runId, earlierRunId = null, signal }) {
     writing = true;
     again.disabled = true;
     body.setAttribute("aria-busy", "true");
-    meta.textContent = "Writing a recap…";
+    meta.textContent = t("recap.writingARecap");
     try {
       paint(await api.post(`/runs/${runId}/recap`, { force }));
       stalled = false;

@@ -13,6 +13,7 @@ import { api } from "./api.js";
 import { el, plural, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
+import { t, tCount, listAnd } from "./i18n.js";
 
 // How many of the files stand by name; the rest are counted.
 const NAMED = 3;
@@ -26,7 +27,7 @@ export function shownEdits(edits) {
 
 /** "a file" or "2 files". */
 function files(count) {
-  return count === 1 ? "a file" : `${count} files`;
+  return count === 1 ? "a file" : t("runchanges.countFiles", { count });
 }
 
 /** What the run did to `edits` in words: "Created a file", "Changed 3 files", "Created 2 files and changed 1". A file
@@ -35,21 +36,21 @@ export function changedWords(edits) {
   const created = edits.filter((edit) => edit.action === "delete").length;
   const changed = edits.length - created;
   if (created === 0) {
-    return `Changed ${files(changed)}`;
+    return t("runchanges.changedFiles", { files: files(changed) });
   }
   if (changed === 0) {
-    return `Created ${files(created)}`;
+    return t("runchanges.createdFiles", { files: files(created) });
   }
-  return `Created ${files(created)} and changed ${changed}`;
+  return t("runchanges.createdFilesAndChangedChanged", { files: files(created), changed });
 }
 
 // What a step outside the undo journal is called, by its category (`outside` of `GET /runs/{id}/actions`).
 const OUTSIDE_NOUNS = {
   shell: ["command", "commands"],
-  browser: ["browser action", "browser actions"],
-  desktop: ["desktop action", "desktop actions"],
-  message: ["message step", "message steps"],
-  app: ["connected app action", "connected app actions"],
+  browser: [t("runchanges.browserAction"), t("runchanges.browserActions")],
+  desktop: [t("runchanges.desktopAction"), t("runchanges.desktopActions")],
+  message: [t("runchanges.messageStep"), t("runchanges.messageSteps")],
+  app: [t("runchanges.connectedAppAction"), t("runchanges.connectedAppActions")],
 };
 
 /**
@@ -63,9 +64,9 @@ export function outsideWords(outside) {
     return "";
   }
   const parts = counted.map((item) => plural(item.steps, ...OUTSIDE_NOUNS[item.category]));
-  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  const list = listAnd(parts);
   const total = counted.reduce((sum, item) => sum + item.steps, 0);
-  return `Dot also ran ${list}. Undo takes back files only, so it cannot take ${total === 1 ? "this" : "these"} back.`;
+  return t(total === 1 ? "runchanges.alsoRanOne" : "runchanges.alsoRanMany", { list });
 }
 
 /**
@@ -80,21 +81,21 @@ export function accountWords(account) {
   const unseen = acts.contradicted + acts.uncertain + acts.not_checked;
   if (acts.verified + unseen + acts.failed > 0) {
     const parts = [
-      acts.not_checked === 0 ? "" : `${acts.not_checked} not checked`,
-      acts.uncertain === 0 ? "" : `${acts.uncertain} uncertain`,
-      acts.contradicted === 0 ? "" : `${acts.contradicted} contradicted`,
+      acts.not_checked === 0 ? "" : t("runchanges.notCheckedNotChecked", { not_checked: acts.not_checked }),
+      acts.uncertain === 0 ? "" : t("runchanges.uncertainUncertain", { uncertain: acts.uncertain }),
+      acts.contradicted === 0 ? "" : t("runchanges.contradictedContradicted", { contradicted: acts.contradicted }),
     ].filter((part) => part !== "");
-    const failed = acts.failed === 0 ? "" : ` ${plural(acts.failed, "step", "steps")} failed.`;
-    words.push(`Checked on the page or the screen: ${acts.verified} seen to hold${unseen === 0 ? "" : `, ${unseen} not (${parts.join(", ")})`}.${failed}`);
+    const failed = acts.failed === 0 ? "" : t("runchanges.partFailed", { part: tCount(acts.failed, "runchanges.countStep", "runchanges.countSteps") });
+    words.push(t("runchanges.checkedOnThePageOr", { verified: acts.verified, value: unseen === 0 ? "" : t("runchanges.unseenNotJoin", { unseen, join: parts.join(", ") }), failed }));
   }
   if (account.sent_count > 0) {
-    words.push(`Sent ${plural(account.sent_count, "thing", "things")}: ${account.sent.join("; ")}.`);
+    words.push(t("runchanges.sentPartJoin", { part: tCount(account.sent_count, "runchanges.countThing", "runchanges.countThings"), join: account.sent.join("; ") }));
   }
   if (account.unshown.length > 0) {
-    words.push(`Marked done with no tool result that shows it: ${account.unshown.join("; ")}.`);
+    words.push(t("runchanges.markedDoneWithNoTool", { join: account.unshown.join("; ") }));
   }
   if (account.open_steps.length > 0) {
-    words.push(`Left open: ${account.open_steps.join("; ")}.`);
+    words.push(t("runchanges.leftOpenJoin", { join: account.open_steps.join("; ") }));
   }
   return words;
 }
@@ -105,17 +106,17 @@ export function undoQuestion(ready, shown) {
   const restored = ready.length - deleted;
   const parts = [];
   if (restored > 0) {
-    parts.push(`${restored === 1 ? "A file goes" : `${restored} files go`} back as it was before the task`);
+    parts.push(t("runchanges.valueBackAsItWas", { value: restored === 1 ? t("runchanges.aFileGoes") : t("runchanges.restoredFilesGo", { restored }) }));
   }
   if (deleted > 0) {
-    parts.push(`${deleted === 1 ? "the file it created is" : `the ${deleted} files it created are`} deleted`);
+    parts.push(deleted === 1 ? t("runchanges.createdFileDeleted") : t("runchanges.createdFilesDeleted", { deleted }));
   }
   // A file changed since the run (a conflict) apart from one that cannot go back for another reason.
   const conflicts = shown.filter((edit) => edit.state === "conflict").length;
   const cannot = shown.filter((edit) => edit.state === "cannot").length;
   const stays = [
-    conflicts === 0 ? "" : ` ${conflicts === 1 ? "A file changed since stays as it is." : `${conflicts} files changed since stay as they are.`}`,
-    cannot === 0 ? "" : ` ${cannot === 1 ? "A file that cannot go back stays as it is." : `${cannot} files that cannot go back stay as they are.`}`,
+    conflicts === 0 ? "" : ` ${conflicts === 1 ? t("runchanges.aFileChangedSinceStays") : t("runchanges.conflictsFilesChangedSinceStay", { conflicts })}`,
+    cannot === 0 ? "" : ` ${cannot === 1 ? t("runchanges.aFileThatCannotGo") : t("runchanges.cannotFilesThatCannotGo", { cannot })}`,
   ].join("");
   const said = parts.join(", and ");
   return `${said.charAt(0).toUpperCase()}${said.slice(1)}.${stays}`;
@@ -133,7 +134,7 @@ function baseName(path) {
  * run's undo plan and draws the card, which stays empty and hidden for a run that changed no file.
  */
 export function runChangesCard({ runId, onReview, onUndone }) {
-  const element = el("section", { class: "run-changes", "aria-label": "What the task changed", hidden: true });
+  const element = el("section", { class: "run-changes", "aria-label": t("runchanges.whatTheTaskChanged"), hidden: true });
   // Whether this card's Undo took files back: only then does an empty plan say the changes were taken back. A file the
   // run changed and changed back, or one the owner put back by hand, leaves nothing to say.
   let undone = false;
@@ -149,7 +150,7 @@ export function runChangesCard({ runId, onReview, onUndone }) {
     const accountLine =
       account.length === 0 ? null : el("div", { class: "run-changes-account", dataset: { account: "" } }, ...account.map((line) => el("p", null, line)));
     if (shown.length === 0) {
-      const taken = undone ? [icon("undo"), el("span", { class: "run-changes-words" }, "Its file changes were taken back.")] : [];
+      const taken = undone ? [icon("undo"), el("span", { class: "run-changes-words" }, t("runchanges.itsFileChangesWereTaken"))] : [];
       element.replaceChildren(...taken, ...[outsideLine, accountLine].filter((part) => part !== null));
       element.hidden = !undone && outsideLine === null && accountLine === null;
       return;
@@ -169,10 +170,10 @@ export function runChangesCard({ runId, onReview, onUndone }) {
       "button",
       { class: "btn ghost sm", type: "button", disabled: ready.length === 0, onclick: () => takeBack() },
       icon("undo"),
-      el("span", null, "Undo"),
+      el("span", null, t("runchanges.undo")),
     );
     if (ready.length === 0) {
-      undo.title = "No file can go back as the task left it";
+      undo.title = t("runchanges.noFileCanGoBack");
     }
     // The native replaceChildren writes a null as the word: a line that is not there is left out first.
     element.replaceChildren(
@@ -182,7 +183,7 @@ export function runChangesCard({ runId, onReview, onUndone }) {
         el(
           "div",
           { class: "run-changes-actions" },
-          onReview === null ? null : el("button", { class: "btn ghost sm", type: "button", onclick: onReview }, "Review"),
+          onReview === null ? null : el("button", { class: "btn ghost sm", type: "button", onclick: onReview }, t("runchanges.review")),
           undo,
         ),
         outsideLine,
@@ -215,14 +216,14 @@ export function runChangesCard({ runId, onReview, onUndone }) {
     if (ready.length === 0 || !now.ended) {
       draw(now);
       if (!now.ended) {
-        toast("error", "Undo waits for the task and its helpers to end.");
+        toast("error", t("runchanges.undoWaitsForTheTask"));
       }
       return;
     }
     const confirmed = await confirmDialog({
-      title: "Take back what this task changed?",
+      title: t("runchanges.takeBackWhatThisTask"),
       message: undoQuestion(ready, shown),
-      confirmLabel: "Undo",
+      confirmLabel: t("runchanges.undo"),
       danger: true,
       focusCancel: true,
     });

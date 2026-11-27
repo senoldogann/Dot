@@ -23,6 +23,7 @@ from dotagent.plugins.manifest import PluginVariables, parse_manifest, parse_ser
 from dotagent.plugins.types import McpServerJson, PluginCatalog
 from dotagent.server.app import STATIC_DIR as STATIC
 from dotagent.skills.catalog import (
+    _READ,
     BUILTIN_SKILLS,
     BUILTIN_SOURCE,
     SkillRoot,
@@ -761,3 +762,23 @@ def test_the_prompt_asks_for_the_smallest_fitting_work_and_for_looking_things_up
     assert "simplest approach that fully does it" in prompt
     assert "look it up before acting" in prompt
     assert "use what is already installed" in prompt
+
+
+def test_a_skill_file_is_parsed_once_while_it_stays_and_again_once_it_changes(tmp_path: Path) -> None:
+    """Item 2004: a run's start reads every skill; a SKILL.md unchanged since it was read is not parsed again (the
+    same skill comes back), and one that changed, even within the same second, is."""
+    root: Path = tmp_path / "skills"
+    folder: Path = _skill_dir(root, "notes", "---\nname: notes\ndescription: Keep the notes.\n---\n\nWrite them.\n")
+    roots: tuple[SkillRoot, ...] = (SkillRoot(path=root, source="home"),)
+    first: Skill = load_catalog(roots).skills[0]
+    assert load_catalog(roots).skills[0] is first
+    (folder / "SKILL.md").write_text(
+        "---\nname: notes\ndescription: Keep the notes, dated.\n---\n\nWrite them.\n", encoding="utf-8"
+    )
+    stat: os.stat_result = (folder / "SKILL.md").stat()
+    os.utime(folder / "SKILL.md", ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
+    assert load_catalog(roots).skills[0].description == "Keep the notes, dated."
+    # A skill whose file is gone is not kept.
+    (folder / "SKILL.md").unlink()
+    assert load_catalog(roots).skills == ()
+    assert all(path != str(folder / "SKILL.md") for path, _ in _READ)

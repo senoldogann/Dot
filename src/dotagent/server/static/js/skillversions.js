@@ -4,15 +4,16 @@
 // its own, so that the put-back can be taken back: the steps the skill has now stay in the list.
 
 import { api } from "./api.js";
-import { dateTime, dateTimeFull, el, plural } from "./dom.js";
+import { dateTime, dateTimeFull, el, } from "./dom.js";
 import { icon } from "./icons.js";
 import { countChanges, describeVersion, markOf, stepChanges } from "./skilldiff.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
+import { t, tCount } from "./i18n.js";
 
 /** @typedef {import("./skilldiff.js").StepChange} StepChange */
 
 // What a line of a version's steps says of the step, for a reader that does not see its colour.
-const SIGN_WORDS = { "+": "Added", "-": "Dropped", " ": "" };
+const SIGN_WORDS = { "+": t("skillversions.added"), "-": t("skillversions.dropped"), " ": "" };
 
 /**
  * The steps a version changed from the one before it: each step once, an added one marked and a dropped one struck
@@ -43,8 +44,8 @@ function stepsList(before, after) {
           "div",
           { class: "hint version-counts" },
           counts.added + counts.dropped === 0
-            ? "The steps are the same as the version before."
-            : `${plural(counts.added, "step", "steps")} added, ${plural(counts.dropped, "step", "steps")} dropped, ${counts.kept} kept.`,
+            ? t("skillversions.theStepsAreTheSame")
+            : t("skillversions.partAddedPart2DroppedKept", { part: tCount(counts.added, "skillversions.countStep", "skillversions.countSteps"), part2: tCount(counts.dropped, "skillversions.countStep", "skillversions.countSteps"), kept: counts.kept }),
         );
   return [note, list];
 }
@@ -55,11 +56,11 @@ function restoreQuestion(skill, detail, current) {
   const marked =
     detail.note.tainted === false
       ? ""
-      : " This version carries the mark of content other people can write, so tasks are offered it with the web addresses, commands and file names in its steps withheld.";
+      : t("skillversions.thisVersionCarriesTheMark");
   return {
-    title: `Put version ${detail.note.n} of ${skill.name} back?`,
-    message: `Its steps become version ${made}. The steps the skill has now stay as version ${current.note.n}, so this can be taken back.${marked}`,
-    confirmLabel: "Put it back",
+    title: t("skillversions.putVersionNOfName", { n: detail.note.n, name: skill.name }),
+    message: t("skillversions.itsStepsBecomeVersionMade", { made, n: current.note.n, marked }),
+    confirmLabel: t("skillversions.putItBack"),
     focusCancel: true,
   };
 }
@@ -70,23 +71,23 @@ function versionBlock(detail, earlier, current, onRestore) {
   const mark = markOf(note.tainted);
   const restore = detail.current
     ? null
-    : el("button", { class: "btn ghost sm", type: "button", title: `Put version ${note.n} back as the skill's steps` }, icon("undo"), "Restore");
+    : el("button", { class: "btn ghost sm", type: "button", title: t("skillversions.putVersionNBackAs", { n: note.n }) }, icon("undo"), t("skillversions.restore"));
   if (restore !== null) {
     restore.addEventListener("click", () => onRestore(detail, current));
   }
   const by =
     note.run_id === null || note.run_id === ""
       ? null
-      : el("a", { href: `#/runs/${encodeURIComponent(note.run_id)}` }, "Open the task");
+      : el("a", { href: `#/runs/${encodeURIComponent(note.run_id)}` }, t("skillversions.openTheTask"));
   return el(
     "div",
     { class: "version-block", dataset: { version: String(note.n), current: String(detail.current) } },
     el(
       "div",
       { class: "version-head" },
-      el("span", { class: "version-number" }, `Version ${note.n}`),
-      detail.current ? el("span", { class: "badge b-ok" }, "Current") : null,
-      mark === null ? null : el("span", { class: "badge b-warn", title: "Tasks are offered these steps with addresses, commands and file names withheld." }, icon("alert"), mark),
+      el("span", { class: "version-number" }, t("skillversions.versionN", { n: note.n })),
+      detail.current ? el("span", { class: "badge b-ok" }, t("skillversions.current")) : null,
+      mark === null ? null : el("span", { class: "badge b-warn", title: t("skillversions.tasksAreOfferedTheseSteps") }, icon("alert"), mark),
       el("span", { class: "grow" }),
       restore,
     ),
@@ -105,15 +106,15 @@ function versionBlock(detail, earlier, current, onRestore) {
 export function showVersions(skill, onChanged) {
   return new Promise((resolve) => {
     const dialog = el("dialog", { class: "modal versions-dialog", "aria-labelledby": "versions-title" });
-    const body = el("div", { class: "versions-list" }, el("div", { class: "hint" }, "Reading the versions…"));
-    const close = el("button", { class: "btn", type: "button", onclick: () => dialog.close() }, "Close");
+    const body = el("div", { class: "versions-list" }, el("div", { class: "hint" }, t("skillversions.readingTheVersions")));
+    const close = el("button", { class: "btn", type: "button", onclick: () => dialog.close() }, t("skillversions.close"));
 
     async function restore(detail, current) {
       if (!(await confirmDialog(restoreQuestion(skill, detail, current)))) {
         return;
       }
       const page = await api.post(`/skills/learned/${encodeURIComponent(skill.name)}/restore`, { version: detail.note.n });
-      toast("ok", `Put version ${detail.note.n} of ${skill.name} back.`);
+      toast("ok", t("skillversions.putVersionNOfName2", { n: detail.note.n, name: skill.name }));
       onChanged(page.items);
       await load();
     }
@@ -131,7 +132,7 @@ export function showVersions(skill, onChanged) {
         const view = await api.get(`/skills/learned/${encodeURIComponent(skill.name)}/versions`);
         paint(view.items);
       } catch (error) {
-        body.replaceChildren(el("p", { class: "hint", role: "alert" }, `The versions could not be read: ${error.message}`));
+        body.replaceChildren(el("p", { class: "hint", role: "alert" }, t("skillversions.theVersionsCouldNotBe", { message: error.message })));
       }
     }
 
@@ -139,8 +140,8 @@ export function showVersions(skill, onChanged) {
       el(
         "div",
         { class: "modal-body" },
-        el("h3", { id: "versions-title" }, `Versions of ${skill.name}`),
-        el("p", { class: "muted" }, "Each rewrite, merge or restore keeps the steps it replaces. Restore puts one back as a new version, which can be put back in turn."),
+        el("h3", { id: "versions-title" }, t("skillversions.versionsOfName", { name: skill.name })),
+        el("p", { class: "muted" }, t("skillversions.eachRewriteMergeOrRestore")),
         body,
       ),
       el("div", { class: "modal-actions" }, close),

@@ -7,6 +7,7 @@
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
+import { t } from "./i18n.js";
 
 const SIZE_KEY = "dot.computer.size";
 const COMPACT_PX = 320;
@@ -15,9 +16,9 @@ const CHAT_MIN_PX = 360;
 const HANDLE_PX = 28;
 const STEP_PX = 32;
 const STAGE_SIZES = [
-  { id: "compact", label: "Compact", hint: "The panel at its own width", icon: "panelRight" },
-  { id: "wide", label: "Wide", hint: "Half of the page for the panel", icon: "columns" },
-  { id: "full", label: "Full", hint: "The conversation at its narrowest, the rest for the panel", icon: "maximize" },
+  { id: "compact", label: t("stagesize.compact"), hint: t("stagesize.thePanelAtItsOwn"), icon: "panelRight" },
+  { id: "wide", label: t("stagesize.wide"), hint: t("stagesize.halfOfThePageFor"), icon: "columns" },
+  { id: "full", label: t("stagesize.full"), hint: t("stagesize.theConversationAtItsNarrowest"), icon: "maximize" },
 ];
 
 /** The size kept in this browser: `{ size, px }`, `size` one of the three (compact while none was chosen) or "custom"
@@ -57,14 +58,14 @@ export function createStageSize({ layout }) {
       icon(option.icon),
     ),
   );
-  const chooser = el("div", { class: "stage-sizes", role: "group", "aria-label": "Size of the panel" }, ...buttons);
+  const chooser = el("div", { class: "stage-sizes", role: "group", "aria-label": t("stagesize.sizeOfThePanel") }, ...buttons);
   const handle = el("div", {
     class: "stage-handle",
     role: "separator",
     tabindex: "0",
     "aria-orientation": "vertical",
-    "aria-label": "Width of the panel",
-    title: "Drag to set the width of the panel; a double click gives it back its own width",
+    "aria-label": t("stagesize.widthOfThePanel"),
+    title: t("stagesize.dragToSetTheWidth"),
   });
 
   /** The room the conversation leaves the rail of its messages at its left, when it leaves one (item 228, run.css). */

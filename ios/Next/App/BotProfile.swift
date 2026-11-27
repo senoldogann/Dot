@@ -58,7 +58,8 @@ struct BotProfile: View {
                         systemImage: "clock.arrow.circlepath", title: String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away"),
                         description: bot.isDot ? nil : String(localized: "What \(bot.record.name) did", comment: "Bot profile: the Activity row of an agent; the argument is its name"),
                         detail: nil
-                    ) { ActivityPage(agent: bot.isDot ? nil : bot.id) }
+                    ) { ActivityScreen(agent: bot.isDot ? nil : bot.id) }
+                    .accessibilityIdentifier("profile.activity")
                 }
                 GroupedSection(
                     header: nil,
@@ -349,20 +350,6 @@ struct BotChatsPage: View {
 /// A chat whose library is open.
 private struct LibraryChat: Identifiable {
     let id: String
-}
-
-/// What Dot did while the owner was away; helper W2 builds the view (`agent` scopes it to one agent, `nil` is all).
-struct ActivityPage: View {
-    let agent: String?
-
-    var body: some View {
-        SettingsScroll(title: String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away")) {
-            EmptyState(
-                title: String(localized: "Activity comes in the next version", comment: "Activity page: placeholder until the view is built"), systemImage: "clock.arrow.circlepath",
-                detail: String(localized: "What Dot does on its own (schedules, helpers, drafts that wait) will show here.", comment: "Activity page: what it will show"),
-                actionTitle: nil, action: {})
-        }
-    }
 }
 
 // MARK: Computer

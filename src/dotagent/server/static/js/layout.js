@@ -3,6 +3,7 @@
 
 import { readPref, writePref } from "./prefs.js";
 import { themeInUse } from "./theme.js";
+import { t } from "./i18n.js";
 
 const FOLD_KEY = "dot.foldSteps";
 const INSPECTOR_KEY = "dot.inspector";
@@ -13,21 +14,17 @@ const WORK_KEY = "dot.work";
 // run told as a conversation (item 1976): Dot's short messages of what it turns to, and that line under them; the choice
 // is `data-work` on the page, which run.css reads.
 export const WORK_SHOWN = [
-  { id: "steps", label: "Every step", hint: "Its thoughts, commands and steps, each in its line." },
-  { id: "status", label: "What it is doing", hint: "One line that says what it does now; press it for the steps." },
-  {
-    id: "messages",
-    label: "Messages only",
-    hint: "Dot tells what it turns to in short messages, as a person would, with one line of what it does now and for how long; press the line for the steps.",
-  },
+  { id: "steps", label: t("layout.everyStep"), hint: t("layout.itsThoughtsCommandsAndSteps") },
+  { id: "status", label: t("layout.whatItIsDoing"), hint: t("layout.oneLineThatSaysWhat") },
+  { id: "messages", label: t("layout.messagesOnly"), hint: t("layout.dotTellsWhatItTurns") },
 ];
 // What a chat shows of the work until the owner chooses (item 830): the conversation, as people chat, with one line of
 // what the run does now; the steps are a press away.
 const DEFAULT_WORK = "status";
 // How close the rows, cards and stacks sit (the paddings are tokens in app.css, switched by `data-density` on the page).
 export const DENSITIES = [
-  { id: "comfortable", label: "Comfortable", hint: "Room around every row and card." },
-  { id: "compact", label: "Compact", hint: "Rows, cards and lists sit closer, for more on one screen." },
+  { id: "comfortable", label: t("layout.comfortable"), hint: t("layout.roomAroundEveryRowAnd") },
+  { id: "compact", label: t("layout.compact"), hint: t("layout.rowsCardsAndListsSit") },
 ];
 const DEFAULT_DENSITY = "comfortable";
 

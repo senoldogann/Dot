@@ -14,7 +14,10 @@ Node to run). `npm run check` runs Biome's recommended lint rules over `src/dota
 `desktop/ui` and `tests/js` (`biome.json`; two rules of style alone are off), `tsc` over the scripts' JSDoc with
 `checkJs` (`tsconfig.json`, and `tsconfig.sw.json` for the service worker, whose globals are a worker's; the types the
 DOM library lacks are in `types/interface.d.ts`), and the unit tests of the pure modules (the Markdown reader, the words
-of a flow, the formatting helpers, the reasoning levels) under `tests/js` with `node --test`. The type check starts
+of a flow, the formatting helpers, the reasoning levels) under `tests/js` with `node --test`; one of them reads every
+module with acorn and fails for a word of English a module writes in its code where it reaches the screen
+(`tests/js/i18n-literals.test.js`: it goes through `t()` and has its Turkish in `js/lang`, or the line the program alone
+reads is named in `tests/js/i18n-exempt.json` with why). The type check starts
 loose: `strict` is off, so a parameter without a type is no error, and what it catches is a property an element does
 not have, a call with the wrong arguments, a union read without a check. `noImplicitAny` is the next step, taken once
 the modules carry their JSDoc. Biome's formatter is configured but off, as the scripts were not written to its line
@@ -556,6 +559,12 @@ default), `DOT_DESKTOP_BANK_K` the attempts of each task.
 ## Measuring the agent
 
 How well Dot finishes work is measured, not guessed, in two ways.
+
+**`dotx perf [--window 24h|7d]`** (item 2003) is where the runs' seconds went, stage by stage, the table of
+Settings › Maintenance › Speed ([The daemon](daemon.md)): a run's start to its first model call and each read of that
+start, the time between two steps and Dot's own part of it, the model calls by model and purpose, the first word of a
+step's reply and each tool, each row with n, p50, p95, p99, the longest and how many took over 3 s. It reads the store
+read-only (`dotagent/store/perf.py`).
 
 **`dotx stats [--days N]`** counts the runs that really happened (the last 30 days by default), those of deleted chats
 too as the run ledger keeps them (item 1323; their numbers, endings, tool calls, stalls and compactions count, their times,

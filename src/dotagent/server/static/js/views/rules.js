@@ -9,7 +9,7 @@
 // is left out: no setting of Dot's turns a check off without making Dot ask less (roadmap/622.md).
 
 import { api } from "../api.js";
-import { clip, el, plural } from "../dom.js";
+import { clip, el, } from "../dom.js";
 import { icon } from "../icons.js";
 import { buildAdder } from "../ruleadder.js";
 import { ruleSentence } from "../rulesentence.js";
@@ -18,6 +18,7 @@ import { DEFAULT_CHOICE, LATELY_DAYS, neverUsedWhy, ruleText } from "../ruleword
 import { emptyPanel, inlineError, inlineLoading, setSection, switchRowSetting } from "../panels.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
+import { t, tCount } from "../i18n.js";
 
 const QUOTE_CHARS = 100;
 // The live event of a rule added, switched or deleted on any page (`rules_changed`, `dotagent.server.routes_data`).
@@ -25,9 +26,9 @@ const RULES_CHANGED = "rules_changed";
 // Sentences to start from: a click puts the words and the choice in the adder (the drafter turns each into a rule: a
 // command or two of the shell, a command that stops Dot, every step on one site).
 const EXAMPLES = [
-  { label: "Run git status and git diff on its own", wants: "run git status and git diff", choice: "allow" },
-  { label: "Ask me before deleting anything with rm", wants: "delete anything with rm", choice: "ask" },
-  { label: "Leave everything on mybank.com to me", wants: "do anything on mybank.com", choice: "handoff" },
+  { label: t("views.rules.runGitStatusAndGit"), wants: t("views.rules.runGitStatusAndGit2"), choice: "allow" },
+  { label: t("views.rules.askMeBeforeDeletingAnything"), wants: t("views.rules.deleteAnythingWithRm"), choice: "ask" },
+  { label: t("views.rules.leaveEverythingOnMybankCom"), wants: t("views.rules.doAnythingOnMybankCom"), choice: "handoff" },
 ];
 
 /** One of a rule's two arrows: up toward the first rule, down toward the last; at its end of the order it is off. */
@@ -38,8 +39,8 @@ function moveButton(record, index, total, direction, onMove) {
     {
       class: "btn ghost sm icon-only rule-move",
       type: "button",
-      title: up ? "Move this rule up: it is checked earlier" : "Move this rule down: it is checked later",
-      "aria-label": `Move rule ${index + 1} ${direction}`,
+      title: up ? t("views.rules.moveThisRuleUpIt") : t("views.rules.moveThisRuleDownIt"),
+      "aria-label": t("views.rules.moveRuleValueDirection", { value: index + 1, direction }),
       "data-rule": record.id,
       "data-move": direction,
       disabled: up ? index === 0 : index === total - 1,
@@ -57,7 +58,7 @@ function neverUsed(record, numberOf, behaviorOf) {
   }
   const why = neverUsedWhy(numberOf(record.never_decided_by), behaviorOf(record.never_decided_by), record.behavior);
   return {
-    badge: el("span", { class: "badge b-warn", title: why }, "Never used"),
+    badge: el("span", { class: "badge b-warn", title: why }, t("views.rules.neverUsed")),
     note: el("p", { class: "rule-never" }, icon("alert"), el("span", null, why)),
   };
 }
@@ -66,10 +67,10 @@ function neverUsed(record, numberOf, behaviorOf) {
  * (`used`, a line, or null until it is read and for a rule switched off). */
 function ruleFacts(record, used) {
   const facts = [
-    ["Tool", el("code", { class: "mono" }, record.tool_glob)],
-    ["Pattern", record.match_regex === "" ? "None: it fits every time." : el("code", { class: "mono rule-pattern" }, record.match_regex)],
-    record.description === "" ? null : ["Why", record.description],
-    used !== null ? ["Used lately", used] : record.enabled ? null : ["Used lately", "It is switched off, so it decides nothing."],
+    [t("views.rules.tool"), el("code", { class: "mono" }, record.tool_glob)],
+    [t("views.rules.pattern"), record.match_regex === "" ? t("views.rules.noneItFitsEveryTime") : el("code", { class: "mono rule-pattern" }, record.match_regex)],
+    record.description === "" ? null : [t("views.rules.why"), record.description],
+    used !== null ? [t("views.rules.usedLately"), used] : record.enabled ? null : [t("views.rules.usedLately"), t("views.rules.itIsSwitchedOffSo")],
   ].filter((fact) => fact !== null);
   return el(
     "dl",
@@ -87,8 +88,8 @@ function ruleRow(record, index, total, numberOf, behaviorOf, handlers, used, ope
     type: "button",
     role: "switch",
     "aria-checked": String(record.enabled),
-    "aria-label": `${record.enabled ? "Switch off" : "Switch on"} rule ${index + 1}`,
-    title: record.enabled ? "Switch this rule off" : "Switch this rule on",
+    "aria-label": t("views.rules.valueRuleValue2", { value: record.enabled ? t("views.rules.switchOff") : t("views.rules.switchOn"), value2: index + 1 }),
+    title: record.enabled ? t("views.rules.switchThisRuleOff") : t("views.rules.switchThisRuleOn"),
     onclick: () => handlers.onToggle(record),
   });
   const remove = el(
@@ -96,8 +97,8 @@ function ruleRow(record, index, total, numberOf, behaviorOf, handlers, used, ope
     {
       class: "btn ghost sm icon-only",
       type: "button",
-      title: "Delete this rule",
-      "aria-label": `Delete rule ${index + 1}`,
+      title: t("views.rules.deleteThisRule"),
+      "aria-label": t("views.rules.deleteRuleValue", { value: index + 1 }),
       onclick: () => handlers.onDelete(record),
     },
     icon("trash"),
@@ -108,7 +109,7 @@ function ruleRow(record, index, total, numberOf, behaviorOf, handlers, used, ope
     "button",
     { class: "btn ghost sm rule-more", type: "button", "aria-expanded": String(open), "aria-controls": facts.id },
     el("span", { class: "chev" }, icon("chevron")),
-    "Details",
+    t("views.rules.details"),
   );
   more.addEventListener("click", () => {
     facts.hidden = !facts.hidden;
@@ -126,7 +127,7 @@ function ruleRow(record, index, total, numberOf, behaviorOf, handlers, used, ope
       el(
         "div",
         { class: "rule-line" },
-        el("span", { class: "rule-number", title: "Rules are checked in this order", "aria-hidden": "true" }, String(index + 1)),
+        el("span", { class: "rule-number", title: t("views.rules.rulesAreCheckedInThis"), "aria-hidden": "true" }, String(index + 1)),
         el("span", { class: "rule-text" }, ruleSentence(record), never === null ? null : never.badge),
       ),
       never === null ? null : never.note,
@@ -149,14 +150,14 @@ function foot(count, onSeeAll) {
     "div",
     { class: "rule-foot" },
     count > 1
-      ? el("p", null, "If two rules fit the same action, the one higher up decides. A rule that leaves it to you always wins, wherever it stands.")
+      ? el("p", null, t("views.rules.ifTwoRulesFitThe"))
       : null,
     el(
       "p",
       null,
-      "Dot's built-in safety checks come first, and your rules cannot switch them off: spending money, passwords, posts and messages in your name, and changes to Dot's own files. The mode “Ask only to pay or send” is the one exception: there Dot asks only before a payment, a message or mail sent for you or a public post, in a chat you opened.",
+      t("views.rules.dotSBuiltInSafety"),
     ),
-    el("button", { class: "set-link rule-see-all", type: "button", onclick: onSeeAll }, "See them all"),
+    el("button", { class: "set-link rule-see-all", type: "button", onclick: onSeeAll }, t("views.rules.seeThemAll")),
   );
 }
 
@@ -166,10 +167,10 @@ function emptyState(onPick) {
   return el(
     "div",
     { class: "rule-empty" },
-    emptyPanel("shield", "No rules yet", "For now, Dot's built-in safety checks and the mode you chose decide when it asks you first. Add a rule above, or start from one of these:"),
+    emptyPanel("shield", t("views.rules.noRulesYet"), t("views.rules.forNowDotSBuilt")),
     el(
       "div",
-      { class: "rule-examples", role: "group", "aria-label": "Rules to start from" },
+      { class: "rule-examples", role: "group", "aria-label": t("views.rules.rulesToStartFrom") },
       EXAMPLES.map((example) => el("button", { class: "rule-example", type: "button", onclick: () => onPick(example) }, example.label)),
     ),
   );
@@ -178,11 +179,11 @@ function emptyState(onPick) {
 /** What no rule lifts, in words: five checked lines and what a run in the least-asking mode does, one row of the Advanced card. */
 function protections() {
   const lines = [
-    "Reading your secrets and sending them out is refused.",
-    "Money and passwords are handed to you: Dot stops and asks you to do that step yourself.",
-    "A message or a post in your name waits for your yes.",
-    "A change to Dot's own files (its code, skills and emergency stop) is asked of you.",
-    ["A research run only reads. ", el("span", { class: "muted" }, "“Ask only to pay or send” keeps this one too.")],
+    t("views.rules.readingYourSecretsAndSending"),
+    t("views.rules.moneyAndPasswordsAreHanded"),
+    t("views.rules.aMessageOrAPost"),
+    t("views.rules.aChangeToDotS"),
+    [t("views.rules.aResearchRunOnlyReads"), el("span", { class: "muted" }, t("views.rules.askOnlyToPayOr"))],
   ];
   return el(
     "div",
@@ -191,7 +192,7 @@ function protections() {
       "div",
       { class: "rule-always-head" },
       el("span", { class: "rule-tile", "aria-hidden": "true" }, icon("lock")),
-      el("h3", { class: "rule-always-title", id: "rule-always-title" }, "Always on, whatever your rules say"),
+      el("h3", { class: "rule-always-title", id: "rule-always-title" }, t("views.rules.alwaysOnWhateverYourRules")),
     ),
     el(
       "ul",
@@ -202,7 +203,7 @@ function protections() {
       "p",
       { class: "rule-always-note" },
       // What a yolo run keeps besides (item 559): what an untrusted read leaves it is said, not only what it waives.
-      "“Ask only to pay or send” asks about none of the others: Dot does the step and records why it would have asked. Even then, once a run has read something from outside (a web page, a mail), a secret is still refused on its way out, and the review model checks any step that page may be after.",
+      t("views.rules.askOnlyToPayOr2"),
     ),
   );
 }
@@ -214,13 +215,13 @@ function protections() {
 function buildFreeMode(isDisposed) {
   let view = null;
   const setting = switchRowSetting({
-    label: "Free mode: Dot asks you nothing",
+    label: t("views.rules.freeModeDotAsksYou"),
     hint: [
-      "On, no task asks you anything, in any chat and any mode: Dot pays, sends mail and messages for you, posts and puts projects live by itself, and records why it would have asked. Off, each chat asks as its mode says: “Ask only to pay or send” only before a payment, a message or mail and a post, and Dot's own work keeps its mails and posts as drafts until you say yes.",
+      t("views.rules.onNoTaskAsksYou"),
       el(
         "span",
         { class: "rule-fine" },
-        "It holds from the next step of every task, with no restart. A refusal still stands (research stays read-only). It is switched on from the Mac, not a phone. Kept in the config file as ",
+        t("views.rules.itHoldsFromTheNext"),
         el("code", { class: "mono" }, "[policy] free"),
         ".",
       ),
@@ -228,7 +229,7 @@ function buildFreeMode(isDisposed) {
     read: () => view?.free === true,
     write: async (on) => {
       view = await api.put("/policy/free", { free: on });
-      toast("ok", on ? "Free mode is on: from the next step, no task asks you anything." : "Free mode is off: each chat asks as its mode says.");
+      toast("ok", on ? t("views.rules.freeModeIsOnFrom") : t("views.rules.freeModeIsOffEach"));
     },
     onToggled: () => {
       if (!isDisposed()) {
@@ -261,13 +262,13 @@ function buildFreeMode(isDisposed) {
 function buildSandbox(isDisposed) {
   let view = null;
   const setting = switchRowSetting({
-    label: "Keep Dot's commands in a safe box",
+    label: t("views.rules.keepDotSCommandsIn"),
     hint: [
-      "Commands, terminals, scripts and searches that a run starts can't read or change Dot's own files (its keys, settings, memory and browser profiles), and can't run as an administrator. A run in “Ask only to pay or send” is never put in the box.",
+      t("views.rules.commandsTerminalsScriptsAndSearche"),
       el(
         "span",
         { class: "rule-fine" },
-        "Off, they run with your account's full rights, and Dot still reads every command before it runs. It takes effect from the next command, with no restart. This is the macOS sandbox, kept in the config file as ",
+        t("views.rules.offTheyRunWithYour"),
         el("code", { class: "mono" }, "[shell] sandbox"),
         ".",
       ),
@@ -275,7 +276,7 @@ function buildSandbox(isDisposed) {
     read: () => view?.sandbox === true,
     write: async (on) => {
       view = await api.put("/shell/sandbox", { sandbox: on });
-      toast("ok", on ? "From the next command on, Dot's commands run in the safe box (a run in “Ask only to pay or send” never does)." : "From the next command on, Dot's commands run without the safe box.");
+      toast("ok", on ? t("views.rules.fromTheNextCommandOn") : t("views.rules.fromTheNextCommandOn2"));
     },
     onToggled: () => {
       if (!isDisposed()) {
@@ -320,7 +321,7 @@ export function mount(root, ctx) {
       return;
     }
     // What the page holds, at the head's right: how many rules there are.
-    ctx.head.setMeta(...(rules.length === 0 ? [] : [plural(rules.length, "rule", "rules")]));
+    ctx.head.setMeta(...(rules.length === 0 ? [] : [tCount(rules.length, "views.rules.countRule", "views.rules.countRules")]));
     if (rules.length === 0) {
       holder.replaceChildren(emptyState((example) => adder.start(example.wants, example.choice)), foot(0, showAdvanced));
       return;
@@ -419,9 +420,9 @@ export function mount(root, ctx) {
 
   async function remove(record) {
     const confirmed = await confirmDialog({
-      title: "Delete this rule?",
-      message: `“${clip(ruleText(record), QUOTE_CHARS)}” stops applying.`,
-      confirmLabel: "Delete",
+      title: t("views.rules.deleteThisRule2"),
+      message: t("views.rules.clipStopsApplying", { clip: clip(ruleText(record), QUOTE_CHARS) }),
+      confirmLabel: t("views.rules.delete"),
       danger: true,
       focusCancel: true,
     });
@@ -430,7 +431,7 @@ export function mount(root, ctx) {
     }
     await api.del(`/rules/${record.id}`);
     opened.delete(record.id);
-    toast("ok", "Rule deleted.");
+    toast("ok", t("views.rules.ruleDeleted"));
     await reload();
   }
 
@@ -444,8 +445,8 @@ export function mount(root, ctx) {
       "summary",
       { class: "rule-advanced-head" },
       el("span", { class: "chev" }, icon("chevron")),
-      el("span", { class: "rule-advanced-title" }, "Advanced"),
-      el("span", { class: "rule-advanced-lead" }, "The safe box for Dot's commands, and the checks that always apply"),
+      el("span", { class: "rule-advanced-title" }, t("views.rules.advanced")),
+      el("span", { class: "rule-advanced-lead" }, t("views.rules.theSafeBoxForDot")),
     ),
     el("div", { class: "rule-advanced-body" }, sandbox.element, protections()),
   );
@@ -457,22 +458,22 @@ export function mount(root, ctx) {
     advanced.querySelector("summary")?.focus({ preventScroll: true });
   }
 
-  ctx.head.setLead("Say what Dot may do on its own, what it should ask you first, and what it should leave to you.");
+  ctx.head.setLead(t("views.rules.sayWhatDotMayDo"));
   root.append(
     el(
       "div",
       { class: "set-sections" },
       setSection({
-        title: "How Dot asks",
-        lead: "One switch for every chat: free, or asking as each chat's mode says.",
-        body: el("section", { class: "set-card rule-free", "aria-label": "How Dot asks" }, freeMode.element),
+        title: t("views.rules.howDotAsks"),
+        lead: t("views.rules.oneSwitchForEveryChat"),
+        body: el("section", { class: "set-card rule-free", "aria-label": t("views.rules.howDotAsks") }, freeMode.element),
       }),
       setSection({
-        title: "Add a rule",
-        lead: "Say it in your own words. Dot turns it into a rule and shows it to you before anything changes.",
+        title: t("views.rules.addARule"),
+        lead: t("views.rules.sayItInYourOwn"),
         body: adder.element,
       }),
-      setSection({ title: "Your rules", body: el("section", { class: "set-card rule-panel", "aria-label": "Your rules" }, holder) }),
+      setSection({ title: t("views.rules.yourRules"), body: el("section", { class: "set-card rule-panel", "aria-label": t("views.rules.yourRules") }, holder) }),
       advanced,
     ),
   );

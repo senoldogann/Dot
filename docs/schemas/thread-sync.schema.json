@@ -1065,6 +1065,17 @@
           },
           "title": "Messages",
           "type": "array"
+        },
+        "routed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoutedMessage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -1153,6 +1164,18 @@
           },
           "title": "Attachments",
           "type": "array"
+        },
+        "carried_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Carried From"
         },
         "created_at": {
           "title": "Created At",
@@ -1363,6 +1386,59 @@
         "note_id"
       ],
       "title": "ReactionRecord",
+      "type": "object"
+    },
+    "RouteKind": {
+      "enum": [
+        "stopped",
+        "new",
+        "queued",
+        "steered",
+        "continued"
+      ],
+      "type": "string"
+    },
+    "RoutedMessage": {
+      "additionalProperties": false,
+      "description": "Where a message sent to a chat with several tasks went (item 2012): ``kind`` says how, ``thread_id`` is the\ntask's thread (the chat for a stop of every task), ``run_id`` the run it started, steered or stopped,\n``message_id`` the queued message it became.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/RouteKind"
+        },
+        "message_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Message Id"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Id"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "thread_id",
+        "run_id",
+        "message_id"
+      ],
+      "title": "RoutedMessage",
       "type": "object"
     },
     "RunAccount": {

@@ -546,18 +546,6 @@
   display: none;
 }
 
-.wait-line-mark {
-  display: inline-grid;
-  flex: none;
-}
-
-.wait-line-mark .icon {
-  width: 14px;
-  height: 14px;
-  animation: spin var(--motion-spin) linear infinite;
-  animation-play-state: var(--endless);
-}
-
 .wait-line-main {
   flex: 1;
   min-width: 0;
@@ -593,12 +581,6 @@
 @media (hover: hover) {
   .wait-line-button:hover {
     background: var(--surface-2);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wait-line-mark .icon {
-    animation: none;
   }
 }
 
@@ -1059,6 +1041,10 @@
     display: inline-grid;
   }
 
+  .dock-mark[hidden] {
+    display: none;
+  }
+
   .dock-seg .icon,
   .dock-end .icon {
     width: 14px;
@@ -1070,11 +1056,6 @@
     width: 18px;
     height: 18px;
     color: var(--text-2);
-  }
-
-  .dock-seg[data-tone="work"] .dock-mark .icon {
-    animation: spin var(--motion-spin) linear infinite;
-    animation-play-state: var(--endless);
   }
 
   .dock-seg[data-tone="waiting"],
@@ -1146,10 +1127,9 @@
     flex: 1 1 0;
   }
 
-  /* Reduced motion: the capsule does not rise into place and the dashed circle of a run at work stands still. */
+  /* Reduced motion: the capsule does not rise into place. */
   @media (prefers-reduced-motion: reduce) {
-    .dockbar-capsule,
-    .dock-seg[data-tone="work"] .dock-mark .icon {
+    .dockbar-capsule {
       animation: none;
     }
   }
@@ -3931,13 +3911,6 @@ dialog.computer-full::backdrop {
   overflow: visible;
 }
 
-/* On a Mac's box the reasoning, the approvals and the mode have pills of their own: the model's says its name alone. */
-@media (min-width: 720.02px) {
-  .composer-pill[data-pill="model"] > .composer-pill-extra {
-    display: none;
-  }
-}
-
 
 /* A phone's chat settings (item 1202, sheet.js): a sheet from the foot of the screen over a dim, its head Close, the
    title and Done, the models in a section per provider and the Options in cards, and the search of the models kept
@@ -4181,6 +4154,35 @@ dialog.computer-full::backdrop {
   font-size: var(--text-sm);
 }
 
+/* A switch as a row of the chat's settings (Fast mode, Plan first), as the phone draws it: the title and its line on
+   the left, the switch on the right, a little more height for the line under the title. */
+.sheet-switch {
+  padding-block: var(--space-2);
+}
+
+.sheet-switch > .switch {
+  flex: none;
+}
+
+/* `.sheet-row` draws no border of its own: the card's hairline between two rows is drawn again for a switch row. */
+.sheet-card > * + .sheet-switch {
+  border-top: 1px solid var(--border);
+}
+
+/* The same row at the foot of the Reasoning pill's menu on a desk, under a hairline, as compact as the levels above it. */
+.pop-switches {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+}
+
+.pop-switches > .sheet-row {
+  min-height: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: inherit;
+}
+
 .model-sheet-row {
   display: flex;
   align-items: center;
@@ -4306,4 +4308,130 @@ dialog.computer-full::backdrop {
   max-width: 100%;
   overflow: auto;
   white-space: pre;
+}
+
+/* ---------- the composer as DotNext draws it, on every width (item 2015) ---------- */
+
+/* One capsule on every width (the owner's word of 2026-11-27: the desktop composer works as the phone's does). The words
+   take a line of their own over the controls once they are long, break a line or carry files (`data-shape="expanded"`,
+   composershape.js); while they are short the "+", the words, the model, the microphone and the send are one row. The
+   model's pill is the one choice in the bar: it opens the chat's settings, which hold the reasoning, the mode and the
+   approvals (choices.js); YOLO's lock alone stays in sight, as the run asks nothing in it. */
+.composer-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "field field field field"
+    "plus options meter send";
+  align-items: center;
+  column-gap: var(--space-1);
+  row-gap: var(--space-1);
+}
+
+.composer-bar.has-mic {
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas:
+    "field field field field field"
+    "plus options meter mic send";
+}
+
+.composer-bar > .plus-button {
+  grid-area: plus;
+}
+
+.composer-bar > .composer-field {
+  grid-area: field;
+  flex: none;
+  order: 0;
+}
+
+.composer-bar > .composer-options {
+  grid-area: options;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.composer-bar > .context-meter {
+  grid-area: meter;
+}
+
+.composer-bar > .mic-button {
+  grid-area: mic;
+}
+
+.composer-bar > .send {
+  grid-area: send;
+}
+
+.composer-options > .composer-pill:is([data-pill="mode"], [data-pill="reasoning"], [data-pill="options"]:not([data-yolo])) {
+  display: none;
+}
+
+.composer:has(.composer-pill[data-pill="options"]) {
+  margin-bottom: 0;
+}
+
+.composer-pill[data-pill="options"][data-yolo] {
+  position: static;
+}
+
+/* The model: its provider's mark, its name with the level and Fast in grey after it, and a chevron (the phone's item
+   1991); the name gives way to the grey words, which stay whole. */
+.composer-pill[data-pill="model"] {
+  min-width: 0;
+}
+
+.composer-pill[data-pill="model"] > .composer-pill-value {
+  flex: 0 1 auto;
+}
+
+.composer-pill[data-pill="model"] > .composer-pill-extra {
+  flex: none;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.composer-pill[data-pill="model"] > .icon:last-child {
+  display: inline-block;
+}
+
+/* One row: the words beside the controls, the model its mark and its chevron alone (its name stays for a screen reader);
+   the chat's size keeps its ring, which a phone's composer does not have. */
+.composer[data-shape="compact"] .composer-bar {
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "plus field options meter send";
+}
+
+.composer[data-shape="compact"] .composer-bar.has-mic {
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+  grid-template-areas: "plus field options meter mic send";
+}
+
+.composer[data-shape="compact"] .composer-pill[data-pill="model"]:has(> .composer-pill-icon:not(:empty)) > :is(.composer-pill-value, .composer-pill-extra) {
+  position: absolute;
+  padding: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The chat's settings over a window wider than a phone's (item 2015): the phone's sheet, as wide as a reading column,
+   standing over the middle of the window with all its corners rounded. */
+@media (min-width: 721px) {
+  .sheet {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sheet-panel {
+    width: min(560px, calc(100vw - 32px));
+    height: min(80vh, 720px);
+    border-radius: var(--radius-lg);
+  }
+
+  .sheet-grip {
+    display: none;
+  }
 }

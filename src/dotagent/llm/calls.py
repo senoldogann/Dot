@@ -45,6 +45,8 @@ type CallPurpose = Literal[
     "watch",
     # Whether a message sent to a chat at work is a request of its own (item 915).
     "busy",
+    # Which task of a chat with several a message sent there belongs to (item 2012).
+    "route",
     # The review of a plugin the scout found for the gallery (item 710).
     "scout",
     # Which free agents could help an agent at work (item 896); none is asked since item 1836, kept so that the

@@ -17,6 +17,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from chat_settings import close_settings, menu, open_for
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -273,7 +274,7 @@ async def test_while_a_run_works_the_word_goes_with_a_queued_message_and_not_wit
                 pill: Locator = dock.locator(".composer-pill[data-pill='reasoning']")
                 box: Locator = dock.locator("textarea")
                 rows: Locator = page.locator(".queue-row")
-                await expect(box).to_have_attribute("placeholder", re.compile(r"^Write the next task"))
+                await expect(box).to_have_attribute("placeholder", re.compile(r"^Queue a message"))
                 # Queued, the message keeps the word's choice for the run it starts.
                 await box.fill("ultrathink: then this.")
                 await _expect_boost(dock, pill, "ultrathink", "Ultrathink")
@@ -300,9 +301,9 @@ async def test_while_a_run_works_the_word_goes_with_a_queued_message_and_not_wit
                 await page.evaluate("() => localStorage.setItem('dot.busySend', 'steer')")
                 await page.reload()
                 await expect(dock.locator(".btn.send")).to_have_attribute("aria-label", "Stop")
-                await pill.click()
-                await page.locator(".composer-popover .pop-option", has_text="Ultrathink").first.click()
-                await page.keyboard.press("Escape")
+                await open_for(dock, page, "reasoning")
+                await menu(page, "Reasoning").locator(".pop-option", has_text="Ultrathink").first.click()
+                await close_settings(page)
                 note: Locator = page.locator(".intent-note")
                 await expect(note).to_be_visible()
                 await expect(note).to_contain_text("wait in the box for your next message")

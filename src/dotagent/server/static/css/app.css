@@ -8282,12 +8282,12 @@ dialog.message-sheet::backdrop {
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
 }
 
+/* Sentence case, not capitals: a CSS uppercase turns an English "is" under lang="tr" into "İS", and a label a language
+ * writes without capitals reads better as it is written (item 20). */
 .asks-title {
   color: var(--muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-label);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .asks-count {
@@ -11925,9 +11925,8 @@ button.attach-chip {
   display: inline-grid;
 }
 
-.capsule-work[data-state="working"] .capsule-mark .icon {
-  animation: spin var(--motion-spin) linear infinite;
-  animation-play-state: var(--endless);
+.capsule-mark:empty {
+  display: none;
 }
 
 .capsule-work[data-state="waiting"],
@@ -11943,8 +11942,7 @@ button.attach-chip {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .capsule:not([hidden]),
-  .capsule-work[data-state="working"] .capsule-mark .icon {
+  .capsule:not([hidden]) {
     animation: none;
   }
 }
@@ -12482,6 +12480,28 @@ dialog.teach {
 
 .watch-status[hidden] {
   display: none;
+}
+
+/* What a card folds away (item 22 of the 2026-11-26 review): the chips for what the step counts as, its risk and the
+   policy's own words for asking. The command stays in view; these open on a click. */
+.approval-fold {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.approval-fold > summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.approval-fold > .stack {
+  margin-top: var(--space-2);
+}
+
+/* The quiet word under what a stopped run had said (item 23 of the 2026-11-26 review). */
+.answer-stopped-note {
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 /* Structured blocks in a run's conversation. */

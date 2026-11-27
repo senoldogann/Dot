@@ -936,6 +936,27 @@ async def test_no_rule_of_the_owners_brings_a_question_back_into_yolo_or_free_mo
     assert asked == {row.tool for row in ROWS if row.asks & way.asks}
 
 
+async def test_the_background_driver_changes_how_a_desktop_step_goes_never_what_the_gate_answers(
+    room: Room, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``[desktop] background_driver = "cua"`` (item 2007) sends a step through cua-driver instead of the Mac's own
+    pointer and keyboard: every desktop row is classified alike with it on, and the table holds as it does off, so a
+    yolo or free run asks nothing new and is refused nothing it was allowed."""
+    desktop_rows: list[Row] = [row for row in ROWS if row.id.startswith("desktop:")]
+    off: list[PreparedCall] = [await _prepared(room, row) for row in desktop_rows]
+    on: AppConfig = CONFIG.model_copy(
+        update={"desktop": CONFIG.desktop.model_copy(update={"background_driver": "cua"})}
+    )
+    monkeypatch.setitem(globals(), "CONFIG", on)
+    monkeypatch.setitem(globals(), "TOOLS", {**TOOLS, **build_registry(_tool_groups(on, True)).tools})
+    for row, before in zip(desktop_rows, off, strict=True):
+        after: PreparedCall = await _prepared(room, row)
+        assert (after.action, after.weighed) == (before.action, before.weighed), row.id
+    failures, asked = await _table(room, WAYS[0])
+    assert failures == [], "\n".join(failures)
+    assert asked == {row.tool for row in ROWS if row.asks & WAYS[0].asks}
+
+
 def test_every_row_that_names_an_ask_is_a_row_the_contract_lists() -> None:
     kinds: set[str] = {kind for row in ROWS for kind in row.asks}
     assert kinds <= OWNERS_CHAT_ASKS | INITIATIVE_CHAT_ASKS

@@ -4,11 +4,12 @@
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { anchoredPopover } from "./popover.js";
+import { t } from "./i18n.js";
 
 const STEP_MARKS = { done: "check", failed: "x", skipped: "arrowRight" };
 // How a done step stands against the run's record when nothing of it shows the step done (`proof`, item 1745).
 const UNSHOWN = new Set(["none", "unverified"]);
-const STEP_LABELS = { pending: "Not started", in_progress: "In progress", done: "Done", failed: "Failed", skipped: "Skipped" };
+const STEP_LABELS = { pending: t("planbubble.notStarted"), in_progress: t("planbubble.inProgress"), done: t("planbubble.done"), failed: t("planbubble.failed"), skipped: t("planbubble.skipped") };
 
 /** Whether `step` is marked done and no tool result of the run shows it (item 1745); a plan stored before has no
  * `proof`. */
@@ -18,7 +19,7 @@ export function unshownStep(step) {
 
 /** The targets of an open-ended goal, the first line of the plan: what the run works toward and how it measures it. */
 export function planTargets(targets) {
-  return el("div", { class: "plan-targets", title: "Targets" }, icon("target"), el("span", { class: "text" }, targets));
+  return el("div", { class: "plan-targets", title: t("planbubble.targets") }, icon("target"), el("span", { class: "text" }, targets));
 }
 
 /** One step of the plan: its mark, its text, the steps it waits for, "not verified" for a done step no tool result
@@ -32,14 +33,14 @@ export function planStep(step) {
   const dependsOn = step.depends_on ?? [];
   const line = el("span", { class: "line" }, el("span", { class: "text" }, step.text));
   if (dependsOn.length > 0) {
-    line.append(el("span", { class: "after", title: "Waits for these steps" }, `after ${dependsOn.join(", ")}`));
+    line.append(el("span", { class: "after", title: t("planbubble.waitsForTheseSteps") }, t("planbubble.afterJoin", { join: dependsOn.join(", ") })));
   }
   // A step marked done that no tool result of the run shows (item 1745): the run's record says so, beside its words.
   if (unshownStep(step)) {
-    line.append(el("span", { class: "unshown", title: "No tool result of the run shows this step done" }, "not verified"));
+    line.append(el("span", { class: "unshown", title: t("planbubble.noToolResultOfThe") }, t("planbubble.notVerified")));
   }
   const body = el("span", { class: "body" }, line);
-  if (evidence !== "") body.append(el("span", { class: "evidence", title: "Evidence" }, evidence));
+  if (evidence !== "") body.append(el("span", { class: "evidence", title: t("planbubble.evidence") }, evidence));
   return el("div", { class: `plan-step ${step.status}`, title: STEP_LABELS[step.status] ?? step.status }, mark, body);
 }
 
@@ -52,11 +53,11 @@ export function planContent({ steps, targets, openTab, head = true }) {
   const done = steps.filter((step) => step.status === "done").length;
   return [
     ...(head
-      ? [el("div", { class: "plan-popover-head" }, el("span", { class: "plan-popover-title" }, "Plan"), el("span", { class: "plan-popover-count" }, `${done} / ${steps.length}`))]
+      ? [el("div", { class: "plan-popover-head" }, el("span", { class: "plan-popover-title" }, t("planbubble.plan")), el("span", { class: "plan-popover-count" }, `${done} / ${steps.length}`))]
       : []),
     ...(targets === "" ? [] : [planTargets(targets)]),
     el("div", { class: "plan-list plan-popover-steps" }, ...steps.map(planStep)),
-    el("button", { class: "plan-popover-open", type: "button", onclick: openTab }, "Open in the side panel", icon("chevron")),
+    el("button", { class: "plan-popover-open", type: "button", onclick: openTab }, t("planbubble.openInTheSidePanel"), icon("chevron")),
   ];
 }
 
@@ -69,7 +70,7 @@ export function planContent({ steps, targets, openTab, head = true }) {
 export function planBubble({ anchor, frame, onOpenTab }) {
   let steps = [];
   let targets = "";
-  const popover = anchoredPopover({ anchor, frame, label: "Plan", build });
+  const popover = anchoredPopover({ anchor, frame, label: t("planbubble.plan"), build });
 
   function build() {
     return planContent({

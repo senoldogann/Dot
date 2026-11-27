@@ -555,15 +555,9 @@ async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_wit
                         await goal.type(f"/{name}")
                         await expect(composer.locator(".slash-menu [role=option]").first).to_contain_text(name)
                         await goal.press("Enter")
-                    # Options holds Goal mode and Plan first; a phone's model menu holds them (item 1121).
-                    held: str = "model" if width < 720 else "options"
-                    await composer.locator(f".composer-pill[data-pill='{held}']").click()
-                    # A phone's chat settings (item 1202) show how Dot works as they open.
-                    options_menu: Locator = (
-                        page.get_by_role("dialog", name="Chat settings")
-                        if width < 720
-                        else composer.locator(".composer-popover[aria-label='Options']")
-                    )
+                    # The chat's settings hold Goal mode and Plan first, on every width (items 1202 and 2015).
+                    await composer.locator(".composer-pill[data-pill='model']").click()
+                    options_menu: Locator = page.get_by_role("dialog", name="Chat settings")
                     await expect(options_menu.get_by_role("switch", name="Goal mode")).to_be_visible()
                     await options_menu.get_by_role("switch", name="Plan first").click()
                     await expect(options_menu.get_by_role("switch", name="Plan first")).to_have_attribute(

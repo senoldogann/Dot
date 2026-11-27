@@ -8,6 +8,7 @@ import { dotName, setDotName } from "./face.js";
 import { MAC_OWNER_KEY, ownerName, setOwnerName } from "./presence.js";
 import { readPref, writePref } from "./prefs.js";
 import { toast } from "./ui.js";
+import { t } from "./i18n.js";
 
 const DEFAULT_NAME = "Dot";
 // Set once this browser's names went to the daemon, so that a later change elsewhere is never undone from here.
@@ -62,7 +63,7 @@ export async function loadAssistant() {
   } catch (error) {
     // The daemon's names stand; the owner hears why this browser's did not move, and can give them in Settings.
     writePref(MOVED_KEY, "1");
-    toast("error", `The names this browser kept could not move to Dot: ${error.message}`);
+    toast("error", t("assistant.theNamesThisBrowserKept", { message: error.message }));
     return keep(view);
   }
 }
