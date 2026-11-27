@@ -25,8 +25,8 @@ struct AnswerView: View {
     }
 
     var body: some View {
-        let visible: String = shown >= markdown.count ? markdown : String(markdown.prefix(shown))
-        let blocks: [MarkdownBlock] = markdownBlocks(visible)
+        // A whole answer's blocks are parsed once and kept (`DrawnAnswers`); words still being revealed as they show.
+        let blocks: [DrawnBlock] = shown >= markdown.count ? DrawnAnswers.blocks(of: markdown) : drawnBlocks(String(markdown.prefix(shown)))
         VStack(alignment: .leading, spacing: Space.s) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 view(of: block, fading: index == blocks.count - 1 ? tail : 0)
@@ -60,39 +60,99 @@ struct AnswerView: View {
         }
     }
 
-    @ViewBuilder private func view(of block: MarkdownBlock, fading: Int) -> some View {
+    @ViewBuilder private func view(of block: DrawnBlock, fading: Int) -> some View {
         switch block {
         case .heading(let level, let text):
-            ReferenceText(text: fadedTail(inline(text), characters: fading), role: level <= 1 ? .title : level == 2 ? .headline : .body).fontWeight(.semibold)
+            ReferenceText(text: fadedTail(text, characters: fading), role: level <= 1 ? .title : level == 2 ? .headline : .body).fontWeight(.semibold)
                 .foregroundStyle(Tone.text).tint(Tone.text).accessibilityAddTraits(.isHeader)
                 .padding(.top, level <= 2 ? Space.xs : 0)
         case .paragraph(let text):
-            AnswerWords(text: fadedTail(inline(text), characters: fading))
+            AnswerWords(text: fadedTail(text, characters: fading))
         case .listItem(let depth, let number, let text):
             HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
                 Text(verbatim: number.map { "\($0)." } ?? "•").textRole(.body).foregroundStyle(Tone.secondary).tabularNumbers()
                     .frame(minWidth: 16, alignment: .trailing)
                     .accessibilityHidden(number == nil)
-                AnswerWords(text: fadedTail(inline(text), characters: fading))
+                AnswerWords(text: fadedTail(text, characters: fading))
             }
             .padding(.leading, CGFloat(depth) * Space.l)
         case .code(let language, let text):
             CodeBlock(language: language.isEmpty ? String(localized: "Code", comment: "Code block header when no language is named") : language, code: text)
-        case .table(let header, let rows):
-            TableBlock(header: header.map(inline), rows: rows.map { $0.map(inline) })
+        case .table(let header, let rows, let signature):
+            TableBlock(header: header, rows: rows, signature: signature)
         case .quote(let text):
             HStack(spacing: Space.s) {
                 Rectangle().fill(Tone.separator).frame(width: 3).accessibilityHidden(true)
-                AnswerWords(text: inline(text)).foregroundStyle(Tone.secondary)
+                AnswerWords(text: text).foregroundStyle(Tone.secondary)
             }
             .fixedSize(horizontal: false, vertical: true)
         case .rule:
             Rectangle().fill(Tone.separator).frame(height: 1).padding(.vertical, Space.xs).accessibilityHidden(true)
         }
     }
+}
 
-    private func inline(_ text: String) -> AttributedString {
-        (try? answerInline(markdown: text)) ?? AttributedString(text)
+/// A block of an answer with its words parsed for drawing (`answerInline`): what `AnswerView` draws.
+enum DrawnBlock {
+    case heading(level: Int, text: AttributedString)
+    case paragraph(AttributedString)
+    case listItem(depth: Int, number: Int?, text: AttributedString)
+    case code(language: String, text: String)
+    /// A table's cells, and what they are drawn as (`tableSignature`), made once with the parse.
+    case table(header: [AttributedString], rows: [[AttributedString]], signature: String)
+    case quote(AttributedString)
+    case rule
+}
+
+/// The blocks of `markdown` (`markdownBlocks`) with the words of each parsed (`answerInline`; words it cannot parse
+/// show as they are).
+func drawnBlocks(_ markdown: String) -> [DrawnBlock] {
+    func inline(_ text: String) -> AttributedString { (try? answerInline(markdown: text)) ?? AttributedString(text) }
+    return markdownBlocks(markdown).map { block in
+        switch block {
+        case .heading(let level, let text): .heading(level: level, text: inline(text))
+        case .paragraph(let text): .paragraph(inline(text))
+        case .listItem(let depth, let number, let text): .listItem(depth: depth, number: number, text: inline(text))
+        case .code(let language, let text): .code(language: language, text: text)
+        case .table(let header, let rows): drawnTable(header: header.map(inline), rows: rows.map { $0.map(inline) })
+        case .quote(let text): .quote(inline(text))
+        case .rule: .rule
+        }
+    }
+}
+
+/// A table's block, with what its cells are drawn as made once (`tableSignature`). Pure.
+func drawnTable(header: [AttributedString], rows: [[AttributedString]]) -> DrawnBlock {
+    .table(header: header, rows: rows, signature: tableSignature(header: header, rows: rows))
+}
+
+/// The parsed blocks of whole answers, kept while the app runs (owner 2026-11-27: scrolling a long chat stuttered; the
+/// lazy transcript makes a row again each time it comes into sight, and each time its answer was parsed anew, headings,
+/// tables and links). Keyed by the answer's words, so an answer that changes is parsed again; at most 400 are kept.
+@MainActor
+enum DrawnAnswers {
+    /// The blocks of one answer, boxed for the cache.
+    final class Kept {
+        let blocks: [DrawnBlock]
+
+        init(blocks: [DrawnBlock]) {
+            self.blocks = blocks
+        }
+    }
+
+    private static let kept: NSCache<NSString, Kept> = {
+        let cache: NSCache<NSString, Kept> = NSCache<NSString, Kept>()
+        cache.countLimit = 400
+        return cache
+    }()
+
+    static func blocks(of markdown: String) -> [DrawnBlock] {
+        let key: NSString = markdown as NSString
+        if let held: Kept = kept.object(forKey: key) { return held.blocks }
+        let blocks: [DrawnBlock] = drawnBlocks(markdown)
+        kept.setObject(Kept(blocks: blocks), forKey: key)
+        PerfCounters.shared.parsed()
+        return blocks
     }
 }
 
@@ -148,6 +208,8 @@ struct AnswerWords: View {
 struct TableBlock: View {
     let header: [AttributedString]
     let rows: [[AttributedString]]
+    /// What the cells are drawn as (`tableSignature`), made once where the answer was parsed.
+    let signature: String
     @State private var width: CGFloat = 0
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
     @Environment(\.legibilityWeight) private var legibilityWeight: LegibilityWeight?
@@ -155,7 +217,7 @@ struct TableBlock: View {
     var body: some View {
         let cells: [AttributedString] = header + rows.flatMap { $0 }
         let measures: TableMeasureKey = TableMeasureKey(
-            cells: tableSignature(header: header, rows: rows), type: dynamicTypeSize, bold: legibilityWeight == .bold,
+            cells: signature, type: dynamicTypeSize, bold: legibilityWeight == .bold,
             siteIcons: SiteIconBook.shared.drawnIcons(of: siteMarks(cells), side: referenceSide(role: .footnote, type: dynamicTypeSize)))
         ScrollView(.horizontal) {
             TableGrid(
