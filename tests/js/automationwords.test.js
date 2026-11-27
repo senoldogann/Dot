@@ -51,7 +51,7 @@ test("a schedule whose last run failed, or that runs now, says it by its state",
 
 test("a cron that has no words is said plainly, never as the cron", () => {
   const odd = automationWords(view({ cron: "0 9 1 * *" }), false, NOW);
-  assert.equal(odd.line, "Repeats on a schedule");
+  assert.equal(odd.line, "Repeats as a routine");
 });
 
 test("a schedule says how its last run ended and when, and how many failed in a row (item 1355)", () => {
