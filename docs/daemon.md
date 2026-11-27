@@ -501,9 +501,10 @@ asks again. A card whose run is gone (the daemon restarted, or the `dotx` comman
 expired too, live and when the chat opens again (item 1049); and a run that asked two things at once, in a step of
 read-only calls, stays waiting until both are answered (item 1050).
 A run you stop keeps the words it had streamed, in its answer's place, with a quiet **Stopped** note under them instead
-of the daemon's sentence "The run was stopped." (item 1980; the words are the page's own while it is open, so a page that
+of the daemon's sentence ("The run was stopped.", the emergency stop's, or that of a run cut off when the daemon shut down
+or its `dotx` command was told to end; item 1980; the words are the page's own while it is open, so a page that
 reads the run again later shows the note alone). A run that ended for a fault of Dot's (an internal error, empty
-replies, replies cut short, a stall, a limit, a restart, a start that failed, or an end that carried an error of the
+replies, replies cut short, a stall, a limit, a restart, a start that failed, a model's refusal, or an end that carried an error of the
 daemon's, whose words begin in lower case as a line of a log does) says in a sentence what happened and what to do, with
 the program's own words under a closed **Details** (item 1981), as a run its model's service stopped already did; the
 agent's own report of what it could not do is its answer and is not rewritten. Where the page has no error object (a

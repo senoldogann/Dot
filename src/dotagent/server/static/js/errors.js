@@ -154,9 +154,15 @@ export function serviceFailure(line) {
 
 // What the daemon writes as the result of a run the owner stopped (`RESULT_STOPPED` in store/endings.py): a screen says
 // it in the owner's language and does not show these words.
-export const STOPPED_RESULT = "The run was stopped.";
+const STOPPED_RESULT = "The run was stopped.";
 // What the daemon writes as the result of runs the emergency stop ended (`RESULT_EMERGENCY_STOPPED`, `PREFIX_EMERGENCY_STOP`).
 const EMERGENCY_PREFIX = "Emergency stop: ";
+// The results of runs cut off when the daemon shut down or the `dotx` command that drove them was told to end
+// (`RESULT_SHUTDOWN`, `RESULT_PROCESS_ENDED`): they end cancelled too.
+const CUT_OFF_RESULTS = [
+  "The daemon was shut down while this run was active.",
+  "The dotx command that drove this run was told to end while the run was active.",
+];
 
 /**
  * Whether `text` is a result the daemon writes for a run that was stopped (by the owner or by the emergency stop): its
@@ -166,7 +172,7 @@ const EMERGENCY_PREFIX = "Emergency stop: ";
  */
 export function isStoppedResult(text) {
   const words = text.trim();
-  return words === STOPPED_RESULT || words.startsWith(EMERGENCY_PREFIX);
+  return words === STOPPED_RESULT || words.startsWith(EMERGENCY_PREFIX) || CUT_OFF_RESULTS.some((result) => words === result);
 }
 
 // What the harness writes as a failed run's last words when the run ended for a reason of its own (`store/endings.py`),

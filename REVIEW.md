@@ -31,6 +31,7 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_stopped_run_text.py::test_an_emergency_stop_keeps_the_words_too_and_says_stopped_in_turkish` — a run the emergency stop ended kept the daemon's English sentence and lost its streamed words (item 1980's review).
 - `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
   on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
   chat deleted (item 1962's review).

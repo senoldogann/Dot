@@ -107,8 +107,8 @@ async def served(runtime: Runtime) -> AsyncIterator[tuple[RunManager, str]]:
         await manager.shutdown()
 
 
-async def _stop_after_streaming(browser: Browser, manager: RunManager, address: str, language: str) -> Page:
-    """Open a run that streams, stop it from the composer once its words show, and return the page once it ended."""
+async def _open_streaming(browser: Browser, manager: RunManager, address: str, language: str) -> Page:
+    """Open a run that streams, once its words show, and return the page."""
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     STREAMING.go.clear()
     run: RunRecord = await manager.start(
@@ -128,6 +128,12 @@ async def _stop_after_streaming(browser: Browser, manager: RunManager, address: 
         await page.goto(f"{address}/#/runs/{run.id}")
     STREAMING.go.set()
     await expect(page.get_by_text(_SHOWN)).to_be_visible(timeout=_WAIT_S * 1000)
+    return page
+
+
+async def _stop_after_streaming(browser: Browser, manager: RunManager, address: str, language: str) -> Page:
+    """Open a run that streams, stop it from the composer once its words show, and return the page once it ended."""
+    page: Page = await _open_streaming(browser, manager, address, language)
     await page.locator(
         "button.btn.send, button[title='Stop this task'], button[title='Bu görevi durdur']"
     ).first.click()
@@ -159,5 +165,24 @@ async def test_in_turkish_the_note_says_durduruldu(served: tuple[RunManager, str
             answer = page.locator(".answer-cancelled")
             await expect(answer).to_contain_text(_SHOWN)
             await expect(answer.locator(".answer-stopped-note")).to_have_text("Durduruldu")
+        finally:
+            await browser.close()
+
+
+async def test_an_emergency_stop_keeps_the_words_too_and_says_stopped_in_turkish(
+    served: tuple[RunManager, str],
+) -> None:
+    """The emergency stop's own result ("Emergency stop: every active run was stopped.") is the daemon's English
+    sentence, which the page does not show: the words stay under the note, as after the owner's own stop."""
+    manager, address = served
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            page: Page = await _open_streaming(browser, manager, address, "tr")
+            await manager.emergency_stop()
+            answer = page.locator(".answer-cancelled")
+            await expect(answer).to_contain_text(_SHOWN, timeout=_WAIT_S * 1000)
+            await expect(answer.locator(".answer-stopped-note")).to_have_text("Durduruldu")
+            await expect(page.get_by_text("Emergency stop")).to_have_count(0)
         finally:
             await browser.close()

@@ -69,6 +69,8 @@
   "Sonnet": "a product's or a person's name, written the same in every language",
   "Suomi": "a language's name in itself",
   "Svenska": "a language's name in itself",
+  "The daemon was shut down while this run was active.": "the daemon's own result of a run cut off, matched (store/endings.py)",
+  "The dotx command that drove this run was told to end while the run was active.": "the daemon's own result of a run cut off, matched (store/endings.py)",
   "The run was stopped.": "the daemon's own result of a stopped run, matched (store/endings.py)",
   "Troy": "a product's or a person's name, written the same in every language",
   "TypeSafe": "a product's or a person's name, written the same in every language",
