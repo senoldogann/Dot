@@ -57,6 +57,8 @@ struct ChatScreen: View {
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
     @AppStorage(PrefKey.readingWidth) private var readingWidthRaw: String = ReadingWidth.standard.rawValue
     @State private var draft: String = ""
+    /// A message the owner quoted by a swipe or the menu (item 1972): its words ride on the next message as a "> quote".
+    @State private var quoted: String?
     @State private var attachments: [ComposerAttachment] = []
     @State private var keepingMessage: Bool = false
     @State private var panel: ChatPanel?
@@ -77,6 +79,8 @@ struct ChatScreen: View {
     @State private var stopping: Bool = false
     /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
     @State private var stepsShown: Bool = false
+    /// The link line the pill shows, once a state lasted a second (item 1931: a blip does not flicker).
+    @State private var shownLink: LinkLine?
     /// The helper whose chat a row of the stream opened (item 1909).
     @State private var openedHelper: String?
     /// The answer of a side question (`/btw`), shown in an alert.
@@ -117,10 +121,12 @@ struct ChatScreen: View {
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
     private var builtItems: [TranscriptItem] {
-        // Messages only (item 1915): every step is built, the run at work's are left out, and a finished run's fold keeps
-        // its steps behind "Worked for 2m", so a tap shows them and nothing is lost.
+        // Messages only (items 1915 and 1976): the chat told as a conversation, Dot's words and the lines of the calls they
+        // did not tell; a finished run's steps fold behind "Worked for 2m" before its answer, so nothing is lost.
         guard !showsSteps, !stepsShown else { return transcript(in: mode) }
-        return messagesOnly(transcript(in: .showAll))
+        return DotEngine.conversation(
+            of: chat ?? ChatProjection(threadId: thread), pending: model.pending(in: thread), streaming: streaming,
+            context: TranscriptContext(answeredHere: model.answeredHere))
     }
 
     private func transcript(in mode: DotEngine.ToolCallMode) -> [TranscriptItem] {
@@ -164,6 +170,15 @@ struct ChatScreen: View {
                 if RenderMeter.shown {
                     Text(verbatim: "\(drawings)").font(.system(size: 1)).opacity(0.01).accessibilityIdentifier("debug.renders")
                 }
+            }
+            .task(id: linkNow) {
+                // A state shows once it lasted a second, and goes at once: a blip of the link does not flicker the pill.
+                guard let next = linkNow else {
+                    shownLink = nil
+                    return
+                }
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                shownLink = next
             }
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
             .toolbar { chrome }
@@ -273,7 +288,13 @@ struct ChatScreen: View {
                     } else if linesTheWork || now == .queued || now == .typing {
                         // With the steps shown too, while the run has no row to show yet (it waits to start, or its model
                         // has not answered), the line moves so the chat never stands still (item 1919).
-                        WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
+                        WorkLineView(
+                            now: now, stepsShown: stepsShown,
+                            speaker: showsSteps
+                                ? nil
+                                : WorkLineSpeaker(
+                                    id: botChat?.record.id ?? dotAgentId, look: botChat?.record.look, since: Date(timeIntervalSince1970: run.createdAt))
+                        ) { stepsShown.toggle() }
                     }
                 }
                 ChatDrafts(thread: thread)
@@ -356,11 +377,12 @@ struct ChatScreen: View {
         switch item {
         case .owner(let id, let text, let delivery):
             VStack(alignment: .trailing, spacing: Space.xxs) {
-                OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, tell: { toast = $0 }))
+                OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, quote: quoteMessage, tell: { toast = $0 }))
                 // "Pending" (or why it was refused) until the Mac took the message; nothing once it did (item 1927).
                 if let delivery, delivery != .delivered { deliveryLine(id: id, delivery: delivery) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
+            .swipeToQuote(text, quote: quoteMessage)
         case .note(_, let text):
             DotNoteRow(text: text)
         case .answer(let id, let text, let writing, let endedAt):
@@ -378,19 +400,24 @@ struct ChatScreen: View {
                         })
                 }
             }
+            .swipeToQuote(text, quote: quoteMessage)
             .contextMenu {
+                Button(String(localized: "Quote", comment: "Message menu and VoiceOver action: puts the message in the composer as a quote"), systemImage: "arrowshape.turn.up.left") { quoteMessage(text) }
                 Button(String(localized: "Copy", comment: "Code block header button that copies the code"), systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
             }
         case .thought(_, let text, let live):
             ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
+        case .narration(_, let step):
+            // One of Dot's short messages, drawn as its words are (item 1976).
+            AnswerBody(markdown: narrationWords(step), writing: false)
         case .helpers(_, _, let list):
-            // Each helper its own row, where the run started it (item 1909, after another coding agent's work log); the
-            // capsule's people segment keeps them all a tap away too.
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(list, id: \.runId) { helper in HelperStreamRow(helper: helper, open: { openedHelper = helper.threadId }) }
-            }
+            // The run's helpers as one row where it started them, a tap away from a card of each (item 1957); the
+            // capsule's people segment keeps them a tap away too.
+            HelperGroupRow(
+                lines: list.map { HelperEntry(helper: $0, engine: engineLine($0, models: model.models)) },
+                open: { openedHelper = $0 })
         case .plan:
             // The plan is the chip beside the capsule (item 1880), never a card in the stream.
             EmptyView()
@@ -439,10 +466,14 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    status: capsuleStatus, activity: activityWords,
-                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil, queued: view?.queue.messages.count ?? 0,
+                    status: shownLink == nil ? capsuleStatus : nil, activity: activityWords,
+                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil,
+                    // The chat's queue on the Mac, which the segment's sheet lists; the phone's own messages still to go
+                    // say so under their bubbles ("Pending", "Waiting for the link"), item 1931.
+                    queued: view?.queue.messages.count ?? 0,
                     helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
-                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping),
+                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping && shownLink == nil,
+                    link: shownLink),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
                 stop: { stop() },
                 openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
@@ -467,6 +498,7 @@ struct ChatScreen: View {
                 ComposerView(
                     text: edit == nil ? $draft : Binding(get: { edit?.text ?? "" }, set: { edit?.text = $0 }),
                     attachments: $attachments,
+                    quote: $quoted,
                     placeholder: activeRun == nil
                         ? botChat.map { askPlaceholder($0.record.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer")
                         : followUp == .queue
@@ -512,6 +544,11 @@ struct ChatScreen: View {
     }
 
     // MARK: Doings
+
+    /// Puts a message's words in the composer as the quote of the next message.
+    private func quoteMessage(_ words: String) {
+        quoted = quoteOf(words)
+    }
 
     private func perform(_ action: ComposerAction) {
         switch action {
@@ -563,7 +600,7 @@ struct ChatScreen: View {
             keepingMessage = true
             Task {
                 defer { keepingMessage = false }
-                let text: String = words.isEmpty && !files.isEmpty ? attachmentMessage() : words
+                let text: String = quotedWords(words.isEmpty && !files.isEmpty ? attachmentMessage() : words, quote: quoted)
                 guard await model.send(text, thread: thread, steerInto: run, files: files, picks: picks) != nil else {
                     toast = ToastMessage(id: UUID(), text: messageStorageFailure(), systemImage: "exclamationmark.triangle", actionTitle: nil)
                     return
@@ -571,6 +608,7 @@ struct ChatScreen: View {
                 // A steer carries no picks, so plan first waits for a subsequent message.
                 if run == nil { planFirst = false }
                 draft = ""
+                quoted = nil
                 attachments = []
                 model.keep(draft: "", of: thread)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -694,8 +732,23 @@ struct ChatScreen: View {
         }
     }
 
+    /// The link line of this moment, before the second's wait (item 1931).
+    private var linkNow: LinkLine? {
+        linkLine(transport: model.transport, freshness: chat?.freshness, mac: model.macName ?? String(localized: "your Mac", comment: "The Mac when its name is not known"))
+    }
+
+    /// Whether the subtitle says what the pill does not (item 1931): since when the copy is saved while offline, that a
+    /// run worked when it was saved, a refused key, an old Dot. Reconnecting and Syncing are the pill's.
+    private var subtitleSaysTheLink: Bool {
+        switch model.transport {
+        case .reconnecting: false
+        case .connecting, .up: model.workingAt[thread] != nil
+        case .offline, .keyRefused, .daemonTooOld: true
+        }
+    }
+
     private var subtitle: String {
-        if let chat, let line = freshnessLine(
+        if subtitleSaysTheLink, let chat, let line = freshnessLine(
             freshness: chat.freshness, transport: model.transport, savedAt: model.savedAt[thread], workingAt: model.workingAt[thread], now: .now)
         {
             return line
@@ -778,19 +831,6 @@ func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
         case .work(let fold):
             return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
         default: return item
-        }
-    }
-}
-
-/// A transcript with only the messages (item 1915): the owner's words, Dot's answers, the asks, the helpers, how runs
-/// ended and their folds; the steps of the run at work (its tool calls that did not fail, its thoughts) are left out, its
-/// live line saying what it does. A finished run's fold is kept whole: its steps open from "Worked for 2m". Pure.
-func messagesOnly(_ items: [TranscriptItem]) -> [TranscriptItem] {
-    items.filter { item in
-        switch item {
-        case .thought: false
-        case .tool(let entry): entry.state == .failed
-        default: true
         }
     }
 }

@@ -49,6 +49,9 @@ curl -fsS -H "$main" "$base/api/threads?limit=20" | check "Scout's first meeting
 # The new chat of the bot's menu carries the bot: its first message is a run of Scout's own.
 curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the new chat's first message went to Scout" \
     'any(r["goal"] == "Hello from a new chat" and r["agent_id"] is not None for r in d)'
+# The swiped message went out with its quote in front, the words the model reads (item 1972).
+curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the quote rides on the message" \
+    'any(r["goal"] == "> Hello from a new chat\n\nSay it again" for r in d)'
 # Edit's avatar page changed the look on the Mac; the first meeting asks for one answer, no tool (item 1962).
 curl -fsS -H "$main" "$base/api/agents" | check "Scout's new look was kept" \
     'any(a["record"]["name"] == "Scout" and a["record"]["look"] is not None and a["record"]["look"]["shape"] == "cloud" and a["record"]["look"]["colour"] == "teal" for a in d)'

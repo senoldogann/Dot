@@ -154,11 +154,11 @@ async def test_holding_a_message_opens_its_sheet_and_a_touch_screen_shows_no_but
             await expect(answer.locator(".answer-foot")).to_be_visible()
             assert await answer.evaluate(_OUT_OF_SIGHT, ".answer-foot .btn")
 
-            # Your message: Copy, Select text and Edit from here; Select text selects its words.
+            # Your message: Copy, Select text, Quote and Edit from here; Select text selects its words.
             await page.evaluate(HOLD, [".user-message .bubble.user", HOLD_MS])
             await expect(sheet).to_be_visible()
             labels = await sheet.locator(".sheet-action").all_inner_texts()
-            assert labels == ["Copy the message", "Select text", "Edit from here"], labels
+            assert labels == ["Copy the message", "Select text", "Quote the message", "Edit from here"], labels
             await expect(sheet.locator(".sheet-reaction")).to_have_count(0)
             await sheet.get_by_role("button", name="Select text").click()
             await expect(sheet).to_have_count(0)

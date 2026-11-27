@@ -118,6 +118,8 @@ struct ComposerSuggestions: Sendable {
 struct ComposerView: View {
     @Binding var text: String
     @Binding var attachments: [ComposerAttachment]
+    /// A message the owner quotes (item 1972), shown as a chip above the text; `nil` when none.
+    @Binding var quote: String?
     let placeholder: String
     let buttons: ComposerButtons
     let perform: (ComposerAction) -> Void
@@ -171,6 +173,7 @@ struct ComposerView: View {
             }
         }
         .haptic(.medium, trigger: voice.phase == .recording)
+        .onChange(of: quote) { _, now in if now != nil { isFocused = true } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { voice.leftTheScreen() } }
         .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
         .photosPicker(isPresented: shown(.photos), selection: $photoItems, maxSelectionCount: OutgoingAttachment.maximumCount, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
@@ -239,6 +242,7 @@ struct ComposerView: View {
     private func fieldPill(compact: Bool) -> some View {
             VStack(alignment: .leading, spacing: 0) {
                 if buttons.primary != .confirmEdit {
+                    if let quoted = quote { QuoteChip(quote: quoted, remove: { quote = nil }) }
                     if !attachments.isEmpty { attachmentStrip }
                     if preparing != nil {
                         ProgressView(String(localized: "Preparing attachments…", comment: "Composer status while opening or exporting selected files"))
@@ -549,6 +553,24 @@ struct DocumentScanner: UIViewControllerRepresentable {
     }
 }
 
+/// How the link to the Mac stands in the pill while the chat is not live (item 1931, after another coding agent's app).
+enum LinkLine: Equatable, Sendable {
+    /// The link broke and is being opened again, to the paired Mac by its name.
+    case reconnecting(mac: String)
+    /// The link is up and the chat is being brought up to date.
+    case syncing
+    /// The phone has no link.
+    case offline
+
+    var words: String {
+        switch self {
+        case .reconnecting(let mac): String(localized: "Reconnecting to \(mac)…", comment: "Chat pill: the link to the Mac broke and is being opened again; the argument is the Mac's name")
+        case .syncing: String(localized: "Syncing messages…", comment: "Chat pill: the chat is being brought up to date")
+        case .offline: String(localized: "Offline", comment: "Chat subtitle: the phone has no link")
+        }
+    }
+}
+
 /// What the floating capsule says about the chat's work; a segment exists only while it has something to say.
 struct WorkingSummary: Equatable, Sendable {
     /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
@@ -568,8 +590,13 @@ struct WorkingSummary: Equatable, Sendable {
     let plan: PlanProgress?
     /// The run can be stopped from the capsule.
     let canStop: Bool
+    /// How the link to the Mac stands while it is not live, in the status's place (item 1931); `nil` while the chat is
+    /// live.
+    let link: LinkLine?
 
-    var isEmpty: Bool { status == nil && queued == 0 && helpersTotal == 0 && plan == nil }
+    /// The pill opens with the link's words or the status.
+    var leads: Bool { status != nil || link != nil }
+    var isEmpty: Bool { !leads && queued == 0 && helpersTotal == 0 && plan == nil }
 }
 
 /// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
@@ -627,7 +654,21 @@ struct FloatingWorkingControl: View {
         let inset: CGFloat = glyphs ? Space.xs : Space.s
         let layout: AnyLayout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
-            if let status = summary.status {
+            if let link = summary.link {
+                // The link's state in the status's place while it is not live (item 1931): the spinner while it comes
+                // back, a quiet glyph while there is none.
+                segment(action: openStatus, label: link.words, inset: inset) {
+                    HStack(spacing: Space.xxs + 1) {
+                        if link == .offline {
+                            Image(systemName: "wifi.slash").textRole(.label).foregroundStyle(Tone.tertiary)
+                        } else {
+                            ProgressView().controlSize(.mini).tint(Tone.secondary)
+                        }
+                        Text(link.words).textRole(.label).fontWeight(.medium).foregroundStyle(Tone.secondary).lineLimit(1)
+                    }
+                }
+                .accessibilityIdentifier("capsule.link")
+            } else if let status = summary.status {
                 // The status and its clock are drawn every second, whether events come or not: a clock drawn with
                 // the screen froze between events and jumped when they came (the owner's report of 2026-11-25). The
                 // ticks are counted from the run's start, never from `.now`: a schedule from `.now` began again at
@@ -652,7 +693,7 @@ struct FloatingWorkingControl: View {
                 }
             }
             if summary.canStop {
-                if summary.status != nil { divider }
+                if summary.leads { divider }
                 segment(action: stop, label: String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), inset: inset) {
                     if glyphs {
                         Image(systemName: "stop.fill").textRole(.label).foregroundStyle(Tone.text)
@@ -664,7 +705,7 @@ struct FloatingWorkingControl: View {
                 .accessibilityIdentifier("capsule.stop")
             }
             if let plan = summary.plan {
-                if summary.status != nil || summary.canStop { divider }
+                if summary.leads || summary.canStop { divider }
                 segment(
                     action: openPlan,
                     label: String(localized: "Plan, \(plan.done) of \(plan.total) steps done", comment: "VoiceOver: the plan chip beside the working capsule; the arguments are the steps done and all steps"),
@@ -682,7 +723,7 @@ struct FloatingWorkingControl: View {
                 .accessibilityIdentifier("capsule.plan")
             }
             if summary.queued > 0 {
-                if summary.status != nil || summary.canStop || summary.plan != nil { divider }
+                if summary.leads || summary.canStop || summary.plan != nil { divider }
                 segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count"), inset: inset) {
                     Label { Text(verbatim: "\(summary.queued)").lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
                         .tabularNumbers().foregroundStyle(Tone.secondary)
@@ -690,7 +731,7 @@ struct FloatingWorkingControl: View {
                 .accessibilityIdentifier("capsule.queue")
             }
             if summary.helpersTotal > 0 {
-                if summary.status != nil || summary.canStop || summary.plan != nil || summary.queued > 0 { divider }
+                if summary.leads || summary.canStop || summary.plan != nil || summary.queued > 0 { divider }
                 segment(
                     action: openHelpers,
                     label: String(localized: "Helpers, \(summary.helpersDone) of \(summary.helpersTotal) done", comment: "VoiceOver: the capsule segment of the run's helpers; the arguments are the helpers that ended and all of them"),

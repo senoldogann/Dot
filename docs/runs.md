@@ -64,7 +64,21 @@ and the time, where the pointer rests (item 842; on a touch screen it is a row o
 and turns to *Hide the steps* once
 pressed. Approvals, questions, notes and the messages stay in sight either way; the changes of the memory stand with the
 steps, with **What it is doing** (item 830), and an agent's message is folded until you open it, in either choice
-(item 859). The choice is kept by the browser. A run
+(item 859). The choice is kept by the browser. A third choice, **Messages only** (item 1976, after Grok Bot's chats),
+tells the run as a conversation: the steps and thoughts fold out as with *What it is doing*; what the run says on the way
+to its calls is drawn as one of its messages and stays where it was said; and a call that turns the run to other work
+which its own words did not tell is one of Dot's short messages too, in the words the line uses for it ("Searching the
+web for “GistSmith contact”", "Looking at gistsmith.com", "Running a command"). The line under them says what the run
+does now and for how long ("Reading README.md… · 2 min"). Those lines come from the daemon's `narration` events
+(`agent/narration.py`), one beside a call's `tool_call` in every harness (Dot's own loop, Claude Code, OpenCode, whose own tools are told as the Dot tool that does the same): no model
+is asked for them and the model never reads them, so they cost no token. A stretch of one kind of work is one line: a
+call of a kind one of the run's four newest lines told is not told again, but for a search of other words or a page on
+another site; a line names a page by its site, a file by its name and a search by its words, never a command's text. Over
+the owner's 279 runs of two weeks that made a median of one line a run on Claude Code (at most 17) and six on OpenCode
+(at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
+the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
+may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
+the line wears the bot's face, and a finished run's steps fold behind one *Worked for* line before its answer. A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow

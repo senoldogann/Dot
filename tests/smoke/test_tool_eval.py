@@ -24,7 +24,7 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 pytestmark = pytest.mark.asyncio
 
 
-async def test_the_cases_are_played_and_a_model_that_only_finishes_passes_none_but_the_one_where_finishing_fits() -> (
+async def test_the_cases_are_played_and_a_model_that_only_finishes_passes_none_but_the_ones_where_finishing_fits() -> (
     None
 ):
     config = eval_config(load_default_config())
@@ -44,6 +44,8 @@ async def test_the_cases_are_played_and_a_model_that_only_finishes_passes_none_b
     passed: dict[str, bool] = {result.case_id: result.passed for result in results}
     # Reading the page it opened, the model may answer at once: the order says it is confirmed.
     assert passed.pop("read-what-the-page-shows") is True
+    # A desktop_act whose result shows the change is answered with no look again (item 1960): finishing is the call.
+    assert passed.pop("no-look-after-a-change-the-result-shows") is True
     assert not any(passed.values()), passed
     edit: CaseResult = next(result for result in results if result.case_id == "edit-with-dots-own-arguments")
     assert (edit.tool, edit.why) == ("finish", "called finish, not one of edit_file")

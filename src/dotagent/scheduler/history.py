@@ -7,10 +7,13 @@ import json
 from collections.abc import Sequence
 from zoneinfo import ZoneInfo
 
+from pydantic import JsonValue
+
 from dotagent.core.types import FrozenModel
 from dotagent.llm.types import Message
 from dotagent.scheduler.timing import format_local
 from dotagent.store.models import RunRecord, RunStatus
+from dotagent.tools.meta import FINISH_TOOL
 
 HISTORY_OPEN: str = "<earlier_runs>"
 HISTORY_CLOSE: str = "</earlier_runs>"
@@ -132,24 +135,31 @@ _SYSTEM_NOTE: str = "[system note]"
 _OPENING_MARKS: tuple[str, ...] = (HISTORY_OPEN, OWNER_WAIT_OPEN, CHAT_OPEN)
 
 
-def _spoken(message: Message) -> bool:
-    """Whether ``message`` is something said in a chat: the owner's or the model's own words, not a tool call, a tool's
-    answer, a note of Dot's (a command's end, a helper's report: words of third parties may be in them, and each firing
-    writes its own, so they would fill the budget) or a firing's opening with its digest."""
-    if message.role not in ("user", "assistant") or message.tool_calls or message.content.strip() == "":
-        return False
-    if message.content.startswith(_SYSTEM_NOTE):
-        return False
-    return not (message.role == "user" and any(mark in message.content for mark in _OPENING_MARKS))
+def _words(message: Message) -> str:
+    """What ``message`` said in the chat, "" when it said nothing there: the owner's or the model's own words, or the
+    answer of the model's ``finish`` call, which is how a run's final answer is kept (its message has no words of its
+    own). A call of any other tool, a tool's answer, a note of Dot's (a command's end, a helper's report: words of third
+    parties may be in them, and each firing writes its own, so they would fill the budget) and a firing's opening with
+    its digest say nothing."""
+    if message.role == "assistant" and message.tool_calls:
+        if len(message.tool_calls) != 1 or message.tool_calls[0].name != FINISH_TOOL:
+            return ""
+        answer: JsonValue = message.tool_calls[0].arguments.get("answer")
+        return answer if isinstance(answer, str) else ""
+    if message.role not in ("user", "assistant") or message.content.startswith(_SYSTEM_NOTE):
+        return ""
+    if message.role == "user" and any(mark in message.content for mark in _OPENING_MARKS):
+        return ""
+    return message.content.strip()
 
 
-def _said(message: Message, limit: int) -> str:
-    """One thing said in the chat as a line of the digest: who said it and its words as a quoted string, cut to
-    ``limit`` characters, whose ``<`` is escaped so that nothing said can close the digest."""
-    words: str = " ".join(message.content.split())
-    clipped: str = words if len(words) <= limit else f"{words[: limit - 1]}…"
+def _said(role: str, words: str, limit: int) -> str:
+    """One thing said in the chat as a line of the digest: who said it (``role``) and its ``words`` as a quoted string,
+    cut to ``limit`` characters, whose ``<`` is escaped so that nothing said can close the digest."""
+    flat: str = " ".join(words.split())
+    clipped: str = flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
     quoted: str = json.dumps(clipped, ensure_ascii=False).replace("<", "\\u003c")
-    return f"- {'owner' if message.role == 'user' else 'you'}: {quoted}"
+    return f"- {'owner' if role == 'user' else 'you'}: {quoted}"
 
 
 def condensed_chat(messages: Sequence[Message], budget: int) -> list[Message]:
@@ -160,27 +170,25 @@ def condensed_chat(messages: Sequence[Message], budget: int) -> list[Message]:
     characters), and so is a message of the owner's the chat repeats later word for word (the schedule's goal that each
     firing opens with, which the firing's own opening says again). The newest answer keeps up to half the budget, each
     older line :data:`ANSWER_CHARS`."""
-    repeated: dict[str, int] = {}
-    for index, message in enumerate(messages):
-        if _spoken(message) and message.role == "user":
-            repeated[message.content] = index
-    said: list[Message] = [
-        message
-        for index, message in enumerate(messages)
-        if _spoken(message) and (message.role == "assistant" or repeated[message.content] == index)
+    spoken: list[tuple[int, str, str]] = [
+        (index, message.role, words) for index, message in enumerate(messages) if (words := _words(message)) != ""
+    ]
+    repeated: dict[str, int] = {words: index for index, role, words in spoken if role == "user"}
+    said: list[tuple[str, str]] = [
+        (role, words) for index, role, words in spoken if role == "assistant" or repeated[words] == index
     ]
     fixed: int = len(CHAT_LEAD) + len(CHAT_OPEN) + len(CHAT_CLOSE) + 3
     lines: list[str] = []
     used: int = fixed
     newest_answer: bool = True
-    for message in reversed(said):
-        limit: int = max(budget // 2, ANSWER_CHARS) if newest_answer and message.role == "assistant" else ANSWER_CHARS
-        line: str = _said(message, limit)
+    for role, words in reversed(said):
+        limit: int = max(budget // 2, ANSWER_CHARS) if newest_answer and role == "assistant" else ANSWER_CHARS
+        line: str = _said(role, words, limit)
         if used + len(line) + 1 > budget:
             break
         lines.append(line)
         used += len(line) + 1
-        newest_answer = newest_answer and message.role != "assistant"
+        newest_answer = newest_answer and role != "assistant"
     if not lines:
         return []
     lines.reverse()

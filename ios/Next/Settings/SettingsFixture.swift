@@ -22,6 +22,7 @@
         case scheduleEdit = "settings-schedule-edit"
         case rules = "settings-rules"
         case memory = "settings-memory"
+        case memoryTrash = "settings-memory-trash"
         case agents = "settings-agents"
         case campaigns = "settings-campaigns"
         case campaign = "settings-campaign"
@@ -69,6 +70,7 @@
             case .schedules, .scheduleEdit: .schedules
             case .rules: .rules
             case .memory: .memory
+            case .memoryTrash: .memoryTrash
             case .agents: .agents
             case .campaigns: .campaigns
             case .campaign: .campaign("cmp_fixture")
@@ -207,6 +209,7 @@
                 )
             case ("GET", "/api/policy/free"): return (200, #"{"free":false}"#)
             case ("GET", "/api/memories"): return (200, memories(now: now))
+            case ("GET", "/api/memories/trash"): return (200, trash(now: now))
             case ("GET", "/api/agents"): return (200, agents(now: now))
             case ("GET", _) where path.hasPrefix("/api/agents/"):
                 return (200, #"{"record":\#(agent("ag_scout", "Scout", "Finds leads and checks them", now: now)),"runs":[],"messages":[],"learned":{"lessons":[],"scores":{},"skills":[]},"usage":null,"work":null,"home":null}"#)
@@ -342,6 +345,17 @@
 
         private func note(_ id: String, _ content: String, _ tags: String, now: Double, used: Int) -> String {
             #"{"id":"\#(id)","content":"\#(content)","tags":\#(tags),"created_at":\#(now - 900000),"updated_at":\#(now - 90000),"source_run":null,"agent_id":null,"used_count":\#(used),"last_used_at":\#(now - 7200),"expires_at":null,"replaced_by":null,"tainted":false,"merged_into":null,"merged_from":[],"pinned_at":null,"rested_at":null,"edited_by":"owner","proposed":null}"#
+        }
+
+        private func trash(now: Double) -> String {
+            let one: (String, String, String, Double) -> String = { id, content, tags, ago in
+                #"{"record":\#(self.note(id, content, tags, now: now, used: 2)),"trashed_at":\#(now - ago),"purged_at":\#(now - ago + 30 * 86400)}"#
+            }
+            let items: [String] = [
+                one("mem_t1", "Oulu cafés list their hours on Facebook, not a site.", "[\"lesson\"]", 7200),
+                one("mem_t2", "The old invoice folder was ~/Documents/Invoices-2025.", "[\"work\"]", 3 * 86400),
+            ]
+            return #"{"items":[\#(items.joined(separator: ","))],"total":2,"trash_days":30}"#
         }
 
         private func memories(now: Double) -> String {

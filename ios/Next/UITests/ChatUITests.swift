@@ -14,6 +14,42 @@ final class ChatUITests: XCTestCase {
         return app
     }
 
+    /// Swipe to quote (item 1972), on the fixtures: the owner's message pulled to the right puts its first line in the
+    /// composer as a chip with a cross; a short pull, or one that starts at the screen's edge, quotes nothing; the cross drops
+    /// the chip. At the largest accessibility size too.
+    @MainActor
+    func testASwipeOnAMessageQuotesItAndTheCrossDropsTheQuote() {
+        for extra in [[String](), ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge"]] {
+            // A scene with nothing writing: a chat whose rows move under the finger is no place to measure a swipe.
+            let app: XCUIApplication = launch("n2-failed", defaults: extra)
+            let message: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+            XCTAssertTrue(message.waitForExistence(timeout: 10))
+            let origin: XCUICoordinate = app.coordinate(withNormalizedOffset: .zero)
+            func drag(from x: CGFloat, by dx: CGFloat) {
+                let start: CGVector = CGVector(dx: x, dy: message.frame.midY)
+                origin.withOffset(start).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: x + dx, dy: start.dy)))
+            }
+            let chip: XCUIElement = app.descendants(matching: .any)["composer.quote"]
+            drag(from: message.frame.midX, by: 30)
+            XCTAssertFalse(chip.exists, "a short pull is no quote")
+            drag(from: 10, by: 160)
+            XCTAssertFalse(chip.exists, "a pull from the screen's edge is the back gesture's")
+            drag(from: message.frame.midX - 40, by: 160)
+            XCTAssertTrue(chip.waitForExistence(timeout: 10), "the swipe put the message in the composer as a quote")
+            XCTAssertTrue(chip.label.contains("Book me the dentist"), chip.label)
+            let remove: XCUIElement = app.buttons["composer.quote.remove"]
+            XCTAssertGreaterThanOrEqual(remove.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(remove.frame.width, 44)
+            let attachment: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = extra.isEmpty ? "quote-chip" : "quote-chip-ax3"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            remove.tap()
+            XCTAssertFalse(chip.exists, "the cross drops the quote")
+            app.terminate()
+        }
+    }
+
     @MainActor
     func testThePlusMenuAttachesAVideoWithItsDurationAndCanRemoveIt() throws {
         let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))
@@ -209,7 +245,7 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
         // The sheet's row (it names the helper's model), not the helper's row in the work log under the sheet (item
         // 1909), which no tap reaches.
-        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "Check the dentist", "Opus")).firstMatch
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS[c] %@", "Check the dentist", "Opus")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertTrue(row.label.contains("Working"), row.label)
         XCTAssertFalse(row.label.contains("browser_open"), "no raw tool name: \(row.label)")
@@ -280,9 +316,13 @@ final class ChatUITests: XCTestCase {
         // closed first, so the taps reach the chat.
         let app: XCUIApplication = launch("n2-queue")
         if app.navigationBars["Queued"].waitForExistence(timeout: 5) { app.buttons["Close"].firstMatch.tap() }
+        // The helpers are one row (item 1957): its card lists each.
+        let helpers: XCUIElement = app.buttons["helpers.group"]
+        XCTAssertTrue(helpers.waitForExistence(timeout: 10), "the helpers are one row")
+        helpers.tap()
         let helper: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "helper.row", "Check the dentist")).firstMatch
-        XCTAssertTrue(helper.waitForExistence(timeout: 10), "a helper is its own row")
-        XCTAssertGreaterThanOrEqual(helper.frame.height, 44)
+        XCTAssertTrue(helper.waitForExistence(timeout: 5), "each helper a row of the card")
+        XCTAssertGreaterThanOrEqual(helper.frame.height.rounded(), 44)
         // The line stands at the end of the stream: scroll to it (the stream draws only what is near the screen).
         let waiting: XCUIElement = app.staticTexts["waiting.line"]
         for _ in 0..<4 where !waiting.exists { app.swipeUp() }
@@ -303,6 +343,69 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(group.label, "Read 2 files and ran 2 commands")
         let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         shot.name = "work-log"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Item 1957: the run's helpers are one row, "2 helpers" over "1 working · 1 done", with their time and a chevron; a
+    /// tap opens a card with a row per helper (its state and its engine in words), whose tap opens the helper's chat.
+    func testTheHelpersAreOneRowThatOpensACardOfEach() {
+        let app: XCUIApplication = launch("n2-chat")
+        let group: XCUIElement = app.buttons["helpers.group"]
+        for _ in 0..<4 where !group.exists { app.swipeUp() }
+        XCTAssertTrue(group.waitForExistence(timeout: 10))
+        XCTAssertEqual(group.label, "2 helpers, 1 working, 1 done")
+        XCTAssertEqual(group.value as? String, "Collapsed")
+        XCTAssertGreaterThanOrEqual(group.frame.height.rounded(), 44)
+        XCTAssertFalse(app.buttons["helper.row"].exists, "no row per helper while folded")
+        let folded: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        folded.name = "helpers-collapsed"
+        folded.lifetime = .keepAlways
+        add(folded)
+        group.tap()
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "helper.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertEqual(rows.count, 2)
+        let working: XCUIElement = rows.matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+        XCTAssertTrue(working.label.contains("Working"), working.label)
+        XCTAssertTrue(working.label.contains("Claude Code"), "the engine in words: \(working.label)")
+        let open: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        open.name = "helpers-expanded"
+        open.lifetime = .keepAlways
+        add(open)
+        working.tap()
+        XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5), "the helper's chat")
+    }
+
+    /// Item 1957: the open group at AX3 in Turkish and dark: the words wrap, nothing is cut but a title, every row keeps
+    /// its 44 pt.
+    func testTheHelpersGroupHoldsAtAX3InTurkishAndDark() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-chat", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-colorScheme", "dark",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
+        ]
+        app.launch()
+        let group: XCUIElement = app.buttons["helpers.group"]
+        // Brought to the middle of the screen by its frame, in short drags: `isHittable` of a row out of sight fails the
+        // test on GitHub's runner ("Activation point invalid"), and at AX sizes a row near an edge sits under the
+        // navigation bar or the composer, where a tap does not reach it.
+        let window: CGRect = app.windows.firstMatch.frame
+        let middle: ClosedRange<CGFloat> = (window.minY + window.height * 0.25)...(window.minY + window.height * 0.6)
+        let centre: XCUICoordinate = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        for _ in 0..<16 where !(group.exists && middle.contains(group.frame.midY)) {
+            let down: Bool = group.exists && group.frame.midY < middle.lowerBound
+            centre.press(forDuration: 0.05, thenDragTo: centre.withOffset(CGVector(dx: 0, dy: down ? 220 : -220)))
+        }
+        XCTAssertTrue(group.waitForExistence(timeout: 10))
+        XCTAssertTrue(group.label.hasPrefix("2 yardımcı"), group.label)
+        group.tap()
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "helper.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 3))
+        for index in 0..<rows.count { XCTAssertGreaterThanOrEqual(rows.element(boundBy: index).frame.height.rounded(), 44) }
+        app.swipeUp()
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "helpers-ax3-tr-dark"
         shot.lifetime = .keepAlways
         add(shot)
     }
@@ -348,6 +451,20 @@ final class ChatUITests: XCTestCase {
         let settled: String = meter.label
         sleep(4)
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
+    }
+
+    /// Item 1931: with no link, the pill says Offline in the status's place (after the second that keeps a blip from
+    /// flickering), and offers no Stop.
+    func testThePillSaysOfflineWithoutALink() {
+        let app: XCUIApplication = launch("n2-offline-saved")
+        let link: XCUIElement = app.buttons["capsule.link"]
+        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        XCTAssertEqual(link.label, "Offline")
+        XCTAssertFalse(app.buttons["capsule.stop"].exists, "nothing to stop over no link")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "pill-offline"
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {

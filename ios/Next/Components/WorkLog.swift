@@ -539,54 +539,223 @@ struct DotMark: View {
     }
 }
 
-/// A helper the run started, as its own row of the stream (item 1909, after another coding agent's work log): its face
-/// with a dot while it works, its title, one quiet line of what it does now or said last, its time at the right, and a
-/// chevron; a tap opens the helper's own chat.
-struct HelperStreamRow: View {
+/// A helper of the stream's group with its engine in words ("Claude Code · Opus 5.5 · High", `engineLine`).
+struct HelperEntry: Equatable, Sendable {
     let helper: HelperView
-    let open: () -> Void
+    let engine: String
+}
+
+/// How many helpers of a group stand in one state.
+struct HelperTally: Equatable, Sendable {
+    let state: HelperState
+    let count: Int
+}
+
+/// The group's states in the order its line says them: what works first, then what waits on the owner, then what
+/// ended (failed before stopped before done); a state no helper is in is left out. Pure.
+func helperTallies(_ states: [HelperState]) -> [HelperTally] {
+    let order: [HelperState] = [.working, .stopping, .waitingOnYou, .failed, .stopped, .done]
+    return order.compactMap { state in
+        let count: Int = states.filter { $0 == state }.count
+        return count == 0 ? nil : HelperTally(state: state, count: count)
+    }
+}
+
+/// One state's count in words ("2 working", "1 done"). Pure.
+func helperTallyWords(_ tally: HelperTally) -> String {
+    switch tally.state {
+    case .working: String(localized: "\(tally.count) working", comment: "Helpers group: how many helpers work now")
+    case .stopping: String(localized: "\(tally.count) stopping", comment: "Helpers group: how many helpers are being stopped")
+    case .waitingOnYou: String(localized: "\(tally.count) waiting on you", comment: "Helpers group: how many helpers wait for the owner")
+    case .failed: String(localized: "\(tally.count) failed", comment: "Helpers group: how many helpers failed")
+    case .stopped: String(localized: "\(tally.count) stopped", comment: "Helpers group: how many helpers the owner stopped")
+    case .done: String(localized: "\(tally.count) done", comment: "Helpers group: how many helpers finished")
+    }
+}
+
+/// The ink of a helper's state in the group: blue while it works, amber while it waits on the owner, red once it
+/// failed, grey once it ended (item 1957). Pure.
+func helperInk(_ state: HelperState) -> Color {
+    switch state {
+    case .working, .stopping: Tone.live
+    case .waitingOnYou: Tone.warn
+    case .failed: Tone.failure
+    case .done, .stopped: Tone.tertiary
+    }
+}
+
+/// The group's time: from its first helper's start to its last one's end, or on while one still works. Pure.
+func helperGroupSpan(_ helpers: [HelperView]) -> (start: Date, end: Date?) {
+    let start: Double = helpers.map(\.startedAt).min() ?? 0
+    let live: Bool = helpers.contains { helperState($0.status).isLive }
+    let end: Double? = live ? nil : helpers.map { $0.finishedAt ?? $0.startedAt }.max()
+    return (Date(timeIntervalSince1970: start), end.map { Date(timeIntervalSince1970: $0) })
+}
+
+/// The helpers a run started, as ONE row of the stream (item 1957, after the owner's reference of another coding
+/// agent's subagents): their providers' marks overlapping, "2 helpers", under it what they do in their states' inks
+/// ("1 working · 1 done"), the group's time and a chevron. A tap opens a card of one row per helper, each opening its
+/// own chat.
+struct HelperGroupRow: View {
+    let lines: [HelperEntry]
+    let open: (String) -> Void
+    @State private var expanded: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     var body: some View {
-        let state: HelperState = helperState(helper.status)
-        let started: Date = Date(timeIntervalSince1970: helper.startedAt)
-        let ended: Date? = helper.finishedAt.map { Date(timeIntervalSince1970: $0) }
-        Button(action: open) {
-            HStack(spacing: Space.xs) {
-                AgentAvatar(size: 24)
-                    .overlay(alignment: .bottomTrailing) {
-                        if state.isLive {
-                            Circle().fill(state.tone.color).frame(width: 8, height: 8)
-                                .overlay(Circle().stroke(Tone.ground, lineWidth: 1.5))
-                                .accessibilityHidden(true)
-                        }
+        let large: Bool = dynamicTypeSize.isAccessibilitySize
+        let states: [HelperState] = lines.map { helperState($0.helper.status) }
+        let tallies: [HelperTally] = helperTallies(states)
+        let span: (start: Date, end: Date?) = helperGroupSpan(lines.map(\.helper))
+        let title: String = String(localized: "\(lines.count) helpers", comment: "Helpers group: how many helpers the run started")
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Button {
+                withAnimation(motionAnimation(.disclosure, reduceMotion: reduceMotion)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: Space.s) {
+                    ProviderMarks(providers: lines.map(\.helper.provider))
+                    // At the accessibility sizes the words wrap whole and the clock stands under them: beside them it
+                    // cut "2 helpers" to "2 hel…".
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(title).textRole(.footnote).foregroundStyle(Tone.text).lineLimit(large ? nil : 1)
+                        Text(talliesText(tallies)).textRole(.label).lineLimit(large ? nil : 2)
+                        if large { HelperClock(start: span.start, end: span.end) }
                     }
-                    .frame(width: Metric.iconSlot)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(helper.shortTitle).textRole(.footnote).foregroundStyle(Tone.text).lineLimit(1)
-                    Text(latest(state)).textRole(.label).foregroundStyle(Tone.secondary).lineLimit(1)
+                    Spacer(minLength: Space.xs)
+                    if !large { HelperClock(start: span.start, end: span.end) }
+                    Symbol(name: expanded ? "chevron.up" : "chevron.down", context: .chevron).foregroundStyle(Tone.glyph)
+                }
+                .frame(minHeight: Metric.hit)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(([title] + tallies.map(helperTallyWords)).joined(separator: ", "))
+            .accessibilityValue(
+                expanded
+                    ? String(localized: "Expanded", comment: "VoiceOver value of an open group")
+                    : String(localized: "Collapsed", comment: "VoiceOver value of a closed group"))
+            .accessibilityHint(
+                expanded
+                    ? String(localized: "Hides the helpers", comment: "VoiceOver hint of the open helpers group")
+                    : String(localized: "Shows each helper", comment: "VoiceOver hint of the closed helpers group"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("helpers.group")
+            if expanded {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(lines, id: \.helper.runId) { line in
+                        HelperCardRow(line: line, open: { open(line.helper.threadId) })
+                    }
+                }
+                .padding(.horizontal, Space.s)
+                .padding(.vertical, Space.xxs)
+                .background(Tone.card, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                .transition(.opacity)
+            }
+        }
+    }
+
+    /// "1 working · 1 done", each count in its state's ink, the dots between in grey.
+    private func talliesText(_ tallies: [HelperTally]) -> AttributedString {
+        var text: AttributedString = AttributedString()
+        for (index, tally) in tallies.enumerated() {
+            if index > 0 {
+                var dot: AttributedString = AttributedString(" · ")
+                dot.foregroundColor = Tone.tertiary
+                text += dot
+            }
+            var words: AttributedString = AttributedString(helperTallyWords(tally))
+            words.foregroundColor = helperInk(tally.state)
+            text += words
+        }
+        return text
+    }
+}
+
+/// The providers' marks of a group, overlapping, at most three (the owner's reference).
+struct ProviderMarks: View {
+    let providers: [String]
+    @ScaledMetric(relativeTo: .footnote) private var size: CGFloat = 26
+
+    var body: some View {
+        HStack(spacing: -size * 0.35) {
+            ForEach(Array(providers.prefix(3).enumerated()), id: \.offset) { _, provider in
+                Image(providerMarkAsset(provider)).resizable().renderingMode(.template).scaledToFit()
+                    .foregroundStyle(Tone.secondary)
+                    .padding(size * 0.24)
+                    .frame(width: size, height: size)
+                    .background(Tone.nested, in: Circle())
+                    // The ground around each disc keeps the overlap legible without a stroke (plan §3: no strokes).
+                    .padding(1.5)
+                    .background(Tone.ground, in: Circle())
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// A clock of the helpers' time, ticking from their start while one works (`end` nil), fixed once they all ended.
+struct HelperClock: View {
+    let start: Date
+    let end: Date?
+
+    var body: some View {
+        // Ticks counted from the start: a schedule from `.now` began again at every drawing.
+        TimelineView(.periodic(from: start, by: 1)) { context in
+            Text(elapsedWords(from: start, to: end ?? context.date)).textRole(.label).foregroundStyle(Tone.tertiary)
+                .tabularNumbers().lineLimit(1).fixedSize()
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// One helper in the group's card (the owner's reference): a dot in its state's ink, its title on one line, "· Working"
+/// in that ink, its time and a chevron that opens its chat; under them, in grey, its provider's mark and its engine.
+/// At the accessibility sizes the title takes three lines and the time its own.
+struct HelperCardRow: View {
+    let line: HelperEntry
+    let open: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var mark: CGFloat = 13
+
+    var body: some View {
+        let state: HelperState = helperState(line.helper.status)
+        let start: Date = Date(timeIntervalSince1970: line.helper.startedAt)
+        let end: Date? = line.helper.finishedAt.map { Date(timeIntervalSince1970: $0) }
+        let large: Bool = dynamicTypeSize.isAccessibilitySize
+        Button(action: open) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                Circle().fill(helperInk(state)).frame(width: 7, height: 7)
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.xxs) {
+                        Text(line.helper.shortTitle).textRole(.footnote).foregroundStyle(Tone.text)
+                            .lineLimit(large ? 3 : 1).truncationMode(.tail)
+                            .layoutPriority(0)
+                        Text("· " + state.word).textRole(.footnote).foregroundStyle(helperInk(state))
+                            .lineLimit(1).fixedSize().layoutPriority(1)
+                    }
+                    HStack(alignment: .center, spacing: Space.xxs) {
+                        Image(providerMarkAsset(line.helper.provider)).resizable().renderingMode(.template).scaledToFit()
+                            .frame(width: mark, height: mark).foregroundStyle(Tone.tertiary)
+                        Text(line.engine).textRole(.label).foregroundStyle(Tone.tertiary).lineLimit(large ? 2 : 1)
+                    }
+                    if large { HelperClock(start: start, end: state.isLive ? nil : end ?? start) }
                 }
                 Spacer(minLength: Space.xs)
-                TimelineView(.periodic(from: started, by: 1)) { context in
-                    Text(elapsedWords(from: started, to: ended ?? context.date)).textRole(.label).foregroundStyle(Tone.tertiary)
-                        .tabularNumbers().lineLimit(1).fixedSize()
-                }
+                if !large { HelperClock(start: start, end: state.isLive ? nil : end ?? start) }
                 Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
             }
+            .padding(.vertical, Space.s)
             .frame(minHeight: Metric.hit)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([helper.shortTitle, state.word, latest(state)].joined(separator: ", "))
+        .accessibilityLabel([line.helper.shortTitle, state.word, line.engine].filter { !$0.isEmpty }.joined(separator: ", "))
         .accessibilityHint(String(localized: "Opens the helper's chat", comment: "VoiceOver hint of a helper row"))
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("helper.row")
-    }
-
-    /// What it does now while it works, else the last line it said, else its state.
-    private func latest(_ state: HelperState) -> String {
-        if state.isLive, let step = helper.step { return callPhrase(step) }
-        let line: String = helper.step?.line.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return line.isEmpty ? state.word : line
     }
 }

@@ -73,6 +73,21 @@ export function callPhrase(tool, args) {
   return t(PHRASES[kind] ?? PHRASES.other);
 }
 
+/**
+ * A call the run told as a line of the conversation (a `narration` event, item 1976), in the line's words: a page or a
+ * site by its name ("Looking at gistsmith.com"), any other call as the live line says it.
+ */
+export function narrationPhrase(tool, args) {
+  const address = typeof args?.url === "string" ? args.url : "";
+  return address === "" ? callPhrase(tool, args) : t("work.lookingAt", { what: clip(hostOf(address).replace(/^www\./, ""), DETAIL_CHARS) });
+}
+
+/** How long a run has worked, as the line says it beside its words ("12 s", "3 min"). */
+export function workedFor(seconds) {
+  const whole = Math.max(0, Math.floor(seconds));
+  return whole < 60 ? t("work.forSeconds", { count: whole }) : t("work.forMinutes", { count: Math.floor(whole / 60) });
+}
+
 /** What a step's message says it does next, as the line says it (item 1131): its first line, without the marks of
  * markdown or the stop at its end ("Kanıt netleşti. Son bir kontrol yapıp sonucu yazıyorum." stays whole). */
 function toldWords(text) {
@@ -104,11 +119,17 @@ function hostOf(address) {
  * the chat as the timeline does, `setActive(bool)` says whether the run is at work (`queued`: it waits to start, until
  * its `run_started`), and `stopping()` that Stop was pressed. `onToggle(shown)` runs when the reader asks for
  * the steps (`shown` true) or folds them back. `announcer` is the status region that says a change of state; the page
- * places it.
+ * places it. `startedAt` (epoch seconds) is when the run began, which the line's time counts from ("· 3 min", shown
+ * with "Messages only", item 1976) until its `run_started` says.
  */
-export function createWorkStatus({ rootRunId, active, queued, onToggle, face }) {
+export function createWorkStatus({ rootRunId, active, queued, onToggle, face, startedAt }) {
   let words = el("span", { class: "work-status-words" });
   const more = el("span", { class: "work-status-more" });
+  // How long the run has worked, beside its words: run.css shows it with "Messages only" (item 1976), as a chat with a
+  // person says "· 1 min" under their typing.
+  const time = el("span", { class: "work-status-time" });
+  let began = startedAt;
+  let ticking = 0;
   // The face of who works stands first, in the place the answer's face takes (item 843), and the words where the words
   // of the messages start.
   const element = el(
@@ -118,6 +139,7 @@ export function createWorkStatus({ rootRunId, active, queued, onToggle, face }) 
     // The model typing (item 1091): drawn in the face's place while the line says "Typing…" (run.css).
     el("span", { class: "typing-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
     words,
+    time,
     more,
   );
   const announcer = el("div", { class: "visually-hidden", role: "status" });
@@ -177,6 +199,30 @@ export function createWorkStatus({ rootRunId, active, queued, onToggle, face }) 
       return t("work.waitingFor", { name });
     }
     return t(PHRASES[kind] ?? PHRASES.other);
+  }
+
+  function paintTime() {
+    setText(time, working ? `· ${workedFor(Date.now() / 1000 - began)}` : "");
+  }
+
+  /** The time ticks each second while the run works and the line is on the page; it stops once either ends. */
+  function tick() {
+    window.clearInterval(ticking);
+    ticking = 0;
+    paintTime();
+    if (working) {
+      ticking = window.setInterval(() => {
+        if (!working || (element.dataset.placed === "true" && !element.isConnected)) {
+          window.clearInterval(ticking);
+          ticking = 0;
+          return;
+        }
+        if (element.isConnected) {
+          element.dataset.placed = "true";
+        }
+        paintTime();
+      }, 1000);
+    }
   }
 
   function announce() {
@@ -240,6 +286,8 @@ export function createWorkStatus({ rootRunId, active, queued, onToggle, face }) 
     const data = record.data ?? {};
     if (record.kind === "run_started") {
       waiting = false;
+      began = record.ts;
+      paintTime();
       paint();
       return;
     }
@@ -298,10 +346,12 @@ export function createWorkStatus({ rootRunId, active, queued, onToggle, face }) 
       halting = false;
       waiting = false;
       paint();
+      tick();
     }
   }
 
   paint();
+  tick();
   return {
     element,
     announcer,

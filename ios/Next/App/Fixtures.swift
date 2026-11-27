@@ -24,6 +24,8 @@
         case failed = "n2-failed"
         /// The phone offline with nothing saved of the chat.
         case offline = "n2-offline"
+        /// No link, with the chat's copy saved on the phone (item 1931: the pill says Offline over it).
+        case offlineSaved = "n2-offline-saved"
         /// A chat deleted on the Mac while open.
         case deleted = "n2-deleted"
         /// The agents sheet (§19's one-line titles).
@@ -52,9 +54,11 @@
         /// The snapshot the scene draws.
         func snapshot(now: Double) -> EngineSnapshot {
             var snapshot: EngineSnapshot = .empty
-            snapshot.transport = self == .offline ? .offline : .up
-            snapshot.online = self != .offline
-            let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : .live
+            let linked: Bool = self != .offline && self != .offlineSaved
+            snapshot.transport = linked ? .up : .offline
+            snapshot.online = linked
+            if self == .offlineSaved { snapshot.savedAt[Self.thread] = now - 240 }
+            let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : self == .offlineSaved ? .cached : .live
             if self != .offline {
                 let view: ThreadView = decode(viewJSON(now: now))
                 var chat: ChatProjection = ChatProjection.drawn(view: view, events: decode(eventsJSON(now: now)), freshness: freshness)
@@ -138,8 +142,8 @@
                  "queue":{"held":false,"messages":\(queue),"beside_run_id":"run_b","beside_thread_id":null},
                  "asks":\(asks),
                  "helpers":[
-                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"Claude","model":"Opus 5.5","effort":"Medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
-                   {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"Claude","model":"Sonnet 5.5","effort":"Low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
+                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
+                   {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"claude_code","model":"sonnet","effort":"low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
                  ],
                  "background":[],
                  "reactions":[{"run_id":"run_a","message":"answer","reaction":"good"}],

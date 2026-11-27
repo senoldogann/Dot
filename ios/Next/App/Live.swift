@@ -62,6 +62,23 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
     }
 }
 
+/// The pill's link line (item 1931): a real state of the transport only, never "Reconnecting" over a healthy stream
+/// (R-f §3): no link is Offline, a broken one Reconnecting to the Mac, an up one whose chat is not live yet Syncing;
+/// `nil` while the chat is live, and for a refused key or an old Dot, which the subtitle says. Pure.
+func linkLine(transport: Transport, freshness: Freshness?, mac: String) -> LinkLine? {
+    switch transport {
+    case .offline: return .offline
+    case .reconnecting: return .reconnecting(mac: mac)
+    case .keyRefused, .daemonTooOld: return nil
+    case .connecting, .up:
+        guard let freshness else { return .syncing }
+        switch freshness {
+        case .live, .deleted: return nil
+        case .empty, .cached, .syncing: return .syncing
+        }
+    }
+}
+
 /// Where an owner's message stands, in words (plan §13 B3).
 func deliveryWords(_ delivery: Delivery) -> String {
     switch delivery {
@@ -103,9 +120,13 @@ func helperState(_ status: String) -> HelperState {
     }
 }
 
-/// "Provider · model · effort", the daemon's words.
-func engineLine(_ helper: HelperView) -> String {
-    [helper.provider, helper.model, helper.effort].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+/// "Provider · model · effort" in words ("Claude Code · Opus 5.5 · High"): the provider's and the level's names, the
+/// model's label from the daemon's list (its id when the list does not hold it). Pure.
+func engineLine(_ helper: HelperView, models: [ProviderModels]) -> String {
+    let ref: String = helper.provider + ":" + helper.model
+    let label: String = models.flatMap(\.models).first { $0.ref == ref }?.label ?? helper.model
+    return [providerTitle(helper.provider), label, helper.effort.map(effortTitle)].compactMap { $0 }.filter { !$0.isEmpty }
+        .joined(separator: " · ")
 }
 
 // MARK: The chat list
@@ -581,7 +602,7 @@ struct BotNewChat: View {
                 .padding(.horizontal, Space.s)
             }
             ComposerView(
-                text: $text, attachments: $attachments,
+                text: $text, attachments: $attachments, quote: .constant(nil),
                 placeholder: bot.map { $0.isDot ? String(localized: "Message Dot", comment: "Placeholder of the composer") : askPlaceholder($0.record.name) }
                     ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
                 buttons: composerButtons(
@@ -769,7 +790,7 @@ struct LiveAgentsSheet: View {
         if stopping.contains(helper.runId), state.isLive { state = .stopping }
         return HelperRun(
             id: helper.runId, title: helper.shortTitle, state: state, startedAt: Date(timeIntervalSince1970: helper.startedAt),
-            endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper),
+            endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper, models: model.models),
             doing: helper.step.map { stepWords(tool: $0.tool, target: $0.target) } ?? (state.isLive ? ChatStatus.starting.word : nil))
     }
 }

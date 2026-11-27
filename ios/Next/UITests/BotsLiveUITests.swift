@@ -142,6 +142,26 @@ final class BotsLiveUITests: XCTestCase {
         newField.typeText("Hello from a new chat")
         app.buttons["composer.send"].tap()
         XCTAssertTrue(app.staticTexts["Hello from a new chat"].waitForExistence(timeout: 20), "the first message opens the chat in place")
+
+        // Swipe to quote (item 1972): the message pulled to the right becomes a chip above the text; sent, the message
+        // carries it as a "> quote" and the chat shows it as one. The swipe starts away from the screen's edge.
+        let chatField: XCUIElement = app.descendants(matching: .any)["composer.field"]
+        XCTAssertTrue(chatField.waitForExistence(timeout: 30), "the chat itself, with its composer")
+        let said: XCUIElement = app.scrollViews.staticTexts["You: Hello from a new chat"]
+        XCTAssertTrue(said.waitForExistence(timeout: 10))
+        let origin: XCUICoordinate = app.coordinate(withNormalizedOffset: .zero)
+        let from: CGVector = CGVector(dx: said.frame.midX - 40, dy: said.frame.midY)
+        origin.withOffset(from).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: from.dx + 160, dy: from.dy)))
+        let chip: XCUIElement = app.descendants(matching: .any)["composer.quote"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "the swipe put the message in the composer as a quote")
+        XCTAssertTrue(chip.label.contains("Hello from a new chat"), chip.label)
+        XCTAssertGreaterThanOrEqual(app.buttons["composer.quote.remove"].frame.height, 44)
+        shot(app, "bot-quote")
+        chatField.tap()
+        chatField.typeText("Say it again")
+        app.buttons["composer.send"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["message.quote"].waitForExistence(timeout: 20), "the sent message shows its quote")
+        XCTAssertFalse(chip.exists, "the chip went with the message")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(pill.waitForExistence(timeout: 10), "back to the bot's earlier chat")
 
