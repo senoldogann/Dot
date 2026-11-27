@@ -67,9 +67,9 @@ task that did not run on the plan records none), and `top_runs`, the five runs o
 task. **Caps** under it sets the caps of what the runs spend, in millions of tokens, with today's tokens in all and by
 source (item 1731, [Limits](limits.md)). Beside the tokens of each day, of the week and of each costliest task, and
 on a task's Cost card (its own tokens, and with its helpers beside its cap), stands **an estimate in dollars** (item
-1856): see [What a run costs in dollars](#what-a-run-costs-in-dollars). Each role's box opens the composer's
-model menu (item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed,
-starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model
+1856): see [What a run costs in dollars](#what-a-run-costs-in-dollars). Each role's box opens a model menu
+(item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed, starred as
+in the composer's Chat settings (whose favourites are the same). A role's menu offers only the models that can do its work: the fast and the vision model
 offer no model of an agent program of its own (OpenCode's free models, the Claude plan), and the own work model none
 of OpenCode's free models, whose provider stays on the rail and says why, while the default model, the review model
 and the night's roles offer the Claude plan's too. A cloud model that Ollama's service retired stays in Ollama's own
@@ -141,7 +141,7 @@ refusal after that note, or of a task with no such grounds (one Dot began itself
 the run at once: failed, with the model's own words under "The model declined this task" (`dotx stats` counts it as
 "the model declined the task", and no schedule tries it again). Dot does not argue with it, does not word the model's
 answer for it and does not move to another model on its own. The run's page offers one action over the box,
-**Restart on…**: the model menu of the box, without the model that declined, and the model you pick starts the same
+**Restart on…**: a model menu (the rail of the Settings' role boxes), without the model that declined, and the model you pick starts the same
 task in the same chat (`POST /api/runs/{id}/restart`), as a message of yours, with the old run's approvals, goal mode,
 and its reasoning level and speed as near as the new model offers them; the old run records that you chose it. A
 refused run of a schedule or a delegated part restarts so too, as your own task in its chat. A message the
