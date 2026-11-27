@@ -56,6 +56,7 @@ const LOADED = {
   agents: { load: () => import("./agents.js"), params: ([, id]) => [id] },
   campaigns: { load: () => import("./campaigns.js"), params: ([, id]) => [id] },
   diagnostics: { load: () => import("./diagnostics.js") },
+  hooks: { load: () => import("./hooks.js") },
   licences: { load: () => import("./licences.js") },
 };
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");

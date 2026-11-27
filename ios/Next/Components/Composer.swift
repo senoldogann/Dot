@@ -139,6 +139,8 @@ struct ComposerView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     @State private var preparing: Task<Void, Never>?
+    /// The re-encoding of each video on show, so that the × of one gives that export up and not the whole pick.
+    @State private var exports: [UUID: Task<ComposerAttachment, any Error>] = [:]
     @State private var mediaError: String?
     @State private var trimming: ComposerAttachment?
 
@@ -196,7 +198,7 @@ struct ComposerView: View {
                     picking = nil
                     switch result {
                     case .success(.photo(let image)): prepare([image], load: ComposerAttachment.photo)
-                    case .success(.movie(let file)): prepare([file], load: { try await ComposerAttachment.video($0, name: "Camera.mov") })
+                    case .success(.movie(let file)): prepare([file], load: { try await loadVideo($0, name: "Camera.mov") })
                     case .success(nil): break
                     case .failure(let error): mediaError = error.localizedDescription
                     }
@@ -293,7 +295,7 @@ extension ComposerView {
     private func loadPhotoItem(_ item: PhotosPickerItem) async throws -> ComposerAttachment {
         if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) || $0.conforms(to: .video) }) {
             guard let movie = try await item.loadTransferable(type: MovieFile.self) else { throw ComposerMediaError.invalidVideo("Video") }
-            return try await ComposerAttachment.video(movie, name: movie.originalName)
+            return try await loadVideo(movie, name: movie.originalName)
         }
         // Decoded at the upload size, never at a camera's 12 MP (item 1926).
         guard let data = try await item.loadTransferable(type: Data.self), let image = ImageSizing.decoded(data, longest: ImageSizing.upload) else {
@@ -315,7 +317,11 @@ extension ComposerView {
                 do {
                     let attachment: ComposerAttachment = try await load(item)
                     try Task.checkCancellation()
-                    attachments.append(attachment)
+                    // A video's tile is on show already, as it is made ready (``loadVideo``).
+                    if !attachments.contains(where: { $0.id == attachment.id }) { attachments.append(attachment) }
+                } catch is CancellationError {
+                    // The whole pick given up (the composer left), or one video (its × was pressed): the rest goes on.
+                    if Task.isCancelled { return }
                 } catch {
                     guard !Task.isCancelled else { return }
                     errors.append(error.localizedDescription)
@@ -325,11 +331,34 @@ extension ComposerView {
         }
     }
 
+    /// A video added: its tile (first frame, length, a ring) is on show at once, and is made ready in its place while the
+    /// file is re-encoded. A video that fails or is given up leaves no tile.
+    private func loadVideo(_ movie: MovieFile, name: String) async throws -> ComposerAttachment {
+        let id: UUID = UUID()
+        let shown: ComposerAttachment = try await ComposerAttachment.exportingVideo(movie, name: name, id: id)
+        attachments.append(shown)
+        let progress: ExportProgress? = shown.exportProgress
+        let export: Task<ComposerAttachment, any Error> = Task { try await ComposerAttachment.video(movie, name: name, id: id, progress: progress) }
+        exports[id] = export
+        defer { exports[id] = nil }
+        do {
+            let ready: ComposerAttachment = try await withTaskCancellationHandler { try await export.value } onCancel: { export.cancel() }
+            try Task.checkCancellation()
+            // The owner took the tile away while it was made: nothing is added in its place.
+            guard let index = attachments.firstIndex(where: { $0.id == id }) else { throw CancellationError() }
+            attachments[index] = ready
+            return ready
+        } catch {
+            attachments.removeAll { $0.id == id }
+            throw error
+        }
+    }
+
     private func prepareReplacement(_ id: UUID, video: MovieFile, name: String) {
         preparing = Task {
             defer { preparing = nil }
             do {
-                let attachment: ComposerAttachment = try await ComposerAttachment.video(video, name: name)
+                let attachment: ComposerAttachment = try await ComposerAttachment.video(video, name: name, id: id, progress: nil)
                 try Task.checkCancellation()
                 if let index = attachments.firstIndex(where: { $0.id == id }) { attachments[index] = attachment }
             } catch {
@@ -345,7 +374,7 @@ extension ComposerView {
                 prepare([data]) { bytes in
                     let file: MovieFile = MovieFile(fileExtension: "mp4")
                     try bytes.write(to: file.url)
-                    return try await ComposerAttachment.video(file, name: "Sample.mp4")
+                    return try await loadVideo(file, name: "Sample.mp4")
                 }
                 return
             }
@@ -393,8 +422,7 @@ extension ComposerView {
             let accessible: Bool = dynamicTypeSize.isAccessibilitySize
             Button(action: openSettings) {
                 HStack(spacing: Space.xs) {
-                    Image(providerMarkAsset(provider)).resizable().renderingMode(.template).scaledToFit()
-                        .frame(width: 20, height: 20).foregroundStyle(Tone.text)
+                    modelMarkImage(model)
                     if style == .named {
                         Text(modelNameWithoutProvider(model.label, provider: provider)).textRole(.body).fontWeight(.medium)
                             .foregroundStyle(Tone.text).lineLimit(1).truncationMode(.tail)
@@ -414,6 +442,15 @@ extension ComposerView {
             .accessibilityLabel(String(localized: "Model: \(chipWords(model))", comment: "VoiceOver: the composer's model button; the argument is the model and effort"))
             .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
             .accessibilityIdentifier("composer.model")
+        }
+    }
+
+    @ViewBuilder private func modelMarkImage(_ choice: ModelChoice) -> some View {
+        switch modelMark(ref: choice.ref, provider: providerOfModel(choice.ref, in: app.models)) {
+        case .asset(let name):
+            Image(name).resizable().renderingMode(.template).scaledToFit().frame(width: 20, height: 20).foregroundStyle(Tone.text)
+        case .symbol(let name):
+            Image(systemName: name).frame(width: 20, height: 20).foregroundStyle(Tone.text).accessibilityHidden(true)
         }
     }
 
@@ -440,9 +477,11 @@ extension ComposerView {
             HStack(spacing: Space.xs) {
                 ForEach(attachments) { attachment in
                     ComposerAttachmentChip(attachment: attachment, trim: { trimming = attachment }, remove: {
+                        // A video being re-encoded is given up with its tile; the rest of the pick goes on.
+                        exports[attachment.id]?.cancel()
                         attachments.removeAll { $0.id == attachment.id }
                     })
-                    .disabled(preparing != nil)
+                    .disabled(preparing != nil && attachment.exportProgress == nil)
                 }
             }
             .padding(.horizontal, Space.m)

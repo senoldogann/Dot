@@ -48,7 +48,7 @@ import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.j
 import { splitQuote } from "../quotebutton.js";
 import { createQueue } from "../queue.js";
 import { recapSection } from "../recap.js";
-import { showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
+import { pendingMessage, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
 import { LAST_CHAT_KEY, openingOf, readPref, removePref } from "../prefs.js";
@@ -1036,6 +1036,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // model is at a step, after the tool at work otherwise (item 509).
   const waitingMessages = [];
   const waitingList = el("div", { class: "stack tight", hidden: true });
+  // A message on its way to start the chat's next run (`pendingMessage`), until the page of that run is open.
+  const pendingPlace = el("div", { class: "pending-place" });
 
   function holdMessage(text) {
     const label = el("span", null, t("run.sending", { text: clip(text, QUOTE_CHARS) }));
@@ -1149,13 +1151,24 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     const files = attachments.ids();
     sending = true;
     send.disabled = true;
+    // A message that starts the chat's next run is in the chat at once (item 1999): its bubble, "Pending" and the
+    // agent's "Starting…", its words out of the box; a steer and a queued message have notes of their own.
+    const pending = active ? null : { node: pendingMessage(text), words: frame.takeWords() };
+    let went = false;
+    if (pending !== null) {
+      pendingPlace.append(pending.node);
+      toEnd("smooth");
+    }
     try {
       await attemptWithFallback(
         async () => {
           const next = await deliver(text, files, other);
+          went = true;
           frame.clear();
           if (next !== null) {
             goOn(`/runs/${next}`);
+          } else {
+            pending?.node.remove();
           }
         },
         async (fallback) => {
@@ -1170,6 +1183,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     } finally {
       sending = false;
       send.disabled = false;
+      // A send that did not go: its bubble goes, and its words are the box's again.
+      if (pending !== null && !went) {
+        pending.node.remove();
+        frame.giveBack(pending.words);
+      }
     }
   }
 
@@ -2165,6 +2183,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     waitingList,
     lessonsPlace,
     outboxRows.element,
+    pendingPlace,
   );
   paintWorking();
   const main = el("div", { class: "run-main" }, thread, dock);
@@ -2225,13 +2244,19 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   paintQuestions(detail.questions);
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
-  // A choice tapped in a page of the conversation (item 658) is written into the box, for the user to send.
+  // A choice tapped in a page or a card of the conversation (items 658 and 1967) is written into the box, for the user to
+  // send: what a run wrote never goes out as the owner's word on a tap.
   // A delegated run has no box (syncControls): the page is told so rather than filling one nobody sees.
   const onPageAnswer = (/** @type {Event} */ event) => {
     if (frame.element.hidden) {
       return;
     }
-    frame.fill(/** @type {CustomEvent} */ (event).detail.text);
+    const { text, preserveDraft } = /** @type {CustomEvent<{ text: string, preserveDraft?: boolean }>} */ (event).detail;
+    if (preserveDraft === true && input.value.trim() !== "") {
+      toast("error", t("cards.finishMessage"));
+    } else {
+      frame.fill(text);
+    }
     event.preventDefault();
   };
   window.addEventListener(PAGE_ANSWER_EVENT, onPageAnswer);

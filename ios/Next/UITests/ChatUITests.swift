@@ -92,7 +92,9 @@ final class ChatUITests: XCTestCase {
         ).firstMatch
         XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
         library.tap()
-        let duration: XCUIElement = app.staticTexts["composer.videoDuration"]
+        // The video stands as a tile (its first frame, the length at its foot, a × at its corner), item 1992.
+        XCTAssertTrue(app.otherElements["composer.videoTile"].waitForExistence(timeout: 15), app.debugDescription)
+        let duration: XCUIElement = app.staticTexts["tile.duration"]
         XCTAssertTrue(duration.waitForExistence(timeout: 15))
         XCTAssertTrue(duration.label.hasPrefix("0:01"), duration.label)
         app.buttons["Remove Sample.mp4"].tap()
@@ -460,6 +462,53 @@ final class ChatUITests: XCTestCase {
         shot.name = "messages-only"
         shot.lifetime = .keepAlways
         add(shot)
+    }
+
+    /// Item 1996, the owner's shot of 2026-11-27: with Show steps off, no step row shows, a failed one neither, while a
+    /// run works and once it ended, and after the chat is opened again: a finished run with a failed step stays folded
+    /// in its one "Worked for" line, and the failure that ended it is its end line.
+    func testShowStepsOffKeepsEveryStepFoldedAFailedOneToo() {
+        let off: [String] = ["-showSteps", "NO", "-stepsOverrides", "{}", "-toolCallMode", "showAll"]
+        let working: XCUIApplication = launch("n2-chat", defaults: off)
+        XCTAssertTrue(
+            working.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Tuesday and Thursday afternoons")).firstMatch
+                .waitForExistence(timeout: 15))
+        for _ in 0..<3 { working.swipeUp() }
+        XCTAssertFalse(working.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "icalbuddy")).firstMatch.exists, "a failed step of a working run is no row")
+        working.terminate()
+        for pass in ["ended", "reopened"] {
+            let app: XCUIApplication = launch("n2-failed", defaults: off)
+            let end: XCUIElement = app.descendants(matching: .any).matching(identifier: "end.line").firstMatch
+            for _ in 0..<4 where !end.exists { app.swipeUp() }
+            XCTAssertTrue(end.waitForExistence(timeout: 15), "\(pass): the failure that ended the run is its end line")
+            let folds: XCUIElementQuery = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Worked for"))
+            XCTAssertGreaterThanOrEqual(folds.count, 1, "\(pass): the steps are behind Worked for")
+            for index in 0..<folds.count {
+                XCTAssertEqual(folds.element(boundBy: index).value as? String, "Collapsed", "\(pass): every fold starts folded")
+            }
+            XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "icalbuddy")).firstMatch.exists, "\(pass): no failed step row")
+            XCTAssertFalse(app.buttons["thought.row"].exists, "\(pass): no thought row")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "messages-only-\(pass)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
+    /// Item 1996, the owner's shot of 2026-11-27: an answer the finish said again stands once, with no "Finish" row, in
+    /// every tool mode and with Show steps off.
+    func testAnAnswerTheFinishSaysAgainStandsOnce() {
+        for defaults in [["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", "{}"], ["-showSteps", "NO", "-stepsOverrides", "{}"]] {
+            let app: XCUIApplication = launch("n2-restated", defaults: defaults)
+            let first: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Tuesday at 14:00 with Dr. Lind")).firstMatch
+            for _ in 0..<4 where !first.exists { app.swipeUp() }
+            XCTAssertTrue(first.waitForExistence(timeout: 15), "\(defaults): the answer")
+            for _ in 0..<3 { app.swipeUp() }
+            XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Tuesday at 14:00 with Dr. Lind")).count, 1, "\(defaults): the answer once")
+            XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Finish")).firstMatch.exists, "\(defaults): no Finish row")
+            app.terminate()
+        }
     }
 
     /// Item 1932: the asks scene settles: once it stood still for a few seconds, the screen is not drawn again (its

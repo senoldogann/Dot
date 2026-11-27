@@ -237,6 +237,23 @@ func chipDetail(effort: String?, fast: Bool) -> String? {
     return parts.isEmpty ? nil : parts.joined(separator: " ")
 }
 
+/// What the composer's model chip draws for a model (item 1992): its provider's mark, except for a model of a family this
+/// app has no mark of that a gateway hosts (DeepSeek, Kimi, GLM, Qwen, MiniMax on OpenCode Go, OpenRouter or Ollama), which
+/// wore the gateway's: OpenCode's mark is a plain white block, so every such model read as an empty rectangle. Those get a
+/// neutral symbol.
+enum ModelMark: Equatable {
+    case asset(String)
+    case symbol(String)
+}
+
+func modelMark(ref: String, provider: String) -> ModelMark {
+    let gateways: Set<String> = ["opencode", "opencode_go", "openrouter", "ollama"]
+    let name: String = (ref.split(separator: ":", maxSplits: 1).last.map(String.init) ?? ref).split(separator: "/").last.map(String.init) ?? ref
+    let families: [String] = ["deepseek", "kimi", "glm", "qwen", "minimax"]
+    if gateways.contains(provider), families.contains(where: { name.lowercased().hasPrefix($0) }) { return .symbol("sparkles") }
+    return .asset(providerMarkAsset(provider))
+}
+
 /// The asset of a provider's mark (`Resources/Assets.xcassets/provider-*`, the web's `static/icons/providers`): Zen's
 /// free models wear OpenCode Go's, the Claude plan Anthropic's, Antigravity Google's; the rest the generic one.
 func providerMarkAsset(_ provider: String) -> String {

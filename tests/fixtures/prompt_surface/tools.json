@@ -2859,6 +2859,306 @@
     }
   },
   {
+    "description": "Draw a chart, table, choice or image gallery, or show post drafts in the conversation. Group draft alternatives in one call. Post drafts are previews only. Use draft_message for sendable email and iMessage drafts. Images must be raster files you made in the workspace. The web UI draws cards; the phone's app and the channels do not yet, so say what matters in your answer.",
+    "name": "show_cards",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "cards": {
+          "description": "Cards in display order.",
+          "items": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "account": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "post_draft",
+                    "type": "string"
+                  },
+                  "media": {
+                    "default": [],
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "alt": {
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "path": {
+                          "description": "Raster file in the workspace.",
+                          "maxLength": 500,
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "alt"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 4,
+                    "type": "array"
+                  },
+                  "platform": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "text": {
+                    "maxLength": 5000,
+                    "minLength": 1,
+                    "pattern": "\\S",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "platform",
+                  "account",
+                  "text"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "chart_type": {
+                    "enum": [
+                      "line",
+                      "bar",
+                      "area",
+                      "pie",
+                      "scatter"
+                    ],
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "chart",
+                    "type": "string"
+                  },
+                  "series": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "values": {
+                          "items": {
+                            "maximum": 1000000000000.0,
+                            "minimum": -1000000000000.0,
+                            "type": "number"
+                          },
+                          "maxItems": 60,
+                          "minItems": 1,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "values"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 6,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "title": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "unit": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "x": {
+                    "description": "Shared x labels, or numeric coordinates for scatter.",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        {
+                          "maximum": 1000000000000.0,
+                          "minimum": -1000000000000.0,
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "maxItems": 60,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "x_label": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "y_label": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title",
+                  "chart_type",
+                  "x",
+                  "series"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "columns": {
+                    "items": {
+                      "maxLength": 120,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 8,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "const": "table",
+                    "type": "string"
+                  },
+                  "rows": {
+                    "items": {
+                      "items": {
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      "maxItems": 8,
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "maxItems": 40,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "title": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title",
+                  "columns",
+                  "rows"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "choice",
+                    "type": "string"
+                  },
+                  "options": {
+                    "description": "Visible answers; a tap writes one into the owner's message box for them to send.",
+                    "items": {
+                      "maxLength": 240,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 6,
+                    "minItems": 2,
+                    "type": "array"
+                  },
+                  "prompt": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "prompt",
+                  "options"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "images": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "alt": {
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "path": {
+                          "description": "Raster file in the workspace.",
+                          "maxLength": 500,
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "alt"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 4,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "const": "image_gallery",
+                    "type": "string"
+                  },
+                  "title": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title",
+                  "images"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "maxItems": 6,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "cards"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "description": "Show the user a page you write in HTML, in the conversation where they read you: a chart, a table, a diagram, a 3D view, a mockup or anything that says more drawn than written. Show a document (a CV) as its text, not a picture: zoomed, text stays sharp. It is part of your answer: no title over it and no box round it, on the conversation's own ground, as wide as the conversation (about 360px on a phone) and as tall as the page; the user can open it full screen. Give it a quiet heading of its own if it needs one, not a banner; leave html, body and the outermost element without a background, a border or side padding, and give a box that needs its own ground 16px of padding and var(--radius) corners. Keep its top right corner (about 72 by 40 pixels) free of controls: Full screen and Open sit there, always on a phone. Write a whole document or only its body. Its scripts run but fetch nothing except the libraries they load from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh: put the data in the page itself. Pictures, sounds and videos load only written in: name a workspace file by its relative path or write a data: address; a web address is refused. Give charts and 3D views a height in pixels: a height in vh follows the frame, which grows with the page, so the page grows again (clamp one between pixels if you must). Take the look of the user's theme, light or dark, from the CSS variables --background, --foreground, --muted, --muted-foreground, --card, --border, --accent, --accent-foreground, --destructive, --warning, --success, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. To let the user choose, give each option an element with data-answer=\"Option B\": a tap writes those words into their message box, for them to send. Make it live: animate its entrance, show values on hover, let a table sort and a chart toggle its series, and keep still under prefers-reduced-motion. Libraries that fit, in a pinned version: Apache ECharts or Chart.js for charts, Mermaid for diagrams, D3 for a drawing of your own, three.js for 3D. A page you made in the workspace (.htm, .html, .svg, .xhtml) is shown by its path instead of html. The workspace's files a page names by a relative path (style sheets, scripts, pictures, fonts) are written in; a frame, an object or an embed loads nothing, and neither does what a script loads by itself. The answer gives the page's address: open it with your browser at a phone's width and the conversation's to see what you showed, and show it again if something is cut, crowded or unreadable.",
     "name": "show_page",
     "parameters": {

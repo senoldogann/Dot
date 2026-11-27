@@ -63,6 +63,40 @@ final class ConversationTests: XCTestCase {
         XCTAssertEqual(fold.items.map(\.id), ["t:c11", "t:c21"])
     }
 
+    /// Item 1996: a failed step is no row while the run works, and a finished run's fold holding it is drawn folded (the
+    /// owner's shot: every step of an ended run showed with Show steps off, its fold opened by one failed page).
+    func testAFailedStepIsNoRowAndItsFoldStartsFolded() {
+        let failing: [EventRecord] =
+            events + [event(30, "tool_call", ["call_id": .string("c30"), "tool": .string("shell"), "args": .object([:])]),
+                event(31, "tool_result", ["call_id": .string("c30"), "ok": .bool(false), "text": .string("no such command")])]
+        let working: [TranscriptItem] = conversation(of: chat(status: "running", failing), pending: [], streaming: true, context: .none)
+        XCTAssertFalse(working.contains { if case .tool = $0 { true } else { false } }, "no step row, a failed one neither")
+        let ended: [EventRecord] = failing + [event(40, "run_finished", ["status": .string("done"), "result": .string("Two fields.")])]
+        let items: [TranscriptItem] = conversation(of: chat(status: "done", ended), pending: [], streaming: true, context: .none)
+        guard let fold: WorkFold = items.compactMap({ if case .work(let fold) = $0 { fold } else { nil } }).first else { return XCTFail("one fold") }
+        XCTAssertTrue(fold.hasFailure)
+        XCTAssertFalse(fold.startsOpen, "folded with Show steps off, its failure inside")
+        XCTAssertEqual(items.filter { if case .work = $0 { true } else { false } }.count, 1)
+    }
+
+    /// Item 1996, the owner's shot of 2026-11-27: the model wrote its answer, then called finish with it in slightly
+    /// other words; the daemon named the step restated (`restated: [3]`), and the phone, reading that list as words,
+    /// drew both and a "Finish" row between them. The answer stands once, and a finish that was taken has no row.
+    func testAnAnswerSaidAgainByTheFinishStandsOnce() {
+        let said: [EventRecord] = [
+            step(3, "Two parts:\n\n1) the park.\n2) the screen. ", []),
+            step(4, "", ["finish"]),
+            event(5, "tool_call", ["call_id": .string("f1"), "tool": .string("finish"), "args": .object(["answer": .string("Two parts:\n\n1) the park.\n2) the screen.")])]),
+            event(6, "tool_result", ["call_id": .string("f1"), "ok": .bool(true), "text": .string("done")]),
+            event(7, "run_finished", ["status": .string("done"), "result": .string("Two parts:\n\n1) the park.\n2) the screen."), "restated": .array([.int(3)])]),
+        ]
+        for mode in ToolCallMode.allCases {
+            let items: [TranscriptItem] = transcript(of: chat(status: "done", said), pending: [], mode: mode, streaming: true, context: .none)
+            XCTAssertEqual(items.map(\.id), ["u:run_a", "r:run_a"], "\(mode): the answer once, no Finish row")
+        }
+        XCTAssertEqual(conversation(of: chat(status: "done", said), pending: [], streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"])
+    }
+
     func testNoToolModeDrawsALineOfACall() {
         for mode in ToolCallMode.allCases {
             let items: [TranscriptItem] = transcript(of: chat(status: "running", events), pending: [], mode: mode, streaming: true, context: .none)

@@ -4,8 +4,9 @@ A session is one command run by zsh with a pseudo-terminal as its controlling te
 process group of its own, with the environment of the shell tool. What it prints is kept until it is read, the newest
 ``_KEPT_CHARS`` of it, and read as plain text: escape sequences are removed and no terminal emulator runs, so a
 full-screen program (vim, htop) shows as garbled text. The sessions belong to a thread: at most ``[shell]
-terminal_sessions`` at a time, each closed once it was not used for ``terminal_idle_s``, and all of them when the daemon
-stops. The end of a run closes none: a server outlives the run that started it.
+terminal_sessions`` whose program runs at a time (one whose program ended does not count, item 1990), each closed once
+it was not used for ``terminal_idle_s``, and all of them when the daemon stops. The end of a run closes none: a server
+outlives the run that started it.
 
 A command in the background (item 229) is a session the run left to run on its own, as an eval or a long build: it is
 not closed for being left unread while it runs, and when it ends by itself its chat is told, once, with no word of what
@@ -26,9 +27,11 @@ import re
 import signal
 import termios
 import time
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Protocol
+
+from pydantic import JsonValue
 
 from dotagent.agent.held_secrets import held_values
 from dotagent.core.errors import TerminalInputFullError, ToolExecutionError, ToolInputError
@@ -342,6 +345,14 @@ def ended_notices(sessions: Sequence[TerminalSession]) -> str:
     return "\n\n".join(notices)
 
 
+def running_sessions(sessions: Iterable[TerminalSession]) -> list[str]:
+    """The ids of ``sessions`` whose program still runs, which the limit of a chat's sessions counts (item 1990). One
+    whose program ended is kept for its last output and exit status until it is read, closed or idle, and holds no
+    program: counted, three short commands left unread after their end held a chat's every session for half an hour,
+    and five runs on the owner's Mac were refused a fourth."""
+    return [session.id for session in sessions if not session.ended]
+
+
 class TerminalWatcher(Protocol):
     """Who hears of the daemon's terminal sessions (item 229), the run manager: the pages follow a chat's sessions as
     they change, and a chat whose command in the background ended is told when no run works there."""
@@ -392,11 +403,12 @@ class Terminals:
                 {"command": command},
             )
         mine: dict[str, TerminalSession] = self._sessions.setdefault(thread_id, {})
-        if len(mine) >= self._limit:
+        running: list[str] = running_sessions(mine.values())
+        if len(running) >= self._limit:
             raise ToolInputError(
-                f"This chat has {len(mine)} terminal sessions open ({', '.join(mine)}), the most it may have: close "
-                "one with terminal_close first.",
-                {"open": list(mine), "limit": self._limit},
+                f"This chat has {len(running)} terminal sessions running ({', '.join(running)}), the most it may "
+                "have: close one with terminal_close first.",
+                {"running": list[JsonValue](running), "limit": self._limit},
             )
         master, follower = pty.openpty()
         started: bool = False

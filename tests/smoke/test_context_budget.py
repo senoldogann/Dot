@@ -133,7 +133,12 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # (items 1887 and 1888, which item 1889 sits on): 33,116 measured on the gate's runner.
 # Raised by 300 for `generate_image` (item 1969): one tool of a few lines and seven short fields, in a group of its
 # own (33,521 measured here), and by 150 more with main's Safari lines (item 1959): 33,674 measured here.
-BUDGET_TOKENS: int = 33_700
+# Raised by 100 for the Desktop section's batch line item 1974 put back (system 9,235, which raised the system budget
+# alone) and the syntax `search_files` reads in its pattern's description (item 1988: models wrote look-arounds and
+# newlines that ripgrep refused, each refusal a turn): 33,732 measured on the gate's runner.
+# Raised by 1,150 for `show_cards` (item 1967): the schema of the five card kinds the model fills in, in the `pages`
+# group; 34,884 measured here on main's numbers.
+BUDGET_TOKENS: int = 34_950
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -183,7 +188,9 @@ SYSTEM_BUDGET_TOKENS: int = 9_250
 # Raised by 100 for item 1953 (a helper ends at its open pull request, and its checks are watched in the background):
 # the sentence of `delegate` that says so and `gh pr checks <number> --watch` in the shell tools' background hint, which
 # the run review of 2026-11-26 measured against 382 polling calls and 9.27 hours of 37 helper runs (24,257 measured).
-TOOLS_BUDGET_TOKENS: int = 24_300
+# Raised by 100 for the syntax of `search_files`'s pattern of item 1988 above (24,327 measured on the gate's runner).
+# Raised by 1,150 for `show_cards` of item 1967 above (25,480 measured here on main's 24,327).
+TOOLS_BUDGET_TOKENS: int = 25_550
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

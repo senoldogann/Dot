@@ -18,21 +18,21 @@ final class ChatWordsTests: XCTestCase {
     }
 
     func testTheFoldSaysHowLongAndWhatInTheOwnersLanguage() {
-        let fold: WorkFold = WorkFold(id: "f", seconds: 134, tally: WorkTally(counts: [.read: 3, .command: 2], failed: 0), items: [])
+        let fold: WorkFold = WorkFold(id: "f", seconds: 134, tally: WorkTally(counts: [.read: 3, .command: 2], failed: 0), items: [], startsOpen: false)
         XCTAssertEqual(foldWords(fold, locale: turkish), "2 dk 14 sn çalıştı")
         XCTAssertEqual(foldWords(fold, locale: english), "Worked for 2m 14s", "how long only, no counts (item 1904)")
     }
 
     func testFindInChatSearchesTheWordsOfTheChatNotTheToolOutput() {
         let items: [TranscriptItem] = [
-            .owner(id: "u:1", text: "Book the garage", delivery: nil),
+            .owner(id: "u:1", text: "Book the garage", delivery: nil, files: []),
             .tool(ToolEntry(id: "t:1", tool: "shell", kind: .command, target: "garage", args: "", output: "garage", state: .done, images: [], startedAt: 0, endedAt: 1)),
             .answer(id: "a:1", text: "The GARAGE is booked", writing: false, endedAt: 2),
         ]
         XCTAssertEqual(findMatches(items, words: "garage"), ["u:1", "a:1"], "case does not matter; a tool's output is not searched")
         XCTAssertEqual(findMatches(items, words: "  "), [], "empty words find nothing")
         let fold: WorkFold = WorkFold(
-            id: "f:run_a", seconds: 12, tally: WorkTally(counts: [:], failed: 0), items: [.thought(id: "th:1", text: "Which garage is open on Friday", live: false)])
+            id: "f:run_a", seconds: 12, tally: WorkTally(counts: [:], failed: 0), items: [.thought(id: "th:1", text: "Which garage is open on Friday", live: false)], startsOpen: false)
         XCTAssertEqual(findMatches([.work(fold)], words: "friday"), ["f:run_a"], "a finished run's folded thought is found, at its fold")
     }
 
@@ -144,5 +144,16 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertNil(linkLine(transport: .up, freshness: .deleted, mac: "MacBook Air"), "a deleted chat says so itself")
         XCTAssertEqual(linkLine(transport: .connecting, freshness: .cached, mac: "MacBook Air"), .syncing, "the first connection brings it up to date")
         XCTAssertTrue(LinkLine.reconnecting(mac: "MacBook Air").words.contains("MacBook Air"), "the paired Mac by its name, in the phone's language")
+    }
+
+    /// Item 1996: the live picture's caption says a call with the work log's mark and words.
+    func testTheLiveCaptionSaysACallAsTheWorkLogDoes() {
+        let call: HelperStep = HelperStep(tool: "browser_open", target: "https://dentist.example/booking", line: "", at: 0)
+        let row: ToolEntry = ToolEntry(
+            id: "t:1", tool: "browser_open", kind: .web, target: "https://dentist.example/booking", args: "", output: "", state: .running, images: [],
+            startedAt: 0, endedAt: nil)
+        XCTAssertEqual(toolLine(captionEntry(call)), toolLine(row))
+        XCTAssertEqual(toolSymbol(captionEntry(call).kind), toolSymbol(row.kind))
+        XCTAssertEqual(toolSymbol(captionEntry(HelperStep(tool: "desktop_act", target: "", line: "", at: 0)).kind), "cursorarrow.click")
     }
 }
