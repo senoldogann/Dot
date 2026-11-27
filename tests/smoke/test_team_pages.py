@@ -230,9 +230,9 @@ async def test_your_teams_are_a_tab_beside_your_agents_and_the_agents_are_a_grid
         teams: Locator = page.locator(".owned-team")
         await expect(teams).to_have_count(2)
         yours_teams: Locator = page.locator("section[aria-label='Your teams']")
-        yours_agents: Locator = page.locator("section[aria-label='Your agents']")
+        yours_agents: Locator = page.locator("section[aria-label='Your bots']")
         # The teams are a part of their own, a tab beside the agents' (item 1136).
-        await page.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Teams").click()
+        await page.get_by_role("group", name="Parts of the Bots page").get_by_role("button", name="Teams").click()
         await expect(yours_teams.locator(".section-label")).to_contain_text("Your teams")
         await expect(yours_agents).to_be_hidden()
         # A card names the team and what it is for; the faces of six agents are four and the rest counted, those of two
@@ -243,13 +243,13 @@ async def test_your_teams_are_a_tab_beside_your_agents_and_the_agents_are_a_grid
         await expect(first.locator(".owned-team-purpose")).to_have_text("Finds sources and checks them")
         await expect(first.locator(".face-stack .avatar")).to_have_count(4)
         await expect(first.locator(".face-stack-more")).to_have_text("+2")
-        await expect(first.locator(".owned-team-count")).to_have_text("6 agents")
+        await expect(first.locator(".owned-team-count")).to_have_text("6 bots")
         await expect(first.locator(".agent-card-chat-title")).to_have_text("Check the claims in the launch post")
         await expect(second.locator(".face-stack .avatar")).to_have_count(2)
         await expect(second.locator(".face-stack-more")).to_have_count(0)
         await expect(second.locator(".agent-card-chat-title")).to_have_text("No chats yet")
         # Your agents: Dot and the eight, as cards; two to four across, none tall, each name and role on one line.
-        await page.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Agents").click()
+        await page.get_by_role("group", name="Parts of the Bots page").get_by_role("button", name="Bots").click()
         grid: dict[str, Any] = await page.evaluate(_GRID, ".agent-card")
         assert grid["count"] == 9 and 2 <= grid["across"] <= 4 and grid["columns"] == grid["across"], grid
         assert grid["tallest"] < 140 and grid["sideways"] <= 0, grid
@@ -257,7 +257,7 @@ async def test_your_teams_are_a_tab_beside_your_agents_and_the_agents_are_a_grid
         assert await card.locator(".agent-card-title").evaluate(_ONE_LINE)
         assert await card.locator(".agent-card-role").evaluate(_ONE_LINE)
         await page.screenshot(path=tmp_path / "agents-1280.png", full_page=True)
-        await page.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Teams").click()
+        await page.get_by_role("group", name="Parts of the Bots page").get_by_role("button", name="Teams").click()
         await first.click()
         await expect(page).to_have_url(f"{page.url.split('#')[0]}#/teams/{desk['id']}")
         await page.context.close()
@@ -267,7 +267,7 @@ async def test_your_teams_are_a_tab_beside_your_agents_and_the_agents_are_a_grid
         narrow: dict[str, Any] = await phone.evaluate(_GRID, ".agent-card")
         assert narrow["count"] == 9 and narrow["across"] == 1 and narrow["columns"] == 1, narrow
         assert narrow["widest"] <= 390 and narrow["sideways"] <= 0, narrow
-        await phone.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Teams").click()
+        await phone.get_by_role("group", name="Parts of the Bots page").get_by_role("button", name="Teams").click()
         narrow_teams: dict[str, Any] = await phone.evaluate(_GRID, ".owned-team")
         assert narrow_teams["across"] == 1 and narrow_teams["widest"] <= 390, narrow_teams
         await phone.screenshot(path=tmp_path / "agents-390.png", full_page=True)
@@ -299,7 +299,7 @@ async def test_use_team_puts_the_team_under_your_teams_and_a_second_use_keeps_it
         await expect(gallery.locator(".team-added")).to_have_text("In your teams")
         await use.click()
         await expect(
-            page.locator(".toast.ok", has_text="You have every agent of the Content team already.")
+            page.locator(".toast.ok", has_text="You have every bot of the Content team already.")
         ).to_be_visible()
         await expect(card).to_have_count(1)
         assert len((await client.get("/api/teams")).json()) == 1
@@ -324,7 +324,7 @@ async def test_a_message_to_a_team_starts_a_run_in_a_chat_with_the_team_which_th
         await expect(page.locator(".team-who .home-greeting")).to_have_text("Writes a report with sources")
         await expect(page.locator(".team-roster li")).to_have_text(["Scout", "Writer"])
         await expect(page.locator(".team-who .face-stack .avatar")).to_have_count(2)
-        await expect(page).to_have_title("Desk · Agents · Dot")
+        await expect(page).to_have_title("Desk · Bots · Dot")
         message: Locator = page.locator("textarea[aria-label='Message']")
         await expect(message).to_have_attribute("placeholder", "Message Desk")
         await expect(page.locator(".team-empty")).to_have_count(0)
@@ -416,14 +416,14 @@ async def test_a_team_with_no_agent_left_says_so_and_takes_no_message_until_the_
     try:
         page: Page = await _open(browser, client, f"/teams/{team['id']}", 1280)
         note: Locator = page.locator(".team-empty")
-        await expect(note).to_contain_text("no agents left")
+        await expect(note).to_contain_text("no bots left")
         await expect(page.locator("textarea[aria-label='Message']")).to_have_count(0)
         await expect(page.locator(".team-roster")).to_have_count(0)
         # The refusal is the daemon's too: no chat starts with a team that has no agent.
         refused = await client.post("/api/runs", json={"goal": "Anyone?", "mode": "chat", "team_id": team["id"]})
         assert refused.status_code == 422, refused.text
         await page.goto(f"{page.url.split('#')[0]}#/agents")
-        await expect(page.locator(".owned-team .owned-team-count")).to_have_text("No agents left")
+        await expect(page.locator(".owned-team .owned-team-count")).to_have_text("No bots left")
         await page.go_back()
         # Edit puts an agent of the owner's in, and the box comes back.
         await note.get_by_role("button", name="Edit").click()
@@ -457,7 +457,7 @@ async def test_a_team_page_that_is_open_while_the_team_changes_follows_it_at_the
         MODEL.script = ScriptedProvider(_PROVIDER, [ANSWER, ANSWER])
         started = await client.post("/api/runs", json={"goal": "Something else", "mode": "chat"})
         assert started.status_code == 201, started.text
-        await expect(page.locator(".team-empty")).to_contain_text("no agents left")
+        await expect(page.locator(".team-empty")).to_contain_text("no bots left")
         await expect(message).to_have_count(0)
         # An agent is put in, in another window: the next run brings the box back, and the agent's name.
         changed = await client.put(
@@ -491,7 +491,7 @@ async def test_a_removed_team_leaves_its_agents_and_its_chats_and_its_page_says_
         page: Page = await _open(browser, client, f"/teams/{team['id']}", 1280)
         await page.get_by_role("button", name="Remove the team").click()
         dialog: Locator = page.locator("dialog.modal")
-        await expect(dialog).to_contain_text("Its agents stay yours")
+        await expect(dialog).to_contain_text("Its bots stay yours")
         await dialog.get_by_role("button", name="Remove").click()
         await expect(page).to_have_url(f"{page.url.split('#')[0]}#/settings/agents")
         await expect(page.locator(".toast.ok", has_text="Desk removed")).to_be_visible()
@@ -529,10 +529,10 @@ async def test_agents_picked_on_their_cards_make_a_team_in_the_order_picked(
     playwright, browser = await _launch(runtime)
     try:
         page: Page = await _open(browser, client, "/agents", 1280)
-        mine: Locator = page.get_by_role("region", name="Your agents")
+        mine: Locator = page.get_by_role("region", name="Your bots")
         await mine.get_by_role("button", name="Select").click()
-        bar: Locator = page.get_by_role("region", name="Agents picked for a team")
-        await expect(bar).to_contain_text("Tick the agents of the team")
+        bar: Locator = page.get_by_role("region", name="Bots picked for a team")
+        await expect(bar).to_contain_text("Tick the bots of the team")
         await expect(bar.get_by_role("button", name="Make a team")).to_be_disabled()
         await expect(mine.get_by_role("checkbox")).to_have_count(3)
         await mine.locator(f".agent-card[data-agent='{checker['id']}']").click()
@@ -540,7 +540,7 @@ async def test_agents_picked_on_their_cards_make_a_team_in_the_order_picked(
         await expect(mine.locator(f".agent-card[data-agent='{checker['id']}']")).to_have_attribute(
             "aria-checked", "true"
         )
-        await expect(bar).to_contain_text("2 agents picked")
+        await expect(bar).to_contain_text("2 bots picked")
         # Picking stays on the page: no card led away.
         await expect(page).to_have_url(re.compile(r"#/settings/agents$"))
         await page.screenshot(path=str(tmp_path / "picking.png"))

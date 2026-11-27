@@ -64,6 +64,13 @@ export function fromEvent(runId, data) {
   };
 }
 
+/**
+ * The answer of a question card while it waits, and how to send it, by the card's node (item 2001): the asks panel
+ * sends every question's answer with one Submit once each has one, as the phone's dock does.
+ * @type {WeakMap<HTMLElement, { answer: () => string, send: () => void }>}
+ */
+export const questionControls = new WeakMap();
+
 // What joins the labels of the options chosen in one answer (`CHOICES_JOIN` of dotagent.agent.questions).
 const CHOICES_JOIN = "; ";
 
@@ -385,8 +392,10 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     const why = reason === "" ? null : plain ?? reason;
     const policyWords = plain === null ? null : reason;
     const choices = isQuestion ? questionOptions(approval.args) : [];
-    // Several options may be chosen: each is ticked, and Send answer sends them with what was written.
+    // Several options may be chosen; one is otherwise. A pick is a card ringed and pressed, sent with the answer
+    // (item 2001): a tap no longer sends it at once, so the panel's one Submit sends every question's answer together.
     const several = choices.length > 0 && approval.args.multiple === true;
+    const picked = new Set();
     const note = el("input", {
       class: "input",
       type: "text",
@@ -394,13 +403,13 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       placeholder: !isQuestion ? t("approvals.noteForDotOptional") : choices.length > 0 ? t("approvals.orWriteYourOwnAnswer") : t("approvals.yourAnswer"),
       "aria-label": isQuestion ? t("approvals.yourAnswer") : t("approvals.noteForDot"),
     });
-    const ticks = several ? choices.map((option) => el("input", { type: "checkbox", value: option.label })) : [];
     // "Don't ask again in this chat" (item 866): on a question of the policy open now, of a step that may be
     // remembered, in a chat that is not of Dot's own initiative.
     const remember = rememberable(approval, isQuestion || isHandoff || isLeft || isBudget) ? el("input", { type: "checkbox", class: "approval-remember-box" }) : null;
-    // An answer to a question is the options ticked and what was written; it is never empty.
+    // An answer to a question is the options picked and what was written; it is never empty.
+    const answerNow = () => chosenAnswer(choices.filter((option) => picked.has(option.label)).map((option) => option.label), note.value);
     const submit = (approve) => {
-      const answer = isQuestion && approve ? chosenAnswer(ticks.filter((tick) => tick.checked).map((tick) => tick.value), note.value) : note.value.trim();
+      const answer = isQuestion && approve ? answerNow() : note.value.trim();
       if (isQuestion && approve && answer === "") {
         note.focus();
         return;
@@ -415,35 +424,44 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         submit(true);
       }
     });
-    // One option chosen alone is the answer: its row sends it.
-    const options =
-      choices.length === 0
-        ? null
-        : el(
-            "div",
-            { class: "choices" },
-            several
-              ? choices.map((option, index) => el("label", { class: "choice" }, ticks[index], choiceText(option)))
-              : choices.map((option) =>
-                  el(
-                    "button",
-                    {
-                      class: "choice",
-                      type: "button",
-                      onclick: () => {
-                        note.value = option.label;
-                        submit(true);
-                      },
-                    },
-                    choiceText(option),
-                  ),
-                ),
-          );
+    // Each option a full-width card: a tap picks it (one of them, or several), a second tap lets it go.
+    const optionButtons = choices.map((option) =>
+      el("button", { class: "choice", type: "button", "aria-pressed": "false", "data-label": option.label }, choiceText(option), el("span", { class: "choice-mark", "aria-hidden": "true" }, icon("check"))),
+    );
+    const changed = () => {
+      for (const button of optionButtons) {
+        button.setAttribute("aria-pressed", String(picked.has(button.dataset.label ?? "")));
+      }
+      if (isQuestion) {
+        yesButton.disabled = answerNow() === "";
+        node.dispatchEvent(new Event("answerchange", { bubbles: true }));
+      }
+    };
+    optionButtons.forEach((button, index) => {
+      button.addEventListener("click", () => {
+        const label = choices[index].label;
+        if (picked.has(label)) {
+          picked.delete(label);
+        } else {
+          if (!several) {
+            picked.clear();
+          }
+          picked.add(label);
+        }
+        changed();
+      });
+    });
+    note.addEventListener("input", () => changed());
+    const options = choices.length === 0 ? null : el("div", { class: `choices${several ? " several" : ""}` }, optionButtons);
     const more = typeof approval.args.more_words === "string" ? ` (+${approval.args.more_words})` : "";
     const yes = isQuestion ? t("approvals.sendAnswer") : isHandoff ? t("approvals.iDidIt") : isBudget ? t("approvals.continueMore", { more }) : isKept ? t("approvals.allowOnce") : t("approvals.approve");
     const no = isQuestion ? t("approvals.skip") : isHandoff ? t("approvals.skipThisStep") : isBudget ? t("approvals.stop") : isKept ? t("approvals.skip") : t("approvals.deny");
     note.hidden = isBudget;
-    const yesButton = el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes);
+    const yesButton = el("button", { class: "btn primary approval-yes", type: "button", onclick: () => submit(true) }, yes);
+    if (isQuestion) {
+      yesButton.disabled = true;
+      questionControls.set(node, { answer: answerNow, send: () => submit(true) });
+    }
     // A yes with a note is the note first (item 1140): the daemon holds the step until the run read it, and the step
     // goes through once if the note still calls for it. The button says so while a note is written.
     if (!isQuestion && !isHandoff && !isLeft && !isBudget) {
@@ -463,6 +481,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           el("span", { class: "spacer" }),
           heading,
         ),
+        // A question's topic, as small capitals over its words (item 2001, "APPROVAL"), when the run gave one.
+        isQuestion && typeof approval.args.header === "string" && approval.args.header !== "" ? el("div", { class: "approval-topic" }, approval.args.header) : null,
         text === "" ? null : el("div", { class: "approval-text" }, text),
         why === null ? null : el("div", { class: "small muted approval-why" }, why),
         several ? el("div", { class: "small muted" }, t("approvals.chooseOneOrMoreThen")) : null,
