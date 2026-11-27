@@ -5560,6 +5560,43 @@ dialog.modal.versions-dialog {
   display: none;
 }
 
+/* A message on its way (item 1999, as DotNext says it, items 1919 and 1927): under the bubble a quiet "Pending" at its
+   right edge, the one place it shows, and under the message the agent's typing dots and "Starting…", shimmering as the
+   line of the work does, until the page of the run it starts is open. */
+.pending-place:empty {
+  display: none;
+}
+
+.pending-send {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pending-note {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.starting-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.starting-line > .typing-dots {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 28px;
+  height: 28px;
+}
+
 .message-time {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
