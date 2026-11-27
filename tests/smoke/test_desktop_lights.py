@@ -233,8 +233,8 @@ async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str
             # opens (item 1328), and the button beside the search writes to it.
             await expect(page.locator("#sidebar").get_by_role("link", name="New chat")).to_have_count(0)
             await page.goto(f"{address}/#/team")
-            await page.get_by_role("button", name="Your agents", exact=True).click()
-            await page.get_by_role("menu", name="Your agents").get_by_role("menuitem", name=re.compile("^Dot")).click()
+            await page.get_by_role("button", name="Your bots", exact=True).click()
+            await page.get_by_role("menu", name="Your bots").get_by_role("menuitem", name=re.compile("^Dot")).click()
             await expect(page).to_have_url(re.compile(r"#/runs$"))
             await expect(page.get_by_role("textbox", name="Goal")).to_be_focused()
             await hide.click()

@@ -97,7 +97,7 @@ async def _open(browser: Browser, client: httpx.AsyncClient, width: int, phone: 
     await page.goto(ui_url(host, port, TOKEN))
     await page.goto(f"http://{host}:{port}/#/agents")
     # The work orders are a part of the Agents page of their own (item 1136).
-    await page.get_by_role("group", name="Parts of the Agents page").get_by_role("button", name="Orders").click()
+    await page.get_by_role("group", name="Parts of the Bots page").get_by_role("button", name="Orders").click()
     return page
 
 
