@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1982](1982.md) | design | 2026-11-27 | Several tasks at once in one chat: design |
 | [1976](1976.md) | done | 2026-11-27 | A chat told as a conversation: Dot's short messages of what it turns to, and the live line with its face and time |
 | [1974](1974.md) | done | 2026-11-26 | The Desktop section's batch line is back: a batch's result is the run's look |
 | [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |
