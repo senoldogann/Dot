@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { goesStreamed, isMedia, limitOf } from "../../src/dotagent/server/static/js/attachments.js";
+import { goesStreamed, isMedia, isVideo, lengthWords, limitOf } from "../../src/dotagent/server/static/js/attachments.js";
 
 const file = (name, type, size) => ({ name, type, size });
 
@@ -22,4 +22,14 @@ test("a video or a file past a few megabytes goes as the raw body, a small docum
   assert.equal(goesStreamed(file("a.mp4", "video/mp4", 10)), true);
   assert.equal(goesStreamed(file("a.pdf", "application/pdf", 5 * 1024 * 1024)), true);
   assert.equal(goesStreamed(file("a.txt", "text/plain", 1024)), false);
+});
+
+test("a video is told from a sound, and its length is said as the phone says it", () => {
+  assert.equal(isVideo(file("clip.mp4", "video/mp4", 1)), true);
+  assert.equal(isVideo(file("IMG_0042.MOV", "", 1)), true);
+  assert.equal(isVideo(file("memo.m4a", "audio/x-m4a", 1)), false);
+  assert.equal(isVideo(file("notes.pdf", "application/pdf", 1)), false);
+  assert.equal(lengthWords(14), "0:14");
+  assert.equal(lengthWords(0.6), "0:01");
+  assert.equal(lengthWords(723), "12:03");
 });

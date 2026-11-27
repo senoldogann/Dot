@@ -445,7 +445,8 @@ def prepare_home(model: str) -> None:
     ensure_layout()
     config.write_text(
         f'{CONFIG_MARK}\n[models]\nmain = "{model}"\n\n[browser]\nheadless = true\n\n'
-        '[policy]\napprovals = "supervised"\n',
+        # No floor of free space: a check of the phone is not refused (507) by how full the Mac it runs on is.
+        '[policy]\napprovals = "supervised"\n\n[store]\nmin_free_gb = 0\n',
         encoding="utf-8",
     )
 
