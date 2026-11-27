@@ -50,7 +50,7 @@ from dotagent.mcp.naming import exposed_name
 from dotagent.mcp.types import McpTool, ToolHints
 from dotagent.policy import engine
 from dotagent.policy.engine import OWNERS_REASON, decide
-from dotagent.policy.sandbox import UNSANDBOXED, SwitchedSandbox
+from dotagent.policy.sandbox import NO_SEAL, UNSANDBOXED, Seal, SwitchedSandbox
 from dotagent.policy.types import ActionInfo, ApprovalMode, Decision, Preset
 from dotagent.runtime import Runtime, _tool_groups, close_runtime, open_runtime
 from dotagent.safari.desk import SafariDesk
@@ -336,7 +336,7 @@ class World:
             protected=(home / ".ssh", home / "Library" / "Keychains"),
             dot_paths=(self.dot_home,),
             # A run the owner started in yolo, whose processes start with no sandbox (item 2016).
-            sandbox=SwitchedSandbox(UNSANDBOXED, False, False),
+            sandbox=SwitchedSandbox(UNSANDBOXED, NO_SEAL, False, False),
             approvals=SimpleNamespace(free=False),
             judge=_Judge(),
             vault=_Missing("vault"),
@@ -845,9 +845,21 @@ def _gate(
         owners_chat=way.owners_chat,
         owner_there=True,
         unattended=way.unattended,
+        # A run nobody started keeps from Dot's own tools what its sandbox seals (item 2026): Dot's own folder.
+        seal=_seal(room.world) if way.unattended else None,
     )
     gate.tainted = way.tainted
     return gate
+
+
+def _seal(world: World) -> Seal:
+    """What the sandbox of a run nobody started seals in the world: Dot's own folder, never written."""
+    return Seal(sealed=(), unwritable=(world.dot_home,), closed=(world.dot_home,), open_folders=())
+
+
+# The rows a run nobody started is refused, in every mode (item 2026, the owner's word of 2026-11-27): the steps of
+# Dot's own tools that change Dot's own files, which the sandbox seals for that run's processes too. Nothing else.
+SEALED_ROWS: frozenset[str] = frozenset({"files: write Dot's own files", "files: edit Dot's own files"})
 
 
 async def _prepared(room: Room, row: Row) -> PreparedCall:
@@ -875,6 +887,7 @@ async def _table(
     broker.switch_free(way.free)
     gate: RunGate = _gate(room, broker, way, preset=preset)
     failures: list[str] = []
+    sealed_rows: set[str] = set()
     for row in ROWS:
         prepared: PreparedCall = await _prepared(room, row)
         info: ActionInfo = prepared.action
@@ -887,6 +900,12 @@ async def _table(
                 failures.append(f"{row.id}: asked the owner, which the contract does not allow here ({asked})")
             elif ("financial" in info.flags) != (asked.severity == "handoff"):
                 failures.append(f"{row.id}: asked with severity {asked.severity!r} for flags {info.flags}")
+            continue
+        except PolicyDenied as denied:
+            sealed: bool = denied.context.get("source") == "seal"
+            if not (way.unattended and sealed and row.id in SEALED_ROWS):
+                failures.append(f"{row.id}: refused, which a yolo or free run never does here ({denied})")
+            sealed_rows.add(row.id)
             continue
         except Exception as error:  # noqa: BLE001 - any refusal of a step is a finding of this table
             failures.append(
@@ -910,6 +929,8 @@ async def _table(
             ]
             if len(notes) != 1 or (notes[0].status, notes[0].decided_by) != ("approved", "yolo") or not notes[0].note:
                 failures.append(f"{row.id}: the policy would have asked ({policy.reason}) and no yolo record says so")
+    if sealed_rows != (SEALED_ROWS if way.unattended else set()):
+        failures.append(f"the seal refused {sorted(sealed_rows)}, and the contract names {sorted(SEALED_ROWS)}")
     assert await room.store.list_approvals("pending", 10) == []
     return failures, set(broker.asked)
 
@@ -1183,6 +1204,11 @@ async def test_the_gate_adds_no_wait_in_yolo_and_free_mode(
     gate: RunGate = _gate(room, broker, way)
     for row in ROWS:
         prepared: PreparedCall = await _prepared(room, row)
+        if way.unattended and row.id in SEALED_ROWS:
+            # The seal of a run nobody started refuses these at once (item 2026): no wait either.
+            with pytest.raises(PolicyDenied, match="what Dot loads and runs"):
+                await asyncio.wait_for(gate.authorize_recorded(prepared.action, None, prepared.weighed), 5)
+            continue
         done: Authorization = await asyncio.wait_for(
             gate.authorize_recorded(prepared.action, None, prepared.weighed), 5
         )
