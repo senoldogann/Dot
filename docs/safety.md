@@ -1203,11 +1203,16 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   the run that tells a schedule's command in the background ended keeps the sandbox in your own chat too (`/loop`). A
   run you started (a message in the app, on a phone, by iMessage, `dotx run`) runs as before, also in a chat a schedule
   opened; Resume on a schedule's run goes on as that run, in the sandbox, and so do the sessions of a campaign after its
-  first, which its schedule starts. What it does not cover: Dot's own file tools (`write_file`, `edit_file`)
-  run in the daemon's process, not in the sandbox, so in `yolo` they still change Dot's files unasked; Apple Events and a
-  hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from the daemon itself, in a checkout
-  of its own, not through a run's tools, and is not changed by it. `false` has those runs follow `[shell] sandbox` and
-  `yolo` as yours do.
+  first, which its schedule starts. Dot's own tools, which read and write in the daemon's process and not in
+  the sandbox, keep the same seal for such a run (item 2026): a step of `read_file`, `write_file`, `edit_file`, the
+  search tools, `generate_image`, `watch_video`, a page shown from a file, a pipeline record, a browser upload or a file
+  a web tool reads is refused, in every mode, when the file is one the sandbox seals for that run (read or written: Dot's
+  own files and `[policy] sealed_paths`; written: what Dot loads and runs, and Dot's home and logs but the workspace).
+  The gate refuses it before the policy weighs it, so nothing asks; its policy event says `seal`. What it does not cover:
+  a tool that changes Dot's files through its own interface and names no path (the memory tools, `skill_save`, a
+  schedule), Apple Events and a hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from
+  the daemon itself, in a checkout of its own, not through a run's tools, and is not changed by it. `false` has those
+  runs follow `[shell] sandbox` and `yolo` as yours do.
 - **Code mode** (items 1500 to 1507, [Code mode](code-mode.md)): the code of a `code_run` is text a model wrote, which a page
   may have shaped, so it does not run in the sandbox above, which allows everything but Dot's files. It runs under
   `sandbox-exec` with `(deny default)`: it reads its interpreter's installation and its `tools` folder, reads and writes its
