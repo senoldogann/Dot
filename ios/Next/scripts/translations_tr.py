@@ -1,6 +1,9 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# A new chat's first send opens the one chat screen (item 2025).
+TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+# The question card like another coding agent's (item 2001).
 # Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
@@ -1221,6 +1224,9 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "User input needed": "Senden bir cevap bekleniyor",
+        "%lld / %lld": "%lld / %lld",
+        "Submit answers": "Yanıtları gönder",
         "Default (%@)": "Varsayılan (%@)",
         "Favourite": "Favori",
         "Can't reach %@": "%@ cihazına ulaşılamıyor",
@@ -1623,7 +1629,6 @@ TR.update(
     {
         "%lld min": "%lld dk",
         "%lld s": "%lld sn",
-        "Looking at %@": "%@ inceleniyor",
     }
 )
 
@@ -1694,6 +1699,25 @@ TR.update(
         "Resume bot": "Botu sürdür",
     }
 )
+# A change opened from This chat, its folded sections (CH1, item 2017).
+TR.update(
+    {
+        "No diff to show": "Gösterilecek fark yok",
+        "Loading the change": "Değişiklik yükleniyor",
+        "View": "Görünüm",
+        "Formatted": "Biçimli",
+        "Source": "Kaynak",
+        "Deleted": "Silindi",
+        "New · %lld lines": "Yeni · %lld satır",
+        "Lines from %lld": "%lld. satırdan itibaren",
+        "Added, line %lld: %@": "Eklendi, satır %1$lld: %2$@",
+        "Removed, line %lld: %@": "Silindi, satır %1$lld: %2$@",
+        "Line %lld: %@": "Satır %1$lld: %2$@",
+        # In the catalogue since item 1967 without its line here, which stopped apply_translations.py.
+        "Show cards": "Kart göster",
+    }
+)
+EN_PLURALS.update({"New · %lld lines": ("New · %lld line", "New · %lld lines")})
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
 # Chat settings as inset groups, the capsule without a spinner (the owner's report of 2026-11-27).
 
@@ -1701,5 +1725,15 @@ EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
 TR.update(
     {
         "Check the spelling or try a new search.": "Yazımı kontrol edin ya da yeni bir arama deneyin.",
+    }
+)
+
+# HS1 (2026-11-27): a routine's message in a chat.
+TR.update(
+    {
+        "Routine": "Rutin",
+        "Routine: %@": "Rutin: %@",
+        "Hides the message": "Mesajı gizler",
+        "Shows the whole message": "Mesajın tamamını gösterir",
     }
 )

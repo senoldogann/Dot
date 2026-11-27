@@ -8,14 +8,14 @@ import { compact, el, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
-  needsAside, outcomeOf, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+  needsAside, outcomeOf, routineMessage, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { chatCardRenderer, POST_DRAFT_SETTLED } from "./chatcards.js";
+import { ROUTINE_SOURCES } from "./routinewords.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { sourcesRow } from "./sources.js";
 import { countKinds, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, toolRow } from "./tools.js";
-import { narrationPhrase } from "./workstatus.js";
 
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read before the page is drawn (items 374 and 708), side by side: they stand right
@@ -219,8 +219,6 @@ function drawFlow(past, flow, asked, events, reactions) {
   // Dot's reaction (item 664) stands on the latest message of yours when it came: the turn's own, or a steer since.
   let reaction = null;
   let reactedTo = null;
-  // Whether the newest step wrote words, which tell its calls (item 1976).
-  let stepSaid = false;
   for (const event of events) {
     // A compaction is not a turn of the conversation: one short line, and its record under the details toggle.
     if (!visibleInConversation(event)) {
@@ -229,18 +227,13 @@ function drawFlow(past, flow, asked, events, reactions) {
       continue;
     }
     if (event.kind === "narration") {
-      // A line of the run told as a conversation (item 1976), drawn with "Messages only" alone and none beside the step's
-      // own words; it ends no batch of steps, which stay as they were with the steps shown.
-      if (!stepSaid) {
-        blocks.push({ told: narrationPhrase(event.data.tool, event.data.args ?? {}) });
-      }
+      // A call's line is the live line's alone (owner 2026-11-27): never one of the conversation's messages.
       continue;
     }
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
       // Only words drawn tell the step's calls: those the answer restates are not drawn here.
-      stepSaid = said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer);
-      if (stepSaid) {
+      if (said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer)) {
         batch = null;
         blocks.push({ say: said, step: event.data.step, progress: narrates(event.data.tool_calls ?? []) });
       }
@@ -327,9 +320,7 @@ function drawFlow(past, flow, asked, events, reactions) {
     }
   }
   const nodes = blocks.map((block) =>
-    block.told !== undefined
-      ? el("div", { class: "turn-told say-narration", role: "article", "aria-label": t("outcome.update") }, prose(block.told))
-      : block.internal !== undefined
+    block.internal !== undefined
       ? internalRecord(block.internal)
       : block.cards !== undefined
       ? block.cards
@@ -502,7 +493,9 @@ function turn(past, editFromHereOf, known, signal, reactions) {
         ? backgroundNote(past.goal)
         : past.source === WORK_ORDER_SOURCE
           ? workOrderNote(past.goal)
-          : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
+          : ROUTINE_SOURCES.has(past.source)
+            ? routineMessage({ goal: past.goal, threadId: past.thread_id })
+            : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
   const element = el("section", { class: ended ? "turn" : "turn turn-working" }, asked, ops, answer);
   if (ended) {
     if (known !== undefined) {

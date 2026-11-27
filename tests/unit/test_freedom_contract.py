@@ -50,6 +50,7 @@ from dotagent.mcp.naming import exposed_name
 from dotagent.mcp.types import McpTool, ToolHints
 from dotagent.policy import engine
 from dotagent.policy.engine import OWNERS_REASON, decide
+from dotagent.policy.sandbox import UNSANDBOXED, SwitchedSandbox
 from dotagent.policy.types import ActionInfo, ApprovalMode, Decision, Preset
 from dotagent.runtime import Runtime, _tool_groups, close_runtime, open_runtime
 from dotagent.safari.desk import SafariDesk
@@ -334,6 +335,8 @@ class World:
             config=CONFIG,
             protected=(home / ".ssh", home / "Library" / "Keychains"),
             dot_paths=(self.dot_home,),
+            # A run the owner started in yolo, whose processes start with no sandbox (item 2016).
+            sandbox=SwitchedSandbox(UNSANDBOXED, False, False),
             approvals=SimpleNamespace(free=False),
             judge=_Judge(),
             vault=_Missing("vault"),
@@ -704,6 +707,8 @@ class Way:
     owners_chat: bool = False
     owners_word: bool = False
     tainted: bool = False
+    # A run nobody started (item 2016): its processes keep the sandbox, and it asks what such a run asked before.
+    unattended: bool = False
 
     @property
     def asks(self) -> frozenset[str]:
@@ -725,6 +730,9 @@ WAYS: tuple[Way, ...] = (
     Way("yolo, in the owner's chat, after outside content", "yolo", False, owners_chat=True, tainted=True),
     Way("yolo, in a chat of Dot's own", "yolo", False, owners_word=True),
     Way("yolo, in a run nobody watches", "yolo", False),
+    Way("yolo and free, in a run nobody started", "yolo", True, unattended=True),
+    Way("yolo, in a run nobody started", "yolo", False, unattended=True),
+    Way("yolo, in a run nobody started, in a chat of Dot's own", "yolo", False, owners_word=True, unattended=True),
 )
 
 
@@ -836,6 +844,7 @@ def _gate(
         owners_word=way.owners_word,
         owners_chat=way.owners_chat,
         owner_there=True,
+        unattended=way.unattended,
     )
     gate.tainted = way.tainted
     return gate

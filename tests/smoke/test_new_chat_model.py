@@ -221,6 +221,10 @@ async def test_a_message_from_the_home_starts_a_new_chat_on_the_model_picked_and
             await page.get_by_role("button", name="Start").click()
             await page.wait_for_url(re.compile(r"#/runs/[^/]+$"))
             run_id: str = page.url.rpartition("/")[2]
+            # The first send opens the one chat page (item 2025): the message in it and the chat's own composer, as
+            # any chat shows them, not a page of its own for a chat that starts.
+            await expect(page.get_by_text(WORDS).first).to_be_visible()
+            await expect(page.locator(".dock .composer")).to_be_visible()
             assert errors == []
         finally:
             await browser.close()

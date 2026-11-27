@@ -147,7 +147,10 @@ final class AppModel {
         parts.outbox = outbox
         parts.accepted = accepted
         parts.online = online
-        return parts.pending(in: thread)
+        // A chat this phone started and the daemon has not named yet is shown by its outbox key (item 2025): its first
+        // message is the new chat's own item of the outbox.
+        let starting: [PendingMessage] = startingChats[thread] == nil ? [] : parts.pendingChats.filter { $0.key == thread }
+        return starting + parts.pending(in: thread)
     }
 
     /// New chats not yet in the list, from the outbox and the link.
@@ -184,7 +187,8 @@ final class AppModel {
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
-    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
+    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849). Only these show
+    /// as a starting chat (item 2025); a key left in the outbox from an earlier launch is not one of them.
     var startingChats: [String: String] = [:]
 
     /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
@@ -195,6 +199,20 @@ final class AppModel {
     /// "Show steps" of a chat where its This chat sheet set it, over Settings › Chat's (item 1915), kept on the phone.
     var stepsOverrides: [String: Bool] = (UserDefaults.standard.dictionary(forKey: "stepsOverrides") as? [String: Bool]) ?? [:] {
         didSet { UserDefaults.standard.set(stepsOverrides, forKey: "stepsOverrides") }
+    }
+    /// The chat that started each helper's chat this phone has seen listed, by the helper's chat: a helper's chat shows
+    /// its steps as its parent does unless it chose itself (`showsSteps(of:everywhere:)`). Kept in memory: a helper's chat
+    /// is opened from its parent's, which lists it first.
+    private(set) var helperParents: [String: String] = [:]
+
+    /// Notes that `helpers` work for `parent`; a helper already known is not written again (no redraw for nothing).
+    func noteHelpers(_ helpers: [String], of parent: String) {
+        for helper in helpers where helper != parent && helperParents[helper] != parent { helperParents[helper] = parent }
+    }
+
+    /// Whether `thread` shows its steps: its own choice, else its parent chat's, else Settings › Chat's (item 1915).
+    func showsSteps(of thread: String, everywhere: Bool) -> Bool {
+        DotEngine.showsSteps(of: thread, overrides: stepsOverrides, parents: helperParents, everywhere: everywhere)
     }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
@@ -584,13 +602,12 @@ extension AppModel {
     }
 
     func actions(of run: String) async -> RunActions? {
-        guard let engine else { return nil }
-        return try? await engine.api.runActions(run: run)
+        await read { api throws(DaemonRequestError) in try await api.runActions(run: run) }.value
     }
 
+    /// What the chat's runs changed; read through the fixture daemon too, so the screen tests open real changes.
     func changes(of run: String) async -> RunChanges? {
-        guard let engine else { return nil }
-        return try? await engine.api.changes(run: run)
+        await read { api throws(DaemonRequestError) in try await api.changes(run: run) }.value
     }
 
     /// The owner's half-written words of a chat, kept across launches (per-chat drafts).

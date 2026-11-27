@@ -212,6 +212,14 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
                     "after it would run as commands nobody assessed. Send them in a call of their own.",
                     {"session": session.id},
                 )
+            # A line typed at a prompt that only looks like a password's still runs in that session: one opened outside
+            # the sandbox this run's commands start in takes none (the security review of item 2016).
+            if run_sandbox(ctx).commands and not session.sandboxed:
+                raise ToolInputError(
+                    f"{session.id} was opened outside the sandbox the commands of this run start in (by a yolo run, "
+                    "or while the sandbox was off): open a terminal of this run with terminal_open.",
+                    {"session": session.id, "command": session.command},
+                )
             # Flagged as a credential, so that the gate waives it with that reason in the step's record (item 443), as
             # the browser's secret fields are.
             return _action(

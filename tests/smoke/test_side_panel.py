@@ -38,7 +38,7 @@ _STEPS: tuple[str, ...] = ("Read the brief", "Draft the outline", "Write the sum
 _WAIT_COMMAND: str = "sleep 300"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
-_TABS: list[str] = ["Task", "Changes", "Plan 1/3", "Agents", "Screen"]
+_TABS: list[str] = ["Task", "Changes", "Plan 1/3", "Bots", "Screen"]
 # Whether the panel is leaving, whether it is hidden, and whether the conversation keeps room for it.
 _PANEL_STATE: str = (
     "() => [document.querySelector('.inspector').dataset.leaving ?? '', document.querySelector('.inspector').hidden,"
@@ -245,8 +245,8 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                     # WebKit does not focus a button that is clicked.
                     await plan_tab.focus()
                     await page.keyboard.press("ArrowRight")
-                    await expect(panel.get_by_role("tab", name="Agents")).to_be_focused()
-                    await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Agent"])
+                    await expect(panel.get_by_role("tab", name="Bots")).to_be_focused()
+                    await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Bot"])
                     # The Screen tab opens the Mac's screen live, a task or not (item 1322): the stream is asked for as
                     # the tab comes into sight, and Pause holds it.
                     async with page.expect_request("**/api/screen/live"):

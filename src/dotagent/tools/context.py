@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol
 
-from dotagent.policy.sandbox import UNSANDBOXED, Sandbox
+from dotagent.policy.sandbox import Sandbox
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.store.models import RunMode, RunRecord
 from dotagent.web.documents import ReadDocuments
@@ -205,9 +205,14 @@ class ToolContext:
     owner_words: OwnerWords | None = None
     # How a tool waits off its own clock (item 1890): handed to the tool by the executor for the call.
     off_clock: OffClock = _on_the_clock
+    # Whether nobody started the run (item 2016): a schedule's, a watcher's, a hook's, Dot's own initiative's, or one
+    # that goes on from them, as Dot decided when the run started (``RunGate.unattended``), never a model. Its
+    # processes start in the sandbox in every mode (:func:`run_sandbox`). ``False`` outside a run of the loop.
+    unattended: bool = False
 
 
 def run_sandbox(ctx: ToolContext) -> Sandbox:
-    """Where the processes of the run start: in the sandbox of the runtime while it is on, or as they are in a yolo run,
-    whose lines the guard lets change Dot's own files as well."""
-    return UNSANDBOXED if ctx.approvals == "yolo" else ctx.runtime.sandbox.current()
+    """Where the processes of the run start (:meth:`dotagent.policy.sandbox.SwitchedSandbox.for_run`): a run nobody
+    started in the sandbox in every mode (item 2016); else in the sandbox of the runtime while it is on, or as they
+    are in a yolo run, whose lines the guard lets change Dot's own files as well."""
+    return ctx.runtime.sandbox.for_run(ctx.approvals, ctx.unattended)

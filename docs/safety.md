@@ -601,11 +601,11 @@ judged as after a page until you write in its chat. A note starts nothing; a run
 a run marked untrusted, which a note marks too, so that no chain of notes carries a page's words, or a note's, on past
 the rules each run keeps (item 963); none goes to a run whose approval mode asks you less than its sender's; and a run
 of Dot's own initiative, which asks before a message, a post or a release in every mode, sends none to a run that does
-not ask them, but for a run of a chat you opened (an agent's chat among them, item 963), which asks a payment, a
+not ask them, but for a run of a chat you opened (a bot's chat among them, item 963), which asks a payment, a
 message, a mail and a post itself or has the review model judge them (item 860), a release there being checked by the
 review model (item 962) as after a page; in yolo with `[policy] yolo_taint_check = false` nothing would check it, so it
 sends none there then. A `preapproved` rule of yours lets a step through in a run a note marked as it does after a page
-(see [Agents](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
+(see [Bots and campaigns](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
 some. A message you send to the run clears the mark; your answer to a question of a run you watch does not, whether the
 run waited for it or went on (item 508), as it answers what the run asked rather than sending it on its way: the run it
 reaches stays marked, and the run it starts once that run has ended starts as untrusted as that run ended; so does
@@ -614,7 +614,7 @@ as your instruction, not the question the run wrote, which a page it read may ha
 run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off, a run that goes on
 in a chat of recurring work (an agent's one chat, a run of Dot's own initiative in the chat of the same name, a look
 for work's among them, a campaign's sessions', item 952) as that chat's last run ended, whoever sent it, since it reads that run's words: once such a chat read outside content, its runs stay
-marked until you write in it yourself, and an agent's chat keeps that mark when the chat that sent it the work is
+marked until you write in it yourself, and a bot's chat keeps that mark when the chat that sent it the work is
 deleted, whose runs go with it, and the run that
 tells a chat that its command in the background ended as the chat's last run ended: that message is Dot's, not yours,
 and so is the note that tells a run at work of such an end, which clears nothing. The report of a helper the run
@@ -1029,8 +1029,9 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   script given to the tool that names the clipboard (`the clipboard`, `clipboard info`, their raw events,
   `theClipboard`, `clipboardInfo`, `pbpaste`, a pasteboard), whether it reads it or puts text on it: telling the two
   apart takes a reading of the script that a pattern gets wrong, and a string or a comment that names it asks too.
-  `desktop_clipboard_write` hands nothing over and asks nothing more than before. A `yolo` run asks nothing and has no
-  sandbox (item 443), and neither has a run with `[shell] sandbox = false`: there the guard's names are all there is,
+  `desktop_clipboard_write` hands nothing over and asks nothing more than before. A `yolo` run you started asks nothing
+  and has no sandbox (item 443), and neither has a run of yours with `[shell] sandbox = false` (a run nobody started
+  keeps it, item 2016): there the guard's names are all there is,
   and what it does not read gets through (a name the line builds as it runs, a quote the shell takes out twice, `sh -c
   "pb''paste"`, a script in a file, `osascript r.applescript`, which asks as a script that may send (item 561) but not
   as a read of the clipboard, a script typed into a session, `osascript -i`).
@@ -1151,7 +1152,7 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   process of its own that no sandbox of Dot's holds. A skill whose steps may come from outside content is offered with
   the lines that name an address, run a command or reach a path withheld, as before.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
-  default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
+  default), and so do those of a run nobody started in every mode (below, `[shell] sandbox_unattended`): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
   files above (its key file, token, push key, APNs key, MCP sign-ins, browser profiles, configuration, database and
   journals) and the stores no program has any use for (`[policy] sealed_paths`: the data and caches of your browsers,
   their cookies, Messages and Mail, the folder of the APNs key, item 531), nor change what Dot loads and runs, nor
@@ -1167,7 +1168,7 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   those the guard reads its line. A search that meets a place it may not read shows what it found elsewhere and names
   the places it did not read, as a search of any run does with a folder whose reading macOS broke off (it does now and
   then under `~/Library/Containers` when the home folder is searched). macOS starts no program that runs as root inside
-  the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo` run runs them, `[shell] sandbox =
+  the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo` run you started runs them, `[shell] sandbox =
   false` turns the sandbox off. Nor does a process of a run have another program act for it, outside the sandbox (item
   418): it opens nothing through Launch Services (`open`, a program's own call), starts neither the `launchctl`,
   `shortcuts` nor `lsregister` that macOS installs and reaches neither the Shortcuts service nor the Launch Services
@@ -1182,6 +1183,28 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   Dot's commands in a safe box", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
   file keeps it; a terminal session already open keeps how it started. Switching it on where `sandbox-exec` does not
   start is refused, and nothing changes.
+- **A run nobody started keeps the sandbox in every mode** (item 2016, `[shell] sandbox_unattended`, on by default):
+  a run of a schedule, a watcher, a hook (item 1970: it fires a schedule or starts a watcher's run), Dot's own
+  initiative, a mail's reply handed on, a notice or a reflection, and what goes on from one of them (its helpers, a run
+  that resumes it, a run that goes on in a chat one of them opened without a message of yours: a command's end in the
+  background, an agent's answer to a work order, a helper's report), starts its processes in the sandbox above in
+  `yolo` and in free mode too, and whatever `[shell] sandbox` and the switch in Settings › Rules say; so do the commands
+  of a schedule's and a watcher's check (item 1855). Dot decides which run that is as the run starts, from where it
+  came from, never from what a model or a caller says; a run whose origin it cannot read keeps the sandbox. What it seals
+  is the list above and nothing else: Dot's own files, `[policy] sealed_paths`, what Dot loads and runs, Dot's home and
+  logs but the workspace, the folders above them, the hand-offs to launchd, Shortcuts and Launch Services, and the
+  clipboard; the network, your files and your programs stay as the run's mode allows. It asks nothing new, in any mode:
+  a step that would read or change one of those through a process is refused by macOS (`Operation not permitted`) and
+  the run goes on with the answer, as such a step of a run outside `yolo` always was ([Freedom](freedom.md) lists it
+  under what still refuses). A run that goes on without a message of yours goes on from the run before it in its chat:
+  the run that tells a schedule's command in the background ended keeps the sandbox in your own chat too (`/loop`). A
+  run you started (a message in the app, on a phone, by iMessage, `dotx run`) runs as before, also in a chat a schedule
+  opened; Resume on a schedule's run goes on as that run, in the sandbox, and so do the sessions of a campaign after its
+  first, which its schedule starts. What it does not cover: Dot's own file tools (`write_file`, `edit_file`)
+  run in the daemon's process, not in the sandbox, so in `yolo` they still change Dot's files unasked; Apple Events and a
+  hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from the daemon itself, in a checkout
+  of its own, not through a run's tools, and is not changed by it. `false` has those runs follow `[shell] sandbox` and
+  `yolo` as yours do.
 - **Code mode** (items 1500 to 1507, [Code mode](code-mode.md)): the code of a `code_run` is text a model wrote, which a page
   may have shaped, so it does not run in the sandbox above, which allows everything but Dot's files. It runs under
   `sandbox-exec` with `(deny default)`: it reads its interpreter's installation and its `tools` folder, reads and writes its
@@ -1326,9 +1349,11 @@ own initiative, a message, a post or a release waits for your own yes in every m
 but free mode (below).
 A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer (not in free mode, which asks no run's owner anything: item 1563); one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
-what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
-ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are cards, each with
+what it leads to, and the one Dot recommends is marked: a tap picks an option (one, or several when several may be
+chosen; a second tap lets it go), and what you pick is sent with what you write, as one answer. Several questions page
+in one panel ("1 / 3", on the phone and on the web alike), and its one "Submit answers" sends them all once each has an
+answer or was skipped (item 2001). In the terminal you type an option's number (several, separated by
 commas) or your own words. The run reads which option you chose, and whether it was the one it recommended. A line
 typed in the terminal before a prompt for a decision appears (the next message of a chat, typed while the run worked)
 is set aside and answers nothing, and the prompt says so; at a hand-off only Enter or a yes says that you did the step,

@@ -137,11 +137,11 @@ struct BotChatScreen: View {
             // A chat being deleted is gone from the moment the delete is under way, not once its own stream says so (item
             // 1985: while twenty chats were deleted, Dot's screen opened the one it held and waited on it, "Syncing…").
             deleted: { model.goneChats.contains($0) || model.chats[$0]?.freshness == .deleted })
-        if let key = shown, model.startingChats[key] != nil {
-            StartingChat(key: key)
-        } else if let thread = shown {
+        if let thread = shown {
+            // A chat this phone started keeps the screen's identity from its first send to the daemon's name for it (item
+            // 2025): the key, then the thread that key was named; nothing is pushed or drawn anew at the swap.
             ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
-                .id(thread)
+                .id(model.startedChats.first { $0.value == thread }?.key ?? thread)
                 .onAppear { if chosen == nil, route.thread == nil, held != thread { held = thread } }
         } else {
             // A bot with no chat yet: the new chat in place; its first message opens the chat, as a pushed one does.
@@ -285,6 +285,8 @@ func findMatches(_ items: [TranscriptItem], words: String) -> [String] {
 private func holds(_ item: TranscriptItem, _ wanted: String) -> Bool {
     switch item {
     case .owner(_, let text, _, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
+    // A routine's row is found by the title it shows and by its words.
+    case .automation(_, let title, let prompt): title.localizedStandardContains(wanted) || prompt.localizedStandardContains(wanted)
     case .work(let fold): fold.items.contains { holds($0, wanted) }
     default: false
     }
