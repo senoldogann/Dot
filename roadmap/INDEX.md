@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2004](2004.md) | done | 2026-11-27 | A run's start no longer reads every skill again, nor waits minutes for an embedding |
 | [2003](2003.md) | done | 2026-11-27 | Where the seconds go: `dotx perf` and Settings › Maintenance › Speed |
 | [1990](1990.md) | done | 2026-11-27 | A terminal session whose program ended leaves room for another |
 | [1988](1988.md) | done | 2026-11-27 | A search pattern ripgrep cannot read is told as the call's own error, with the syntax it reads |
