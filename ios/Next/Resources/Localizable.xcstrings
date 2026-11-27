@@ -1427,6 +1427,17 @@
         }
       }
     },
+    "Added, line %lld: %@": {
+      "comment": "VoiceOver: a line the change added; first argument its number, second its text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklendi, satır %1$lld: %2$@"
+          }
+        }
+      }
+    },
     "Address": {
       "comment": "This Mac: the Mac's tailnet address",
       "localizations": {
@@ -2898,7 +2909,7 @@
       }
     },
     "Collapsed": {
-      "comment": "VoiceOver value of a closed disclosure\nVoiceOver value of a closed group",
+      "comment": "VoiceOver value of a closed disclosure\nVoiceOver value of a closed group\nVoiceOver: a folded section of This chat is closed",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3262,7 +3273,7 @@
       }
     },
     "Copy": {
-      "comment": "Code block header button that copies the code\nContext menu of a tool call: copies its line and detail\nContext menu: copies the text",
+      "comment": "Change sheet: copies the change's text\nCode block header button that copies the code\nContext menu of a tool call: copies its line and detail\nContext menu: copies the text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3737,6 +3748,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu zamanlanmış görev silinsin mi?"
+          }
+        }
+      }
+    },
+    "Deleted": {
+      "comment": "Change sheet subtitle: the file is gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silindi"
           }
         }
       }
@@ -5217,7 +5239,7 @@
       }
     },
     "Expanded": {
-      "comment": "VoiceOver value of an open disclosure\nVoiceOver value of an open group",
+      "comment": "VoiceOver value of an open disclosure\nVoiceOver value of an open group\nVoiceOver: a folded section of This chat is open",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5729,6 +5751,17 @@
         }
       }
     },
+    "Formatted": {
+      "comment": "Change sheet: a Markdown file shown formatted",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biçimli"
+          }
+        }
+      }
+    },
     "Free": {
       "comment": "Chat settings filter: the models served at no cost",
       "localizations": {
@@ -6231,6 +6264,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardımcıları gizler"
+          }
+        }
+      }
+    },
+    "Hides the message": {
+      "comment": "VoiceOver hint of an unfolded routine row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajı gizler"
           }
         }
       }
@@ -6851,6 +6895,28 @@
         }
       }
     },
+    "Line %lld: %@": {
+      "comment": "VoiceOver: a line of code; first argument its number, second its text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satır %1$lld: %2$@"
+          }
+        }
+      }
+    },
+    "Lines from %lld": {
+      "comment": "VoiceOver: a hunk of a diff starts; the argument is its first line's number",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. satırdan itibaren"
+          }
+        }
+      }
+    },
     "List rows": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -6935,6 +7001,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yükleniyor"
+          }
+        }
+      }
+    },
+    "Loading the change": {
+      "comment": "VoiceOver: a change's lines are being laid out",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişiklik yükleniyor"
           }
         }
       }
@@ -7662,6 +7739,35 @@
         }
       }
     },
+    "New · %lld lines": {
+      "comment": "Change sheet subtitle: a file the task made; the argument is its line count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "New · %lld line"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "New · %lld lines"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni · %lld satır"
+          }
+        }
+      }
+    },
     "Next": {
       "comment": "Find in chat: the find after",
       "localizations": {
@@ -7856,6 +7962,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz sohbet yok"
+          }
+        }
+      }
+    },
+    "No diff to show": {
+      "comment": "Change sheet: the daemon has no diff of the file",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gösterilecek fark yok"
           }
         }
       }
@@ -8598,7 +8715,7 @@
       }
     },
     "Off": {
-      "comment": "Reasoning level: none\nThis Mac: Tailscale is off\nVoiceOver value of a switch that is off",
+      "comment": "Reasoning level: none\nThis Mac: Tailscale is off\nThis chat sheet: a folded section's switch is off\nVoiceOver value of a switch that is off",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8686,7 +8803,7 @@
       }
     },
     "On": {
-      "comment": "Reasoning level: on, no levels\nVoiceOver value of a switch that is on",
+      "comment": "Reasoning level: on, no levels\nThis chat sheet: a folded section's switch is on\nVoiceOver value of a switch that is on",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10347,6 +10464,17 @@
         }
       }
     },
+    "Removed, line %lld: %@": {
+      "comment": "VoiceOver: a line the change removed; first argument its number, second its text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silindi, satır %1$lld: %2$@"
+          }
+        }
+      }
+    },
     "Rename": {
       "comment": "Context menu of a chat",
       "localizations": {
@@ -10574,6 +10702,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dikey çevir"
+          }
+        }
+      }
+    },
+    "Routine": {
+      "comment": "Chat: the label of a message a schedule, watcher or hook sent",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutin"
+          }
+        }
+      }
+    },
+    "Routine: %@": {
+      "comment": "VoiceOver: a routine's message in a chat; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutin: %@"
           }
         }
       }
@@ -11894,6 +12044,17 @@
         }
       }
     },
+    "Shows the whole message": {
+      "comment": "VoiceOver hint of a folded routine row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajın tamamını gösterir"
+          }
+        }
+      }
+    },
     "Shows the whole thinking": {
       "comment": "VoiceOver hint of a thinking row",
       "localizations": {
@@ -12011,6 +12172,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un senin için kendi başına yapabileceği bir şey"
+          }
+        }
+      }
+    },
+    "Source": {
+      "comment": "Change sheet: a Markdown file shown as it is written",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaynak"
           }
         }
       }
@@ -14432,6 +14604,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Video %@, %@"
+          }
+        }
+      }
+    },
+    "View": {
+      "comment": "Change sheet: how a Markdown file is shown",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görünüm"
           }
         }
       }

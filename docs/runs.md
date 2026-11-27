@@ -533,7 +533,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the packages and builds of a project such as `node_modules`, item 1088; a full path in words may go through a folder
   of capitalised words such as `Application Support`), and the eye on a file's row in the
   Changes tab, which shows the file as it is now without opening its diff. The Task tab's list of the conversation's files went
-  with item 544. The panel takes half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
+  with item 544. A file's row in the Changes tab (and in the iPhone app's This chat sheet, whose
+  sections all start folded with their count) opens on its change read by its format (item 2017): a file changed
+  as a diff in a monospaced view that never wraps (it scrolls sideways), with both line numbers, a + or − and a green or
+  red tint for a line added or removed, a hunk's head as a quiet band and the code coloured by its language (Python,
+  JavaScript, TypeScript, Swift, JSON, TOML, YAML, shell, Markdown, HTML and XML, CSS, Rust, Go); a file the runs made
+  as the file, numbered from 1 with no sign on each line, a Markdown file formatted with its source a press away and
+  JSON laid out in its own key order; an image or a PDF opens as the file it is now. The rows are drawn as they come
+  into view, so a file of thousands of lines opens at once. The panel takes half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
   daemon draws with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused
   rather than drawn (item 386). A Word document, an Excel
   workbook and a presentation show first as macOS's Quick Look draws them (item 268), as Finder would: their fonts,
