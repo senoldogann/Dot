@@ -272,7 +272,7 @@ const CORE = {
   "line.offlineCopy": "Çevrimdışı: kayıtlı sohbetler gösteriliyor, son güncelleme {age}",
   "line.offlineWaiting": "Çevrimdışı: {count} gönderilmeyi bekliyor",
   "line.macUnreachable": "Mac uykuda veya ulaşılamıyor",
-  "line.macUnreachableSince": "Saat {time}’den beri Mac uykuda veya ulaşılamıyor",
+  "line.macUnreachableSince": "Mac uykuda veya ulaşılamıyor · son bağlantı {time}",
   "line.ageNow": "az önce",
   "line.ageMinutes": "{count} dk önce",
   "line.ageHours": "{count} sa önce",

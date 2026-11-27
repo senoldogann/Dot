@@ -54,7 +54,7 @@ test("an unreachable Mac shows its last confirmed contact in both languages", ()
   const time = "00:05";
   const lost = facts({ reconnecting: true, lastContact, waiting: 3 });
   assert.deepEqual(lineOf(lost, english), { kind: "reconnecting", text: `Mac asleep or unreachable since ${time}`, action: null });
-  assert.equal(lineOf(lost, turkish)?.text, `Saat ${time}’den beri Mac uykuda veya ulaşılamıyor`);
+  assert.equal(lineOf(lost, turkish)?.text, `Mac uykuda veya ulaşılamıyor · son bağlantı ${time}`);
 });
 
 test("no link comes before reconnecting: a phone with no link is offline, not reconnecting", () => {

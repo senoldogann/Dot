@@ -7162,7 +7162,7 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Saat %@’den beri Mac uykuda veya ulaşılamıyor"
+            "value": "Mac uykuda veya ulaşılamıyor · son bağlantı %@"
           }
         }
       }

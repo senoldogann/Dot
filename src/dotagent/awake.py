@@ -100,21 +100,28 @@ async def keep_awake_while_working(
 ) -> None:
     """Hold ``awake`` while work is active or due soon and for ``after_s`` seconds afterward.
 
-    Check every ``every_s`` seconds until ``stopping`` is set. If a work check fails, keep the current assertion
-    and check again at the next tick. Release it on exit. Raise a failure to start ``caffeinate`` for the daemon to log.
+    Check every ``every_s`` seconds until ``stopping`` is set. A work check that fails counts as no work seen: a hold
+    that was on runs out its grace and is released, so a check that keeps failing cannot hold the Mac awake for good.
+    Only the first failure of a row is logged. Release it on exit. Raise a failure to start ``caffeinate`` for the
+    daemon to log.
     """
     last_work_at: float | None = None
+    failing: bool = False
     try:
         while not stopping.is_set():
             now: float = time.monotonic()
             try:
                 busy: bool = await working()
             except Exception:
-                log.exception("keep_awake_work_check_failed")
+                if not failing:
+                    log.exception("keep_awake_work_check_failed")
+                failing = True
+                busy = False
             else:
-                if busy:
-                    last_work_at = now
-                await awake.switch(holds_awake(busy, last_work_at, now, after_s))
+                failing = False
+            if busy:
+                last_work_at = now
+            await awake.switch(holds_awake(busy, last_work_at, now, after_s))
             try:
                 async with asyncio.timeout(every_s):
                     await stopping.wait()

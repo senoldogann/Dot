@@ -1734,9 +1734,8 @@ TR.update(
 # MS1: the last confirmed contact with the Mac.
 TR.update(
     {
-        "Starting the chat…": "Sohbet başlatılıyor…",
         "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
-        "Mac asleep or unreachable since %@": "Saat %@’den beri Mac uykuda veya ulaşılamıyor",
+        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
     }
 )
 

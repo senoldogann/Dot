@@ -70,6 +70,36 @@ async def test_caffeinate_i_recovers_from_a_failed_work_check_and_holds_through_
     assert _said(said) == ["-i", "-w", str(os.getpid())]
 
 
+@pytest.mark.asyncio
+async def test_a_work_check_that_keeps_failing_lets_a_hold_run_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review of item 2044: after one busy tick every check fails; the grace runs out and the hold is released."""
+    said: Path = tmp_path / "said.txt"
+    monkeypatch.setenv("DOT_CAFFEINATE", _stand_in(tmp_path, said))
+    awake: KeepAwake = KeepAwake("-i")
+    checks: list[int] = [0]
+    stopping: asyncio.Event = asyncio.Event()
+
+    async def working() -> bool:
+        checks[0] += 1
+        if checks[0] == 1:
+            return True
+        raise sqlite3.OperationalError("database is locked")
+
+    keeping: asyncio.Task[None] = asyncio.create_task(keep_awake_while_working(awake, working, 0.3, 0.05, stopping))
+    try:
+        async with asyncio.timeout(5):
+            while not awake.on:  # noqa: ASYNC110 - the hold has no event of its own
+                await asyncio.sleep(0.02)
+            while awake.on:  # noqa: ASYNC110 - as above
+                await asyncio.sleep(0.02)
+        assert checks[0] > 2, "the checks went on failing while the hold ran out"
+    finally:
+        stopping.set()
+        await keeping
+
+
 def _stand_in(folder: Path, said: Path) -> str:
     program: Path = folder / "caffeinate"
     program.write_text(f'#!/bin/sh\necho "$@" >> {said}\nexec sleep 60\n')

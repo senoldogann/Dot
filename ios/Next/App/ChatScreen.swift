@@ -85,7 +85,6 @@ struct ChatScreen: View {
     @State private var stopping: Bool = false
     /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
     @State private var stepsShown: Bool = false
-    /// The link line the pill shows, once a state lasted a second (item 1931: a blip does not flicker).
     /// The helper whose chat a row of the stream opened (item 1909).
     @State private var openedHelper: HelperChatRef?
     /// The answer of a side question (`/btw`), shown in an alert.
