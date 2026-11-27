@@ -57,6 +57,15 @@ final class SettingsControlsUITests: XCTestCase {
         return changed
     }
 
+    /// Whether a menu is open over the page. iOS 26 draws a SwiftUI `Menu` as a collection view of its own named nothing,
+    /// a popover narrower than the window (250 pt on a 402 pt phone), where a page drawn as a list fills the window's
+    /// width: a menu left open covered the next row (the Models page's "Reasoning" and "Fast mode", 2026-11-27).
+    private var menuIsOpen: Bool {
+        if app.menuItems.firstMatch.exists || app.collectionViews["menu"].exists { return true }
+        let window: CGFloat = app.windows.firstMatch.frame.width
+        return app.collectionViews.allElementsBoundByIndex.contains { $0.exists && $0.frame.width < window * 0.8 }
+    }
+
     private func restore(to page: String) {
         for _ in 0..<3 {
             if app.sheets.firstMatch.exists || app.alerts.firstMatch.exists {
@@ -70,7 +79,7 @@ final class SettingsControlsUITests: XCTestCase {
             } else if title != "Settings", app.navigationBars.buttons["Close"].exists {
                 // The settings sheet's own ✕ closes the sheet: only a sheet over it is closed here.
                 app.navigationBars.buttons["Close"].tap()
-            } else if app.menuItems.firstMatch.exists || app.collectionViews["menu"].exists {
+            } else if menuIsOpen {
                 app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
             } else if title != page, app.navigationBars.buttons.firstMatch.exists {
                 app.navigationBars.buttons.firstMatch.tap()
