@@ -22,6 +22,8 @@ final class Dictation {
     @ObservationIgnored private var request: SFSpeechAudioBufferRecognitionRequest?
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
     @ObservationIgnored private var recognizer: SFSpeechRecognizer?
+    /// What this go heard, utterance by utterance (item 2050: a pause closes one inside the task).
+    @ObservationIgnored private var transcript: DictationTranscript = .empty
     @ObservationIgnored private var onHeard: ((String) -> Void)?
     @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "dictation")
 
@@ -33,6 +35,7 @@ final class Dictation {
         }
         self.onHeard = onHeard
         heard = ""
+        transcript = .empty
         blocked = nil
         state = .starting
         Task { await begin() }
@@ -137,8 +140,8 @@ final class Dictation {
         try engine.start()
         self.engine = engine
 
-        task = Self.recognize(with: recognizer, request: request) { @Sendable [weak self] words, final, failed in
-            Task { @MainActor in self?.took(words: words, final: final, failed: failed) }
+        task = Self.recognize(with: recognizer, request: request) { @Sendable [weak self] words, final, closes, failed in
+            Task { @MainActor in self?.took(words: words, final: final, closesUtterance: closes, failed: failed) }
         }
         state = .listening
     }
@@ -151,18 +154,21 @@ final class Dictation {
 
     private nonisolated static func recognize(
         with recognizer: SFSpeechRecognizer, request: SFSpeechAudioBufferRecognitionRequest,
-        deliver: @escaping @Sendable (String?, Bool, Bool) -> Void
+        deliver: @escaping @Sendable (String?, Bool, Bool, Bool) -> Void
     ) -> SFSpeechRecognitionTask {
         recognizer.recognitionTask(with: request) { result, error in
-            deliver(result?.bestTranscription.formattedString, result?.isFinal ?? false, error != nil)
+            // A result with metadata closes its utterance (a pause) though the task goes on and it is not final.
+            let closes: Bool = result.map { $0.isFinal || $0.speechRecognitionMetadata != nil } ?? false
+            deliver(result?.bestTranscription.formattedString, result?.isFinal ?? false, closes, error != nil)
         }
     }
 
-    private func took(words: String?, final: Bool, failed: Bool) {
+    private func took(words: String?, final: Bool, closesUtterance: Bool, failed: Bool) {
         guard state == .listening || state == .starting else { return }
-        if let words, words != heard {
-            heard = words
-            onHeard?(words)
+        transcript = transcript.taking(words: words ?? "", closesUtterance: closesUtterance)
+        if transcript.text != heard {
+            heard = transcript.text
+            onHeard?(heard)
         }
         if final {
             finish(failure: nil)
