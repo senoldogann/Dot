@@ -938,7 +938,7 @@ every mode but `yolo` (item 433).
   Mac's pointer, keyboard and front window left alone: they go while you are at the Mac. Dot starts the driver as its
   own child (`cua-driver serve --embedded --no-overlay` on a private socket, spoken to through `cua-driver mcp
   --embedded`), so macOS answers its permission checks with Dot's own grants and it asks for none; it gets Dot's
-  environment without its secrets, and its telemetry is off. A step is judged and recorded exactly as before, and goes only to the batch's application: typing and keys
+  environment without its secrets, and its telemetry is off. A step is judged and recorded exactly as before, and its text goes in pieces of 100 characters with the emergency stop checked before each, so a stop ends it within one piece; and goes only to the batch's application: typing and keys
   without a ref are judged against that application's focused field, not the one in front; a step at a point the
   review found in another application's window is not sent; a ref is clicked in its window even when another covers
   it. Such a step posts nothing to the Mac's own input, so your touch while it runs is seen as your return. A point
@@ -947,8 +947,8 @@ every mode but `yolo` (item 433).
   use the Mac's own pointer and keyboard and wait for you to step away. Typing goes in through accessibility where the
   field takes it (the driver's own key events where it does not) and a paste is typed the same way, leaving the
   clipboard alone; a scroll is counted in wheel notches of about 20 px. Dot uses only cua-driver 0.28.2 signed by
-  Cua AI (`desktop.background_driver_path`) and never installs it: `dotx doctor` says whether it is there and the
-  one command that installs it. A driver that cannot start, or a step it fails, fails the step with why; nothing falls
+  Cua AI (`desktop.background_driver_path`), its signature checked before it is ever run, and never installs it: `dotx doctor` says whether it is there and the
+  one command that installs it. A driver that cannot start fails the batch that needs it, and a step it fails fails, each with why; nothing falls
   back to your pointer. A call that gets no answer within a minute stops the driver, and what it did is not known; the
   next batch starts a new one. The driver uses private macOS interfaces that an update can break.
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so

@@ -158,16 +158,34 @@ def test_a_call_that_gets_no_answer_in_time_stops_the_driver_and_is_not_sent_aga
         started.close()
 
 
-def test_a_driver_that_is_missing_or_not_the_pinned_version_is_not_started(
+def test_a_driver_that_is_missing_or_not_signed_by_cua_ai_is_never_run(
     fake: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """The stand-in carries no signature: it is refused before it runs, not even asked its version (on Linux, where
+    there is no codesign, the check itself fails, and it is not run either)."""
     with pytest.raises(DesktopError, match="not installed") as missing:
         cua.open_driver(tmp_path / "nowhere" / "cua-driver", 5.0, 5.0)
     assert missing.value.context["fix"] == cua.INSTALL_COMMAND
+    with pytest.raises(DesktopError, match=r"not signed by Cua AI|could not be run"):
+        cua.open_driver(fake, 5.0, 5.0)
+    assert not (fake.parent / "calls.jsonl").exists()
+
+
+def test_the_version_of_a_driver_signed_by_cua_ai_is_read_and_another_one_refused(
+    fake: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cua, "signer_at", lambda path, timeout_s: cua.TEAM_ID)
     monkeypatch.setenv("FAKE_CUA_VERSION", "0.63.2")
     with pytest.raises(DesktopError, match=r"measured with 0\.28\.2 only"):
         cua.open_driver(fake, 5.0, 5.0)
-    assert not (fake.parent / "calls.jsonl").exists()
+    [ran] = _calls(fake)
+    assert ran["tool"] == "manifest"
+
+
+def test_a_long_text_is_cut_in_pieces() -> None:
+    assert cua.chunks_of("abcdefg", 3) == ["abc", "def", "g"]
+    assert cua.chunks_of("", 3) == []
+    assert "".join(cua.chunks_of("ğüşiöç İI" * 30, cua.TEXT_CHUNK_CHARS)) == "ğüşiöç İI" * 30
 
 
 def test_the_driver_is_not_given_the_secrets_of_dots_environment(monkeypatch: pytest.MonkeyPatch) -> None:

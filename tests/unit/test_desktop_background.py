@@ -3,16 +3,17 @@ they go to the batch's own application with the review judging what they reach, 
 the Mac where the Mac's own pointer would wait (item 1890). A fake driver stands in for cua-driver and the accessibility
 calls are replaced, so nothing reaches the screen."""
 
+import threading
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import pytest
 from pydantic import JsonValue
 
 from dotagent.config import DesktopConfig, load_default_config
-from dotagent.core.errors import DesktopStepNotSent, OwnerAtTheMac
-from dotagent.desktop import actions, apps, ax, screen, session
+from dotagent.core.errors import DesktopStepNotSent, FailSafeTriggered, OwnerAtTheMac
+from dotagent.desktop import actions, apps, ax, cua, screen, session
 from dotagent.desktop import input as hid
 from dotagent.desktop.actions import Inspection, StepEnv
 from dotagent.desktop.ax import ElementState
@@ -20,7 +21,7 @@ from dotagent.desktop.cua import CuaResult
 from dotagent.desktop.presence import OwnerPresence
 from dotagent.desktop.safety import StepContext
 from dotagent.desktop.session import DesktopSession, StepReview, no_browser_chrome
-from dotagent.desktop.types import ActOutcome, AppInfo, DisplayInfo, Rect, Step, WindowInfo
+from dotagent.desktop.types import ActOutcome, AppInfo, DisplayInfo, Point, Rect, Step, WindowInfo
 
 _MAIL: AppInfo = AppInfo(
     pid=700, name="Mail", bundle_id="com.apple.mail", bundle_path="", kind="regular", frontmost=False
@@ -91,6 +92,10 @@ def _inspection(pid: int) -> Inspection:
         context=StepContext(role="other", app="Mail", element=None, secure=False, line=None),
         pid=pid,
     )
+
+
+# The emergency stop as actions has it, before the fixture below takes it out.
+_CHECK_FAILSAFE: Callable[[StepEnv], None] = actions.check_failsafe
 
 
 @pytest.fixture
@@ -322,3 +327,71 @@ async def test_a_background_step_is_not_taken_as_dots_own_input(
         assert [call[0] for call in driver.calls] == ["press_key", "get_window_state", "click"]
     else:
         assert len(noted) == 2 and driver.calls == []
+
+
+class _StopsAfter(_Driver):
+    """A driver during whose first piece of text the owner stops Dot: ``stop`` is called after that call."""
+
+    def __init__(self, stop: Callable[[], None]) -> None:
+        super().__init__()
+        self._stop: Callable[[], None] = stop
+
+    def call(self, tool: str, arguments: Mapping[str, JsonValue]) -> CuaResult:
+        result: CuaResult = super().call(tool, arguments)
+        self._stop()
+        return result
+
+
+@pytest.mark.parametrize("how", ["stop file", "run stopped"])
+def test_a_stop_during_a_long_text_ends_it_within_one_piece(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mac: list[object], how: str
+) -> None:
+    """A text goes to the driver in pieces with the emergency stop checked before each (item 683's promise for the
+    Mac's own typing): the STOP file, or the run's stop, ends it after the piece under way."""
+    monkeypatch.setattr(actions, "check_failsafe", _CHECK_FAILSAFE)
+    monkeypatch.setattr(screen, "pointer_location", lambda: Point(500.0, 500.0))
+    monkeypatch.setattr(actions, "_field_in", lambda env, ref, holder: None)
+    stop: threading.Event = threading.Event()
+    env: StepEnv = _env(tmp_path, True, None)
+
+    def stops() -> None:
+        if how == "stop file":
+            env.failsafe_file.write_text("stop", encoding="utf-8")
+        else:
+            stop.set()
+
+    driver: _StopsAfter = _StopsAfter(stops)
+    text: str = "x" * (cua.TEXT_CHUNK_CHARS * 3 + 7)
+    actions.set_call_stop(stop)
+    try:
+        with pytest.raises(FailSafeTriggered):
+            actions.execute_step(
+                replace(env, background=driver), Step(action="type", text=text), _inspection(_MAIL.pid)
+            )
+    finally:
+        actions.set_call_stop(None)
+    typed: list[str] = [str(arguments["text"]) for tool, arguments in driver.calls if tool == "type_text"]
+    assert typed == [text[: cua.TEXT_CHUNK_CHARS]] and mac == []
+
+
+def test_a_long_text_goes_whole_in_pieces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mac: list[object]) -> None:
+    monkeypatch.setattr(actions, "_field_in", lambda env, ref, holder: None)
+    driver: _Driver = _Driver()
+    text: str = "ğüşiöç İI " * 25
+    effect: actions.Effect = actions.execute_step(
+        _env(tmp_path, True, driver), Step(action="type", text=text), _inspection(_MAIL.pid)
+    )
+    typed: list[str] = [str(arguments["text"]) for tool, arguments in driver.calls if tool == "type_text"]
+    assert len(typed) == 3 and "".join(typed) == text and f"typed {len(text)} chars" in effect.detail
+
+
+def test_a_menu_items_ref_is_refused_with_why(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mac: list[object]
+) -> None:
+    menu_item: ElementState = replace(_FIELD, role="AXMenuItem", label="Save")
+    monkeypatch.setattr(actions, "_element_for", lambda env, raw: (9, "item"))
+    monkeypatch.setattr(actions, "_state_of", lambda env, number, element: menu_item)
+    driver: _Driver = _Driver()
+    with pytest.raises(DesktopStepNotSent, match="in a menu"):
+        actions.execute_step(_env(tmp_path, True, driver), Step(action="right_click", ref="a9"), _inspection(_MAIL.pid))
+    assert driver.calls == []
