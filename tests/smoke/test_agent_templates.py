@@ -61,8 +61,8 @@ STRANGE_TOOL: str = "made_up_tool"
 DRIVERS: frozenset[str] = frozenset({"shell", "terminal_open", "terminal_send", "apple_script", "desktop_act"})
 _AGENT_URL: re.Pattern[str] = re.compile(r"#/agents/[^/]+$")
 # The titles of the Import and Export buttons, their names on a phone, where their labels hide.
-IMPORT_TITLE: str = "Make an agent from a file exported from Dot"
-EXPORT_TITLE: str = "Save the agent as a file, to import into another Dot"
+IMPORT_TITLE: str = "Make a bot from a file exported from Dot"
+EXPORT_TITLE: str = "Save the bot as a file, to import into another Dot"
 
 
 async def _more(page: Page) -> None:
@@ -143,9 +143,7 @@ async def _skip_setup(page: Page, template: AgentTemplate) -> None:
 async def _singles(page: Page) -> None:
     """Show the single agents of the ready-made ones, which the page shows after its teams (item 509)."""
     await (
-        page.get_by_role("group", name="Ready-made agents")
-        .get_by_role("button", name=re.compile("^Single agents"))
-        .click()
+        page.get_by_role("group", name="Ready-made bots").get_by_role("button", name=re.compile("^Single bots")).click()
     )
 
 
@@ -191,7 +189,7 @@ async def _import_opens_a_chooser(page: Page) -> None:
 async def _import(page: Page, file: Path) -> None:
     """Import ``file`` through the Agents page's file field, the one Import an agent opens (`_import_opens_a_chooser`
     shows that it opens a chooser)."""
-    await page.get_by_label("Agent file").set_input_files(file)
+    await page.get_by_label("Bot file").set_input_files(file)
 
 
 def _toast(page: Page, kind: Literal["ok", "error"], words: str) -> Locator:
@@ -421,10 +419,10 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await expect(phone.locator(".template-card").first.locator(".chip.missing")).to_have_count(0)
                 await _import_opens_a_chooser(phone)
                 await _import(phone, broken)
-                await expect(_toast(phone, "error", "broken.json is not an agent file")).to_be_visible()
+                await expect(_toast(phone, "error", "broken.json is not a bot file")).to_be_visible()
                 await _import(phone, stranger)
                 await expect(
-                    _toast(phone, "error", f"an agent names actions that do not exist here: {STRANGE_TOOL}")
+                    _toast(phone, "error", f"a bot names actions that do not exist here: {STRANGE_TOOL}")
                 ).to_be_visible()
                 assert list(await runtime.store.list_agents()) == []
                 # The file from the other home makes the same agent here, and opens its page.
@@ -646,7 +644,7 @@ async def test_a_team_card_makes_its_agents_in_one_click_with_their_schedules_sw
                     (name, False) for name in scheduled
                 )
                 await use.click()
-                await expect(_toast(page, "ok", f"You have every agent of the {team.name} already.")).to_be_visible()
+                await expect(_toast(page, "ok", f"You have every bot of the {team.name} already.")).to_be_visible()
                 assert len((await http.get("/api/agents")).raise_for_status().json()) == 1 + len(names)
                 await page.screenshot(path=tmp_path / "teams-1280-light.png", full_page=True)
                 await page.close()
@@ -690,9 +688,7 @@ async def test_a_team_used_again_gives_the_agents_the_owner_had_their_schedules_
                     await also.click()
                     await expect(also).to_have_attribute("aria-checked", "true")
                     await card.get_by_role("button", name=f"Use the team {team.name}").click()
-                    await expect(page.locator(".toast").last).to_contain_text(
-                        f"You have every agent of the {team.name}"
-                    )
+                    await expect(page.locator(".toast").last).to_contain_text(f"You have every bot of the {team.name}")
                 views: list[JsonObject] = (await http.get("/api/schedules")).raise_for_status().json()
                 records: list[JsonObject] = [view["record"] for view in views]
                 assert sorted(str(record["name"]) for record in records) == sorted(names), records
