@@ -122,6 +122,17 @@
         }
       }
     },
+    "%@ late": {
+      "comment": "Work order: how late it is; the argument is a span such as 2 h",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ gecikti"
+          }
+        }
+      }
+    },
     "%@ ms": {
       "comment": "Maintenance › Performance: milliseconds",
       "localizations": {
@@ -272,6 +283,17 @@
         }
       }
     },
+    "%lld active": {
+      "comment": "Bot profile: how many objectives are active",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld etkin"
+          }
+        }
+      }
+    },
     "%lld by the reviewer": {
       "comment": "Away card: decisions the review model made",
       "localizations": {
@@ -330,6 +352,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld bağlı"
+          }
+        }
+      }
+    },
+    "%lld days": {
+      "comment": "A span of time: days",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld day"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld days"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld gün"
           }
         }
       }
@@ -421,6 +472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld fps"
+          }
+        }
+      }
+    },
+    "%lld h": {
+      "comment": "A span of time: hours",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sa"
           }
         }
       }
@@ -540,6 +602,17 @@
     },
     "%lld on": {
       "comment": "Bot profile: how many of its routines are switched on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld açık"
+          }
+        }
+      }
+    },
+    "%lld open": {
+      "comment": "Bot profile: how many work orders are not over",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -749,6 +822,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld iş: %@"
+          }
+        }
+      }
+    },
+    "%lld today": {
+      "comment": "Bot profile: how many messages between bots there were today",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bugün %lld"
           }
         }
       }
@@ -969,6 +1053,17 @@
         }
       }
     },
+    "A bot that is gone": {
+      "comment": "Work order: its bot was deleted",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silinmiş bir bot"
+          }
+        }
+      }
+    },
     "A chat schedule is edited on your Mac.": {
       "comment": "Schedule edit: a chat-mode schedule cannot be edited here",
       "localizations": {
@@ -1185,6 +1280,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Başlattığın bir görev bitti"
+          }
+        }
+      }
+    },
+    "Accepted": {
+      "comment": "Work order: the lead accepted the result",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kabul edildi"
           }
         }
       }
@@ -1904,6 +2010,17 @@
         }
       }
     },
+    "Attempts": {
+      "comment": "Work order: how many tries it has had",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denemeler"
+          }
+        }
+      }
+    },
     "Audio stays on this device and is transcribed here.": {
       "comment": "Settings › Voice: what transcribing on the phone means",
       "localizations": {
@@ -2142,6 +2259,17 @@
         }
       }
     },
+    "Brief": {
+      "comment": "Work order: what is asked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İş tanımı"
+          }
+        }
+      }
+    },
     "Brown": {
       "comment": "Bot colour",
       "localizations": {
@@ -2314,6 +2442,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yüklemeyi iptal et"
+          }
+        }
+      }
+    },
+    "Cancelled": {
+      "comment": "Work order: it was cancelled",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İptal edildi"
           }
         }
       }
@@ -3943,6 +4082,17 @@
         }
       }
     },
+    "Done means": {
+      "comment": "Work order: what counts as done",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitti sayılır"
+          }
+        }
+      }
+    },
     "Done or failed": {
       "comment": "Push kind: a task ended",
       "localizations": {
@@ -4152,6 +4302,17 @@
         }
       }
     },
+    "Dot hands work out and judges it in its chats; orders are read here.": {
+      "comment": "Work orders: where they are made and judged",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot işi sohbetlerinde verir ve değerlendirir; emirler burada okunur."
+          }
+        }
+      }
+    },
     "Dot is asking you": {
       "comment": "Ask dock title: a question",
       "localizations": {
@@ -4192,6 +4353,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot fiyat tutmaz; bu yüzden bir görevin maliyeti süresi ve token'larıdır."
+          }
+        }
+      }
+    },
+    "Dot keeps these for you and writes their progress as it works; they are read here.": {
+      "comment": "Objectives: who keeps them",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bunları senin için tutar ve çalışırken ilerlemeyi yazar; burada okunur."
           }
         }
       }
@@ -4589,6 +4761,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Damla"
+          }
+        }
+      }
+    },
+    "Due": {
+      "comment": "Work order: its time limit",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son tarih"
           }
         }
       }
@@ -5308,6 +5491,17 @@
         }
       }
     },
+    "Finished": {
+      "comment": "Work orders: the section of those accepted or cancelled",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitenler"
+          }
+        }
+      }
+    },
     "Five parts separated by spaces: minute, hour, day of the month, month, day of the week, in your Mac's time zone. Very frequent schedules are refused.": {
       "comment": "New schedule footer: the cron form",
       "localizations": {
@@ -5392,6 +5586,17 @@
         }
       }
     },
+    "For the objective": {
+      "comment": "Work order: the objective it serves",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı olduğu hedef"
+          }
+        }
+      }
+    },
     "For this chat; Settings › Chat sets it for every chat.": {
       "comment": "This chat sheet: the Show steps switch is this chat's own (item 1915)",
       "localizations": {
@@ -5399,6 +5604,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar."
+          }
+        }
+      }
+    },
+    "For: %@": {
+      "comment": "Work order: the objective it serves",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hedef: %@"
           }
         }
       }
@@ -5524,6 +5740,17 @@
         }
       }
     },
+    "From": {
+      "comment": "Hand-off: who sent it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderen"
+          }
+        }
+      }
+    },
     "From outside content": {
       "comment": "Memory proposal: the run had read outside content\nSelf-improvement: a line may come from content others can write",
       "localizations": {
@@ -5564,6 +5791,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "GitHub"
+          }
+        }
+      }
+    },
+    "Given to": {
+      "comment": "Work order: the bot that has it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verilen bot"
           }
         }
       }
@@ -5685,6 +5923,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Geri ver"
+          }
+        }
+      }
+    },
+    "Hand-off": {
+      "comment": "Title of one hand-off's page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devir"
+          }
+        }
+      }
+    },
+    "Hand-offs": {
+      "comment": "Bot profile: messages between the bot and the other bots",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devirler"
+          }
+        }
+      }
+    },
+    "Handed out": {
+      "comment": "Work order: recorded, its attempt not started",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verildi"
           }
         }
       }
@@ -6316,6 +6587,17 @@
         }
       }
     },
+    "Judged by": {
+      "comment": "Objective: how progress is judged",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ölçüt"
+          }
+        }
+      }
+    },
     "Keep the file changes": {
       "comment": "Edit from here: rewinds the chat and leaves the files as they are",
       "localizations": {
@@ -6400,6 +6682,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Son 7 gün"
+          }
+        }
+      }
+    },
+    "Last note": {
+      "comment": "Work order: the last thing said of it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son not"
           }
         }
       }
@@ -7391,6 +7684,28 @@
         }
       }
     },
+    "Next step": {
+      "comment": "Objective: the step that comes next",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıradaki adım"
+          }
+        }
+      }
+    },
+    "Next: %@": {
+      "comment": "Objective: the step that comes next",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıradaki: %@"
+          }
+        }
+      }
+    },
     "No": {
       "comment": "A no value",
       "localizations": {
@@ -7512,6 +7827,17 @@
         }
       }
     },
+    "No hand-offs today": {
+      "comment": "Hand-offs: empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bugün devir yok"
+          }
+        }
+      }
+    },
     "No helpers": {
       "comment": "Agents sheet empty state: the chat started no helper",
       "localizations": {
@@ -7545,6 +7871,17 @@
         }
       }
     },
+    "No objectives yet": {
+      "comment": "Objectives: empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz hedef yok"
+          }
+        }
+      }
+    },
     "No progress recorded yet": {
       "comment": "Campaign: no progress note",
       "localizations": {
@@ -7563,6 +7900,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz özet yok."
+          }
+        }
+      }
+    },
+    "No reply": {
+      "comment": "Hand-off: it ended without a reply",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıt yok"
           }
         }
       }
@@ -7629,6 +7977,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "İzleyici yok"
+          }
+        }
+      }
+    },
+    "No work orders yet": {
+      "comment": "Work orders: empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz iş emri yok"
           }
         }
       }
@@ -8168,6 +8527,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tamam"
+          }
+        }
+      }
+    },
+    "Objective": {
+      "comment": "Title of one objective's page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hedef"
+          }
+        }
+      }
+    },
+    "Objectives": {
+      "comment": "Bot profile: what the owner wants moved forward",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hedefler"
           }
         }
       }
@@ -8844,6 +9225,17 @@
         }
       }
     },
+    "Pause bot": {
+      "comment": "Bot profile menu: its routines stop starting by themselves",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botu duraklat"
+          }
+        }
+      }
+    },
     "Paused": {
       "comment": "Live picture status: nothing is read (the view is away)\nSchedule: switched off",
       "localizations": {
@@ -8851,6 +9243,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Duraklatıldı"
+          }
+        }
+      }
+    },
+    "Paused: its routines start nothing by themselves.": {
+      "comment": "Bot profile: a paused bot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duraklatıldı: rutinleri kendiliğinden hiçbir şey başlatmaz."
           }
         }
       }
@@ -9647,6 +10050,17 @@
         }
       }
     },
+    "Received": {
+      "comment": "Hand-offs: messages sent to the bot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alınan"
+          }
+        }
+      }
+    },
     "Recent": {
       "comment": "Chat list section: the other chats, newest first",
       "localizations": {
@@ -9900,6 +10314,28 @@
         }
       }
     },
+    "Reply": {
+      "comment": "Hand-off: the answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıt"
+          }
+        }
+      }
+    },
+    "Reply: %@": {
+      "comment": "Hand-off: the answer of the bot that was asked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıt: %@"
+          }
+        }
+      }
+    },
     "Research": {
       "comment": "Connect apps: a section of services\nNew schedule mode: look things up",
       "localizations": {
@@ -9962,6 +10398,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sürdür"
+          }
+        }
+      }
+    },
+    "Resume bot": {
+      "comment": "Bot profile menu: its routines start again",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botu sürdür"
           }
         }
       }
@@ -10835,6 +11282,28 @@
         }
       }
     },
+    "Sent at": {
+      "comment": "Hand-off: when it was sent",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilme saati"
+          }
+        }
+      }
+    },
+    "Sent back": {
+      "comment": "Work order: the lead sent it back for another attempt",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri gönderildi"
+          }
+        }
+      }
+    },
     "Sent once to your Mac, held for this chat's commands; never kept on this phone.": {
       "comment": "Ask dock: where a secret goes",
       "localizations": {
@@ -10842,6 +11311,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'ine bir kez gönderilir, bu sohbetin komutları için tutulur; bu telefonda hiç saklanmaz."
+          }
+        }
+      }
+    },
+    "Sent to others": {
+      "comment": "Hand-offs: messages the bot sent to other bots",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başkalarına gönderilen"
           }
         }
       }
@@ -12130,6 +12610,17 @@
         }
       }
     },
+    "Tell Dot what you want moved forward over time and it keeps an objective for it.": {
+      "comment": "Objectives: how Dot's come to be",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'a zamanla ilerletmesini istediğin şeyi söyle, o da bunun için bir hedef tutar."
+          }
+        }
+      }
+    },
     "Tell me when": {
       "comment": "Notifications section: the kinds of push",
       "localizations": {
@@ -12680,6 +13171,17 @@
         }
       }
     },
+    "The objectives of the work Dot hands this bot show here.": {
+      "comment": "Objectives: what an agent's page lists",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un bu bota verdiği işlerin hedefleri burada görünür."
+          }
+        }
+      }
+    },
     "The order is the priority when several hold.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -13186,6 +13688,17 @@
         }
       }
     },
+    "Title": {
+      "comment": "Work order: what it is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başlık"
+          }
+        }
+      }
+    },
     "To": {
       "comment": "Draft card: the recipients",
       "localizations": {
@@ -13248,6 +13761,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bugün"
+          }
+        }
+      }
+    },
+    "Today's messages between bots, newest first.": {
+      "comment": "Hand-offs: what the list holds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botlar arasındaki bugünkü mesajlar, en yeni önce."
           }
         }
       }
@@ -13945,6 +14469,17 @@
         }
       }
     },
+    "Waiting for Dot's check": {
+      "comment": "Work order: the attempt ended and the lead has not judged it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un kontrolünü bekliyor"
+          }
+        }
+      }
+    },
     "Waiting for a condition": {
       "comment": "Tool row: a wait_until step at work",
       "localizations": {
@@ -13963,6 +14498,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir yardımcıyı bekliyor"
+          }
+        }
+      }
+    },
+    "Waiting for a reply": {
+      "comment": "Hand-off: the bot asked has not answered yet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıt bekleniyor"
           }
         }
       }
@@ -14370,6 +14916,17 @@
         }
       }
     },
+    "When Dot hands a bot a piece of work, it shows here with where it stands.": {
+      "comment": "Work orders: how one comes to be",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bir bota iş verdiğinde, durumuyla birlikte burada görünür."
+          }
+        }
+      }
+    },
     "When Dot works": {
       "comment": "System: keep-awake is on, nothing works now",
       "localizations": {
@@ -14388,6 +14945,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir görevin modeli yanıt veremediğinde (kotası dolduğunda, çok yoğun olduğunda, anahtarı reddedildiğinde, güvenlik filtresi yanıtı durdurduğunda) görev bunlardan yanıt verebilen ilkiyle, her biri en fazla bir kez olmak üzere sürer."
+          }
+        }
+      }
+    },
+    "When this bot and another one message each other, it shows here for the day.": {
+      "comment": "Hand-offs: what the page lists",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu bot ile bir başkası birbirine mesaj yazdığında, gün boyunca burada görünür."
           }
         }
       }
@@ -14447,6 +15015,17 @@
         }
       }
     },
+    "Why it matters": {
+      "comment": "Objective: why the owner wants it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neden önemli"
+          }
+        }
+      }
+    },
     "Wide": {
       "comment": "Appearance › Reading width: 75 characters a line",
       "localizations": {
@@ -14502,6 +15081,17 @@
         }
       }
     },
+    "Work": {
+      "comment": "Bot profile: the section of what the bot is given and passes on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İş"
+          }
+        }
+      }
+    },
     "Work log · medium": {
       "comment": "Symbol sample sheet: a context and the symbol weight used there",
       "localizations": {
@@ -14520,6 +15110,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac boştayken kendi başına çalış"
+          }
+        }
+      }
+    },
+    "Work order": {
+      "comment": "Title of one work order's page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İş emri"
           }
         }
       }
@@ -14740,6 +15341,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ yazıldı, %lld adımdan sonra"
+          }
+        }
+      }
+    },
+    "Written after Dot read content from outside.": {
+      "comment": "Work order and objective: written by a run that read pages or mail others can write",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot dışarıdan içerik okuduktan sonra yazıldı."
           }
         }
       }
@@ -15268,6 +15880,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "bitti"
+          }
+        }
+      }
+    },
+    "due in %@": {
+      "comment": "Work order: when it is due; the argument is a span such as 3 h",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ sonra bitiyor"
           }
         }
       }
