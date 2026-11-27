@@ -54,12 +54,18 @@ def files_of_part(files: list[str], part: int, parts: int) -> set[str]:
 
 
 def _test_files_beside(config: pytest.Config, items: list[pytest.Item]) -> list[str]:
-    """Every test file in the folders the collected tests come from, as their node ids name them: the parts are dealt
-    from these rather than from what was collected, so that a run of the failed tests alone (``--last-failed``, the
-    gate's retry) keeps each file in the part it ran in. Dealt from the collected files, a retry of one file of part 2
-    dealt it to part 1, and the retry ran no test and failed (exit 5)."""
+    """Every test file (pytest's ``python_files``) in the folders the collected tests come from, as node ids name them:
+    the parts are dealt from these rather than from what was collected, so that a run of the failed tests alone
+    (``--last-failed``, the gate's retry) keeps each file in the part it ran in. Dealt from the collected files, a retry
+    of one file of part 2 dealt it to part 1, and the retry ran no test and failed (exit 5)."""
     folders: set[Path] = {item.path.parent for item in items}
-    return [path.relative_to(config.rootpath).as_posix() for folder in folders for path in folder.glob("test_*.py")]
+    patterns: list[str] = config.getini("python_files")
+    return [
+        path.relative_to(config.rootpath).as_posix()
+        for folder in folders
+        for pattern in patterns
+        for path in folder.glob(pattern)
+    ]
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

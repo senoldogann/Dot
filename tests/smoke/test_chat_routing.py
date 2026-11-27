@@ -387,8 +387,9 @@ async def test_move_sends_a_message_elsewhere_and_a_task_past_the_cap_waits_for_
         # The dentist task ends: the waiting one starts.
         gates["DENTIST"].set()
 
+        # It may end at once, and the next of the queue start after it, before this looks: any run of the chat counts.
         async def took() -> bool:
-            return (await _newest(runtime, chat.thread_id)).goal == "Thanks for the report."
+            return any(run.goal == "Thanks for the report." for run in await runtime.store.list_runs(5, chat.thread_id))
 
         try:
             await _until(took, "the task that waited for a free one")
