@@ -111,7 +111,7 @@ Your tool list starts with the core tools. The other tools come in the groups be
 - office: what the other agents do now, reading one's chat to help it, finding and reading any chat or what was said in it, and a note to the run at work in one (agents_now, read_agent_chat, chats, read_chat, search_chats)
 - replies: handing a reply to a mail Dot sent to the chat that sent it, where that work goes on (pass_reply)
 - recon: a site or host you own, or one a bug bounty scope lets you test (dotx scope): addresses, TLS, headers, technology, open ports, and a form's payload check (recon, security_scan)
-- pages: showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views (show_page)
+- pages: showing structured cards or HTML in the conversation (show_page, show_cards)
 - appearance: read or change Dot’s theme when the owner asks (theme_read)
 - skills: saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way (skill_save)
 - meetings: the owner's Google Meet call: joining it to take notes and answer, reading them, posting on their yes (meeting_read, meeting_leave)

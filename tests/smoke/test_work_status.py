@@ -111,7 +111,9 @@ async def _start(manager: RunManager) -> RunRecord:
 
 
 async def _open(browser: Browser, port: int, address: str, run_id: str, work: str | None, width: int) -> Page:
-    page: Page = await browser.new_page(viewport={"width": width, "height": 900}, reduced_motion="reduce")
+    # A desktop's 1440x900 or a phone's 390x844 (the owner's rule of 2026-11-27: phone and desktop move together).
+    height: int = 844 if width < 600 else 900
+    page: Page = await browser.new_page(viewport={"width": width, "height": height}, reduced_motion="reduce")
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
     if work is not None:
         await page.add_init_script(f"localStorage.setItem('dot.work', '{work}')")
@@ -374,5 +376,66 @@ async def test_messages_only_tells_the_calls_as_dots_messages_and_the_line_says_
                 await expect(told.last).to_be_visible()
                 await page.close()
                 await other.close()
+            finally:
+                await browser.close()
+
+
+# A run that writes its answer, is told to finish, and finishes with the same words (item 1996, the owner's shot).
+_SAID_TWICE: str = "The video has two parts: the park and the arcade screen."
+_RESTATED_TURNS: tuple[ScriptedTurn, ...] = (
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="list_dir", arguments={"path": "."}),)),
+    ScriptedTurn(text=_SAID_TWICE, calls=()),
+    ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": _SAID_TWICE, "success": True}),)),
+)
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+@pytest.mark.parametrize("work", ["steps", "status", "messages"])
+async def test_an_answer_the_finish_says_again_stands_once(own_home: Path, work: str, width: int) -> None:
+    """Item 1996: the words the finish restates are its answer, drawn once, and the finish that was taken has no row."""
+    async with _served(own_home, _RESTATED_TURNS) as (manager, address, port):
+        run: RunRecord = await _start(manager)
+        async with asyncio.timeout(30):
+            assert (await manager.wait(run.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+            try:
+                page: Page = await _open(browser, port, address, run.id, work, width)
+                await expect(page.locator(".answer .prose")).to_have_text(_SAID_TWICE)
+                shown: list[str] = await page.locator(".run-thread").evaluate_all(
+                    "threads => [...threads[0].querySelectorAll('.prose')]"
+                    ".filter((node) => node.offsetParent !== null).map((node) => node.textContent.trim())"
+                )
+                assert shown.count(_SAID_TWICE) == 1, shown
+                await expect(page.get_by_text("Finish", exact=True)).to_have_count(0)
+                await page.close()
+            finally:
+                await browser.close()
+
+
+# A run whose command fails, then answers (item 1996): with Messages only no step shows, the failed one neither.
+_FAILING_TURNS: tuple[ScriptedTurn, ...] = (
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="read_file", arguments={"path": "no-such-file-1996.txt"}),)),
+    ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
+)
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+async def test_messages_only_shows_no_step_a_failed_one_neither(own_home: Path, width: int) -> None:
+    """Item 1996, the owner's shot: with the steps hidden an ended run showed every step, its fold opened by a failed
+    one. On the web the steps fold out whole with Messages only, a failed one too."""
+    async with _served(own_home, _FAILING_TURNS) as (manager, address, port):
+        run: RunRecord = await _start(manager)
+        async with asyncio.timeout(30):
+            assert (await manager.wait(run.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+            try:
+                page: Page = await _open(browser, port, address, run.id, "messages", width)
+                await expect(page.locator(".answer .prose")).to_have_text("Done.")
+                assert await page.locator("details.steps").count() >= 1, "the run has its steps"
+                await expect(page.locator("details.steps")).to_be_hidden()
+                await expect(page.get_by_text("no-such-file-1996.txt")).to_be_hidden()
+                await page.close()
             finally:
                 await browser.close()
