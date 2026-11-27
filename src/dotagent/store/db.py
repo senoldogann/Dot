@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Concatenate, Literal, cast, get_args
 
 import aiosqlite
-from pydantic import JsonValue, TypeAdapter
+from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from dotagent.core.errors import InvalidValueError, JsonParseError, NotFoundError, RunConflict, StoreError
 from dotagent.core.ids import new_id
@@ -49,6 +49,7 @@ from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
 from dotagent.store.costs import uses_by_day, uses_of_family, uses_of_runs
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.failed import failed_result_sql
+from dotagent.store.kinds import KindBy, MemoryKind, rule_kind
 from dotagent.store.models import (
     NO_PICKS,
     OBJECTIVE_MOVES,
@@ -1213,7 +1214,29 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         proposed=_proposed_change(row),
         subject=row["subject"],
         origin=row["origin"],
+        kind=_memory_kind(row["kind"], row["id"]),
+        kind_by=_kind_by(row["kind_by"], row["id"]),
     )
+
+
+_KIND: TypeAdapter[MemoryKind | None] = TypeAdapter(MemoryKind | None)
+_KIND_BY: TypeAdapter[KindBy | None] = TypeAdapter(KindBy | None)
+
+
+def _memory_kind(value: str | None, memory_id: str) -> MemoryKind | None:
+    """A note's stored kind; a value that is no kind (written by a newer Dot or by hand) is an error."""
+    try:
+        return _KIND.validate_python(value)
+    except ValidationError as error:
+        raise StoreError("a note's kind is not one of the kinds", {"memory_id": memory_id, "kind": value}) from error
+
+
+def _kind_by(value: str | None, memory_id: str) -> KindBy | None:
+    """Who told a note's stored kind; a value that is none of them is an error."""
+    try:
+        return _KIND_BY.validate_python(value)
+    except ValidationError as error:
+        raise StoreError("who told a note's kind is unknown", {"memory_id": memory_id, "kind_by": value}) from error
 
 
 def _proposed_change(row: aiosqlite.Row) -> ProposedChange | None:
@@ -1409,6 +1432,10 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     # Where the note came from (item 1864, :mod:`dotagent.store.provenance`). Filled once, as the column is added, for
     # the notes whose run is still stored; NULL for the others.
     ("origin", "TEXT"),
+    # What the note is and who told it (item 1975): filled once by version 5 (``_tell_kinds``) for the notes there
+    # were, by the store as it writes a new note, and by the fast model's pass for what the rules cannot tell.
+    ("kind", "TEXT"),
+    ("kind_by", "TEXT"),
 )
 # The kv key of the lessons ``auto`` saved lately (item 1713), a JSON list of ``LessonSave``.
 _LESSON_SAVES_KEY: str = "lessons.saved"
@@ -1616,7 +1643,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
 # or renamed, data rewritten) is a step of ``_MIGRATIONS`` under the next version, and raises this. A database below
 # the version is copied first; one of a later version (a newer Dot wrote it) is refused, so that this one never writes
 # what it does not know. test_store_schema.py pins the tables of the version.
-SCHEMA_VERSION: int = 4
+SCHEMA_VERSION: int = 5
 
 
 async def _drop_trading_tables(connection: aiosqlite.Connection) -> None:
@@ -1710,12 +1737,27 @@ async def _make_chat_index(connection: aiosqlite.Connection) -> None:
         await connection.execute(statement)
 
 
+async def _tell_kinds(connection: aiosqlite.Connection) -> None:
+    """Version 5 (item 1975): give every note there was the kind the fixed rules tell (:func:`rule_kind`), once,
+    recorded as the rules'; a note they cannot tell keeps none, for the fast model's pass. The kind columns are added
+    by the additive layer first; the copy made before the upgrade keeps the notes as they were."""
+    async with connection.execute("SELECT id, content, tags FROM memories WHERE kind IS NULL") as cursor:
+        rows = await cursor.fetchall()
+    told: list[tuple[str, str]] = []
+    for row in rows:
+        kind: MemoryKind | None = rule_kind(str(row["content"]), [tag for tag in str(row["tags"]).split(",") if tag])
+        if kind is not None:
+            told.append((kind, str(row["id"])))
+    await connection.executemany("UPDATE memories SET kind = ?, kind_by = 'rule' WHERE id = ?", told)
+
+
 # The steps after the additive layer, each under the version it brings the database to, in order. Version 1 is the
 # additive layer itself, which every open applies: no step.
 _MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = (
     (2, _drop_trading_tables),
     (3, _make_run_ledger),
     (4, _make_chat_index),
+    (5, _tell_kinds),
 )
 # Where the copy made before a migration goes, beside the database, in a folder of the version it was copied from,
 # which keeps its newest two (``_copy_before_upgrade``); runs neither read nor change them (``runtime._guarded_files``),
@@ -6540,6 +6582,32 @@ class Store:
 
         return await self._unit(statements)
 
+    async def memories_without_kind(self, limit: int) -> list[MemoryRecord]:
+        """The most recently changed notes whose kind neither the rules nor the fast model told (item 1975)."""
+        rows = await self._all("SELECT * FROM memories WHERE kind IS NULL ORDER BY updated_at DESC LIMIT ?", (limit,))
+        return [_memory(row) for row in rows]
+
+    @_writing
+    async def tell_untold_kind(self, memory_id: str, kind: MemoryKind, by: KindBy) -> bool:
+        """Record ``kind`` as told by ``by`` on the note ``memory_id`` while it has none; whether it was recorded (a
+        note forgotten meanwhile, or told by a run or the owner meanwhile, is left as it is)."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE memories SET kind = ?, kind_by = ? WHERE id = ? AND kind IS NULL", (kind, by, memory_id)
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
+    async def set_memory_kind(self, memory_id: str, kind: MemoryKind, by: KindBy) -> None:
+        """Record ``kind`` as told by ``by`` (a run that saved the note, or the owner) on the note ``memory_id``,
+        whatever kind it had. A note that is gone raises."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE memories SET kind = ?, kind_by = ? WHERE id = ?", (kind, by, memory_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("memory not found", {"memory_id": memory_id})
+
     async def origin_of_run(self, run_id: str) -> MemoryOrigin | None:
         """The origin the notes run ``run_id`` saves now would have (item 1864): ``None`` for a run the store does not
         hold."""
@@ -6565,9 +6633,11 @@ class Store:
         tainted: bool,
     ) -> MemoryRecord:
         """The statements that add a note, in the caller's transaction; its origin is read from ``source_run``
-        (:func:`note_origin`)."""
+        (:func:`note_origin`), and its kind is the one the fixed rules tell (:func:`rule_kind`, item 1975), none when
+        they cannot."""
         now: float = time.time()
         origin: MemoryOrigin | None = await self._note_origin(source_run)
+        kind: MemoryKind | None = rule_kind(content, tags)
         record: MemoryRecord = MemoryRecord(
             id=new_id("mem"),
             content=content,
@@ -6582,12 +6652,27 @@ class Store:
             replaced_by=None,
             tainted=tainted,
             origin=origin,
+            kind=kind,
+            kind_by=None if kind is None else "rule",
         )
         tag_text: str = ",".join(record.tags)
         await self._db.execute(
             "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at,"
-            " tainted, origin) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (record.id, content, tag_text, now, now, source_run, agent_id, expires_at, int(tainted), origin),
+            " tainted, origin, kind, kind_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                content,
+                tag_text,
+                now,
+                now,
+                source_run,
+                agent_id,
+                expires_at,
+                int(tainted),
+                origin,
+                kind,
+                record.kind_by,
+            ),
         )
         await self._db.execute(
             "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
@@ -7030,8 +7115,8 @@ class Store:
             tag_text: str = ",".join(tags)
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at,"
-                " tainted, used_count, last_used_at, merged_from, origin)"
-                " VALUES(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)",
+                " tainted, used_count, last_used_at, merged_from, origin, kind, kind_by)"
+                " VALUES(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     merged_id,
                     kept.content,
@@ -7045,6 +7130,9 @@ class Store:
                     max(used) if used else None,
                     _MERGED_SOURCES.dump_json(tuple(_merged_source(note) for note in ordered)).decode(),
                     kept.origin,
+                    # The merged note is the kept note's words, so it is of the kept note's kind (item 1975).
+                    kept.kind,
+                    kept.kind_by,
                 ),
             )
             await self._db.execute(
@@ -7160,7 +7248,8 @@ class Store:
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
                 " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at,"
-                " edited_by, subject, origin) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?, ?)",
+                " edited_by, subject, origin, kind, kind_by)"
+                " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?, ?, ?, ?)",
                 (
                     record.id,
                     record.content,
@@ -7178,6 +7267,8 @@ class Store:
                     record.edited_by,
                     record.subject,
                     record.origin,
+                    record.kind,
+                    record.kind_by,
                 ),
             )
             await self._db.execute(

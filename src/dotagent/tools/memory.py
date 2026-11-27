@@ -31,6 +31,7 @@ from dotagent.memory.supersede import Replacing, handed_echo, normalize_subject,
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.secrets import known_secrets
+from dotagent.store.kinds import MemoryKind
 from dotagent.store.models import MemoryRecord, MemoryRewrite
 from dotagent.store.provenance import holds_saves
 from dotagent.tools.base import (
@@ -199,6 +200,8 @@ class SaveArgs(ToolArgs):
             "same subject replaces the older. Omit for facts that add up."
         ),
     )
+    # What the note is (item 1975, :mod:`dotagent.store.kinds`); without it the store's rules tell, or the fast model.
+    kind: MemoryKind | None = Field(default=None, description="What the note is.")
 
 
 def expiry_of(valid_days: int | None, now: float) -> float | None:
@@ -261,6 +264,9 @@ def _save_tool(max_chars: int) -> RegisteredTool:
             ctx.ever_tainted(),
             args.subject,
         )
+        if args.kind is not None and saved.saved.created:
+            # A note saved before keeps the kind it has: the owner's, or another run's.
+            await ctx.runtime.memory.store.set_memory_kind(saved.saved.record.id, args.kind, "run")
         return ok(render_saved(saved))
 
     return make_tool(

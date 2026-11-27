@@ -293,11 +293,13 @@ from dotagent.memory.render import render_note
 from dotagent.memory.service import (
     REFLECTION_SOURCE,
     LiveNotes,
+    MemoryIndex,
     Remembered,
     live_memories,
     memory_budget,
     owner_prompt_lines,
     owner_section,
+    planned_memories,
     prompt_memories,
     review_memories,
     words_only,
@@ -323,6 +325,7 @@ from dotagent.store.endings import (
     PREFIX_MODEL_REFUSED,
     RESULT_EMPTY_REPLIES,
 )
+from dotagent.store.kinds import KindPlan, kind_plan
 from dotagent.store.models import (
     NO_PICKS,
     AgentRecord,
@@ -1037,6 +1040,9 @@ async def count_start_notes(runtime: Runtime, run: RunRecord, recalled: Remember
             # matched were left out as saved while reading outside content.
             "similarities": {note: score for note, score in recalled.similarities.items()},
             "tainted_left_out": recalled.tainted_left_out,
+            # The kind plan they were ranked by, and how many had no kind told yet (item 1975).
+            "plan": recalled.plan,
+            "untold": recalled.untold,
         },
         True,
     )
@@ -1077,12 +1083,22 @@ async def start_notes(runtime: Runtime, run: RunRecord, query: str, budget: int)
     """The notes ``run`` starts with: by meaning and words, or by words alone when the embedding service fails. A code
     review (the pre-push review, ``source`` review) starts with the notes about code alone (:func:`review_memories`),
     on Dot's own loop and on the Claude plan alike."""
-    recall = review_memories if run.source == REVIEW_SOURCE else prompt_memories
     try:
-        return await recall(runtime.memory, query, budget, run.agent_id)
+        return await _recall_start(runtime.memory, run, query, budget)
     except ProviderError as error:
         await _embedding_failed(runtime, run, "notes", error)
-        return await recall(words_only(runtime.memory), query, budget, run.agent_id)
+        return await _recall_start(words_only(runtime.memory), run, query, budget)
+
+
+async def _recall_start(index: MemoryIndex, run: RunRecord, query: str, budget: int) -> Remembered:
+    """The notes ``run`` starts with from ``index``: a code review's (:func:`review_memories`), those ranked by kind
+    for a source that has a plan (item 1975, :func:`kind_plan`: a schedule, a helper), and the others' as before."""
+    if run.source == REVIEW_SOURCE:
+        return await review_memories(index, query, budget, run.agent_id)
+    plan: KindPlan | None = kind_plan(run.source)
+    if plan is None:
+        return await prompt_memories(index, query, budget, run.agent_id)
+    return await planned_memories(index, query, budget, run.agent_id, plan)
 
 
 async def _close_skills(runtime: Runtime, run: RunRecord, needs: Sequence[str], texts: list[str]) -> list[list[int]]:

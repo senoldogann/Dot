@@ -1833,6 +1833,18 @@
           "minLength": 3,
           "type": "string"
         },
+        "kind": {
+          "description": "What the note is.",
+          "enum": [
+            "profile",
+            "people",
+            "workflow",
+            "rule",
+            "fact",
+            "lesson"
+          ],
+          "type": "string"
+        },
         "subject": {
           "description": "A short name for the fact's slot when it has one current value, like 'user-city'; a newer note with the same subject replaces the older. Omit for facts that add up.",
           "maxLength": 60,
