@@ -1241,6 +1241,24 @@ async def test_the_emergency_stop_cancels_the_harness_step_and_the_reflection_un
     assert stepping.cancelled() and reflecting.cancelled()
 
 
+async def test_the_emergency_stop_cancels_the_kind_pass_under_way_and_starts_none(runtime: Runtime) -> None:
+    """Item 1975: the hourly pass over the notes without a kind asks the fast model; a stop engaged while it works
+    cancels it, and none starts while the stop is engaged."""
+    scheduler: Scheduler = Scheduler(runtime, _Starts(runtime))
+    telling: asyncio.Task[None] = asyncio.create_task(asyncio.sleep(30))
+    scheduler._telling_kinds = telling
+    stop: Path = failsafe_path()
+    await asyncio.to_thread(stop.touch)
+    try:
+        await scheduler._tell_kinds(time.time())
+        await asyncio.wait({telling})
+        await scheduler._tell_kinds(time.time() + 7200.0)
+    finally:
+        await asyncio.to_thread(stop.unlink)
+    assert telling.cancelled()
+    assert scheduler._telling_kinds is telling
+
+
 async def test_the_plugin_scout_starts_at_its_time_once_never_when_off_and_the_stop_cancels_it(
     runtime: Runtime, monkeypatch: pytest.MonkeyPatch
 ) -> None:

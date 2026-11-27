@@ -105,6 +105,25 @@ dotx memory reindex      # embed every note again, for example after changing [m
   after its error, with the lessons that name its tool (`browser_act`, `read_file`; a plain word as `shell` in
   backticks) and that the run was not handed yet, chosen as a site's lessons are and framed as them, the most used
   first, two at most (item 1111: lessons about a tool rarely share the words of a goal).
+- Every note has a kind (item 1975): about you (`profile`), about another person (`people`), how something is done
+  (`workflow`), a rule, preference or decision (`rule`), what is so now (`fact`) or what a run learned (`lesson`).
+  The store tells it as it writes a note, by fixed rules on its tags then its words (`lesson` and `journal` tags, then
+  tags such as `tercih`, `karar`, `rule`; `deploy`, `site-…`; `client`; `aboutme`, `cv`; `proje`, `hesap`; then words
+  such as "kuralı", "kararı", "wants", "istiyor"; `src/dotagent/store/kinds.py`); `memory_save` may name the kind
+  itself (a note a schedule, a watcher or a helper only proposes takes the rules' or the model's kind once the
+  owner saves it). Each note there got its kind once, by the same rules, as a store moved to schema version 5 (copied
+  first, as every upgrade is). A note the rules cannot tell has none until the daemon's background pass, at most once
+  an hour, asks the fast model for its one word and records it as the model's (`kind_by`: `rule`, `model`, `run` or
+  `owner`); an answer that is no kind is logged and asked again at the next pass. The kind ranks the notes some runs
+  start with: a schedule's notes put its workflows and your rules first, then facts, lessons, you and other people;
+  a code review's put lessons and workflows first; a helper (a `delegate` or `team` run another run started) is
+  handed a standing note or one you wrote only when it fits its goal, as any note, since the run that gave it the
+  work holds them and says in its brief what matters (on 2026-11-26 your three business notes and two character
+  notes went to every helper, code reviews among them), and its notes put rules and workflows first. Your chats, a
+  `dotx` command, a watcher's or a reply's run start with the same notes as before kinds. A note whose kind is not
+  told yet comes after every kind and stands as before; the Task tab's "memories" event says the plan and how many
+  had no kind. A note keeps its kind and who told it when its words change, by a run's rewrite too. The emergency stop
+  stops the fast model's pass, as it stops the reflection.
 - A lesson saved while its run had read content third parties can author (most of them: 544 of 569 on the owner's
   Mac on 2026-11-15) is never among the notes a run starts with nor in the note of a site it reaches, which the
   conversation keeps for later runs. A run of Dot's own loop that is tainted at that moment is handed such lessons
