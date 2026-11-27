@@ -108,7 +108,8 @@ struct RootView: View {
                 case .gallery(let page): NavigationStack { GalleryPageView(page: page) }
                 case .sampleChat(let panel): NavigationStack { SampleChatScreen(chat: Samples.chats[0], initialPanel: panel) }
                 case .chatFixture(let fixture):
-                    NavigationStack {
+                    // `-DotNextPushed YES`: the chat is pushed over a root, as in the app, so that going back can be seen.
+                    PushedFixtureChat(pushed: UserDefaults.standard.bool(forKey: "DotNextPushed")) {
                         if fixture == .offlineList {
                             ChatListView(scope: .all, selection: .constant(nil))
                         } else {
@@ -188,3 +189,23 @@ extension RootView {
 
 /// A class in the app's bundle, so code (and the tests) can find the bundle's resources.
 final class AppBundleAnchor {}
+
+#if DEBUG
+    /// A chat fixture in a navigation stack: alone, or, with `pushed`, pushed over a root that says "Fixture home", so that the
+    /// edge swipe and the swipe on a message can be told apart by whether the chat is still open (debug builds).
+    struct PushedFixtureChat<Content: View>: View {
+        let pushed: Bool
+        @ViewBuilder let content: () -> Content
+        @State private var shown: Bool = true
+
+        var body: some View {
+            if pushed {
+                NavigationStack {
+                    Text(verbatim: "Fixture home").navigationDestination(isPresented: $shown) { content() }
+                }
+            } else {
+                NavigationStack { content() }
+            }
+        }
+    }
+#endif

@@ -101,6 +101,15 @@ const ROUTES = [
     // page, it still goes back there.
     parent: () => null,
   },
+  // An agent's work, page by page, as the phone's bot profile lists it (item 2035).
+  {
+    tab: "agents",
+    layout: "page",
+    title: t("views.agentwork.work"),
+    pattern: /^\/agents\/([A-Za-z0-9_-]+)\/(orders|objectives|handoffs)$/,
+    load: () => import("./views/agentwork.js"),
+    parent: (params) => `/agents/${params[0]}`,
+  },
   { tab: "agents", layout: "page", title: t("main.handoffs"), pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
   // A team of the owner's (item 610): its agents' faces, a box for a message to it and its chats.
   { tab: "agents", layout: "page", title: t("main.team"), pattern: /^\/teams\/([A-Za-z0-9_-]+)$/, load: () => import("./views/teams.js"), parent: () => "/agents" },
