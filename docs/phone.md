@@ -155,9 +155,9 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    for each chat, and for a new chat, across launches; the composer's microphone dictates on the iPhone (Apple's Speech
    framework, `requiresOnDeviceRecognition`: no audio leaves the phone; it asks for the speech and the microphone
    permissions when first pressed, and ends in a line, with a way to the app's page in Settings when a permission is
-   off, whenever it cannot start; a pause while you speak loses nothing, item 2050); and the Live Activity, its rows and a notification's Open action open the chat of
-   their run (`dotagent://run/<run id>`, or the alert's `#/runs/<id>` route). What it still leaves to the web UI is in
-   `roadmap/1353.md`.
+   off, whenever it cannot start; a pause while you speak loses nothing, item 2050); and the Live Activity, its rows
+   and a notification's Open action open the chat of their run (`dotagent://run/<run id>`, or the alert's `#/runs/<id>`
+   route). What it still leaves to the web UI is in `roadmap/1353.md`.
 
    **On a bad link (items 1370, 1371 and 1391)** the app draws what it holds first and never makes the owner wait for the
    network. The list, the agents, each chat (its newest runs and their last 400 events, its queue, schedules and
