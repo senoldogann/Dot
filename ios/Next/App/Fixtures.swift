@@ -43,6 +43,8 @@
         /// delegate): the capsule says "Waiting on 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
         /// beside its helper and says "Working".
         case helpersWait = "n2-helpers"
+        /// The first run a schedule fired (owner 2026-11-27): its message is the routine's compact row, not a bubble.
+        case routine = "n2-routine"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -136,12 +138,17 @@
                 self == .queue || self == .editing || self == .work
                 ? #"[{"id":"q1","thread_id":"thr_fixture","position":1,"text":"Connect everything to real data, as a Grok-like assistant would, and keep the tool calls visible","created_at":1,"source":"phone"},{"id":"q2","thread_id":"thr_fixture","position":2,"text":"Then send me the screenshots of the new designs","created_at":2,"source":"phone"}]"#
                 : "[]"
+            let sourceA: String = self == .routine ? "schedule" : "phone"
+            let schedules: String =
+                self == .routine
+                ? #"[{"schedule":{"record":{"id":"sch_1","name":"Site build check","goal":"Find out why the site's build fails on CI and fix it"}},"loop":false}]"#
+                : "[]"
             return """
                 {"revision":7,
                  "thread":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"agent_id":null},
                  "summary":null,
                  "runs":[
-                   {"id":"run_a","thread_id":"thr_fixture","goal":"Find out why the site's build fails on CI and fix it","mode":"task","model":"claude_code:opus","status":"done","created_at":\(now - 3000),"finished_at":\(now - 2866),"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":48210,"output_tokens":3120,"approvals":"auto"},
+                   {"id":"run_a","thread_id":"thr_fixture","goal":"Find out why the site's build fails on CI and fix it","mode":"task","model":"claude_code:opus","status":"done","created_at":\(now - 3000),"finished_at":\(now - 2866),"result":"","parent_run_id":null,"source":"\(sourceA)","effort":"medium","input_tokens":48210,"output_tokens":3120,"approvals":"auto"},
                    {"id":"run_b","thread_id":"thr_fixture","goal":"Book me the dentist for next week, afternoons if you can.","mode":"task","model":"claude_code:opus","status":"\(runB)","created_at":\(now - 2475),"finished_at":null,"result":"","parent_run_id":null,"source":"phone","effort":"medium","input_tokens":3212154,"output_tokens":8132,"approvals":"auto"}
                  ],
                  "older":false,"newest":null,"newest_events":[],"newest_events_cut":false,
@@ -153,7 +160,8 @@
                  ],
                  "background":[],
                  "reactions":[{"run_id":"run_a","message":"answer","reaction":"good"}],
-                 "drafts":[]}
+                 "drafts":[],
+                 "schedules":\(schedules)}
                 """
         }
 

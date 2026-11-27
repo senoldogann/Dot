@@ -304,6 +304,29 @@ final class ChatUITests: XCTestCase {
         XCTAssertGreaterThan(heights[1], heights[0] * 1.3, "the title grows with the chosen text size: \(heights)")
     }
 
+    /// bubble; a tap unfolds the whole message. At AX3 too, where the title may wrap and nothing is cut off the screen.
+    func testARoutinesMessageIsOneCompactRowThatUnfoldsItsWords() {
+        for extra in [[String](), ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge"]] {
+            let app: XCUIApplication = launch("n2-routine", defaults: ["-showSteps", "NO", "-stepsOverrides", "{}"] + extra)
+            let row: XCUIElement = app.buttons["routine.row"]
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            XCTAssertEqual(row.label, "Routine: Site build check")
+            XCTAssertFalse(app.staticTexts["You: Find out why the site's build fails on CI and fix it"].exists, "no owner's bubble")
+            XCTAssertGreaterThanOrEqual(row.frame.height, 44 - 0.01)
+            XCTAssertLessThanOrEqual(row.frame.maxX, app.windows.firstMatch.frame.maxX, "\(row.frame)")
+            row.tap()
+            let unfolded: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", "Find out why the site's build fails on CI and fix it"), object: row)
+            XCTAssertEqual(XCTWaiter.wait(for: [unfolded], timeout: 3), .completed, "a tap shows the whole message: \(String(describing: row.value))")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "routine-row-\(extra.isEmpty ? "L" : "AX3")"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
+    /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// does; a tap shows the steps and a second folds them back.
     func testTheLiveLineSaysTheWorkAndATapShowsTheSteps() {

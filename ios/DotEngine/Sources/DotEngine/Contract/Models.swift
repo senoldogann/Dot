@@ -435,19 +435,24 @@ public struct ThreadView: Codable, Sendable, Hashable {
     public let background: [BackgroundWork]
     public let reactions: [ReactionRecord]
     public let drafts: [DraftRecord]
+    /// The schedules that belong to the chat (`schedules`, item 1333): a routine's message is named by its schedule.
+    /// `nil` from a daemon that sends none.
+    public var schedules: [ChatSchedule]? = nil
 
     enum CodingKeys: String, CodingKey {
-        case revision, thread, summary, runs, older, newest, queue, asks, helpers, background, reactions, drafts
+        case revision, thread, summary, runs, older, newest, queue, asks, helpers, background, reactions, drafts, schedules
         case newestEvents = "newest_events"
         case newestEventsCut = "newest_events_cut"
     }
 
     /// The same view with its helpers replaced (a helper's step came on the stream).
     public func with(helpers next: [HelperView]) -> ThreadView {
-        ThreadView(
+        var view: ThreadView = ThreadView(
             revision: revision, thread: thread, summary: summary, runs: runs, older: older, newest: newest,
             newestEvents: newestEvents, newestEventsCut: newestEventsCut, queue: queue, asks: asks, helpers: next,
             background: background, reactions: reactions, drafts: drafts)
+        view.schedules = schedules
+        return view
     }
 
     public init(
@@ -631,4 +636,38 @@ public struct NamedRecord: Codable, Sendable, Hashable {
 
 public struct TeamSummary: Codable, Sendable, Hashable {
     public let record: NamedRecord
+}
+
+/// A schedule of a chat as its view lists it (the daemon's `ThreadAutomation`): its id, name and the message it sends.
+public struct ChatSchedule: Codable, Sendable, Hashable {
+    public let id: String
+    public let name: String
+    public let goal: String
+
+    public init(id: String, name: String, goal: String) {
+        self.id = id
+        self.name = name
+        self.goal = goal
+    }
+
+    private enum Outer: String, CodingKey { case schedule }
+    private enum Inner: String, CodingKey { case record }
+    private enum Fields: String, CodingKey { case id, name, goal }
+
+    public init(from decoder: any Decoder) throws {
+        let record = try decoder.container(keyedBy: Outer.self).nestedContainer(keyedBy: Inner.self, forKey: .schedule)
+            .nestedContainer(keyedBy: Fields.self, forKey: .record)
+        id = try record.decode(String.self, forKey: .id)
+        name = try record.decode(String.self, forKey: .name)
+        goal = try record.decode(String.self, forKey: .goal)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var outer = encoder.container(keyedBy: Outer.self)
+        var inner = outer.nestedContainer(keyedBy: Inner.self, forKey: .schedule)
+        var record = inner.nestedContainer(keyedBy: Fields.self, forKey: .record)
+        try record.encode(id, forKey: .id)
+        try record.encode(name, forKey: .name)
+        try record.encode(goal, forKey: .goal)
+    }
 }

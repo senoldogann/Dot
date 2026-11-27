@@ -143,7 +143,8 @@ failed request shows no toast over the chat while it does. See [On a bad link: t
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)
 
 The run page is drawn as a developer tool draws a thread, plain and professional, the same language on a Mac and on a
-phone: what you wrote is a raised, rounded box; what Dot says is plain text with no bubble; the steps of a turn are one
+phone: what you wrote is a raised, rounded box, and a routine's message (item 2021) a compact "Routine" row on that
+surface that unfolds its words; what Dot says is plain text with no bubble; the steps of a turn are one
 quiet line each. The modules of the conversation and the panel, and what each holds:
 
 | Module | What it draws |
@@ -155,6 +156,7 @@ quiet line each. The modules of the conversation and the panel, and what each ho
 | `inspector.js` | The side panel, closed by default: one rounded card in two parts, a head that stays (the tabs as a segmented switch, and on a phone the grabber and Close) and a body that scrolls (`.inspector-body`), whose sections each have a small sticky head (`.panel-section-head`: title, count, buttons on one line) over tight rows on the 8 px scale. A sheet from the foot on a phone. |
 | `prose.js`, `linkpill.js` | A link in a message (a markdown link or an autolink, in what you wrote and in what Dot says) is plain words: no frame, no fill and no icon, in the text's ink tilted toward the accent (`.msg-link`; a shade brighter in dark, more saturated in light, above 4.5:1 on every ground), underlined only under the pointer and with the focus, which keeps the page's ring. It opens in a new window, and its label is the link's words, `#1001` for a GitHub pull request or issue, or the site's name for a bare address (`data-words` keeps the words as written for a copy). Dot asks no site for an icon. |
 | `agentlist.js` | The **Lineage** ("Lineage · 2 running": the task that leads and its helpers) and the fold of the previous agents; the Task tab has it compact, the Agents tab in full. |
+| `routinewords.js`, `messages.js` (`routineMessage`) | The row of a message a routine sent (a run of source `schedule` or `watcher`, item 2021): `.routine`, a `details` whose head says "Routine" and the title (the chat's schedule's name from `GET /api/threads/{id}/automations`, else the words' first sentence, `routineTitle`) and whose body is the whole message. |
 | `automations.js`, `automationwords.js` | The **Automations** of the chat in the Task tab: its schedules and loops, each with a pencil (`#/settings/schedules/<id>`, the schedule's editor page), a play and a switch, from `GET /api/threads/{id}/automations`. |
 
 Colours and radii of these are tokens (`var(--accent-strong)` for the colour of work, `--ok`, `--bad`, `--border`,
