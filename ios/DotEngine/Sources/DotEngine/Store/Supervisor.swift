@@ -270,7 +270,14 @@ public actor Supervisor {
         let watchdog: Task<Void, Never> = Task { [clock] in
             await Self.watch(beat: beat, clock: clock, reader: reader)
         }
-        await reader.value
+        // The reader is a task of its own, which the loop's cancel does not reach: `end` (the app went to the background)
+        // may come during an await above, after the stream opened and before `readers[key]` was set, and the stream would
+        // stay open. The loop's cancel, then or later, ends the reader too.
+        await withTaskCancellationHandler {
+            await reader.value
+        } onCancel: {
+            reader.cancel()
+        }
         watchdog.cancel()
         if readers[key] == reader { readers[key] = nil }
         if beats[key] === beat { beats[key] = nil }

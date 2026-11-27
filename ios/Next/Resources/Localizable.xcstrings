@@ -375,7 +375,7 @@
       }
     },
     "%lld done": {
-      "comment": "Away card: tasks that ended done",
+      "comment": "Away card: tasks that ended done\nHelpers group: how many helpers finished",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -415,7 +415,7 @@
       }
     },
     "%lld failed": {
-      "comment": "Away card: tasks that failed",
+      "comment": "Away card: tasks that failed\nHelpers group: how many helpers failed",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -437,7 +437,7 @@
       }
     },
     "%lld helpers": {
-      "comment": "Helper group header, first part; the argument is how many helpers the run started",
+      "comment": "Helper group header, first part; the argument is how many helpers the run started\nHelpers group: how many helpers the run started",
       "localizations": {
         "en": {
           "variations": {
@@ -472,6 +472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%2$@ dk'da %1$lld"
+          }
+        }
+      }
+    },
+    "%lld min": {
+      "comment": "Work line: how long the run has worked, in whole minutes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dk"
           }
         }
       }
@@ -578,6 +589,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld rapor · %@ sn"
+          }
+        }
+      }
+    },
+    "%lld s": {
+      "comment": "Work line: how long the run has worked, in seconds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sn"
           }
         }
       }
@@ -692,12 +714,23 @@
       }
     },
     "%lld stopped": {
-      "comment": "Away card: tasks that were stopped",
+      "comment": "Away card: tasks that were stopped\nHelpers group: how many helpers the owner stopped",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "%lld durduruldu"
+          }
+        }
+      }
+    },
+    "%lld stopping": {
+      "comment": "Helpers group: how many helpers are being stopped",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld durduruluyor"
           }
         }
       }
@@ -782,6 +815,17 @@
         }
       }
     },
+    "%lld waiting on you": {
+      "comment": "Helpers group: how many helpers wait for the owner",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld seni bekliyor"
+          }
+        }
+      }
+    },
     "%lld without asking": {
       "comment": "Away card: decisions the mode that asks only to pay or send let through",
       "localizations": {
@@ -794,7 +838,7 @@
       }
     },
     "%lld working": {
-      "comment": "Away card: tasks still at work\nHelper group header, second part; the argument is how many still work",
+      "comment": "Away card: tasks still at work\nHelper group header, second part; the argument is how many still work\nHelpers group: how many helpers work now",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -947,6 +991,28 @@
         }
       }
     },
+    "A forgotten note waits %lld days here, then it is deleted for good.": {
+      "comment": "Memory: how long the trash keeps a note",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir."
+          }
+        }
+      }
+    },
+    "A forgotten note waits here for a while, and can be brought back.": {
+      "comment": "Memory: what the trash is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unutulan bir not burada bir süre bekler ve geri getirilebilir."
+          }
+        }
+      }
+    },
     "A helper of another task": {
       "comment": "Activity: a run another run delegated",
       "localizations": {
@@ -1020,6 +1086,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni model her görevin bir sonraki başlangıcından geçerli olur; çalışan görevler kendi modelini korur."
+          }
+        }
+      }
+    },
+    "A note you forget waits here, and can be brought back.": {
+      "comment": "Memory: what the trash holds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unuttuğun bir not burada bekler ve geri getirilebilir."
           }
         }
       }
@@ -2704,7 +2781,7 @@
       }
     },
     "Collapsed": {
-      "comment": "VoiceOver value of a closed disclosure",
+      "comment": "VoiceOver value of a closed disclosure\nVoiceOver value of a closed group",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3536,6 +3613,17 @@
         }
       }
     },
+    "Deleted for good %@.": {
+      "comment": "Memory trash: when the note goes for good",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kalıcı olarak silinecek: %@."
+          }
+        }
+      }
+    },
     "Deleted · %@": {
       "comment": "Inspector: a file the task deleted; the argument is its folder",
       "localizations": {
@@ -3983,6 +4071,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot Next sürümü"
+          }
+        }
+      }
+    },
+    "Dot already had a note with these words.": {
+      "comment": "Memory: the note added was already held",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'ta bu sözlerle bir not zaten vardı."
           }
         }
       }
@@ -4946,7 +5045,7 @@
       }
     },
     "Expanded": {
-      "comment": "VoiceOver value of an open disclosure",
+      "comment": "VoiceOver value of an open disclosure\nVoiceOver value of an open group",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5403,6 +5502,17 @@
         }
       }
     },
+    "Forgotten %@": {
+      "comment": "Memory trash: when the note was forgotten",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unutuldu: %@"
+          }
+        }
+      }
+    },
     "Free": {
       "comment": "Chat settings filter: the models served at no cost",
       "localizations": {
@@ -5843,6 +5953,17 @@
         }
       }
     },
+    "Hides the helpers": {
+      "comment": "VoiceOver hint of the open helpers group",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcıları gizler"
+          }
+        }
+      }
+    },
     "Hides the steps": {
       "comment": "VoiceOver hint of an open work-log group",
       "localizations": {
@@ -6008,13 +6129,13 @@
         }
       }
     },
-    "It goes to the trash on your Mac, where it can be restored for a while.": {
+    "It goes to the trash, where it can be restored for a while.": {
       "comment": "Memory: what forgetting does",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac'indeki çöp kutusuna gider; bir süre oradan geri getirilebilir."
+            "value": "Çöp kutusuna gider; orada bir süre geri getirilebilir."
           }
         }
       }
@@ -6543,6 +6664,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekrana baktı"
+          }
+        }
+      }
+    },
+    "Looking at %@": {
+      "comment": "Chat message of Dot's: a page it looks at; the argument is its site",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ inceleniyor"
           }
         }
       }
@@ -7200,6 +7332,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni modeller Modeller açılınca görünür: Dot o an her sağlayıcıya sorar. Dot bir sağlayıcının programını kendi başına asla güncellemez; Claude Code kendini günceller."
+          }
+        }
+      }
+    },
+    "New note": {
+      "comment": "Memory: adds a note",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni not"
           }
         }
       }
@@ -8856,7 +8999,7 @@
       }
     },
     "Pin": {
-      "comment": "Swipe and context action: keeps a chat at the top",
+      "comment": "Memory: a pinned note never rests\nSwipe and context action: keeps a chat at the top",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9306,6 +9449,28 @@
         }
       }
     },
+    "Quote": {
+      "comment": "Message menu and VoiceOver action: puts the message in the composer as a quote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntıla"
+          }
+        }
+      }
+    },
+    "Quote: %@": {
+      "comment": "VoiceOver: a quoted message above a message; the argument is the quote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntı: %@"
+          }
+        }
+      }
+    },
     "Ran %@": {
       "comment": "Tool row: a command that ran; the argument is the command",
       "localizations": {
@@ -9614,6 +9779,17 @@
         }
       }
     },
+    "Reconnecting to %@…": {
+      "comment": "Chat pill: the link to the Mac broke and is being opened again; the argument is the Mac's name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ cihazına yeniden bağlanılıyor…"
+          }
+        }
+      }
+    },
     "Reconnecting…": {
       "comment": "Chat subtitle: the link to the Mac broke and is being opened again\nLive picture status: the stream broke and is tried again",
       "localizations": {
@@ -9768,6 +9944,17 @@
         }
       }
     },
+    "Remove the quote": {
+      "comment": "VoiceOver: the cross on the composer's quote chip",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntıyı kaldır"
+          }
+        }
+      }
+    },
     "Removed from the queue": {
       "comment": "Component gallery (debug builds): a heading or sample text\nToast after removing a queued message",
       "localizations": {
@@ -9841,6 +10028,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıt akışı"
+          }
+        }
+      }
+    },
+    "Restore": {
+      "comment": "Memory: brings a forgotten note back",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri getir"
           }
         }
       }
@@ -11216,6 +11414,17 @@
         }
       }
     },
+    "Shows each helper": {
+      "comment": "VoiceOver hint of the closed helpers group",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her yardımcıyı gösterir"
+          }
+        }
+      }
+    },
     "Shows the change": {
       "comment": "VoiceOver hint of a changed file row",
       "localizations": {
@@ -11774,6 +11983,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eşitlenen klasör"
+          }
+        }
+      }
+    },
+    "Syncing messages…": {
+      "comment": "Chat pill: the chat is being brought up to date",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajlar eşitleniyor…"
           }
         }
       }
@@ -12768,6 +12988,17 @@
         }
       }
     },
+    "The trash is empty": {
+      "comment": "Memory: no forgotten notes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çöp kutusu boş"
+          }
+        }
+      }
+    },
     "Their times and choices are set on your Mac.": {
       "comment": "Activity: where the brief's time and the watchers' choices are set",
       "localizations": {
@@ -13219,6 +13450,17 @@
         }
       }
     },
+    "Trash": {
+      "comment": "Memory: the notes that were forgotten",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çöp kutusu"
+          }
+        }
+      }
+    },
     "Triangle": {
       "comment": "Bot shape",
       "localizations": {
@@ -13440,7 +13682,7 @@
       }
     },
     "Unpin": {
-      "comment": "Swipe and context action on a pinned chat",
+      "comment": "Memory: takes the pin off a note\nSwipe and context action on a pinned chat",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14201,6 +14443,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Neler yapabilir"
+          }
+        }
+      }
+    },
+    "What should Dot remember?": {
+      "comment": "Memory: the new note's field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot neyi hatırlasın?"
           }
         }
       }
@@ -15312,13 +15565,13 @@
         }
       }
     },
-    "notes remember lessons proposals": {
+    "notes remember lessons proposals pin trash restore forget": {
       "comment": "Settings search synonyms of Memory (space separated)",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "notlar hatırla dersler öneriler"
+            "value": "notlar hatırla dersler öneriler sabitle çöp geri getir unut"
           }
         }
       }
@@ -15767,6 +16020,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "· sormadan"
+          }
+        }
+      }
+    },
+    "your Mac": {
+      "comment": "The Mac when its name is not known",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac"
           }
         }
       }

@@ -40,6 +40,10 @@ RESULT_EMERGENCY_STOPPED: str = f"{PREFIX_EMERGENCY_STOP}every active run was st
 PREFIX_INTERNAL_ERROR: str = "Internal error: "
 # Between the answer of a run and what the goal check made of it, when the check does not accept the end.
 GOAL_CHECK_MARK: str = "\n\n---\nGoal check: "
+# What the goal check's note starts with when a schedule's run is done because the goal waits on the owner (item 1952):
+# the run's own finish said what it needs from them, the check found the goal cannot be reached without it, and the run
+# ends done with that need shown, not failed. The next firings read it, and skip that part until the owner answers.
+OWNER_WAIT_NOTE: str = "the goal waits on the owner, who is asked above, not on the run. "
 # What the goal check's note starts with when no model could answer it (item 1402): the run's work stands, not checked.
 # Any other note under the mark is the check's own word on the end.
 GOAL_CHECK_UNAVAILABLE: str = "the check could not run"

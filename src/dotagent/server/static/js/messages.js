@@ -10,6 +10,7 @@ import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { sentPicks } from "./picks.js";
 import { prose } from "./prose.js";
+import { quoteButton } from "./quotebutton.js";
 import { readAloudButton } from "./readaloud.js";
 import { loopRhythm, onceAt } from "./rhythm.js";
 
@@ -116,6 +117,7 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
       { class: "message-foot" },
       stamp(sentAt, dateTimeFull(sentAt)),
       copyButton(text, t("messages.copyMessage")),
+      quoteButton(text),
       editFromHere === null ? null : editFromHereButton(editFromHere),
     ),
   );
@@ -255,6 +257,7 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
       "div",
       { class: "answer-foot" },
       written ? copyButton(text, t("outcome.copy")) : null,
+      written ? quoteButton(text) : null,
       written ? readAloudButton(text, readNow && status === "done") : null,
       written && reactions !== null && runId !== null ? reactions.controls(runId, "answer") : null,
       el("span", { class: "answer-facts meta-facts" }, ...facts),

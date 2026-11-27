@@ -26,6 +26,10 @@ export const EN = {
   "work.stopping": "Stopping",
   "work.showSteps": "Show the steps",
   "work.hideSteps": "Hide the steps",
+  // A line of the run told as a conversation (item 1976): a page it looks at, and how long the run has worked.
+  "work.lookingAt": "Looking at {what}",
+  "work.forSeconds": "{count} s",
+  "work.forMinutes": "{count} min",
   // The line over the composer while a task works (capsule.js).
   "capsule.label": "How the task stands",
   "capsule.working": "Working {took}",
@@ -681,6 +685,7 @@ export const EN = {
   "messages.noteFromChat": "Note from another chat:",
   "messages.editFromHere": "Edit from here",
   "messages.copyMessage": "Copy the message",
+  "messages.quote": "Quote the message",
   "messages.reacted": "Reacted {reaction}: {words}",
   "messages.reactionUnderstood": "understood",
   "messages.reactionLooking": "looking into it",

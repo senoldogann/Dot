@@ -62,8 +62,16 @@ from dotagent.scheduler.failures import (
     record_firing_started,
     retry_after,
 )
-from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
+from dotagent.scheduler.history import (
+    NO_DIGEST,
+    Digest,
+    OwnerWait,
+    firing_opening,
+    history_digest,
+    with_owner_wait,
+)
 from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, said_nothing_new, tells
+from dotagent.scheduler.owner_wait import owner_wait_of
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.precheck import CHECK_TIMEOUT_S, CheckVerdict, failure_line, opening_with_check, run_check
 from dotagent.scheduler.recovery import (
@@ -112,6 +120,8 @@ FAILED_TICKS_TO_END: int = 20
 
 # The status of a one-time schedule that is due while the owner's emergency stop is engaged: it waits for the release.
 HELD_STATUS: str = "waiting: the emergency stop is engaged"
+# The status of a firing that waits, due, for the run working in the chat it goes on in (item 1951): no run, no skip.
+BUSY_STATUS: str = "waiting: a run is working in its chat"
 # The status of a firing whose check said there is nothing to wake for (item 1855): no run, and no skip.
 QUIET_STATUS: str = "quiet: its check found nothing to wake for"
 
@@ -849,6 +859,14 @@ class Scheduler:
             await store.record_schedule_skip(record.id, due, following, overdue)
             await self._tell_missed(record, overdue)
             return
+        if await self._waits_for_chat(record):
+            # Queued behind the run in its chat (item 1951): the firing stays due, so it starts at the first tick after
+            # that run ended. Another firing that comes due meanwhile collapses into the newest, as a missed one does,
+            # so at most one waits, and what waits past ``catch_up_s`` is skipped above, as a late one is.
+            if record.last_status != BUSY_STATUS:
+                log.info("schedule_waits_chat_busy", schedule_id=record.id, thread_id=record.thread_id)
+                await store.set_schedule_status(record.id, BUSY_STATUS)
+            return
         if late:
             # A late start waits its turn (item 1204): the firing stays due, so a later tick, or the next process
             # after a restart, starts it; the claim moves the schedule on before its run starts, so none runs twice.
@@ -868,6 +886,19 @@ class Scheduler:
             if late and record.id not in self._in_flight:
                 # No run started (the claim was dropped, the start failed): the next late firing need not wait.
                 self._next_late_start = now
+
+    async def _waits_for_chat(self, record: ScheduleRecord) -> bool:
+        """Whether a firing of ``record`` goes on in a chat in which a run is working, which another schedule's or the
+        owner's message started (item 1951): it cannot start beside it, and waits. A firing that makes a chat of its own
+        never does."""
+        if record.thread_id is None or not self._same_chat(record):
+            return False
+        return await self._runtime.store.chat_has_working_run(record.thread_id)
+
+    def _same_chat(self, record: ScheduleRecord) -> bool:
+        """Whether a firing of ``record`` goes on in the chat of its last one: its own choice, else the configured."""
+        configured: bool = self._runtime.config.scheduler.same_chat
+        return configured if record.options.same_chat is None else record.options.same_chat
 
     async def _check(self, name: str) -> CheckVerdict:
         """Run the check ``name`` (item 1855) as a run's commands start: in the sandbox while it is on, from the
@@ -1153,6 +1184,7 @@ class Scheduler:
         # As the store had it when it was found due: what the claim below compares (the brief rewrites its goal).
         found: ScheduleRecord = record
         same_chat, digest = await self._history(record, zone)
+        digest = await self._with_owner_wait(record, digest, zone, now)
         record, digest, title = await self._briefed(
             record, digest, now, zone, thread_title(f"{record.name} · {format_local(now, zone)}")
         )
@@ -1174,13 +1206,13 @@ class Scheduler:
             carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
             started = await self._start(*_with_check(record, firing_opening(told, digest), woken), thread_id, carried)
         except DotError as exc:
-            if _chat_busy(exc) and not one_time:
-                # A run going on in a recurring schedule's own chat (the owner's message in it, item 257) is no
-                # failure: the firing is skipped, as one under the emergency stop is, and nobody is told of a fault
-                # (item 723). A one-time schedule's is kept as a failure, whose wait spaces its next try.
-                # Counted with the firings skipped in a row (item 1401), so that where the owner looks it says how many.
-                skipped: int | None = await store.count_schedule_skip(record.id, f"skipped: {exc.message}")
-                log.info("schedule_skipped_chat_busy", schedule_id=record.id, error=exc.message, skipped_in_row=skipped)
+            if _chat_busy(exc):
+                # A run that started in the schedule's chat after :meth:`_waits_for_chat` looked (the owner's message in
+                # it, item 257) is no failure (item 723), and costs no firing: the claim is taken back, so the firing
+                # waits, due, for that run to end (item 1951), and nobody is told of a fault.
+                if await store.release_schedule_fire(found, now, following):
+                    log.info("schedule_waits_chat_busy", schedule_id=record.id, error=exc.message, raced=True)
+                    await store.set_schedule_status(record.id, BUSY_STATUS)
                 return
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
@@ -1322,7 +1354,7 @@ class Scheduler:
         answers its run reads in a chat of its own; in the same chat it reads their conversation instead."""
         store: Store = self._runtime.store
         config: SchedulerConfig = self._runtime.config.scheduler
-        same_chat: bool = config.same_chat if record.options.same_chat is None else record.options.same_chat
+        same_chat: bool = self._same_chat(record)
         kept: int = config.history_runs if record.options.history_runs is None else record.options.history_runs
         digest: Digest = (
             NO_DIGEST
@@ -1330,6 +1362,16 @@ class Scheduler:
             else history_digest(await store.schedule_runs(record.id, SCHEDULE_SOURCE, kept), zone, config.history_chars)
         )
         return same_chat, digest
+
+    async def _with_owner_wait(self, record: ScheduleRecord, digest: Digest, zone: ZoneInfo, now: float) -> Digest:
+        """``digest`` with, in front, the note that an earlier run of ``record`` waits on the owner while one does (item
+        1952), so that the firing does not meet again what only the owner can clear. A firing the owner starts by hand
+        has none: they asked for it."""
+        wait: OwnerWait | None = await owner_wait_of(self._runtime.store, record.id, now)
+        if wait is None:
+            return digest
+        log.info("schedule_firing_skips_owner_wait", schedule_id=record.id, waiting_run_id=wait.run_id)
+        return with_owner_wait(digest, wait, zone)
 
     async def _briefed(
         self, record: ScheduleRecord, digest: Digest, now: float, zone: ZoneInfo, title: str

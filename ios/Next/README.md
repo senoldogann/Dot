@@ -36,7 +36,7 @@ diagnostics' counts, and the app's counters of each time it was open, `App/PerfC
 alone (`POST /api/phone/metrics`, sent when the app opens) and Settings › Maintenance shows its last seven days. A step's thinking is
 one folded line that a tap opens; the running work is one pill (plain words and clock | Stop | Plan 1/5 | queued |
 helpers done/total), whose plan and people segments open the plan's checklist and the Agents sheet; the stream keeps
-no plan or helper card (item 1880). The copy · reaction · time footer is on a run's final answer once it ended;
+no plan card (item 1880), and a run's helpers are one group row whose tap opens a card of each (item 1957). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave L1 (items 1800-1802): the chat list (`ChatListView`, `App/Live.swift`, self-contained so a bot's profile can show
@@ -64,8 +64,8 @@ changed from the phone too: item 1770, a §24 picker sheet), Usage limits and ca
 the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
 switch on each row; edit, run now, delete; + makes a new one, item 1911, and a schedule's History lists its runs,
 each opening its chat), Rules (the approval mode tasks start in and what asks in it; free mode,
-switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every note to read, edit or
-forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
+switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, a new note, every note to read, edit, pin or
+forget, and the Trash to restore from), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
 Mark achieved as the daemon takes them), Health and version, Usage,
 Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on
 the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no Settings row opens
@@ -132,7 +132,8 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 ## Decisions taken in N0
 
 - **No hue.** The ink is the only accent (send, switches, links underlined, selection, the unread dot); amber only for
-  what waits on the owner, red only for a failure. No surface has a stroke.
+  what waits on the owner, red only for a failure, blue (`live`) only for a helper at work in the stream's helpers
+  group (item 1957). No surface has a stroke.
 - **The switch** is drawn (`InkSwitchStyle`): the system's white thumb disappears on a light ink track in the dark look.
 - **iPad**: no tab bar (PLAN §27); a compact width is the home with a bot's chat pushed, a regular width a split view
   (the home as the sidebar, the chat as the detail) with the same selection, so collapsing keeps the open chat. Grouped pages are at most
@@ -239,7 +240,7 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
 `settings-general`, `settings-appearance`, `settings-chat`, `settings-voice`, `settings-models`, `settings-caps`, `settings-caps-refused`,
-`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`, `settings-campaigns`, `settings-campaign`,
+`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-memory-trash`, `settings-system`, `settings-campaigns`, `settings-campaign`,
 `settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`,
 `settings-connect-apps`, `settings-connect-apps-detail`, `settings-connect-apps-offline`, `pairing`, `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
 Settings and every control of each native page and fails on one after which nothing changed.

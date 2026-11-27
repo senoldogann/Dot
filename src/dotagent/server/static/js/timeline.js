@@ -28,7 +28,7 @@ import { blockNode, prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { callKind, describeArguments, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, shortPaths, toolRow, toolWords } from "./tools.js";
 import { detailsFold } from "./ui.js";
-import { callPhrase } from "./workstatus.js";
+import { callPhrase, narrationPhrase } from "./workstatus.js";
 
 const GOAL_CHARS = 160;
 const LATEST_CHARS = 140;
@@ -185,12 +185,13 @@ function sayKind(node, progress, live) {
 
 // What stands between two of the agent's lines without anyone else speaking: its steps, thoughts and notes, and what
 // it asks or shows on the way (a card, a hand-off to an agent, a page, a restart).
-const NOT_SPEAKING = "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart";
+// A line the run's call told (item 1976) is drawn with "Messages only" alone, so it is not someone speaking either.
+const NOT_SPEAKING = "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart, .say-narration";
 
 /** Whether a line of the agent's put at the end of `container` is the first since someone else spoke. */
 function speaksFirst(container) {
   for (let at = container.lastElementChild; at !== null; at = at.previousElementSibling) {
-    if (at.matches(".bubble.say")) {
+    if (at.matches(".bubble.say:not(.say-narration)")) {
       return false;
     }
     if (!at.matches(NOT_SPEAKING)) {
@@ -486,6 +487,8 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       group: null,
       // The group that holds the calls of the model turn under way, open or ended by the rows of the helpers it started.
       turnGroup: null,
+      // Whether the newest step wrote words, which tell its calls: no line of a call is drawn beside them (item 1976).
+      said: false,
       groups: [],
       live: null,
       // The block of the latest step's thinking (item 246; see startThought).
@@ -1164,6 +1167,8 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
 
     assistant(scope, record) {
       const data = record.data;
+      // Words the step wrote tell its calls (item 1976): a line of theirs is not drawn beside them.
+      scope.said = data.text.trim() !== "";
       // A new turn: its calls go in the open group, or in the group its first call makes.
       scope.turnGroup = scope.group;
       settleThought(scope, data);
@@ -1305,6 +1310,19 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         scope.panel.helper.calls += 1;
       }
       showCall(scope, { id: data.call_id, tool: data.tool, args: data.args });
+    },
+
+    // A line of the run told as a conversation (item 1976): one of Dot's short messages, drawn with "Messages only" alone
+    // (run.css), and none where the step's own words stand. It ends no group of steps: with the steps shown they stay
+    // as they were, and the line is not there.
+    narration(scope, record) {
+      if (scope.runId !== rootRunId || scope.said === true) {
+        return;
+      }
+      const words = narrationPhrase(record.data.tool, record.data.args ?? {});
+      scope.container.append(
+        el("div", { class: "bubble say say-narration", role: "article", "aria-label": t("outcome.update") }, el("div", null, prose(words))),
+      );
     },
 
     tool_result(scope, record) {

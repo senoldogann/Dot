@@ -2,7 +2,7 @@
  * A message's sheet (item 1064): on a screen with no pointer to rest a message shows no buttons under it, only the reactions that
  * stand on it, and holding it opens a sheet from the foot of the screen with what its foot holds. On top, when it was
  * sent and how long its work took; then the reactions, a press of one putting it on the message or taking it back;
- * then what the message can do, one row each: copy it, select its text, read it aloud, edit from here, open its task.
+ * then what the message can do, one row each: copy it, select its text, quote it, read it aloud, edit from here, open its task.
  * Each row presses the foot's own button, which a touch screen does not show, so the sheet does what the foot does.
  *
  * Its states are explicit: the hold (`idle`, then `pressing` from a touch until it is held, moved or let go) and the

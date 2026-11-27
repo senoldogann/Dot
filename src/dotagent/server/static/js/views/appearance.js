@@ -631,7 +631,7 @@ function interfaceCard() {
   });
   const work = choiceSetting({
     label: "Work in a chat",
-    hint: "What a conversation shows while Dot works: every step it takes, or one line of what it does now.",
+    hint: "What a conversation shows while Dot works: every step it takes, one line of what it does now, or only its messages.",
     options: WORK_SHOWN.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
     selected: currentWork(),
     onSelect: chooseWork,

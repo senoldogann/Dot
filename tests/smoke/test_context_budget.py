@@ -147,7 +147,10 @@ BUDGET_TOKENS: int = 33_700
 # reads 8,465 now.
 # Raised by 150 for the Code section of item 1501 above (system 8,919 measured here).
 # Raised by 150 for the security testing line of the character (item 1887): system 9,178 measured here.
-SYSTEM_BUDGET_TOKENS: int = 9_200
+# Raised by 50 for the Desktop section's batch line of item 1960, put back by item 1974: the result of a batch is the
+# run's look, which took the tool eval's "no look after a change the result shows" from 3/10 to 13/20 on the owner's
+# model, each look saved being a model turn of thousands of tokens (system 9,234 measured here, on main of item 1931).
+SYSTEM_BUDGET_TOKENS: int = 9_250
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
@@ -177,7 +180,10 @@ SYSTEM_BUDGET_TOKENS: int = 9_200
 # Raised by 300 for `add_proof` of item 1853, a check that must exit 0 before the run is done (23,685 measured).
 # Raised by 100 for the scope words of `recon` and `security_scan` (item 1887): 23,768 measured on the gate's runner.
 # Raised by 350 for `generate_image` of item 1969 above (24,173 measured).
-TOOLS_BUDGET_TOKENS: int = 24_200
+# Raised by 100 for item 1953 (a helper ends at its open pull request, and its checks are watched in the background):
+# the sentence of `delegate` that says so and `gh pr checks <number> --watch` in the shell tools' background hint, which
+# the run review of 2026-11-26 measured against 382 polling calls and 9.27 hours of 37 helper runs (24,257 measured).
+TOOLS_BUDGET_TOKENS: int = 24_300
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

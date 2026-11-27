@@ -41,6 +41,8 @@ enum Tone {
     static let warn: Color = Color(uiColor: .dynamic(\.warn))
     static let warnFill: Color = Color(uiColor: .dynamic(\.warnFill))
     static let failure: Color = Color(uiColor: .dynamic(\.failure))
+    /// A helper at work, in the stream's helpers group (item 1957).
+    static let live: Color = Color(uiColor: .dynamic(\.live))
     static let separator: Color = Color(
         uiColor: UIColor { traits in
             let palette: Palette = Palette.of(PaletteVariant.of(traits))

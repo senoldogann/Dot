@@ -25,6 +25,7 @@ from dotagent.core.errors import ApprovalRejected, PolicyDenied
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData, ToolCall, ToolSpec
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
+from dotagent.store.models import EventRecord
 from dotagent.tools.base import ALL_MODES, PreparedCall, RegisteredTool, ToolResult, ok
 from dotagent.tools.context import ToolContext
 from dotagent.tools.registry import ToolRegistry
@@ -221,6 +222,7 @@ class FakeBus:
 
     def __init__(self) -> None:
         self.events: list[tuple[str, JsonObject]] = []
+        self.narrating: asyncio.Lock = asyncio.Lock()
 
     async def emit(self, run_id: str, kind: str, data: JsonObject, _persist: bool = True) -> None:
         self.events.append((kind, data))
@@ -236,6 +238,10 @@ class FakeStore:
     async def save_images(self, images: tuple[ImageData, ...]) -> list[str]:
         self.saved.extend(images)
         return [f"image-{index}.png" for index, _ in enumerate(images)]
+
+    async def events_of_kind(self, _run_id: str, _kind: str, _limit: int) -> list[EventRecord]:
+        """The run's stored events of a kind: none (the narration lines of item 1976 read the newest)."""
+        return []
 
 
 def tool(

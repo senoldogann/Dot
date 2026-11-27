@@ -62,6 +62,8 @@ struct OwnerMessageActions: ViewModifier {
     let text: String
     let thread: String
     let toComposer: (String) -> Void
+    /// Puts the message's words in the composer as a quote (item 1972).
+    let quote: (String) -> Void
     let tell: (ToastMessage) -> Void
     @Environment(AppModel.self) private var model: AppModel
     @State private var selecting: Bool = false
@@ -110,6 +112,7 @@ struct OwnerMessageActions: ViewModifier {
     }
 
     @ViewBuilder private func menuItems(run: RunRecord?) -> some View {
+        Button(String(localized: "Quote", comment: "Message menu and VoiceOver action: puts the message in the composer as a quote"), systemImage: "arrowshape.turn.up.left") { quote(text) }
         Button(String(localized: "Copy the text", comment: "Owner's message menu: copies its words"), systemImage: "doc.on.doc") {
             UIPasteboard.general.string = text
             tell(ToastMessage(id: UUID(), text: String(localized: "Copied", comment: "Code block header after a copy"), systemImage: "checkmark", actionTitle: nil))
