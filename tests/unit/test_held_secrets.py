@@ -267,3 +267,20 @@ def test_a_file_field_takes_a_key_in_pem_alone(home: Path) -> None:
         with pytest.raises(InvalidValueError, match="key in PEM"):
             save_secrets(THREAD, [answer], now=1000.0)
     assert held_values(THREAD, now=1001.0) == {}
+
+
+def test_a_key_file_is_read_line_by_line_so_a_long_odd_text_is_refused_at_once() -> None:
+    """Item 2040: the PEM check is one pass; a 16 KB text that only starts like a key is refused, a key taken."""
+    import time
+
+    from dotagent.agent.held_secrets import is_pem_block
+
+    started = time.monotonic()
+    refused = [
+        is_pem_block("-----BEGIN X-----" + " " * 16000 + "x"),
+        is_pem_block("-----BEGIN X-----\n" + "AB \n" * 3000 + "!"),
+    ]
+
+    assert refused == [False, False]
+    assert time.monotonic() - started < 0.5
+    assert is_pem_block("-----BEGIN PRIVATE KEY-----\nMIGTAgEA\nAwEHBG0w\n-----END PRIVATE KEY-----\n")

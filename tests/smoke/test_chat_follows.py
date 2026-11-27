@@ -210,9 +210,9 @@ async def test_a_message_sent_on_one_screen_shows_at_once_on_the_other(
             reloaded: Page = await _reloaded_screen(webkit, address, south)
             await _shows(reloaded, west, _FROM_WIDE)
 
-            # A run that left two questions, the newest of its chat, open on both screens: the answer to the first
-            # starts the chat's next run, and both pages stay for the second; the answer to the last, sent on the phone,
-            # opens the chat's newest run there and on the wide window.
+            # A run that left two questions, the newest of its chat, open on both screens: one panel pages them
+            # ("1 / 2") and its one Submit sends both answers once each has one (item 2001); the chat's next run then
+            # opens on both screens.
             asked: RunRecord = await manager.start(
                 _ASKS, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
             )
@@ -227,29 +227,26 @@ async def test_a_message_sent_on_one_screen_shows_at_once_on_the_other(
             # than half the window, and takes the composer's place, the run that left them being over (item 973).
             for page in (questions, other):
                 await expect(page.locator(".dock .composer")).to_be_hidden()
-                await expect(page.get_by_label("Dot asked you").locator(".asks-count")).to_have_text("2")
+                await expect(page.get_by_label("Dot asked you").locator(".asks-count")).to_have_text("1 / 2")
                 overflow, room, window = await page.evaluate(
                     "() => { const list = document.querySelector('.asks-list');"
                     " return [getComputedStyle(list).overflowY, list.getBoundingClientRect().height, innerHeight]; }"
                 )
                 assert overflow == "auto" and room <= window / 2 + 1, (overflow, room, window)
-            await cards.first.get_by_label("Your answer").fill("The north coast.")
-            await cards.first.get_by_role("button", name="Send answer").click()
-            first_answer: RunRecord = await _newest(runtime, asked.thread_id, {asked.id})
-            await expect(cards).to_have_count(1)
-            await expect(other_cards).to_have_count(1)
-            await questions.wait_for_timeout(1500)
-            for page in (questions, other):
-                assert await page.evaluate("() => location.hash") == f"#/runs/{asked.id}"
-            await other_cards.first.get_by_label("Your answer").fill("Ten names.")
-            await other_cards.first.get_by_role("button", name="Send answer").click()
-            last_answer: RunRecord = await _newest(runtime, asked.thread_id, {asked.id, first_answer.id})
-            await other.wait_for_function(
-                "hash => location.hash === hash", arg=f"#/runs/{last_answer.id}", timeout=_FOLLOW_MS
-            )
-            await questions.wait_for_function(
-                "hash => location.hash === hash", arg=f"#/runs/{last_answer.id}", timeout=_FOLLOW_MS
-            )
+            panel: Locator = other.get_by_label("Dot asked you")
+            submit: Locator = panel.locator(".asks-submit")
+            await other_cards.nth(0).get_by_label("Your answer").fill("The north coast.")
+            await expect(submit).to_be_disabled()
+            await panel.get_by_role("button", name="Next ask").click()
+            await other_cards.nth(1).get_by_label("Your answer").fill("Ten names.")
+            await submit.click()
+            await _newest(runtime, asked.thread_id, {asked.id})
+            await expect(other_cards).to_have_count(0)
+            await expect(cards).to_have_count(0)
+            for page in (other, questions):
+                await page.wait_for_function(
+                    "hash => location.hash !== hash", arg=f"#/runs/{asked.id}", timeout=_FOLLOW_MS
+                )
         finally:
             await chromium.close()
             await webkit.close()

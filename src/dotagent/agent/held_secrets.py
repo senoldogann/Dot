@@ -37,10 +37,8 @@ MOST_FILE_CHARS: int = 16384
 SecretKind = Literal["secret", "text", "file"]
 # A line of a key file that is no secret: a PEM's first and last, which every key of the kind shares.
 _PEM_EDGE: re.Pattern[str] = re.compile(r"-----(?:BEGIN|END) [A-Z0-9 ]{1,60}-----")
-# A key in PEM: its first line, base64 lines, its last.
-_PEM_BLOCK: re.Pattern[str] = re.compile(
-    r"-----BEGIN [A-Z0-9 ]{1,60}-----\s+[A-Za-z0-9+/=\s]+-----END [A-Z0-9 ]{1,60}-----"
-)
+# A line of a PEM key's body: base64 alone.
+_PEM_BODY_LINE: re.Pattern[str] = re.compile(r"[A-Za-z0-9+/=]+")
 # The shortest line of a file's text masked on its own: a base64 line of a key, never a short word of a JSON.
 _FILE_LINE_MIN_CHARS: int = 16
 _NAME: re.Pattern[str] = re.compile(r"[A-Z][A-Z0-9_]{1,63}")
@@ -279,6 +277,22 @@ def masked_parts(value: str, kind: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(parts))
 
 
+def is_pem_block(value: str) -> bool:
+    """Whether ``value`` is one key in PEM: a BEGIN line, base64 lines, an END line, blank lines and edge spaces aside.
+
+    Read line by line, not by one pattern over the whole text: a long odd text costs one pass, no backtracking. Pure.
+    """
+    lines: list[str] = [line.strip() for line in value.strip().splitlines() if line.strip()]
+    return (
+        len(lines) >= 3
+        and lines[0].startswith("-----BEGIN ")
+        and _PEM_EDGE.fullmatch(lines[0]) is not None
+        and lines[-1].startswith("-----END ")
+        and _PEM_EDGE.fullmatch(lines[-1]) is not None
+        and all(_PEM_BODY_LINE.fullmatch(line) is not None for line in lines[1:-1])
+    )
+
+
 def _checked_value(answer: SecretAnswer) -> str:
     """The value as it is held: without the spaces and line ends around it (a file keeps its inner lines), at least as
     long as the masks reach, at most :data:`MOST_VALUE_CHARS` (a file's text :data:`MOST_FILE_CHARS`); else refused."""
@@ -298,7 +312,7 @@ def _checked_value(answer: SecretAnswer) -> str:
     # A file's field takes a key in PEM alone: its body is base64 lines, each masked on its own. A JSON or an .env holds
     # its secret in a form a command decodes (an escaped key, a short value after `=`) that no mask of its lines reaches
     # (the security review of item 2040).
-    if answer.kind == "file" and _PEM_BLOCK.fullmatch(value.strip()) is None:
+    if answer.kind == "file" and not is_pem_block(value):
         raise InvalidValueError("a file's field takes a key in PEM (.p8, .pem, .key)", {"name": answer.name})
     return value
 

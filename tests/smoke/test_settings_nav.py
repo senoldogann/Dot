@@ -33,7 +33,7 @@ _ROWS: list[str] = [
     "Memory",
     "Vault",
     "Snapshots",
-    "Agents",
+    "Bots",
     "Models",
     "Browser",
     "Web search",
@@ -147,7 +147,7 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     await expect(sidebar.get_by_role("searchbox", name="Search chats")).to_be_hidden()
     # A search of the settings at the top, then the groups under their small names (items 999 and 1336).
     await expect(nav.get_by_role("searchbox", name="Search settings")).to_be_visible()
-    await expect(nav.get_by_role("heading", level=3)).to_have_text(["Agents", "Connections", "Maintenance", "About"])
+    await expect(nav.get_by_role("heading", level=3)).to_have_text(["Bots", "Connections", "Maintenance", "About"])
     await expect(nav.locator(".snav-label")).to_have_text(_ROWS)
     open_tab = nav.locator("[aria-current='page']")
     await expect(open_tab).to_have_count(1)
@@ -175,7 +175,7 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     search = nav.get_by_role("searchbox", name="Search settings")
     await search.fill("sched")
     await expect(nav.locator(".snav-link:not([hidden])")).to_have_text(["Scheduled tasks"])
-    await expect(nav.get_by_role("heading", level=3)).to_have_text(["Agents"])
+    await expect(nav.get_by_role("heading", level=3)).to_have_text(["Bots"])
     await search.fill("zzzz")
     await expect(nav.get_by_text("No setting matches.")).to_be_visible()
     await search.fill("")
@@ -208,7 +208,7 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     # Back to chats leads out of the settings, to the chat the owner was on, and the sidebar is the chats' again.
     await nav.get_by_role("link", name="Back to chats").click()
     await expect(page).to_have_url(f"{base}/#/runs")
-    await expect(sidebar.get_by_role("button", name="Your agents")).to_be_visible()
+    await expect(sidebar.get_by_role("button", name="Your bots")).to_be_visible()
     await expect(nav).to_be_hidden()
     await page.close()
 

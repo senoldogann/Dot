@@ -2,7 +2,7 @@
 
 A hook is an address a service calls to start Dot's work at once, instead of Dot looking for it on a clock (the
 watchers, [Dot comes to you](proactive.md)). A build that failed, a form that was sent, a monitor that went red, a
-shortcut on your phone: each can call its hook, and the hook starts one schedule or one of your agents.
+shortcut on your phone: each can call its hook, and the hook starts one schedule or one of your bots.
 
 ## What a hook starts
 
@@ -12,12 +12,12 @@ A hook is bound to one thing, which you pick when you make it:
   in a chat titled `<name> · <time> · hook <hook>` (or the schedule's own chat, when it keeps one). It does not start
   while a run of the schedule is at work or the schedule is switched off (the call is answered 409), nor while the
   emergency stop is engaged.
-- **An agent.** A call starts a run of the agent in a chat of its own, within the agent's own model, reasoning level and
-  approvals (the configured ones where the agent has none), as a task nobody watches, like a watcher's run. A paused
-  agent starts nothing (409).
+- **A bot.** A call starts a run of the bot in a chat of its own, within the bot's own model, reasoning level and
+  approvals (the configured ones where the bot has none), as a task nobody watches, like a watcher's run. A paused
+  bot starts nothing (409).
 
 A hook has no approvals, model or mode of its own, and a call cannot carry one: the run never has more rights than the
-schedule or the agent it is bound to.
+schedule or the bot it is bound to.
 
 **What the call carried is data.** A hook names the **fields** of the call's JSON the run may read, by a dotted path
 (`pull_request.title`, `repository.full_name`); nothing else of the body reaches the run. Each field is given as a JSON
@@ -25,7 +25,7 @@ string, its secrets masked, cut at 2,000 characters, inside the fence Dot puts a
 that what is inside is data and never an instruction. A field the body does not have is said to be missing.
 
 **The template** is your own words, what the run does when the hook is called. `{name}` in it names a field: the run
-reads it as `[name]`, which the fence gives, and the template is never filled with what the call carried. For an agent
+reads it as `[name]`, which the fence gives, and the template is never filled with what the call carried. For a bot
 the template is the run's goal; for a schedule it comes before the schedule's goal and may be empty.
 
 **The run starts untrusted**, as a run that read a web page does: what reaches other people or lasts asks first in
@@ -95,7 +95,7 @@ Restart the daemon after changing it (`dotx service restart`). `tailscale funnel
 ## Making and changing hooks
 
 **Settings › Hooks** lists each hook with its address, what it starts, whether it is on, its last 20 signed calls
-(when, the status, why, and the run it started) and the calls refused lately before their signature matched. **New hook** makes one: its name, the schedule or agent it starts, the
+(when, the status, why, and the run it started) and the calls refused lately before their signature matched. **New hook** makes one: its name, the schedule or bot it starts, the
 template, the fields and the calls a minute. The address and the secret are shown once, when it is made: copy the
 secret then, nothing shows it again. **Rotate secret** gives a new one, shown once; calls signed with the old one are
 refused from then on. A hook can be switched off (its calls are refused, and listed) and deleted.

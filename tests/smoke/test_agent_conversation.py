@@ -124,8 +124,8 @@ async def _sent_from_page(manager: RunManager, page: Page, words: str) -> str:
 async def _entry(page: Page, name: str) -> Locator:
     """An agent's entry in the sidebar's agents menu (item 1328: the faces became a menu), which this opens; whatever
     acts on the entry closes the menu."""
-    await page.get_by_role("button", name="Your agents", exact=True).click()
-    return page.get_by_role("menu", name="Your agents").get_by_role("menuitem", name=re.compile(f"^{name}"))
+    await page.get_by_role("button", name="Your bots", exact=True).click()
+    return page.get_by_role("menu", name="Your bots").get_by_role("menuitem", name=re.compile(f"^{name}"))
 
 
 async def _opens(page: Page, name: str, route: str) -> None:
@@ -283,8 +283,8 @@ async def test_the_plus_makes_an_agent_and_a_phone_lists_its_chat_as_the_mac_doe
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             await page.get_by_role("button", name="Show sidebar").click()
-            await page.get_by_role("button", name="New agent").click()
-            dialog: Locator = page.get_by_role("dialog", name="New agent")
+            await page.get_by_role("button", name="New bot").click()
+            dialog: Locator = page.get_by_role("dialog", name="New bot")
             create: Locator = dialog.get_by_role("button", name="Create")
             await expect(create).to_be_disabled()
             await dialog.get_by_role("textbox", name="Name").fill("Quill")
@@ -308,8 +308,8 @@ async def test_the_plus_makes_an_agent_and_a_phone_lists_its_chat_as_the_mac_doe
             link: Locator = row.locator("a.side-run")
             await expect(link).to_have_attribute("href", f"#/runs/{home['latest_run_id']}")
             # The agents' menu, a sheet on a phone, lists it with its count of chats and opens its conversation.
-            await page.get_by_role("button", name="Your agents", exact=True).click()
-            entry: Locator = page.get_by_role("dialog", name="Your agents").get_by_role(
+            await page.get_by_role("button", name="Your bots", exact=True).click()
+            entry: Locator = page.get_by_role("dialog", name="Your bots").get_by_role(
                 "menuitem", name=re.compile("^Quill")
             )
             await expect(entry).to_contain_text("1")
@@ -360,11 +360,9 @@ async def test_a_phone_opens_an_agent_as_a_chat_and_goes_back_to_the_chats(
             await page.route("**/api/schedules", hold)
             button: Locator = page.locator(".stagebar-left button")
             await button.click()
-            await page.get_by_role("button", name="Your agents", exact=True).click()
+            await page.get_by_role("button", name="Your bots", exact=True).click()
             await (
-                page.get_by_role("dialog", name="Your agents")
-                .get_by_role("menuitem", name=re.compile("^Ledger"))
-                .click()
+                page.get_by_role("dialog", name="Your bots").get_by_role("menuitem", name=re.compile("^Ledger")).click()
             )
             await expect(page).to_have_url(re.compile(f"#/agents/{agent_id}$"))
             await expect(page.locator("main .chat-loading")).to_be_visible()

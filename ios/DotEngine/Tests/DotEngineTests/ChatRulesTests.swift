@@ -171,6 +171,18 @@ final class ChatRulesTests: XCTestCase {
         XCTAssertEqual(shortTitle("Check run_ab12cd for errors. Then report."), "Check for errors")
         XCTAssertEqual(shortTitle("Read every file under the project folder and list the ones that import the old parser"), "Read every file under the project…")
         XCTAssertLessThanOrEqual(shortTitle(String(repeating: "word ", count: 30)).count, 40)
+        XCTAssertEqual(shortTitle("Görev: hafıza notlarını birleştirmek.\n\nGirdi dosyası: C8.md"), "Hafıza notlarını birleştirmek")
+        XCTAssertEqual(shortTitle("Fix this: the build"), "Fix this")
+    }
+
+    func testAHelpersChatShowsItsStepsAsTheChatThatStartedItUnlessItChoseItself() {
+        let parents: [String: String] = ["thr_h": "thr_p", "thr_hh": "thr_h", "thr_a": "thr_b", "thr_b": "thr_a"]
+        XCTAssertFalse(showsSteps(of: "thr_h", overrides: ["thr_p": false], parents: parents, everywhere: true))
+        XCTAssertFalse(showsSteps(of: "thr_hh", overrides: ["thr_p": false], parents: parents, everywhere: true))
+        XCTAssertTrue(showsSteps(of: "thr_h", overrides: ["thr_p": false, "thr_h": true], parents: parents, everywhere: true))
+        XCTAssertTrue(showsSteps(of: "thr_h", overrides: [:], parents: parents, everywhere: true))
+        XCTAssertFalse(showsSteps(of: "thr_x", overrides: [:], parents: parents, everywhere: false))
+        XCTAssertTrue(showsSteps(of: "thr_a", overrides: [:], parents: parents, everywhere: true))
     }
 
     func testAnAcceptedQueuedMessageFollowsItsEditSoTheOverlayGoesOnceItsRunShows() {

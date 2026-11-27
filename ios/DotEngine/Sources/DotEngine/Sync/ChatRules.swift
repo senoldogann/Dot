@@ -432,10 +432,12 @@ public func isAtEnd(distanceFromEnd: Double) -> Bool {
 
 // MARK: Titles
 
-/// A short title of a long text: its first sentence, run, thread and hex ids taken out, at most `40` characters cut at
-/// a word with an ellipsis, the first letter capital. Pure.
+/// A short title of a long text: its first sentence, a one-word label it opens with ("Task:", "Görev:") left out,
+/// run, thread and hex ids taken out, at most `40` characters cut at a word with an ellipsis, the first letter
+/// capital. Pure.
 public func shortTitle(_ text: String) -> String {
-    let flat: String = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    let unlabelled: String = text.replacingOccurrences(of: #"^\s*\w+:\s+(?=\S)"#, with: "", options: .regularExpression)
+    let flat: String = unlabelled.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     let ids: String = flat.replacingOccurrences(of: #"\b(run|thr|apr|q|msg)_[A-Za-z0-9]+\b|\b[0-9a-f]{12,}\b"#, with: "", options: .regularExpression)
         .split(separator: " ").joined(separator: " ")
     var sentence: String = ids
@@ -448,4 +450,20 @@ public func shortTitle(_ text: String) -> String {
     let cut: Substring = sentence.prefix(limit - 1)
     let word: Substring = cut.lastIndex(of: " ").map { cut[..<$0] } ?? cut
     return word.trimmingCharacters(in: CharacterSet(charactersIn: " ,")) + "…"
+}
+
+// MARK: Steps shown
+
+/// Whether a chat shows its steps (item 1915): its own choice where its This chat sheet set one, else that of the chat
+/// that started it, up the chain of helpers (a helper's chat opens as its parent's does), else Settings › Chat's
+/// `everywhere`. A loop in `parents` ends the walk. Pure.
+public func showsSteps(of thread: String, overrides: [String: Bool], parents: [String: String], everywhere: Bool) -> Bool {
+    var current: String = thread
+    var seen: Set<String> = []
+    while seen.insert(current).inserted {
+        if let own = overrides[current] { return own }
+        guard let parent = parents[current] else { break }
+        current = parent
+    }
+    return everywhere
 }
