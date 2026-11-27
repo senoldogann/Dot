@@ -294,7 +294,7 @@ function renderSignIn(message, keyFailed = false, refused = false) {
   // A key that Dot refused is said in the line's own words, with the way to pair again (item 1524): the code's field. The
   // line is a phone's, and the style shows it on a touch screen alone (shell.css): a touch screen can reach the page
   // after its first frames, when this is drawn, as the phone browser tests saw (item 966).
-  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: true, now: Date.now() }) : null;
+  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, lastContact: null, refused: true, now: Date.now() }) : null;
   const refusedLine =
     said === null
       ? null

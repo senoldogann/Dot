@@ -601,14 +601,13 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
-    /// Item 1931 and the owner's report of 2026-11-27: with no link, the capsule says Offline in the status's place once
-    /// it lasted a few seconds, and offers no Stop; the header keeps the bot's face and name, no link words.
-    func testThePillSaysOfflineWithoutALink() {
+    /// A lasting outage shows the last contact in the capsule without adding link text to the header.
+    func testThePillShowsTheLastContactWithoutALink() {
         let app: XCUIApplication = launch("n2-offline-saved")
         let link: XCUIElement = app.buttons["capsule.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
-        XCTAssertEqual(link.label, "Offline")
-        for words in ["Syncing", "Reconnecting", "Offline ·"] {
+        XCTAssertEqual(link.label, "Mac asleep or unreachable since 14:05")
+        for words in ["Syncing", "Reconnecting", "Mac asleep or unreachable"] {
             XCTAssertFalse(
                 app.navigationBars.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", words)).firstMatch.exists, "no link words in the header: \(words)")
         }
@@ -617,6 +616,12 @@ final class ChatUITests: XCTestCase {
         shot.name = "pill-offline"
         shot.lifetime = .keepAlways
         add(shot)
+
+        app.terminate()
+        let list: XCUIApplication = launch("n2-offline-list")
+        let listLink: XCUIElement = list.staticTexts["chats.link"]
+        XCTAssertTrue(listLink.waitForExistence(timeout: 15))
+        XCTAssertEqual(listLink.label, "Mac asleep or unreachable since 14:05")
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {

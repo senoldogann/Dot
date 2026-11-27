@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2043](2043.md) | done | 2026-11-27 | Show when the Mac was last reachable |
 | [2034](2034.md) | done | 2026-11-27 | The web says "routine", as the phone does |
 | [2033](2033.md) | done | 2026-11-27 | The web says "bot", as the phone does |
 | [2025](2025.md) | done | 2026-11-27 | A new chat's first message opens the one chat screen, on the phone and on the web |

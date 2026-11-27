@@ -376,6 +376,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     breakToldAt,
   );
   const connectionSlot = el("div", { class: "connection-slot" }, connectionNote);
+  let runStreamLost = false;
+  function paintRunConnection(snapshot) {
+    const lost = runStreamLost && snapshot.stream === "live";
+    showConnectionNote(lost);
+    showReconnecting(lost);
+  }
+  const stopRunConnection = onChange(paintRunConnection);
+  signal.addEventListener("abort", stopRunConnection, { once: true });
 
   // ------------------------------------------------------------------------------------ details and plan
   // The recap heads the Run tab (item 536): what the run did, does and waits for, in a few lines.
@@ -2435,8 +2443,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     signal,
     isFinished: finished,
     onState: (state) => {
-      showConnectionNote(state === "reconnecting");
-      showReconnecting(state === "reconnecting");
+      runStreamLost = state === "reconnecting";
+      paintRunConnection(getSnapshot());
       if (state === "live") {
         // The stream took the page from the last event it read: no gap is left, the chat stands as Dot says.
         kept.verifiedAt = Date.now();

@@ -2,7 +2,7 @@
 // owner: the approvals that wait, the connection while it is not live, the banner of an engaged emergency stop and the
 // one of a page that Dot's update left out of date.
 
-import { el, setText, showFrom } from "./dom.js";
+import { el, setText } from "./dom.js";
 import { releaseFailsafe } from "./failsafe.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
@@ -11,13 +11,10 @@ import { installShortcuts, requestCompose } from "./shortcuts.js";
 import { createConnectionLine } from "./connectionline.js";
 import { buildSidebar } from "./sidebar.js";
 import { stageTitleSlot, stageToolsSlot } from "./stage.js";
-import { breakToldAt } from "./state.js";
 import { SCHEMES, chooseScheme, nextScheme } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 
 const NARROW = "(max-width: 859.98px)";
-const STREAM_LABEL = { connecting: t("shell.connecting"), live: t("shell.live"), reconnecting: t("shell.reconnecting") };
-
 function buildIndicators() {
   const waitingCount = el("span");
   const waiting = el(
@@ -27,11 +24,6 @@ function buildIndicators() {
     waitingCount,
     el("span", { class: "label" }, t("shell.waiting")),
   );
-  const dot = el("span", { class: "live-dot connecting" });
-  const connectionLabel = el("span", { class: "label" }, STREAM_LABEL.connecting);
-  const connection = el("span", { class: "pill", hidden: true }, dot, connectionLabel);
-  const showConnection = showFrom(connection, breakToldAt);
-  let returnsSeen = 0;
   const banner = el(
     "div",
     { class: "banner", hidden: true, role: "alert" },
@@ -47,7 +39,7 @@ function buildIndicators() {
     el("button", { class: "btn sm", type: "button", onclick: () => location.reload() }, t("shell.loadAgain")),
   );
   return {
-    pills: [waiting, connection],
+    pills: [waiting],
     banners: [banner, updated],
     paint(snapshot) {
       setText(waitingCount, String(snapshot.approvals.length));
@@ -59,18 +51,6 @@ function buildIndicators() {
         null,
       );
       waiting.href = first === null ? "#/runs" : `#/runs/${encodeURIComponent(first.run_id)}`;
-      dot.className = `live-dot ${snapshot.stream}`;
-      setText(connectionLabel, STREAM_LABEL[snapshot.stream]);
-      // The connection shows while it is being made or lost; a live one says nothing (item 120), nor does a break that
-      // mends at once (item 286). The runs that work are counted in the sidebar's Working section. A break that began
-      // while the page was away waits again from the page's return, for the grace a waking network takes (items 328
-      // and 709): its wait was counted from when it began, so it showed at once on the return.
-      if (snapshot.returns !== returnsSeen) {
-        returnsSeen = snapshot.returns;
-        showConnection(false);
-      }
-      showConnection(snapshot.stream !== "live");
-      connection.title = t("shell.connectionToDotValue", { value: STREAM_LABEL[snapshot.stream] });
       banner.hidden = snapshot.status === null || !snapshot.status.failsafe_engaged;
       updated.hidden = !snapshot.outdated;
     },

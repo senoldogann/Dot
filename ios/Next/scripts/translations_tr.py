@@ -1196,7 +1196,6 @@ TR: dict[str, str] = {
     # D2: the link in the chat's pill (item 1931).
     "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
     "Syncing messages…": "Mesajlar eşitleniyor…",
-    "your Mac": "Mac",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
@@ -1229,8 +1228,7 @@ TR.update(
         "Submit answers": "Yanıtları gönder",
         "Default (%@)": "Varsayılan (%@)",
         "Favourite": "Favori",
-        "Can't reach %@": "%@ cihazına ulaşılamıyor",
-        "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
+            "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
         "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
         "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
         "Deleted for good %@.": "Kalıcı olarak silinecek: %@.",
@@ -1733,5 +1731,14 @@ TR.update(
         "Routine: %@": "Rutin: %@",
         "Hides the message": "Mesajı gizler",
         "Shows the whole message": "Mesajın tamamını gösterir",
+    }
+)
+
+# MS1: the last confirmed contact with the Mac.
+TR.update(
+    {
+        "Starting the chat…": "Sohbet başlatılıyor…",
+        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
+        "Mac asleep or unreachable since %@": "Saat %@’den beri Mac uykuda veya ulaşılamıyor",
     }
 )

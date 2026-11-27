@@ -14,7 +14,7 @@ const MIN = 60_000;
 
 /** The facts of a link that is well; each test changes what it is about. */
 function facts(changes = {}) {
-  return { online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: false, now: NOW, ...changes };
+  return { online: true, copyFrom: null, waiting: 0, reconnecting: false, lastContact: null, refused: false, now: NOW, ...changes };
 }
 
 test("a link that is well says nothing", () => {
@@ -47,11 +47,14 @@ test("with no link and nothing kept it says only that it is offline", () => {
   assert.equal(lineOf(facts({ online: false }), turkish)?.text, "Çevrimdışı");
 });
 
-test("a daemon that cannot be reached for more than a moment, on a link that is there, is reconnecting", () => {
-  assert.deepEqual(lineOf(facts({ reconnecting: true }), english), { kind: "reconnecting", text: "Can't reach Dot", action: null });
-  assert.equal(lineOf(facts({ reconnecting: true }), turkish)?.text, "Dot'a ulaşılamıyor");
-  assert.equal(lineOf(facts({ reconnecting: true, waiting: 3 }), english)?.text, "Can't reach Dot · 3 waiting to send");
-  assert.equal(lineOf(facts({ reconnecting: true, waiting: 3 }), turkish)?.text, "Dot'a ulaşılamıyor · 3 gönderilmeyi bekliyor");
+test("an unreachable Mac shows its last confirmed contact in both languages", () => {
+  assert.equal(lineOf(facts({ reconnecting: true }), english)?.text, "Mac asleep or unreachable");
+  assert.equal(lineOf(facts({ reconnecting: true }), turkish)?.text, "Mac uykuda veya ulaşılamıyor");
+  const lastContact = new Date(2026, 10, 27, 0, 5).getTime();
+  const time = "00:05";
+  const lost = facts({ reconnecting: true, lastContact, waiting: 3 });
+  assert.deepEqual(lineOf(lost, english), { kind: "reconnecting", text: `Mac asleep or unreachable since ${time}`, action: null });
+  assert.equal(lineOf(lost, turkish)?.text, `Saat ${time}’den beri Mac uykuda veya ulaşılamıyor`);
 });
 
 test("no link comes before reconnecting: a phone with no link is offline, not reconnecting", () => {
