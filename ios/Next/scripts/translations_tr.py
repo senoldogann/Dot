@@ -1689,4 +1689,23 @@ TR.update(
         "Resume bot": "Botu sürdür",
     }
 )
+# A change opened from This chat, its folded sections (CH1, item 2017).
+TR.update(
+    {
+        "No diff to show": "Gösterilecek fark yok",
+        "Loading the change": "Değişiklik yükleniyor",
+        "View": "Görünüm",
+        "Formatted": "Biçimli",
+        "Source": "Kaynak",
+        "Deleted": "Silindi",
+        "New · %lld lines": "Yeni · %lld satır",
+        "Lines from %lld": "%lld. satırdan itibaren",
+        "Added, line %lld: %@": "Eklendi, satır %1$lld: %2$@",
+        "Removed, line %lld: %@": "Silindi, satır %1$lld: %2$@",
+        "Line %lld: %@": "Satır %1$lld: %2$@",
+        # In the catalogue since item 1967 without its line here, which stopped apply_translations.py.
+        "Show cards": "Kart göster",
+    }
+)
+EN_PLURALS.update({"New · %lld lines": ("New · %lld line", "New · %lld lines")})
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})

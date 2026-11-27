@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2017](2017.md) | done | 2026-11-27 | A change reads by its format, on the phone and the web; This chat's sections start folded |
 | [2015](2015.md) | done | 2026-11-27 | The web composer works as DotNext's on every width: one capsule, the model as its mark, its settings in one sheet |
 | [2014](2014.md) | done | 2026-11-27 | The small window's compaction fixture takes the cards tool, and the tool's schema is shorter |
 | [2011](2011.md) | done | 2026-11-27 | The web says "helper" ("yardımcı") where it said "subagent" ("alt ajan"), as the iPhone app does |

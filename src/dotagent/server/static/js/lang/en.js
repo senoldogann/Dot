@@ -993,4 +993,11 @@ export const EN = {
   "speed.stageModel": "Model calls, by model and purpose",
   "speed.stageFirstToken": "First word of a step's reply",
   "speed.stageTool": "Tool calls, their running time",
+  // A change opened in the Changes tab (changes.js, item 2017).
+  "change.formatted": "Formatted",
+  "change.formattedHint": "Show the Markdown formatted",
+  "change.source": "Source",
+  "change.sourceHint": "Show the Markdown as it is written",
+  "change.view": "View",
+  "change.noDiff": "This file has no diff to show.",
 };

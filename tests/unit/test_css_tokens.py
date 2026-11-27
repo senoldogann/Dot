@@ -635,5 +635,24 @@ def test_every_chart_mark_of_a_chat_card_reads_at_3_to_1_on_every_surface(look: 
     assert short == [], short
 
 
+@pytest.mark.parametrize("look", [look for look, _ in _LOOKS])
+@pytest.mark.parametrize("scheme", [0, 1], ids=["light", "dark"])
+def test_the_colours_of_code_read_at_aa_on_every_surface_and_on_a_line_added_or_removed(look: str, scheme: int) -> None:
+    """Item 2017: a change's code is coloured with ``--code-keyword``, ``-string``, ``-number`` and ``-key``, declared
+    once in the base look; each reads at 4.5:1 on every surface and on the tints of a line added or removed."""
+    pairs: dict[str, tuple[str, str]] = _pairs(look)
+    marks: dict[str, tuple[str, str]] = {
+        name: (a, b) for name, a, b in _PAIR.findall(_themes_text()) if name.startswith("--code-")
+    }
+    assert sorted(marks) == ["--code-key", "--code-keyword", "--code-number", "--code-string"]
+    short: list[str] = [
+        f"{name} on {ground}: {contrast(marks[name][scheme], pairs[ground][scheme]):.2f} < 4.5"
+        for name in marks
+        for ground in (*_SURFACES, "--ok-weak", "--bad-weak")
+        if contrast(marks[name][scheme], pairs[ground][scheme]) < 4.5
+    ]
+    assert short == [], short
+
+
 def _themes_text() -> str:
     return (_CSS / "themes.css").read_text(encoding="utf-8")
