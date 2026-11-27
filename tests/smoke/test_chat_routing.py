@@ -447,6 +447,11 @@ async def test_a_verdict_never_vouches_and_a_quoted_stop_of_a_task_at_rest_stops
         rest: JsonObject = _routed(await _send(client, chat.thread_id, f"> {X_GOAL}\n\ndur"))
         assert rest["kind"] == "stopped" and rest["thread_id"] == x_thread and rest["run_id"] is None
         assert (await runtime.store.get_run(chat.id)).status == "running"
+        # A quote of that task at rest starts its next run at once: the reply names the run, no message that is gone,
+        # so that Move takes the run (the review of item 2013).
+        began: JsonObject = _routed(await _send(client, chat.thread_id, f"> {X_GOAL}\n\nAnd the logo too."))
+        assert began["kind"] == "queued" and began["thread_id"] == x_thread
+        assert began["run_id"] is not None and began["message_id"] is None
         # A quote of the report steers it; the same message sent again with its key says no start.
         body: dict[str, str] = {
             "text": "> Write the REPORT.\n\nUse the March figures.",

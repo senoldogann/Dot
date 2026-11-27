@@ -3076,11 +3076,13 @@ class RunManager:
             chat_id, task_thread, text, files, mode, model, effort, speed, approvals, goal_mode, source
         )
         started: RunHandle | None = self._active_on(task_thread)
+        # A free task took the message at once and it left the queue: only its run can be moved, never its message.
+        waiting: bool = any(queued.id == message.id for queued in await self._runtime.store.list_queued(task_thread))
         return RoutedMessage(
             kind="queued",
             thread_id=task_thread,
             run_id=None if started is None else started.run_id,
-            message_id=message.id,
+            message_id=message.id if waiting else None,
         )
 
     async def _start_routed(
