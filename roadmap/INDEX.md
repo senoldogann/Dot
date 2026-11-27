@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2045](2045.md) | done | 2026-11-27 | Measure the character line against the injection evals |
 | [2034](2034.md) | done | 2026-11-27 | The web says "routine", as the phone does |
 | [2033](2033.md) | done | 2026-11-27 | The web says "bot", as the phone does |
 | [2030](2030.md) | done | 2026-11-27 | A swipe on a message quotes it and does not pull the chat back |
