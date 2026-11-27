@@ -8,6 +8,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | ---- | ------ | ---- | ----- |
 | [1997](1997.md) | done | 2026-11-27 | The pre-push hook measures the first step's budget when the prompt surface changes |
 | [1996](1996.md) | done | 2026-11-27 | DotNext: Show steps off hides every step, an answer the finish says again stands once, the live caption speaks as the work log, no Plan in This chat |
+| [1995](1995.md) | in progress | 2026-11-27 | A bot's work on the phone: its work orders, objectives and hand-offs to read, and Pause and Resume in its profile's menu |
 | [1990](1990.md) | done | 2026-11-27 | A terminal session whose program ended leaves room for another |
 | [1988](1988.md) | done | 2026-11-27 | A search pattern ripgrep cannot read is told as the call's own error, with the syntax it reads |
 | [1986](1986.md) | done | 2026-11-27 | A code review whose chat was deleted starts in a new chat instead of failing |

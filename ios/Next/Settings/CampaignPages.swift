@@ -23,7 +23,7 @@ private func clippedText(_ text: String, _ limit: Int) -> String {
 }
 
 /// A row of a page: a title, the lines under it (each wraps), and a trailing detail.
-private struct LinesRow: View {
+struct LinesRow: View {
     let title: String
     let lines: [String]
     let detail: String?
@@ -45,20 +45,26 @@ private struct LinesRow: View {
     }
 }
 
-/// A campaign in the list: its title with its state on the same baseline, then the lines under it across the whole
-/// width (the goal, the sessions, the last progress), and the chevron centred on the row.
-private struct CampaignRow: View {
+/// An item of a list (a campaign, a work order): its title with its state on the same baseline (under it at the
+/// accessibility text sizes), then the lines under it across the whole width, and the chevron centred on the row.
+struct StateRow: View {
     let title: String
     let state: String
     let lines: [String]
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     var body: some View {
         HStack(spacing: Space.s) {
             VStack(alignment: .leading, spacing: Space.xxs) {
-                HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                if dynamicTypeSize.isAccessibilitySize {
                     Text(title).textRole(.body).foregroundStyle(Tone.text).multilineTextAlignment(.leading)
-                    Spacer(minLength: Space.s)
-                    Text(state).textRole(.footnote).foregroundStyle(Tone.secondary)
+                    Text(state).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.leading)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                        Text(title).textRole(.body).foregroundStyle(Tone.text).multilineTextAlignment(.leading)
+                        Spacer(minLength: Space.s)
+                        Text(state).textRole(.footnote).foregroundStyle(Tone.secondary)
+                    }
                 }
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                     Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.leading)
@@ -186,7 +192,7 @@ struct CampaignsPage: View {
                     GroupedSection(header: nil, footer: String(localized: "Goals that Dot keeps working on, one session at a time, until a check confirms they are done.", comment: "Campaigns: what a campaign is")) {
                         ForEach(campaigns) { campaign in
                             NavigationLink(value: SettingsPage.campaign(campaign.id)) {
-                                CampaignRow(title: campaign.record.title, state: campaignStatusWords(campaign.record.status), lines: lines(campaign))
+                                StateRow(title: campaign.record.title, state: campaignStatusWords(campaign.record.status), lines: lines(campaign))
                             }
                             .buttonStyle(RowPressStyle())
                         }

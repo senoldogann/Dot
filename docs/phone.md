@@ -107,6 +107,10 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
+   Work (Work orders, Objectives and Hand-offs, each to read: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
+   and writes none, so the phone only reads, and scopes them to the bot itself: an agent's page has the orders given to it,
+   the objectives those serve and the messages to or from it; Dot's own has every order and objective and the messages it sent
+   or was sent, not those between two other agents; all within the newest 60 orders and 60 objectives the daemon sends), a ⋯ menu with Pause bot and Resume bot for an agent (`POST /api/agents/{id}/pause|resume`, item 465), then
    Routines, Model, Activity, and a Notifications switch that is the phone's own count of its unread chats and what waits
    on the owner on the home: the Mac has no push setting per bot), and one settings sheet from an avatar button; a bot's unread mark counts the
    chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push

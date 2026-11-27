@@ -508,6 +508,8 @@ final class FakeDaemon: @unchecked Sendable {
             let kinds: String = kind.isEmpty ? "{}" : #"{"security":"\#(kind)"}"#
             return #"{"main":"m:main","vision":"m:see","fast":"m:fast","review":"m:review","effort":"medium","helpers":[],"standby":[\#(list)],"kinds":\#(kinds)}"#
         }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "agents", "*", "pause"]) { return ok(Self.agentJSON(found[0], pausedAt: "1795750115.4")) }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "agents", "*", "resume"]) { return ok(Self.agentJSON(found[0], pausedAt: "null")) }
         switch (method, parts) {
         case ("PUT", ["api", "models", "kinds"]):
             return ok(config(fields["model"]?.string ?? "", []))
@@ -531,9 +533,20 @@ final class FakeDaemon: @unchecked Sendable {
             let effort: String = fields["effort"]?.string ?? ""
             let fast: Bool = fields["fast"]?.bool ?? false
             return ok(#"{"worker":{"model":"\#(model)","effort":"\#(effort)","fast":\#(fast)},"worker_lost":false}"#)
+        case ("GET", ["api", "work-orders"]):
+            return ok("[]")
+        case ("GET", ["api", "objectives"]):
+            return ok("[]")
+        case ("GET", ["api", "team"]):
+            return ok(#"{"messages":[]}"#)
         default:
             return nil
         }
+    }
+
+    /// An agent's record as the daemon answers a pause or a resume.
+    private static func agentJSON(_ id: String, pausedAt: String) -> String {
+        #"{"id":"\#(id)","name":"Scribe","role":"Writes the weekly note","instructions":"","model":"","effort":null,"approvals":null,"tools":[],"created_at":0,"updated_at":0,"made_by":null,"look":null,"paused_at":\#(pausedAt),"refuses":""}"#
     }
 
     /// The bodies the phone sent to a path that holds `part`, in order.
