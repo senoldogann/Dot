@@ -110,7 +110,11 @@ struct RootView: View {
                 case .chatFixture(let fixture):
                     // `-DotNextPushed YES`: the chat is pushed over a root, as in the app, so that going back can be seen.
                     PushedFixtureChat(pushed: UserDefaults.standard.bool(forKey: "DotNextPushed")) {
-                        ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing, find: nil)
+                        if fixture == .offlineList {
+                            ChatListView(scope: .all, selection: .constant(nil))
+                        } else {
+                            ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing, find: nil)
+                        }
                     }
                     .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }
                 case .settingsFixture(let fixture):

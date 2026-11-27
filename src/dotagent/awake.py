@@ -4,8 +4,8 @@
 For the phone, the daemon holds macOS's ``caffeinate -s``, which keeps the system from sleeping while it runs on power,
 for as long as Settings › Phone asks it to. While Dot works (``[daemon] keep_awake``), it holds ``caffeinate -i``, which
 keeps the system from idle sleep on power and on battery alike, from the first work on until ``keep_awake_after_s``
-after the last ended (:func:`keep_awake_while_working`); the display still sleeps. Both are a child ``caffeinate`` with
-``-w`` and the daemon's pid rather than an IOKit power assertion made in the daemon's own process: ``-w`` lets the
+after it is last needed. It also holds shortly before a routine or watcher is due; the display still sleeps.
+Each hold uses a child ``caffeinate`` with ``-w`` and the daemon's pid: ``-w`` lets the
 assertion go when the daemon ends however it ends (a crash too), ``pmset -g assertions`` names it, and a test points
 ``DOT_CAFFEINATE`` at a stand-in that keeps nothing awake. Closing a MacBook's lid still puts it to sleep, as macOS
 does."""
@@ -13,7 +13,7 @@ does."""
 import asyncio
 import os
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Literal
 
 from dotagent.core.errors import PhoneSetupError
@@ -96,17 +96,29 @@ def holds_awake(working: bool, last_work_at: float | None, now: float, after_s: 
 
 
 async def keep_awake_while_working(
-    awake: KeepAwake, working: Callable[[], bool], after_s: float, every_s: float, stopping: asyncio.Event
+    awake: KeepAwake, working: Callable[[], Awaitable[bool]], after_s: float, every_s: float, stopping: asyncio.Event
 ) -> None:
-    """Hold ``awake`` while ``working`` says Dot works (a run, a schedule's run, a meeting) and ``after_s`` seconds
-    after, looking every ``every_s`` seconds, until ``stopping`` is set (item 1671); it lets go on its way out. A
-    ``caffeinate`` that cannot be started is raised (the daemon logs the end of this task): the Mac then sleeps as it
-    would, and the log says why."""
+    """Hold ``awake`` while work is active or due soon and for ``after_s`` seconds afterward.
+
+    Check every ``every_s`` seconds until ``stopping`` is set. A work check that fails counts as no work seen: a hold
+    that was on runs out its grace and is released, so a check that keeps failing cannot hold the Mac awake for good.
+    Only the first failure of a row is logged. Release it on exit. Raise a failure to start ``caffeinate`` for the
+    daemon to log.
+    """
     last_work_at: float | None = None
+    failing: bool = False
     try:
         while not stopping.is_set():
             now: float = time.monotonic()
-            busy: bool = working()
+            try:
+                busy: bool = await working()
+            except Exception:
+                if not failing:
+                    log.exception("keep_awake_work_check_failed")
+                failing = True
+                busy = False
+            else:
+                failing = False
             if busy:
                 last_work_at = now
             await awake.switch(holds_awake(busy, last_work_at, now, after_s))

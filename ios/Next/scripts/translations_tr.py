@@ -1,9 +1,6 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
-# A new chat's first send opens the one chat screen (item 2025).
-TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
-# The question card like another coding agent's (item 2001).
 # Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
@@ -1196,7 +1193,6 @@ TR: dict[str, str] = {
     # D2: the link in the chat's pill (item 1931).
     "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
     "Syncing messages…": "Mesajlar eşitleniyor…",
-    "your Mac": "Mac",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
@@ -1229,8 +1225,7 @@ TR.update(
         "Submit answers": "Yanıtları gönder",
         "Default (%@)": "Varsayılan (%@)",
         "Favourite": "Favori",
-        "Can't reach %@": "%@ cihazına ulaşılamıyor",
-        "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
+            "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
         "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
         "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
         "Deleted for good %@.": "Kalıcı olarak silinecek: %@.",
@@ -1629,6 +1624,7 @@ TR.update(
     {
         "%lld min": "%lld dk",
         "%lld s": "%lld sn",
+        "Looking into it…": "Bakıyorum…",
     }
 )
 
@@ -1743,3 +1739,14 @@ TR.update(
         "Shows the whole message": "Mesajın tamamını gösterir",
     }
 )
+
+# MS1: the last confirmed contact with the Mac.
+TR.update(
+    {
+        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
+        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
+    }
+)
+
+# A new chat's first send opens the one chat screen (item 2025).
+TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})

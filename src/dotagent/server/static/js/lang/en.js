@@ -30,6 +30,7 @@ const CORE = {
   "work.showSteps": "Show the steps",
   "work.hideSteps": "Hide the steps",
   // A line of the run told as a conversation (item 1976): a page it looks at, and how long the run has worked.
+  "work.firstWords": "Looking into it…",
   "work.forSeconds": "{count} s",
   "work.forMinutes": "{count} min",
   // The line over the composer while a task works (capsule.js).
@@ -50,7 +51,7 @@ const CORE = {
   "capsule.stop": "Stop",
   // The one capsule over a phone's composer and the sheets its segments open (dockbar.js, docksheet.js).
   "dock.working": "Working · {took}",
-  "dock.reconnecting": "Can't reach Dot",
+  "dock.reconnecting": "Chat updates interrupted",
   "dock.stopLabel": "Stop the task",
   "dock.helperOne": "{count} helper",
   "dock.helperMany": "{count} helpers",
@@ -201,7 +202,7 @@ const CORE = {
   "run.openParent": "Open parent",
   "run.parentWorking": "Part of a task that is working",
   "run.onItsOwn": "Works on its own",
-  "run.connectionLost": "Can't reach Dot",
+  "run.connectionLost": "Chat updates interrupted",
   "run.plan": "Plan",
   "run.lessonsTitle": "Lessons from this task",
   "run.more": "More",
@@ -277,8 +278,8 @@ const CORE = {
   "line.offline": "Offline",
   "line.offlineCopy": "Offline: showing saved chats, last updated {age}",
   "line.offlineWaiting": "Offline: {count} waiting to send",
-  "line.reconnecting": "Can't reach Dot",
-  "line.reconnectingWaiting": "Can't reach Dot · {count} waiting to send",
+  "line.macUnreachable": "Mac asleep or unreachable",
+  "line.macUnreachableSince": "Mac asleep or unreachable since {time}",
   "line.ageNow": "just now",
   "line.ageMinutes": "{count} min ago",
   "line.ageHours": "{count} h ago",
@@ -967,9 +968,6 @@ const CORE = {
   "resume.continue": "Continue",
   "run.jump": "Jump to latest",
   // The indicators over every page (shell.js).
-  "shell.connecting": "Connecting",
-  "shell.live": "Live",
-  "shell.reconnecting": "Can't reach Dot",
   "shell.waitingHint": "Approvals that wait for you",
   "shell.waiting": "waiting",
   // The side panel's tabs and sections (views/run.js, recap.js).

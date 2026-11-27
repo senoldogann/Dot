@@ -41,6 +41,8 @@ here points at a test that no longer exists.
 - `tests/smoke/test_work_orders_page.py::test_a_next_step_written_after_outside_content_is_marked` — the Agents page and the
   phone's bot profile showed an objective's next step with no outside-words mark: the step has its own flag, which the mark
   left out (item 2009's review).
+- `tests/unit/test_first_words.py::test_a_fault_of_the_first_words_is_logged_not_lost` — the first words are a task
+  nothing awaits, so a fault that was no error of Dot's was dropped with no line in the log (item 2018's review).
 - `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
   on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
   chat deleted (item 1962's review).
@@ -59,6 +61,7 @@ here points at a test that no longer exists.
 - `tests/unit/test_css_tokens.py::test_the_daemon_page_tells_the_conversation_once_and_with_no_bubble_on_a_phone` — a
   rebase left `docs/daemon.md` with two copies of the conversation paragraph, one from before the new look (an 18 px
   corner, a quiet ring) and one that still said Dot's words sit in a soft bubble on a phone (item 1335's review).
+- `tests/smoke/test_work_awake.py::test_a_work_check_that_keeps_failing_lets_a_hold_run_out` — a work check that raised kept the Mac awake with no end, and logged a traceback every tick
 - `tests/unit/test_css_tokens.py::test_every_comment_of_a_sheet_closes_where_it_opens` — a merge left a line of a comment under one that had closed it, so the browser read the words as a selector and dropped the rule after it (item 1335).
 - `tests/smoke/test_panel_automations.py::test_the_task_tab_lists_the_chats_schedules_and_loops_and_switches_and_runs_them` — the
   pencil of a chat's Automations linked to `#/settings/schedules/<id>`, which no route matches, so a press dropped the

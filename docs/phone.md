@@ -176,9 +176,10 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    a long run does not read the whole run: at 500 events or more it asks for the newest 400
    (`GET /api/runs/{id}/events?tail=400`; an older Dot answers with the run's first events and no
    `X-Dot-Events-Tail` header, and the app then reads the pages as before) and says that some steps are not shown. One
-   thin line under the status bar says when the phone has no link (*Offline — showing saved chats · last updated 3 min
-   ago*, or *Offline — 2 waiting to send*), when Dot cannot be reached for more than a moment (*Can't reach Dot*) and when
-   the phone's key was refused; it never covers what is read. **What is done with no link is kept and sent when it
+   quiet line in the chat capsule and chat list says *Mac asleep or unreachable since HH:MM* after five seconds
+   without a link. The time is the last successful contact in the phone's time zone. Before the first contact,
+   the line has no time. DotNext uses this line both for a lost phone network and a Mac that stops answering.
+   **What is done with no link is kept and sent when it
    returns, once and in order**: a message shows at once under the chat as *Waiting to send* (with *Retry now* and
    *Edit*) and goes with the key Dot starts a message once by (`POST /api/threads/{id}/queue` sent again after an answer
    that was lost is the same message; a message that waited more than a day is left to the owner to send again, as
@@ -368,6 +369,9 @@ on the helpers, the queue, the loops and the commands at work, five panes one up
 capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
 never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
+**Waiting on 2 helpers** while the run has stopped for them, or **Chat updates interrupted** if only the chat stream
+drops), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**.
+A daemon outage appears in the shared line under the bar. The capsule appears only when it has something to say. A row too narrow says
 **Waiting on 2 helpers** while the run has stopped for them, **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
@@ -536,10 +540,9 @@ Tailscale, the same works on the Mac itself (`localhost` counts as secure) and o
 
 **On a bad link: the web app (items 1520 to 1524).** The web app on the Home Screen does what the iPhone app does on a bad
 link (above, items 1370, 1371 and 1391), with the same numbers and the same rules; its layout of files is its own. The
-service worker stays what it is, the shell only, and caches nothing under `/api`: the page keeps its data itself. All of it is the phone's: a page that is not a phone's touch screen (a pointer that
-hovers) keeps no copy, draws none, has no outbox and shows no line. A Mac's page talks to a Dot on the same Mac, which a
-network that is down does not take away, and `navigator.onLine` is false there while Dot answers: a page that took it
-for a lost link would hold what the owner sends.
+service worker caches the shell. The page keeps chat copies and the outbox on touch screens. Desktop and phone
+browsers both show the outage line when they lose contact with the Mac. A desktop browser can still reach Dot
+on the same Mac when the browser reports that the network is down.
 
 - **What it keeps (item 1520).** The list of chats, the agents, the status and the other lists the shell draws, and for
   each chat it opened the record of every run before the one it was opened at, the last 400 events of that run and of the
@@ -618,19 +621,11 @@ for a lost link would hold what the owner sends.
   told and let go, since no row holds it. An answer made with no link is kept under the chat it was made in (its thread,
   not its run), so that it goes in order with what else was done there. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
   could not reach Dot and the words stay in the box.
-- **The line (item 1524).** One thin line stands under the bar, and has no height while nothing is said. The states that
-  last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Can't reach Dot*
-  floats over the room the conversation leaves under the bar, as the notes of a lost stream always did (item 328), so that
-  what is read never moves when it comes or goes: *Offline: showing saved chats, last updated 3 min ago*
-  (the copy a chat is drawn from, and how old it is, kept true by a clock that runs only while it is shown), *Offline: 2
-  waiting to send* (what the outbox holds, which says more than the copy does), *Can't reach Dot* (Dot not reached for more
-  than a moment on a link that is there; a break that mends at once says nothing), and *This phone's key was refused*
-  with **Pair again**, on the sign-in screen the refused key leads to, which takes the owner to the field where the code
-  of Settings › Phone is typed. What it says is one pure function of the facts (`js/linewords.js`, English and Turkish),
-  one line on a phone 390 px wide and two at 320 px, in the light and the dark look, and the one thing in it that is
-  pressed is 44 px tall. While it says the link is down, a request that got no answer shows no toast over the chat. The line is the
-  phone's: a page that is not a phone's touch screen shows none, and keeps its toasts (the Dot it talks to is on the
-  same Mac, where a network that is down takes nothing away).
+- **The connection line (item 1524).** A lasting daemon outage shows *Mac asleep or unreachable since HH:MM*,
+  using the last successful contact in the browser's time zone. Before the first contact the line has no time.
+  It floats under the bar without moving the conversation. A phone without a network link shows *Offline* with
+  the number of waiting messages or the age of the saved chats. A refused key shows **Pair again** beside its
+  message on the sign-in screen.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 

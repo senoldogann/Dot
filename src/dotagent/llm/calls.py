@@ -56,6 +56,8 @@ type CallPurpose = Literal[
     "meeting",
     # A picture made by a picture model (``generate_image``'s photo path): its tokens are the picture's.
     "image",
+    # Dot's first words in a chat (item 2018): one line of the fast model while the run starts.
+    "first_words",
 ]
 
 CALL_EVENT: str = "model_call"

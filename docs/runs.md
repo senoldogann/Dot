@@ -71,7 +71,15 @@ owner's word of 2026-11-27: stacked "Code run" and "Running a command" lines rea
 conversation says what the run does now, in plain words and never by a tool's name ("Running a command… · 2 min",
 "Reading README.md… · 2 min"; a tool with no phrase of its own is "Working"). The daemon still records a `narration` event
 beside a call's `tool_call` (`agent/narration.py`), in every harness; no model is asked for it, and neither the web
-nor the iPhone draws it as a line. On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
+nor the iPhone draws it as a line. A task you start in a chat says its first words
+the moment it starts (item 2018, `agent/first_words.py`, `[agent] first_words`): *Looking into it…* at once, then in its
+place a line of the fast model (`[models] fast`) of what Dot looks at first, written from your message alone while the
+task gets ready and takes its first step ("Looking at your calendar first."). The line is told only while the task has
+said nothing yet (no words of its own, no call, no question): once it speaks the call is dropped, so the line is never a
+second voice beside the task's own words, and a fast model that fails or takes more than 12 s leaves the first words as
+they were. Neither is a message the task's model reads; the line costs one short call of the fast model and nothing of
+the task's steps. A schedule's, a helper's or a review's task has none.
+On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
 the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
 behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A helper's chat
 shows its steps as the chat that started it does, unless its own This chat sheet chose, and opens as the bottom sheet
