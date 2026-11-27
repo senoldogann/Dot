@@ -171,7 +171,7 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             settings: FloatRect = await _box(foot.get_by_role("link", name="Settings"))
             at: FloatRect = await _box(button)
             assert abs(at["y"] - settings["y"]) <= 1 and settings["x"] + settings["width"] <= at["x"], (at, settings)
-            await expect(page.locator("#sidebar").get_by_role("link", name="Schedules")).to_have_count(0)
+            await expect(page.locator("#sidebar").get_by_role("link", name="Routines")).to_have_count(0)
             await expect(page.locator("#sidebar").get_by_role("link", name="Campaigns")).to_have_count(0)
             await page.get_by_role("button", name="Your bots").click()
             await expect(

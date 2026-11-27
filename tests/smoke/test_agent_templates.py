@@ -471,7 +471,7 @@ async def test_a_template_schedule_is_added_switched_off_and_read_and_switched_o
                     await expect(card).to_be_visible()
                     no_offer: Locator = page.locator(f".template-card[data-template='{plain.id}'] .template-also")
                     await expect(no_offer).to_have_count(0)
-                    also: Locator = card.get_by_role("switch", name="Also add this schedule")
+                    also: Locator = card.get_by_role("switch", name="Also add this routine")
                     await also.click()
                     await expect(also).to_have_attribute("aria-checked", "true")
                     await card.screenshot(path=tmp_path / f"template-card-{width}-{scheme}.png")
@@ -629,14 +629,14 @@ async def test_a_team_card_makes_its_agents_in_one_click_with_their_schedules_sw
                 card: Locator = page.locator(f".team-card[data-team='{team.id}']")
                 await expect(card.locator(".team-members > li")).to_have_text(names)
                 await expect(card.locator(".avatar")).to_have_count(len(names))
-                also: Locator = card.get_by_role("switch", name="Also add their schedules")
+                also: Locator = card.get_by_role("switch", name="Also add their routines")
                 await also.click()
                 await expect(also).to_have_attribute("aria-checked", "true")
                 await card.screenshot(path=tmp_path / "team-card-1280-light.png")
                 use: Locator = card.get_by_role("button", name=f"Use the team {team.name}")
                 await use.click()
                 await expect(_toast(page, "ok", f"{team.name}: ")).to_be_visible()
-                await expect(_toast(page, "ok", "schedules were added, switched off")).to_be_visible()
+                await expect(_toast(page, "ok", "routines were added, switched off")).to_be_visible()
                 summaries: list[JsonObject] = (await http.get("/api/agents")).raise_for_status().json()
                 assert [each["record"]["name"] for each in summaries[1:]] == names
                 views: list[JsonObject] = (await http.get("/api/schedules")).raise_for_status().json()
@@ -684,7 +684,7 @@ async def test_a_team_used_again_gives_the_agents_the_owner_had_their_schedules_
                 page: Page = await _open(browser, address, "/agents", 390, "light")
                 card: Locator = page.locator(f".team-card[data-team='{team.id}']")
                 for _ in range(2):
-                    also: Locator = card.get_by_role("switch", name="Also add their schedules")
+                    also: Locator = card.get_by_role("switch", name="Also add their routines")
                     await also.click()
                     await expect(also).to_have_attribute("aria-checked", "true")
                     await card.get_by_role("button", name=f"Use the team {team.name}").click()
@@ -694,7 +694,7 @@ async def test_a_team_used_again_gives_the_agents_the_owner_had_their_schedules_
                 assert sorted(str(record["name"]) for record in records) == sorted(names), records
                 assert {record["enabled"] for record in records} == {False}
                 # The second Use added none twice, and said that they had them.
-                await expect(page.locator(".toast").last).to_contain_text("had their schedules already")
+                await expect(page.locator(".toast").last).to_contain_text("had their routines already")
                 # An agent whose schedule was deleted is offered it on its page.
                 first: JsonObject = next(record for record in records if record["name"] == names[0])
                 (await http.delete(f"/api/schedules/{first['id']}")).raise_for_status()
