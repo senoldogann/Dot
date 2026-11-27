@@ -52,9 +52,9 @@ hook_hosts = []
 keep_awake = false
 
 [daemon]
-# Whether the daemon keeps the Mac from idle sleep while Dot works (caffeinate -i, item 1671): from the first run,
-# schedule run or meeting at work until keep_awake_after_s seconds after the last one ended, on power and on battery.
-# The display still sleeps, and a closed lid still puts a MacBook to sleep. `dotx service status` says when it holds.
+# Prevent idle sleep (caffeinate -i) while Dot works and shortly before a routine or watcher is due, on power and on
+# battery. The hold lasts keep_awake_after_s seconds after it is last needed. The display can still sleep.
+# `dotx service status` says when the hold is active.
 keep_awake = true
 keep_awake_after_s = 60
 

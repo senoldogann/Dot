@@ -772,7 +772,7 @@ export const ONE_SHOT = { connectMs: ONE_SHOT_PATIENCE_MS, idleMs: ONE_SHOT_PATI
  * @param {AbortSignal} signal
  * @param {() => void} onOpen
  * @param {number} awayMs
- * @param {{ connectMs?: number, idleMs?: number, lastId?: number }} [options]
+ * @param {{ connectMs?: number, idleMs?: number, lastId?: number, onContact?: (at: number) => void }} [options]
  */
 export async function* sse(path, signal, onOpen, awayMs, options = {}) {
   const connectMs = options.connectMs ?? CONNECT_TIMEOUT_MS;
@@ -816,6 +816,7 @@ export async function* sse(path, signal, onOpen, awayMs, options = {}) {
     if (!response.ok) {
       throw await errorOf(response, path);
     }
+    options.onContact?.(Date.now());
     onOpen();
     reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -824,6 +825,9 @@ export async function* sse(path, signal, onOpen, awayMs, options = {}) {
       watch(idleMs, t("api.dotStoppedSendingUpdates"));
       const { done, value } = await reader.read();
       clearTimeout(silence);
+      if (!done) {
+        options.onContact?.(Date.now());
+      }
       // A frame cut by the end of the stream is no event: the stream is made again after the last whole one.
       for (const frame of done ? parser.end() : parser.push(decoder.decode(value, { stream: true }))) {
         if ("bad" in frame) {
@@ -947,7 +951,7 @@ export function tellOutOfDate(text, details = "") {
  * The stream is said to be live once the server has taken it, and reconnecting when it broke or could not be made.
  * A fault of the page in showing one event is not a break of the stream: it is told, and the next event comes.
  */
-export async function follow({ path, after, signal, onMessage, onState, isFinished }) {
+export async function follow({ path, after, signal, onMessage, onState, isFinished, onContact = /** @param {number} _at */ (_at) => {} }) {
   let lastId = after;
   let breaks = 0;
   while (!signal.aborted) {
@@ -956,7 +960,7 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
         breaks = 0;
         onState("live");
       };
-      for await (const message of sse(withAfter(path, lastId), signal, opened, BACK_AWAY_MS, { lastId })) {
+      for await (const message of sse(withAfter(path, lastId), signal, opened, BACK_AWAY_MS, { lastId, onContact })) {
         lastId = Math.max(lastId, message.id);
         try {
           onMessage(message);
