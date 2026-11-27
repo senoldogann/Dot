@@ -30,8 +30,7 @@ the tokens of `themes.css` and `app.css`, never a literal (`tests/unit/test_css_
   chat's title. At the right the toggles of the panels. A page that is no chat's names itself alone. The face a page puts
   before an agent's name stays in the badge, out of sight, and its state tints the badge.
 - **The composer** (`composer.js`, `composershape.js`, `choices.js`, `run.css`): the iPhone app's capsule on every width
-  (item 2015), one rounded box with a hairline edge: one row while the words are short (the "+", the words, the model's
-  mark and chevron, the microphone and the round send), the words on top once they are long, a line break or a file, with
+  (item 2015), one rounded box with a hairline edge: one row while the words are short and the box is at least 340 px wide (the "+", the words, the model's mark and chevron, the microphone and the round send), the words on top once they are long, a line break or a file, with
   the model named and its level in grey on the line under them. The model's pill opens the Chat settings sheet (models,
   Reasoning, Mode, Approvals, How Dot works); YOLO's lock alone stays in the bar. There is no resting state and no button
   that hides the choices.
