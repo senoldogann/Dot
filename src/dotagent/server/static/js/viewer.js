@@ -11,9 +11,9 @@
  * (`idle`, `drag`, `pinch`), each changed in one place.
  */
 import { el } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { MAX_SCALE, MIN_SCALE, clamped, pinchedScale, zoomedAbout } from "./viewmath.js";
-import { t } from "./i18n.js";
 
 // The event a page's frame full screen is sent for a pinch on the page (item 1056, pageframe.js): `{ phase, ratio, x, y }`.
 export const ZOOM_EVENT = "dot:zoom";

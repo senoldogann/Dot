@@ -358,7 +358,15 @@ public actor Supervisor {
         case .list:
             perform(await store.listFrame(frame, connection: connection))
             await seeOpenChats()
-        case .chat(let thread): perform(await store.chatFrame(thread, frame, connection: connection))
+        case .chat(let thread):
+            if case .event(let event) = frame { warnAboutMalformedPage(event) }
+            perform(await store.chatFrame(thread, frame, connection: connection))
+        }
+    }
+
+    private func warnAboutMalformedPage(_ event: EventRecord) {
+        if event.kind == "page_shown", ShownPage(event: event) == nil {
+            logger.warning("Malformed shown-page reference event_id=\(event.id, privacy: .public)")
         }
     }
 
@@ -424,6 +432,7 @@ public actor Supervisor {
         guard let connection: Int = await store.chatViewAsked(thread) else { return }
         do {
             let view: ThreadView = try await api.threadView(thread, tail: Self.tail)
+            for event in view.shownPageEvents ?? view.newestEvents { warnAboutMalformedPage(event) }
             viewFailures[thread] = nil
             perform(await store.chatViewLoaded(thread, view: view, connection: connection))
         } catch {

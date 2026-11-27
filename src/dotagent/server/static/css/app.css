@@ -10123,6 +10123,11 @@ dialog.modal.file-dialog[open] {
   .shown-page-tools {
     opacity: 1;
   }
+
+  .shown-page-tools .shown-page-tool {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 /* A page closed for loading another has no frame to open: its Show it again stands alone. */

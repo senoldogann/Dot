@@ -422,6 +422,8 @@ struct ChatScreen: View {
                 Button(String(localized: "Quote", comment: "Message menu and VoiceOver action: puts the message in the composer as a quote"), systemImage: "arrowshape.turn.up.left") { quoteMessage(text) }
                 Button(String(localized: "Copy", comment: "Code block header button that copies the code"), systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
             }
+        case .page(_, let page):
+            ShownPageCard(page: page)
         case .thought(_, let text, let live):
             ThoughtRow(text: text, live: live)
         case .tool(let entry):

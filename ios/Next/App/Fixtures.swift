@@ -39,6 +39,8 @@
         case jank = "n2-jank"
         /// A run that wrote its answer and finished with it in slightly other words (item 1996): the answer stands once.
         case restated = "n2-restated"
+        /// A page in the transcript, loaded from the UI test's loopback server.
+        case shownPage = "n2-shown-page"
         /// The main run has stopped and only waits for a helper it delegated to (its newest step's one open call is a
         /// delegate): the capsule says "Waiting on 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
         /// beside its helper and says "Working".
@@ -131,7 +133,7 @@
         private var runB: String {
             switch self {
             case .failed: "failed"
-            case .deleted, .restated: "done"
+            case .deleted, .restated, .shownPage: "done"
             default: "running"
             }
         }
@@ -201,6 +203,8 @@
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"failed","result":"","error":{"kind":"model","message":"The model answered HTTP 529: overloaded. Try again in a minute."}}}"#)
             case .deleted:
                 events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 60),"kind":"run_finished","data":{"status":"done","result":"Booked Tuesday 14:00."}}"#)
+            case .shownPage:
+                events.append(#"{"id":30,"run_id":"run_b","ts":\#(b + 50),"kind":"page_shown","data":{"page_id":"page_0123456789ABCDEFGHIJKLMN","title":"Sales by month"}}"#)
             case .helpersWait:
                 events.append(contentsOf: [
                     #"{"id":29,"run_id":"run_b","ts":\#(b + 44),"kind":"tool_result","data":{"call_id":"b4","ok":true,"text":"ready"}}"#,

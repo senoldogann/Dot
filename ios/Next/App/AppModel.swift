@@ -56,6 +56,17 @@ final class AppModel {
     /// The paired Mac's name, for a chat's subtitle ("Dot · <Mac>").
     var macName: String? { host?.name ?? fixtureMac }
 
+    var pageHost: DaemonHost? {
+        #if DEBUG
+            if let address: String = UserDefaults.standard.string(forKey: "DotNextPageFixtureHost"),
+                fixtureMac != nil
+            {
+                return parseLoopbackDaemonHost(address)
+            }
+        #endif
+        return host
+    }
+
     /// The daemon a Settings fixture serves from memory (debug builds; `nil` in the shipped app).
     private(set) var fixtureAPI: DaemonAPI?
 

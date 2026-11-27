@@ -32,6 +32,7 @@ from pydantic import Field, JsonValue
 
 from dotagent.agent.helper_reports import kept_detached
 from dotagent.agent.manager import RunManager
+from dotagent.agent.pages import PAGE_EVENT
 from dotagent.core.errors import DotError, InvalidValueError, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -173,7 +174,8 @@ class ThreadView(FrozenModel):
     """A chat's small state at ``revision`` (module docstring). ``runs`` are its newest runs, oldest first, and
     ``older`` whether older ones are left (read them with ``before``); ``newest`` is the chat's newest run's page,
     ``newest_events`` the tail of its events (``newest_events_cut`` when older ones were left out), from which its
-    cursor goes on; both are empty (``None``, no events) for a page of older runs read with ``before``."""
+    cursor goes on; both are empty (``None``, no events) for a page of older runs read with ``before``.
+    ``shown_page_events`` holds the page references of the runs in this window, independent of stream cursors."""
 
     revision: int
     thread: ThreadRecord
@@ -183,6 +185,7 @@ class ThreadView(FrozenModel):
     newest: RunDetail | None
     newest_events: list[EventRecord]
     newest_events_cut: bool
+    shown_page_events: list[EventRecord] = Field(default_factory=list)
     queue: QueueView
     asks: list[ApprovalRecord]
     helpers: list[HelperView]
@@ -320,6 +323,7 @@ async def thread_view(ctx: ServerContext, thread_id: str, tail: int, before: str
         newest=newest,
         newest_events=events[-NEWEST_EVENTS:],
         newest_events_cut=len(events) > NEWEST_EVENTS,
+        shown_page_events=await store.events_of_kind_for_runs([run.id for run in runs], PAGE_EVENT),
         queue=await queue_view(ctx, thread_id),
         asks=await store.thread_asks(thread_id),
         helpers=helpers,

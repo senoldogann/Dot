@@ -1,3 +1,4 @@
+import Network
 import XCTest
 
 /// The ask dock and the queue's edit on the real chat screen, drawn from the debug build's fixtures (wave N2).
@@ -235,6 +236,85 @@ final class ChatUITests: XCTestCase {
         sheet.name = "plan-sheet"
         sheet.lifetime = .keepAlways
         add(sheet)
+    }
+
+    /// A stored page loads in place, fits its content and opens with the same sandbox full screen.
+    @MainActor
+    func testAShownPageFitsTheConversationAndOpensFullScreen() throws {
+        let listener: NWListener = try shownPageFixture()
+        defer { listener.cancel() }
+        let port: NWEndpoint.Port = try XCTUnwrap(listener.port)
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-shown-page", "-DotNextPageFixtureHost", "http://127.0.0.1:\(port.rawValue)",
+            "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-colorScheme", "dark",
+        ]
+        app.launch()
+        let card: XCUIElement = app.buttons["shownPage.open"]
+        XCTAssertTrue(card.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(card.label, "Tam ekran")
+        // The initial 160 pt placeholder fits to 184 pt after the page has laid itself out.
+        let fitted: NSPredicate = NSPredicate { _, _ in abs(card.frame.height - 184) <= 1 }
+        wait(for: [expectation(for: fitted, evaluatedWith: nil)], timeout: 10)
+        card.tap()
+
+        let close: XCUIElement = app.buttons["shownPage.close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10))
+        XCTAssertEqual(close.label, "Kapat")
+        XCTAssertTrue(app.navigationBars["Sales by month"].exists)
+        let content: XCUIElement = app.webViews.staticTexts["Chart ready in the dark sandbox"]
+        XCTAssertTrue(content.waitForExistence(timeout: 15), app.debugDescription)
+        app.webViews.links["Another page"].tap()
+        XCTAssertTrue(content.exists, "the selected page stays in the viewer")
+        close.tap()
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        XCTAssertEqual(card.frame.height, 184, accuracy: 1)
+    }
+
+    /// Only the loopback fixture serves the page. The WebKit view uses its normal HTTP path and enforces the HTTP CSP.
+    private func shownPageFixture() throws -> NWListener {
+        let parameters: NWParameters = .tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+        let listener: NWListener = try NWListener(using: parameters)
+        let ready: XCTestExpectation = expectation(description: "the fixture can serve the page")
+        let queue: DispatchQueue = DispatchQueue(label: "dev.dotagent.phone.next.page-fixture")
+        let page: String = """
+            <!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>body { margin: 0; height: 184px; color-scheme: light dark }</style>
+            <p id="chart" style="margin: 0">Chart loading</p><a href="/another">Another page</a>
+            <script>
+              let isolated = false;
+              try { localStorage.getItem("fixture"); } catch { isolated = true; }
+              const bridge = window.webkit?.messageHandlers?.dotPageHeight;
+              const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+              document.getElementById("chart").textContent =
+                isolated && !bridge && dark ? "Chart ready in the dark sandbox" : "Chart check failed";
+            </script>
+            """
+        let response: Data = Data((
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n" +
+            "Content-Security-Policy: sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'\r\n" +
+            "Content-Length: \(page.utf8.count)\r\nConnection: close\r\n\r\n" + page
+        ).utf8)
+        listener.stateUpdateHandler = { state in
+            if case .ready = state { ready.fulfill() }
+        }
+        let requestPrefix: String = "GET /pages/page_0123456789ABCDEFGHIJKLMN "
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: queue)
+            connection.receive(minimumIncompleteLength: requestPrefix.utf8.count, maximumLength: 4096) { data, _, _, _ in
+                guard let data, String(decoding: data, as: UTF8.self).hasPrefix(requestPrefix) else {
+                    connection.cancel()
+                    return
+                }
+                connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            }
+        }
+        listener.start(queue: queue)
+        wait(for: [ready], timeout: 5)
+        return listener
     }
 
     /// The owner, 2026-11-26: an answer's links and files show in its words, not listed under it. A GitHub pull

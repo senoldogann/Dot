@@ -2874,7 +2874,7 @@
     },
     "ThreadView": {
       "additionalProperties": false,
-      "description": "A chat's small state at ``revision`` (module docstring). ``runs`` are its newest runs, oldest first, and\n``older`` whether older ones are left (read them with ``before``); ``newest`` is the chat's newest run's page,\n``newest_events`` the tail of its events (``newest_events_cut`` when older ones were left out), from which its\ncursor goes on; both are empty (``None``, no events) for a page of older runs read with ``before``.",
+      "description": "A chat's small state at ``revision`` (module docstring). ``runs`` are its newest runs, oldest first, and\n``older`` whether older ones are left (read them with ``before``); ``newest`` is the chat's newest run's page,\n``newest_events`` the tail of its events (``newest_events_cut`` when older ones were left out), from which its\ncursor goes on; both are empty (``None``, no events) for a page of older runs read with ``before``.\n``shown_page_events`` holds the page references of the runs in this window, independent of stream cursors.",
       "properties": {
         "asks": {
           "items": {
@@ -2955,6 +2955,13 @@
             "$ref": "#/$defs/ThreadAutomation"
           },
           "title": "Schedules",
+          "type": "array"
+        },
+        "shown_page_events": {
+          "items": {
+            "$ref": "#/$defs/EventRecord"
+          },
+          "title": "Shown Page Events",
           "type": "array"
         },
         "summary": {

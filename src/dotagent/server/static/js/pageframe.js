@@ -12,10 +12,10 @@
  * the conversation does not jump under the reader.
  */
 import { el } from "./dom.js";
+import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { shownScheme } from "./theme.js";
 import { ZOOM_EVENT, openViewer } from "./viewer.js";
-import { t } from "./i18n.js";
 
 const MIN_HEIGHT = 80;
 const MAX_HEIGHT = 2000;

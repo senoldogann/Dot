@@ -1104,7 +1104,8 @@ chat), `runs` (its newest `tail` runs, 20 by default and 50 at most, oldest firs
 so a view kept by revision holds the account of its last move until the run ends; `null` with no events for a page read
 with `before`) and
 `newest_events` (the tail of its
-events, 200 at most, `newest_events_cut` when older ones were left out), `queue` (as `GET /api/threads/{id}/queue`),
+events, 200 at most, `newest_events_cut` when older ones were left out), `shown_page_events` (the page references
+of the returned runs, with their original event ids for placement in the transcript), `queue` (as `GET /api/threads/{id}/queue`),
 `asks` (the approvals and questions waiting, its helpers' among them), `helpers` (the runs its runs started in chats of
 their own, newest first, the newest 50 at most (`background` is drawn from them), each with `run_id`, `thread_id` (the helper's own chat, which a row opens), `title` (the first
 sentence of its goal with no ids in it, 80 characters at most), `status`, `started_at`, `finished_at`, `provider`,
