@@ -31,6 +31,16 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_chat_routing.py::test_a_routed_message_is_checked_as_a_queued_one_and_move_keeps_what_it_cannot_move` — words the router queued for a task skipped a queued message's checks, and Move took out a message it could not
+  move (item 2012's review).
+- `tests/smoke/test_chat_routing.py::test_a_move_that_fails_loses_nothing` — a move that failed after the message was
+  taken out lost it, and a run was stopped before its move was checked (item 2012's review).
+- `tests/smoke/test_stopped_run_text.py::test_an_emergency_stop_keeps_the_words_too_and_says_stopped_in_turkish` — a run the emergency stop ended kept the daemon's English sentence and lost its streamed words (item 1980's review).
+- `tests/smoke/test_scheduler.py::test_the_emergency_stop_cancels_the_kind_pass_under_way_and_starts_none` — the
+  hourly pass that asks the fast model the kind of a note went on under the emergency stop (item 1975's review).
+- `tests/smoke/test_work_orders_page.py::test_a_next_step_written_after_outside_content_is_marked` — the Agents page and the
+  phone's bot profile showed an objective's next step with no outside-words mark: the step has its own flag, which the mark
+  left out (item 2009's review).
 - `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
   on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
   chat deleted (item 1962's review).

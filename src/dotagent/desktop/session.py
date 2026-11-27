@@ -42,6 +42,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.desktop import actions, apps, ax, memory, perms, safety, screen, shots, views
 from dotagent.desktop import input as hid
 from dotagent.desktop.actions import Effect, Inspection, SecureFieldCheck, StepEnv
+from dotagent.desktop.cua import RunningDriver
 from dotagent.desktop.memory import AppMemory, ThreadDesktop
 from dotagent.desktop.pointer import PointerOverlay, label_of
 from dotagent.desktop.presence import WAITS_FOR_AWAY, OwnerPresence, owner_back_note, owner_here_note
@@ -432,8 +433,13 @@ class DesktopSession:
         browser_chrome: Callable[[], frozenset[int]],
         pointer: PointerOverlay | None = None,
         presence: OwnerPresence | None = None,
+        background: Callable[[], RunningDriver] | None = None,
     ) -> None:
         self._config: DesktopConfig = config
+        # What starts the background driver of ``[desktop] background_driver`` (item 2007), on the first batch that
+        # acts, and the driver it started; ``None`` when the setting is off: the steps take the Mac's own pointer.
+        self._start_background: Callable[[], RunningDriver] | None = background
+        self._background: RunningDriver | None = None
         # Whether the owner is at the Mac (item 1890), which holds back the steps that take the pointer or the keyboard.
         # Only the daemon's session reads the Mac's clock of the last input: a test gives a clock of its own, or none,
         # and then nothing waits.
@@ -836,6 +842,10 @@ class DesktopSession:
         app: AppInfo = _pick_app(state, name, running, preferred)
         _refuse_secrets(app)
         owner_here: bool = self._owner_here()
+        # The driver starts with the first batch that has a step for it, and serves the batches after it.
+        background: RunningDriver | None = (
+            self._background_job() if any(actions.goes_in_background(step) for step in steps) else None
+        )
         env: StepEnv = StepEnv(
             app=app,
             app_element=ax.app_element(app.pid, self._config.ax_timeout_s),
@@ -851,12 +861,28 @@ class DesktopSession:
             preferred=preferred,
             secure_field=secure_field,
             owner_here=owner_here,
+            background=background,
         )
         actions.check_failsafe(env)
         # The front is the owner's while they are at the Mac (item 1890): the step that needs it waits for them to go.
-        if not owner_here and _needs_front(steps, memory.known_nodes(memory.memory_of(state, app.pid))):
+        # The steps the background driver sends need no front (item 2007).
+        on_the_mac: list[Step] = [step for step in steps if not actions.in_background(env, step)]
+        if not owner_here and _needs_front(on_the_mac, memory.known_nodes(memory.memory_of(state, app.pid))):
             apps.activate(app, self._config.activate_timeout_s)
         return replace(env, expected_front=apps.frontmost_pid())
+
+    def _background_job(self) -> RunningDriver | None:
+        """The background driver for a batch (worker thread): the one running, or a new one when it stopped or a call
+        broke it; ``None`` when ``[desktop] background_driver`` is off. One that cannot start fails the batch: its steps
+        do not go to the Mac's own pointer instead (item 2007)."""
+        if self._start_background is None:
+            return None
+        if self._background is None or not self._background.alive:
+            if self._background is not None:
+                self._background.close()
+            self._background = None
+            self._background = self._start_background()
+        return self._background
 
     async def _run_step(self, env: StepEnv, step: Step, index: int, reviewer: StepReviewer) -> Effect:
         """Review a step, then perform it; a wait is only a pause."""
@@ -904,9 +930,17 @@ class DesktopSession:
 
     async def _execute(self, env: StepEnv, step: Step, inspection: Inspection) -> Effect:
         """Perform a step on the worker thread. The input a step may post is noted as Dot's own (item 1890): macOS's
-        clock of the last input counts it as a touch, which must not read as the owner's."""
+        clock of the last input counts it as a touch, which must not read as the owner's. A step of the background
+        driver posts none (item 2007)."""
         presence: OwnerPresence | None = self._presence
-        if presence is None or env.owner_here or not (step.action == "click" or actions.takes_input(step)):
+        # A step the background driver sends posts nothing to the Mac's own input (item 2007): its span, which may take
+        # seconds, is not Dot's own, so that the owner's return meanwhile is seen.
+        if (
+            presence is None
+            or env.owner_here
+            or actions.in_background(env, step)
+            or not (step.action == "click" or actions.takes_input(step))
+        ):
             return await self._call(partial(actions.execute_step, env, step, inspection))
         began: float = presence.now()
         try:
@@ -1049,7 +1083,7 @@ class DesktopSession:
                     drawn.x, drawn.y, step.action in _RIPPLES, label_of(who, step.action, effect.about)
                 )
             side_effects = side_effects or step.has_side_effects()
-            took_input = took_input or actions.takes_input(step) or effect.pointer is not None
+            took_input = took_input or actions.takes_mac_input(env, step) or effect.pointer is not None
             pointer = effect.pointer if effect.pointer is not None else env.expected_pointer
             env = replace(env, expected_pointer=pointer)
             if effect.switched_to is not None:
@@ -1254,6 +1288,9 @@ class DesktopSession:
         for element in woken.values():
             ax.rest_accessibility(element)
         self._release_hold()
+        if self._background is not None:
+            self._background.close()
+            self._background = None
 
     async def close(self) -> None:
         """Let go of everything: applications woken for accessibility rest, the wake-lock ends, the thread stops."""

@@ -107,7 +107,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
-   Work (Work orders, Objectives and Hand-offs, each to read: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
+   Work (Work orders, Objectives, with those done or let go below the active ones, and Hand-offs with the two faces and "From → To", each to read, and
+   laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
    and writes none, so the phone only reads, and scopes them to the bot itself: an agent's page has the orders given to it,
    the objectives those serve and the messages to or from it; Dot's own has every order and objective and the messages it sent
    or was sent, not those between two other agents; all within the newest 60 orders and 60 objectives the daemon sends), a ⋯ menu with Pause bot and Resume bot for an agent (`POST /api/agents/{id}/pause|resume`, item 465), then
@@ -326,7 +327,7 @@ On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-
 of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General,
 Appearance, Rules, Memory, Vault and Snapshots, then the groups Agents (Agents, Models, Browser, Web search, Scheduled tasks,
 Campaigns, Self-improvement; the sidebar has no Schedules icon, so its page is a row here), Connections (Connectors, Plugins,
-Skills, AI services, Phone, Channels, Hooks), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
+Skills, AI services, Phone, Channels, Hooks), Maintenance (System, Self-repair, Diagnostics, Speed) and About (Open source licences), and under them the first
 steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its

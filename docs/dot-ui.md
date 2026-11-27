@@ -29,12 +29,13 @@ the tokens of `themes.css` and `app.css`, never a literal (`tests/unit/test_css_
   rules of Back are those of items 338, 1079 and 1321), then the breadcrumb: the agent's badge, its name, a slash and the
   chat's title. At the right the toggles of the panels. A page that is no chat's names itself alone. The face a page puts
   before an agent's name stays in the badge, out of sight, and its state tints the badge.
-- **The composer** (`composer.js`, `choices.js`, `app.css`): one rounded box on the token's radius with a hairline edge; the
-  words on top and, under them, one bar: the "+" at the left; at the right the model's pill (the provider's mark, the name and
-  the reasoning as bars), the microphone and the round send. The mode (when named) and the context meter are quiet
-  pills of the same bar; on a Mac the approvals stand under the box at its right, and on a phone the model's sheet holds
-  them (YOLO's lock stays in the bar). The choices are always in sight: there is no resting state and no button that hides
-  them. The queue's sheet over the box is on the box's own ground, a row of it with an up and a down arrow (32 px, 44 on a phone;
+- **The composer** (`composer.js`, `composershape.js`, `choices.js`, `run.css`): the iPhone app's capsule on every width
+  (item 2015), one rounded box with a hairline edge: one row while the words are short (the "+", the words, the model's
+  mark and chevron, the microphone and the round send), the words on top once they are long, a line break or a file, with
+  the model named and its level in grey on the line under them. The model's pill opens the Chat settings sheet (models,
+  Reasoning, Mode, Approvals, How Dot works); YOLO's lock alone stays in the bar. There is no resting state and no button
+  that hides the choices.
+  The queue's sheet over the box is on the box's own ground, a row of it with an up and a down arrow (32 px, 44 on a phone;
   no drag, item 1348); the line over it that says the work's state is a quiet pill.
 
 Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows.py`, `test_activity.py`,
@@ -69,6 +70,7 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | Snapshots | `snapshots.js` | Both Command keys together capture the window in front (a double tap, once on). |
 | System | `system.js` | Daemon health, the emergency stop, health checks and provider models. |
 | Diagnostics | `diagnostics.js` | The daemon's process and the children it started. |
+| Speed | `speed.js` | Where the seconds of the runs went, stage by stage, with p50, p95, p99 and the count over 3 s. |
 | Open source licences | `licences.js` | The licences of what Dot uses. |
 | Controls | `controls.js` | Every control on one page, for checking a look in light and dark. |
 | Theme editor | `themeEditor.js` | A theme of one's own: a name and a palette for each scheme. |

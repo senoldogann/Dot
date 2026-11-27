@@ -5776,3 +5776,21 @@
 .usage-card .set-row-lead {
   font-variant-numeric: tabular-nums;
 }
+
+/* Settings › Maintenance › Speed (item 2003): the window switch with its refresh, and the tables of the stages, their
+   numbers right-aligned in figures of one width; a count of slow samples above none is set in the bad colour. */
+.speed-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.speed-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.speed-table td.speed-slow {
+  color: var(--bad);
+}

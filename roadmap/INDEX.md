@@ -6,9 +6,16 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2015](2015.md) | done | 2026-11-27 | The web composer works as DotNext's on every width: one capsule, the model as its mark, its settings in one sheet |
 | [2014](2014.md) | done | 2026-11-27 | The small window's compaction fixture takes the cards tool, and the tool's schema is shorter |
+| [2012](2012.md) | built | 2026-11-27 | Several tasks in one chat, slice 2: where a message goes |
 | [2011](2011.md) | done | 2026-11-27 | The web says "helper" ("yardımcı") where it said "subagent" ("alt ajan"), as the iPhone app does |
 | [2010](2010.md) | done | 2026-11-27 | A chat's row says when its run waits on its helpers, and what works for it while it rests, as DotNext's rows do |
+| [2009](2009.md) | in progress | 2026-11-27 | A bot's work lists the same on the phone and the web: handed-out time, judged by, finished objectives, hand-offs with their faces |
+| [2007](2007.md) | built | 2026-11-27 | A background driver for the desktop's steps, a trial: cua-driver sends them to the window, the Mac's pointer left alone |
+| [2005](2005.md) | done | 2026-11-27 | A step writes only the message it shortened, not the whole history |
+| [2004](2004.md) | done | 2026-11-27 | A run's start no longer reads every skill again, nor waits minutes for an embedding |
+| [2003](2003.md) | done | 2026-11-27 | Where the seconds go: `dotx perf` and Settings › Maintenance › Speed |
 | [2001](2001.md) | done | 2026-11-27 | The question card is one panel on the phone and on the web: "User input needed", a pick per card, one Submit |
 | [2000](2000.md) | done | 2026-11-27 | The capsule's clock says whole seconds, as DotNext's pill does |
 | [1999](1999.md) | done | 2026-11-27 | A message sent in a chat is in it at once, with a quiet "Pending" and "Starting…", as DotNext does it |
@@ -24,7 +31,13 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1984](1984.md) | built | 2026-11-27 | Several tasks in one chat, slice 1: lanes, the answer's queue, Stop for the whole chat |
 | [1983](1983.md) | done | 2026-11-27 | DotNext's Memory: add a note, pin it, and bring a forgotten one back from the trash |
 | [1982](1982.md) | design | 2026-11-27 | Several tasks at once in one chat: design |
+| [1981](1981.md) | done | 2026-11-27 | A run that ended for a fault says what happened in a plain sentence, with the program's words under Details |
+| [1980](1980.md) | done | 2026-11-27 | A stopped run keeps the words it had streamed, with a quiet "Stopped" note under them |
+| [1979](1979.md) | done | 2026-11-27 | An approval card says what Dot wants to do and why it asks in plain words, with the policy's words folded |
+| [1978](1978.md) | done | 2026-11-27 | An English line is no longer capitals under a Turkish page: the question card's header is plain |
+| [1977](1977.md) | done | 2026-11-27 | The web UI speaks Turkish on every screen, and a check fails for a line of English that is not in the catalogue |
 | [1976](1976.md) | done | 2026-11-27 | A chat told as a conversation: Dot's short messages of what it turns to, and the live line with its face and time |
+| [1975](1975.md) | done | 2026-11-27 | Typed memory: every note has a kind, and a run's starting notes are ranked by kind for where it came from |
 | [1974](1974.md) | done | 2026-11-26 | The Desktop section's batch line is back: a batch's result is the run's look |
 | [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |
 | [1972](1972.md) | done | 2026-11-26 | Swipe a message to quote it |

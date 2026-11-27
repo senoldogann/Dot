@@ -9,6 +9,8 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # A tool row of Dot's own: cards shown in the chat (item 1967).
+    "Show cards": "Kart göster",
     "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",
     "Not sent: an attachment could not be read on this phone": "Gönderilmedi: eklerden biri bu telefonda okunamadı",
     "Upload cancelled": "Yükleme iptal edildi",
@@ -1642,7 +1644,10 @@ TR.update(
         "due in %@": "%@ sonra bitiyor",
         "%@ late": "%@ gecikti",
         "Let go": "Bırakıldı",
-        "Written after Dot read content from outside.": "Dot dışarıdan içerik okuduktan sonra yazıldı.",
+        "Written after Dot read content from outside": "Dot dışarıdan içerik okuduktan sonra yazıldı",
+        "handed out %@": "%@ verildi",
+        "Judged by: %@": "Ölçüt: %@",
+        "%@ is working on it": "%@ üzerinde çalışıyor",
         "Work orders": "İş emirleri",
         "No work orders yet": "Henüz iş emri yok",
         "When Dot hands a bot a piece of work, it shows here with where it stands.": "Dot bir bota iş verdiğinde, durumuyla birlikte burada görünür.",
@@ -1676,7 +1681,6 @@ TR.update(
         "Sent to others": "Başkalarına gönderilen",
         "Today's messages between bots, newest first.": "Botlar arasındaki bugünkü mesajlar, en yeni önce.",
         "Reply: %@": "Yanıt: %@",
-        "Waiting for a reply": "Yanıt bekleniyor",
         "Hand-off": "Devir",
         "From": "Gönderen",
         "Sent at": "Gönderilme saati",

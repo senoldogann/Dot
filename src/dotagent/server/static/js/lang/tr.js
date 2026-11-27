@@ -1,8 +1,10 @@
 // The interface's own words in Turkish (i18n.js): the keys of the English catalogue (en.js), each written for a Turkish
 // reader rather than word for word. `tsc` refuses a key missing here or one en.js does not have.
 
-/** @type {Record<keyof typeof import("./en.js").EN, string>} */
-export const TR = {
+import { TR_APP } from "./tr-app.js";
+import { TR_VIEWS } from "./tr-views.js";
+
+const CORE = {
   "work.typing": "Yazıyor",
   "work.thinking": "Düşünüyor",
   "work.command": "Komut çalıştırıyor",
@@ -65,10 +67,13 @@ export const TR = {
   "intent.sendToTask": "Göreve gönder",
   "intent.held": "Görev beklemede: devam etmesi için yazın",
   "intent.heldShort": "Devam etmesi için yazın",
-  "intent.steerPlaceholder": "Bu göreve ekleyin ya da yan soru için /btw",
-  "intent.steerPlaceholderShort": "Göreve ekle (ya da /btw)",
-  "intent.queuePlaceholder": "Sonraki görevi yazın ya da yan soru için /btw",
-  "intent.queuePlaceholderShort": "Sonraki görev (ya da /btw)",
+  "intent.steerPlaceholder": "Çalışan göreve yaz",
+  "intent.steerPlaceholderShort": "Çalışan göreve yaz",
+  "intent.queuePlaceholder": "Mesajı sıraya al",
+  "intent.queuePlaceholderShort": "Mesajı sıraya al",
+  "composer.messageDot": "{name} adlı asistana yaz",
+  "composer.askAgent": "{name} adlı bota sor",
+  "composer.messageDotPlain": "Dot'a yaz",
   "composer.followUp": "Devam edin",
   "composer.save": "Kaydet",
   "composer.add": "Ekle",
@@ -821,6 +826,7 @@ export const TR = {
   "outcome.failedAlert": "Görev başarısız oldu",
   "outcome.cancelled": "Durduruldu",
   "outcome.cancelledEmpty": "Görev bir yanıt yazmadan önce durduruldu.",
+  "outcome.cutOffEmpty": "Görev, Dot kapandığı ya da onu yürüten komut sona erdiği için yarıda kesildi.",
   "outcome.waiting": "Sizi bekliyor",
   "outcome.waitingEmpty": "Görev yalnızca sizin verebileceğiniz bir şey için durdu.",
   "outcome.needs": "Dot'un sizden istedikleri",
@@ -954,4 +960,28 @@ export const TR = {
   "asks.show": "Dot'un sorduklarını göster",
   "asks.submitOne": "Yanıtı gönder",
   "asks.submitMany": "Yanıtları gönder",
+  // Settings › Maintenance › Speed (item 2003).
+  "speed.title": "Hız",
+  "speed.about": "Dot'un işinin saniyeleri nereye gitti, aşama aşama; run'ların kaydettiklerinden okunur: n kaç tane olduğu, p50, p95 ve p99 yarısının, 100'de 95'inin ve 99'unun içinde kaldığı süre, sonra en uzunu ve kaçının 3 saniyeyi aştığı.",
+  "speed.window24h": "Son 24 saat",
+  "speed.window7d": "Son 7 gün",
+  "speed.refresh": "Yenile",
+  "speed.summaryDayOne": "Son 24 saatte 1 run. Süreler saniye.",
+  "speed.summaryDay": "Son 24 saatte {count} run. Süreler saniye.",
+  "speed.summaryWeekOne": "Son 7 günde 1 run. Süreler saniye.",
+  "speed.summaryWeek": "Son 7 günde {count} run. Süreler saniye.",
+  "speed.empty": "Bu aralıkta hiçbir şey kaydedilmedi.",
+  "speed.colWhat": "Ne",
+  "speed.colMax": "En uzun",
+  "speed.colOver3": "3 sn üstü",
+  "speed.stageStart": "Run'ın başı, ilk model çağrısına kadar",
+  "speed.stageStartRead": "Run başında okunanlar",
+  "speed.stageGap": "İki adım arası",
+  "speed.stageGapDaemon": "İki adım arası, Dot'un kendi süresi (aradaki model çağrıları hariç)",
+  "speed.stageModel": "Model çağrıları, model ve amaca göre",
+  "speed.stageFirstToken": "Adım yanıtının ilk kelimesi",
+  "speed.stageTool": "Araç çağrıları, çalışma süreleri",
 };
+
+/** @type {Record<keyof typeof import("./en.js").EN, string>} */
+export const TR = { ...CORE, ...TR_VIEWS, ...TR_APP };

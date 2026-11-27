@@ -42,8 +42,8 @@ function codeNode(value) {
     {
       class: "code-path",
       type: "button",
-      title: `Show the file: ${value}`,
-      "aria-label": `Show the file ${value}`,
+      title: t("prose.showTheFileValue", { value }),
+      "aria-label": t("prose.showTheFileValue2", { value }),
       dataset: { path: value },
       onclick: (event) => requestFile(event.currentTarget),
     },
@@ -67,7 +67,7 @@ function fileWords(text) {
         {
           class: "file-word",
           type: "button",
-          title: `Show the file: ${match[1]}`,
+          title: t("prose.showTheFileValue", { value: match[1] }),
           dataset: { path: match[1] },
           onclick: (event) => requestFile(event.currentTarget),
         },
@@ -136,7 +136,7 @@ function itemNode(item) {
   const task =
     item.checked === null
       ? null
-      : el("input", { class: "task-box", type: "checkbox", checked: item.checked, disabled: true, "aria-label": item.checked ? "Done" : "Not done" });
+      : el("input", { class: "task-box", type: "checkbox", checked: item.checked, disabled: true, "aria-label": item.checked ? t("prose.done") : t("prose.notDone") });
   return el("li", { class: task === null ? null : "task" }, task, inlineNodes(item.inline), item.blocks.map(blockNode));
 }
 

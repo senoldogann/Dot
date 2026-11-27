@@ -2,16 +2,16 @@
 // releases it; the banner of an engaged one releases it too.
 
 import { api } from "./api.js";
-import { plural } from "./dom.js";
 import { refresh } from "./state.js";
 import { confirmDialog, toast } from "./ui.js";
+import { t, tCount } from "./i18n.js";
 
 /** Ask for confirmation, then stop everything. */
 export async function engageFailsafe() {
   const confirmed = await confirmDialog({
-    title: "Emergency stop",
-    message: "This cancels every running task and blocks desktop control until you release it.",
-    confirmLabel: "Stop everything",
+    title: t("failsafe.emergencyStop"),
+    message: t("failsafe.thisCancelsEveryRunningTask"),
+    confirmLabel: t("failsafe.stopEverything"),
     danger: true,
     focusCancel: false,
   });
@@ -19,12 +19,12 @@ export async function engageFailsafe() {
     return;
   }
   const result = await api.post("/failsafe", null);
-  toast("ok", `Emergency stop engaged; ${plural(result.cancelled_runs.length, "task", "tasks")} stopped.`);
+  toast("ok", t("failsafe.emergencyStopEngagedPartStopped", { part: tCount(result.cancelled_runs.length, "failsafe.countTask", "failsafe.countTasks") }));
   await refresh();
 }
 
 export async function releaseFailsafe() {
   await api.del("/failsafe");
-  toast("ok", "Emergency stop released.");
+  toast("ok", t("failsafe.emergencyStopReleased"));
   await refresh();
 }

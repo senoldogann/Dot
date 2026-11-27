@@ -29,6 +29,7 @@ from dotagent.codemode.sandbox import Probe, code_mode_ready
 from dotagent.config import (
     AntigravityConfig,
     AppConfig,
+    DesktopConfig,
     JudgeConfig,
     LessonsMode,
     McpServerConfig,
@@ -36,7 +37,7 @@ from dotagent.config import (
     ModelsConfig,
     ProvidersConfig,
 )
-from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError, WebError
+from dotagent.core.errors import BrowserError, ConfigError, DesktopError, ProviderError, ToolExecutionError, WebError
 from dotagent.core.paths import (
     chrome_data_dir,
     claude_code_command,
@@ -743,6 +744,33 @@ _DESKTOP_FIX: str = (
 )
 
 
+def _background_driver_row(desktop: DesktopConfig) -> CheckResult:
+    """cua-driver, the opt-in background driver (item 2007): whether it is there, its version and signer, and the
+    one command that installs the version Dot is measured with. Dot never installs it itself."""
+    # Loaded by the check that reads it, as the desktop's other modules are (item 1270).
+    from dotagent.desktop import cua
+
+    path: Path = Path(desktop.background_driver_path).expanduser()
+    try:
+        binary: cua.CuaBinary = cua.find_binary(path, cua.CHECK_TIMEOUT_S)
+    except DesktopError as error:
+        if desktop.background_driver == "off":
+            return _result(
+                "desktop background",
+                True,
+                False,
+                f'off; to try it: {cua.INSTALL_COMMAND}, then [desktop] background_driver = "cua"',
+            )
+        return _result("desktop background", False, False, error.message)
+    refusal: str | None = cua.refusal_of(binary)
+    found: str = f"cua-driver {binary.version or '(version not read)'} (team {binary.team_id}) at {path}"
+    if desktop.background_driver == "off":
+        return _result("desktop background", True, False, f"off; {found}" + ("" if refusal is None else f"; {refusal}"))
+    if refusal is not None:
+        return _result("desktop background", False, False, refusal)
+    return _result("desktop background", True, False, f"on: {found}")
+
+
 def _check_desktop(config: AppConfig) -> list[CheckResult]:
     """The macOS version and the privacy permissions the desktop tools need, as macOS reports them for the app that
     runs Dot."""
@@ -756,6 +784,7 @@ def _check_desktop(config: AppConfig) -> list[CheckResult]:
     )
     return [
         _check_screen_capture_support(),
+        _background_driver_row(config.desktop),
         *(
             _result(
                 name,

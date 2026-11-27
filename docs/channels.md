@@ -19,7 +19,7 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   the run at work (item 611).
 - It is your own message, trusted as one typed in the UI. The run starts with the choices the chat keeps for its next
   follow-up: **Auto** for the mode (the message's words settle it, as in the composer), the approvals of `[policy]
-  approvals`, the default model. Open the chat in Dot and change the pills of its composer, and the next message of the
+  approvals`, the default model. Open the chat in Dot and change the choices of its composer (its Chat settings), and the next message of the
   channel starts with what you chose.
 - `/stop` stops the run at work in the chat, as Stop on its page does, and so do the plain words **stop**, **dur** and
   **durdur** (item 611: the owner writes in English and in Turkish). A message that is only one of them, in any case,

@@ -7,7 +7,8 @@
 // does; a pattern that is more is shown as it is. The patterns the drafter writes, and what the engine makes of the
 // others this file reads, are held to it by tests/unit/test_rule_words.py.
 
-import { clip, plural } from "./dom.js";
+import { clip, } from "./dom.js";
+import { t, tCount } from "./i18n.js";
 
 /** How many characters of the box "When Dot wants to": the sentence the drafter is given round them stays under the
  * 500 it takes (`RuleDraftRequest`). */
@@ -26,35 +27,35 @@ const PATTERN_CHARS = 40;
 export const ANSWERS = [
   {
     id: "allow",
-    choice: "Allow on its own",
-    says: "goes ahead without asking",
+    choice: t("rulewords.allowOnItsOwn"),
+    says: t("rulewords.goesAheadWithoutAsking"),
     tone: "b-ok",
-    text: "Dot does it without asking. If it has just read a web page or a mail, it still asks before anything that reaches outside this Mac.",
-    wish: "do it without asking me",
+    text: t("rulewords.dotDoesItWithoutAsking"),
+    wish: t("rulewords.doItWithoutAskingMe"),
   },
   {
     id: "preapproved",
-    choice: "Allow, whatever it has read",
-    says: "goes ahead, whatever it has read",
+    choice: t("rulewords.allowWhateverItHasRead"),
+    says: t("rulewords.goesAheadWhateverItHas"),
     tone: "b-ok",
-    text: "Dot does it without asking, even after it has read a web page or a mail.",
-    wish: "do it without asking me, even after it has read web pages or mail",
+    text: t("rulewords.dotDoesItWithoutAsking2"),
+    wish: t("rulewords.doItWithoutAskingMe2"),
   },
   {
     id: "ask",
-    choice: "Ask me first",
-    says: "asks you first",
+    choice: t("rulewords.askMeFirst"),
+    says: t("rulewords.asksYouFirst"),
     tone: "b-warn",
-    text: "Dot stops and asks you every time; the run waits for your answer.",
-    wish: "ask me first",
+    text: t("rulewords.dotStopsAndAsksYou"),
+    wish: t("rulewords.askMeFirst2"),
   },
   {
     id: "handoff",
-    choice: "Leave it to me",
-    says: "leaves it to you",
+    choice: t("rulewords.leaveItToMe"),
+    says: t("rulewords.leavesItToYou"),
     tone: "b-hand",
-    text: "Dot does not do it. It says what needs doing and waits: you do the step (in the browser you can take over and give it back), then tell Dot, and the run goes on from there.",
-    wish: "stop and let me do the step myself",
+    text: t("rulewords.dotDoesNotDoIt"),
+    wish: t("rulewords.stopAndLetMeDo"),
   },
 ];
 /** The answers the adder offers, in the order of its choice: the other, which goes further than "on its own", is in Details. */
@@ -75,7 +76,7 @@ export function draftSentence(wants, choice) {
     .trim()
     .replace(/^to\s+/iu, "")
     .replace(/[\s.,;:!?]+$/u, "");
-  return `When Dot wants to ${action}, it should ${answerOf(choice).wish}.`;
+  return t("rulewords.whenDotWantsToAction", { action, wish: answerOf(choice).wish });
 }
 
 // What each tool is, as a person says what Dot does with it: one phrase for each tool or family, and no phrase for two,
@@ -85,32 +86,32 @@ export function draftSentence(wants, choice) {
 // own name.
 const KNOWN_TOOLS = new Map(
   Object.entries({
-    "*": { verb: "do anything", object: true },
-    shell: { verb: "run a command", object: true },
-    apple_script: { verb: "run an AppleScript", object: true },
-    write_file: { verb: "write a file", object: true },
-    edit_file: { verb: "change a file", object: true },
-    read_file: { verb: "read a file", object: true },
-    list_dir: { verb: "look inside a folder", object: true },
-    find_files: { verb: "find a file", object: true },
-    search_files: { verb: "search inside files" },
-    "browser_*": { verb: "use the web browser" },
-    browser_open: { verb: "open a web page", object: true },
-    browser_act: { verb: "work on a web page (click, type, press keys, drag)" },
-    browser_fill_login: { verb: "fill in a login on a web page" },
-    browser_create_login: { verb: "make the login of a new account on a web page" },
-    browser_upload: { verb: "upload a file on a web page" },
-    browser_eval: { verb: "run a script on a web page" },
-    "desktop_*": { verb: "work with apps and the screen of this Mac" },
-    desktop_open_app: { verb: "open an app", object: true },
-    "terminal_*": { verb: "use a terminal" },
-    web_search: { verb: "search the web" },
-    web_fetch: { verb: "read a web page", object: true },
-    web_crawl: { verb: "read a whole website", object: true },
-    web_extract: { verb: "pull facts out of a web page", object: true },
-    "memory_*": { verb: "use its memory" },
-    "schedule_*": { verb: "work with your schedules" },
-    "mcp__*": { verb: "use a connected app" },
+    "*": { verb: t("rulewords.doAnything"), object: true },
+    shell: { verb: t("rulewords.runACommand"), object: true },
+    apple_script: { verb: t("rulewords.runAnApplescript"), object: true },
+    write_file: { verb: t("rulewords.writeAFile"), object: true },
+    edit_file: { verb: t("rulewords.changeAFile"), object: true },
+    read_file: { verb: t("rulewords.readAFile"), object: true },
+    list_dir: { verb: t("rulewords.lookInsideAFolder"), object: true },
+    find_files: { verb: t("rulewords.findAFile"), object: true },
+    search_files: { verb: t("rulewords.searchInsideFiles") },
+    "browser_*": { verb: t("rulewords.useTheWebBrowser") },
+    browser_open: { verb: t("rulewords.openAWebPage"), object: true },
+    browser_act: { verb: t("rulewords.workOnAWebPage") },
+    browser_fill_login: { verb: t("rulewords.fillInALoginOn") },
+    browser_create_login: { verb: t("rulewords.makeTheLoginOfA") },
+    browser_upload: { verb: t("rulewords.uploadAFileOnA") },
+    browser_eval: { verb: t("rulewords.runAScriptOnA") },
+    "desktop_*": { verb: t("rulewords.workWithAppsAndThe") },
+    desktop_open_app: { verb: t("rulewords.openAnApp"), object: true },
+    "terminal_*": { verb: t("rulewords.useATerminal") },
+    web_search: { verb: t("rulewords.searchTheWeb") },
+    web_fetch: { verb: t("rulewords.readAWebPage"), object: true },
+    web_crawl: { verb: t("rulewords.readAWholeWebsite"), object: true },
+    web_extract: { verb: t("rulewords.pullFactsOutOfA"), object: true },
+    "memory_*": { verb: t("rulewords.useItsMemory") },
+    "schedule_*": { verb: t("rulewords.workWithYourSchedules") },
+    "mcp__*": { verb: t("rulewords.useAConnectedApp") },
   }),
 );
 
@@ -237,13 +238,13 @@ function actionOf(rule) {
   if (commands !== null) {
     // The pattern fits the whole line of the command: a `cd` may come first, and the arguments are plain, which is not "any":
     // one with `;` `&` `|` `$` `<` `>` `(` `)` or a backtick (a command chained to it, run inside it, sent on from it) is not fit.
-    return [text(`run ${either(commands)} (with plain arguments, after changing folder at most)`)];
+    return [text(t("rulewords.runEitherWithPlainArguments", { either: either(commands) }))];
   }
   const read = readWords(rule.match_regex);
   if (read === null) {
     return null;
   }
-  const link = tool.object ? "that" : "for something that";
+  const link = tool.object ? "that" : t("rulewords.forSomethingThat");
   return [...tool.verb, text(` ${link} ${read.whole ? "mentions" : "contains"} ${either(read.words)}`)];
 }
 
@@ -255,7 +256,7 @@ const LETTING = new Set(["allow", "preapproved"]);
 function looksLike(rule) {
   const tool = toolOf(rule.tool_glob);
   const shown = LETTING.has(rule.behavior) ? rule.match_regex : clip(rule.match_regex, PATTERN_CHARS);
-  return [...tool.verb, text(` ${tool.object ? "that" : "for something that"} looks like `), code(shown, rule.match_regex)];
+  return [...tool.verb, text(tool.object ? t("rulewords.thatLooksLike") : t("rulewords.forSomethingThatLooksLike")), code(shown, rule.match_regex)];
 }
 
 /**
@@ -274,25 +275,25 @@ export function ruleParts(rule) {
 export function ruleText(rule) {
   const { what, answer } = ruleParts(rule);
   const action = what.map((part) => ("text" in part ? part.text : part.code)).join("");
-  return `When Dot wants to ${action}, it ${answer.says}.`;
+  return t("rulewords.whenDotWantsToAction2", { action, says: answer.says });
 }
 
 /** Why a rule never decides (`never_decided_by`, item 449): the rule `first` decides in its place; `firstAnswer` is its
  * answer and `answer` this rule's. A rule that hands the step to you decides wherever it stands (item 481). */
 export function neverUsedWhy(first, firstAnswer, answer) {
   if (firstAnswer === "handoff" && answer !== "handoff") {
-    return `Rule ${first} leaves everything this rule covers to you, and a rule like that always wins, wherever it stands. So this rule is never used. Narrow one of them, or delete one.`;
+    return t("rulewords.ruleFirstLeavesEverythingThis", { first });
   }
-  return `Rule ${first} already covers everything this rule covers and is checked first, so this rule is never used. Move it above rule ${first}, or delete one of them.`;
+  return t("rulewords.ruleFirstAlreadyCoversEverything", { first, first2: first });
 }
 
 /** The line that says what a rule would have done on the steps of the last days (the answer of `POST /rules/preview`), in
  * the words of a person: the first line the owner reads before the rule is added. */
 export function latelyLine(view, days) {
-  const span = plural(days, "day", "days");
+  const span = tCount(days, "rulewords.countDay", "rulewords.countDays");
   if (view.scanned === 0) {
-    return `Nothing Dot did in the last ${span} was there to try it on.`;
+    return t("rulewords.nothingDotDidInThe", { span });
   }
-  const read = view.partial && view.since !== null ? `the newest ${view.scanned} things Dot did` : `the ${view.scanned} things Dot did in the last ${span}`;
-  return view.fits === 0 ? `It would not have applied to any of ${read}.` : `It would have applied to ${view.fits} of ${read}.`;
+  const read = view.partial && view.since !== null ? t("rulewords.theNewestScannedThingsDot", { scanned: view.scanned }) : t("rulewords.theScannedThingsDotDid", { scanned: view.scanned, span });
+  return view.fits === 0 ? t("rulewords.itWouldNotHaveApplied", { read }) : t("rulewords.itWouldHaveAppliedTo", { fits: view.fits, read });
 }

@@ -6,7 +6,7 @@
 // delete together (item 768), as the sidebar's Select ticks chats.
 
 import { api } from "../api.js";
-import { debounce, el, foldSearch, plural, setText } from "../dom.js";
+import { debounce, el, foldSearch, setText } from "../dom.js";
 import { dotName } from "../face.js";
 import { icon } from "../icons.js";
 import { moreButton, openMenu } from "../menu.js";
@@ -14,19 +14,25 @@ import { emptyPanel, inlineError, inlineLoading, segmented, setCard, setSection 
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 import { itemMatches, reportWords, rowWords } from "../vaultitems.js";
 import { openCardDialog, openContactDialog, openLoginDialog } from "../vaultforms.js";
+import { t, tCount } from "../i18n.js";
 
 const PAGE_SIZE = 60;
 // How far under the list's end the next rows are drawn, so that a scroll does not wait on them.
 const DRAW_AHEAD = "0px 0px 600px 0px";
 const SEARCH_DELAY_MS = 150;
 const TABS = [
-  { id: "all", label: "All", hint: "Every item" },
-  { id: "login", label: "Logins", hint: "Sites you sign in to" },
-  { id: "card", label: "Cards", hint: "Payment cards" },
-  { id: "contact", label: "Contacts", hint: "Names, addresses, phone numbers and emails" },
+  { id: "all", label: t("views.vault.all"), hint: t("views.vault.everyItem") },
+  { id: "login", label: t("views.vault.logins"), hint: t("views.vault.sitesYouSignInTo") },
+  { id: "card", label: t("views.vault.cards"), hint: t("views.vault.paymentCards") },
+  { id: "contact", label: t("views.vault.contacts"), hint: t("views.vault.namesAddressesPhoneNumbersAnd") },
 ];
 const KIND_MARK = { login: "key", card: "creditCard", contact: "contact" };
 const KIND_NAME = { login: "login", card: "card", contact: "contact" };
+
+/** The empty-tab line for the kind of item shown. */
+function noneSaved(kind) {
+  return kind === "login" ? t("views.vault.noneSaved.login") : kind === "card" ? t("views.vault.noneSaved.card") : kind === "contact" ? t("views.vault.noneSaved.contact") : t("views.vault.noneSaved.item");
+}
 
 /** One item as a row: its mark, its words, and its "…" with Edit and Delete (item 848: one action a row). */
 function itemRow(item, actions) {
@@ -34,9 +40,9 @@ function itemRow(item, actions) {
   const more = moreButton({
     name: title,
     items: () => [
-      { label: "Edit", icon: "pencil", run: () => actions.edit(item) },
+      { label: t("views.vault.edit"), icon: "pencil", run: () => actions.edit(item) },
       "separator",
-      { label: "Delete", icon: "trash", danger: true, run: () => actions.remove(item) },
+      { label: t("views.vault.delete"), icon: "trash", danger: true, run: () => actions.remove(item) },
     ],
   });
   return el(
@@ -48,7 +54,7 @@ function itemRow(item, actions) {
       { class: "vault-main" },
       el("div", { class: "vault-title" }, title),
       el("div", { class: "vault-sub" }, sub),
-      item.kind === "card" && Object.keys(item.fields).length > 0 ? el("div", { class: "vault-sub" }, "With a billing address") : null,
+      item.kind === "card" && Object.keys(item.fields).length > 0 ? el("div", { class: "vault-sub" }, t("views.vault.withABillingAddress")) : null,
     ),
     el("div", { class: "vault-actions" }, more),
   );
@@ -89,30 +95,30 @@ export function mount(root, ctx) {
     autocomplete: "off",
     spellcheck: "false",
     maxlength: "200",
-    placeholder: "Search the vault",
-    "aria-label": "Search the vault",
+    placeholder: t("views.vault.searchTheVault"),
+    "aria-label": t("views.vault.searchTheVault"),
   });
   const holder = el("div", null, inlineLoading());
   const list = el("div", { class: "vault-rows" });
   const end = el("div", { class: "vault-end", "aria-hidden": "true" });
-  const selectButton = el("button", { class: "btn", type: "button", hidden: true }, "Select");
+  const selectButton = el("button", { class: "btn", type: "button", hidden: true }, t("views.vault.select"));
   const count = el("span", { class: "vault-select-count", role: "status" });
-  const allButton = el("button", { class: "btn sm", type: "button" }, "Select all");
-  const deleteButton = el("button", { class: "btn danger solid sm", type: "button" }, icon("trash"), "Delete");
+  const allButton = el("button", { class: "btn sm", type: "button" }, t("views.vault.selectAll"));
+  const deleteButton = el("button", { class: "btn danger solid sm", type: "button" }, icon("trash"), t("views.vault.delete"));
   const cancelButton = el(
     "button",
-    { class: "icon-btn", type: "button", title: "Stop choosing", "aria-label": "Stop choosing" },
+    { class: "icon-btn", type: "button", title: t("views.vault.stopChoosing"), "aria-label": t("views.vault.stopChoosing") },
     icon("x"),
   );
   const bar = el("div", { class: "vault-select-bar", hidden: true }, count, el("div", { class: "vault-select-tools" }, allButton, deleteButton, cancelButton));
   const report = el("div", { class: "note vault-report", role: "status", hidden: true });
-  const newItem = el("button", { class: "btn primary", type: "button", "aria-haspopup": "menu", "aria-expanded": "false" }, icon("plus"), "New item");
+  const newItem = el("button", { class: "btn primary", type: "button", "aria-haspopup": "menu", "aria-expanded": "false" }, icon("plus"), t("views.vault.newItem"));
   const tabs = segmented(TABS, kind, (id) => {
     kind = id;
     shown = PAGE_SIZE;
     paint(false);
   });
-  tabs.element.setAttribute("aria-label", "Show");
+  tabs.element.setAttribute("aria-label", t("views.vault.show"));
   tabs.element.classList.add("vault-tabs");
   const tabButtons = [...tabs.element.querySelectorAll("button")];
 
@@ -160,8 +166,8 @@ export function mount(root, ctx) {
   function paintBar() {
     bar.hidden = !selecting;
     const all = current.length > 0 && current.every((item) => selected.has(item.id));
-    setText(count, selected.size === 0 ? "Choose items to delete" : `${plural(selected.size, "item", "items")} selected`);
-    setText(allButton, all ? "Clear" : "Select all");
+    setText(count, selected.size === 0 ? t("views.vault.chooseItemsToDelete") : t("views.vault.partSelected", { part: tCount(selected.size, "views.vault.countItem", "views.vault.countItems") }));
+    setText(allButton, all ? t("views.vault.clear") : t("views.vault.selectAll"));
     allButton.disabled = current.length === 0 || deleting;
     deleteButton.disabled = selected.size === 0 || deleting;
   }
@@ -183,12 +189,12 @@ export function mount(root, ctx) {
     selectButton.hidden = items.length === 0 || selecting;
     paintBar();
     if (items.length === 0) {
-      holder.replaceChildren(emptyPanel("lock", "Nothing saved yet", "Add a login, a card or contact details with New item."));
+      holder.replaceChildren(emptyPanel("lock", t("views.vault.nothingSavedYet"), t("views.vault.addALoginACard")));
       return;
     }
     if (current.length === 0) {
-      const message = search.value.trim() === "" ? `No ${KIND_NAME[kind] ?? "item"}s saved yet.` : "Try other words, or another tab.";
-      holder.replaceChildren(emptyPanel("search", "Nothing matches", message));
+      const message = search.value.trim() === "" ? noneSaved(kind) : t("views.vault.tryOtherWordsOrAnother");
+      holder.replaceChildren(emptyPanel("search", t("views.vault.nothingMatches"), message));
       return;
     }
     const top = keep ? list.scrollTop : 0;
@@ -247,12 +253,12 @@ export function mount(root, ctx) {
     }
     const one = chosen.length === 1;
     const logins = chosen.filter((item) => item.kind === "login").length;
-    const kept = chosen.some((item) => item.kind !== "contact") ? " and from the Keychain" : "";
-    const signIn = logins === 0 ? "" : ` ${dotName()} can no longer sign in with ${logins === chosen.length ? (one ? "it" : "them") : "the logins among them"}.`;
+    const kept = chosen.some((item) => item.kind !== "contact") ? t("views.vault.andFromTheKeychain") : "";
+    const signIn = logins === 0 ? "" : t(logins === chosen.length ? (one ? "views.vault.cannotSignInOne" : "views.vault.cannotSignInMany") : "views.vault.cannotSignInSome", { dotName: dotName() });
     const confirmed = await confirmDialog({
-      title: `Delete ${plural(chosen.length, "item", "items")}?`,
-      message: `${one ? "It is" : "They are"} removed from the vault${kept}.${signIn} This cannot be undone.`,
-      confirmLabel: "Delete",
+      title: t("views.vault.deletePart", { part: tCount(chosen.length, "views.vault.countItem", "views.vault.countItems") }),
+      message: t(one ? "views.vault.removedOne" : "views.vault.removedMany", { kept, signIn }),
+      confirmLabel: t("views.vault.delete"),
       danger: true,
       focusCancel: true,
     });
@@ -264,11 +270,11 @@ export function mount(root, ctx) {
     try {
       const done = await api.post("/vault/items/remove", { ids: chosen.map((item) => item.id) });
       if (done.stopped === null) {
-        toast("ok", `Deleted ${plural(done.removed, "item", "items")}.`);
+        toast("ok", t("views.vault.deletedPart", { part: tCount(done.removed, "views.vault.countItem", "views.vault.countItems") }));
         selecting = false;
         selected.clear();
       } else {
-        toast("error", `Deleted ${plural(done.removed, "item", "items")}; the others are still here: ${done.stopped}.`);
+        toast("error", t("views.vault.deletedPartTheOthersAre", { part: tCount(done.removed, "views.vault.countItem", "views.vault.countItems"), stopped: done.stopped }));
       }
     } finally {
       deleting = false;
@@ -311,12 +317,12 @@ export function mount(root, ctx) {
       attempt(async () => {
         const { title } = rowWords(item);
         const confirmed = await confirmDialog({
-          title: `Delete this ${KIND_NAME[item.kind]}?`,
+          title: t("views.vault.deleteThisValue", { value: KIND_NAME[item.kind] }),
           message:
             item.kind === "contact"
-              ? `${title} is removed from the vault.`
-              : `${title} is removed from the vault and from the Keychain.${item.kind === "login" ? ` ${dotName()} can no longer sign in with it.` : ""}`,
-          confirmLabel: "Delete",
+              ? t("views.vault.titleIsRemovedFromThe", { title })
+              : t("views.vault.titleRemovedAndKeychain", { title, signIn: item.kind === "login" ? t("views.vault.dotnameCanNoLongerSign", { dotName: dotName() }) : "" }),
+          confirmLabel: t("views.vault.delete"),
           danger: true,
           focusCancel: true,
         });
@@ -324,7 +330,7 @@ export function mount(root, ctx) {
           return;
         }
         await api.del(`/vault/items/${encodeURIComponent(item.id)}`);
-        toast("ok", "Deleted.");
+        toast("ok", t("views.vault.deleted"));
         await reload();
       }),
   };
@@ -333,18 +339,18 @@ export function mount(root, ctx) {
   function openImport() {
     const picked = el("input", { class: "input", id: "vault-csv", type: "file", accept: ".csv,text/csv,text/plain" });
     return formDialog({
-      title: "Import logins from a CSV file",
+      title: t("views.vault.importLoginsFromACsv"),
       description:
-        "Export your logins from Chrome, Safari, Firefox, 1Password or Bitwarden as CSV, then choose the file. It is read here and kept nowhere.",
+        t("views.vault.exportYourLoginsFromChrome"),
       body: [
-        el("div", { class: "field" }, el("label", { class: "field-label", for: "vault-csv" }, "CSV file"), picked),
+        el("div", { class: "field" }, el("label", { class: "field-label", for: "vault-csv" }, t("views.vault.csvFile")), picked),
         el(
           "p",
           { class: "hint" },
-          "The file holds your passwords in plain text: delete it once it is imported. Cards, notes and one-time codes are left out.",
+          t("views.vault.theFileHoldsYourPasswords"),
         ),
       ],
-      submitLabel: "Import",
+      submitLabel: t("views.vault.import"),
       valid: () => picked.files !== null && picked.files.length > 0,
       returnFocus: newItem,
       onSubmit: async () => {
@@ -357,10 +363,10 @@ export function mount(root, ctx) {
         report.replaceChildren(
           icon(done.stopped === null ? "check" : "alert"),
           el("div", { class: "vault-report-lines" }, reportWords(done).map((line) => el("p", null, line))),
-          el("button", { class: "btn sm", type: "button" }, "Got it"),
+          el("button", { class: "btn sm", type: "button" }, t("views.vault.gotIt")),
         );
         report.hidden = false;
-        toast("ok", `Imported ${plural(done.imported, "login", "logins")}.`);
+        toast("ok", t("views.vault.importedPart", { part: tCount(done.imported, "views.vault.countLogin", "views.vault.countLogins") }));
         await reload();
         return true;
       },
@@ -370,16 +376,16 @@ export function mount(root, ctx) {
   newItem.addEventListener("click", () => {
     const box = newItem.getBoundingClientRect();
     openMenu({
-      label: "New item",
+      label: t("views.vault.newItem"),
       at: { x: box.left, y: box.bottom + 4 },
       back: newItem,
       button: newItem,
       items: [
-        { label: "Login", icon: "key", run: () => openLoginDialog({ existing: null, returnFocus: newItem, done: saved }) },
-        { label: "Card", icon: "creditCard", run: () => openCardDialog({ existing: null, returnFocus: newItem, done: saved }) },
-        { label: "Contact", icon: "contact", run: () => openContactDialog({ existing: null, returnFocus: newItem, done: saved }) },
+        { label: t("views.vault.login"), icon: "key", run: () => openLoginDialog({ existing: null, returnFocus: newItem, done: saved }) },
+        { label: t("views.vault.card"), icon: "creditCard", run: () => openCardDialog({ existing: null, returnFocus: newItem, done: saved }) },
+        { label: t("views.vault.contact"), icon: "contact", run: () => openContactDialog({ existing: null, returnFocus: newItem, done: saved }) },
         "separator",
-        { label: "Import from CSV…", icon: "upload", run: openImport },
+        { label: t("views.vault.importFromCsv"), icon: "upload", run: openImport },
       ],
     });
   });
@@ -424,7 +430,7 @@ export function mount(root, ctx) {
   });
 
   ctx.head.setLead(
-    `Logins, cards and contact details you keep for ${dotName()}. It can sign in with a login and type your contact details where a form asks. Passwords and cards are kept in your Mac's Keychain.`,
+    t("views.vault.loginsCardsAndContactDetails", { dotName: dotName() }),
   );
   ctx.head.setActions(selectButton, newItem);
   root.append(
@@ -433,7 +439,7 @@ export function mount(root, ctx) {
       { class: "set-sections vault-page" },
       report,
       setSection({
-        title: "Saved items",
+        title: t("views.vault.savedItems"),
         actions: el("div", { class: "note-tools vault-tools" }, tabs.element, el("label", { class: "note-search" }, icon("search"), search)),
         body: setCard(bar, holder),
       }),
@@ -441,7 +447,7 @@ export function mount(root, ctx) {
         "p",
         { class: "vault-note hint" },
         icon("shield"),
-        `${dotName()} never sees a password, a saved card's number, its expiry or its security code. It types a login into a page itself, and asks you first. It can read your contact details, to type them for you. A card is only kept here for now: ${dotName()} does not fill it into a page.`,
+        t("views.vault.dotnameNeverSeesAPassword", { dotName: dotName(), dotName2: dotName() }),
       ),
     ),
   );

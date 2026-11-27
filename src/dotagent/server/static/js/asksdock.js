@@ -128,7 +128,7 @@ export function createAsksDock() {
     element,
     /** @param {HTMLElement} node */
     hold(node) {
-      const mark = document.createComment("a card waiting for an answer");
+      const mark = document.createComment(t("asksdock.aCardWaitingForAn"));
       node.replaceWith(mark);
       marks.set(node, mark);
       arrived(node);

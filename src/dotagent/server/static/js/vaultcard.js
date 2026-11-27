@@ -2,19 +2,21 @@
 // (item 621). The same rules as dotagent/vault/cards.py, which is the authority and checks again when the card is saved.
 // Pure functions, tried without a browser (tests/js/vaultcard.test.js).
 
+import { t } from "./i18n.js";
+
 /** The brands the first digits of a number name, and how each is written. */
 export const BRAND_NAMES = {
   visa: "Visa",
   mastercard: "Mastercard",
-  amex: "American Express",
+  amex: t("vaultcard.americanExpress"),
   discover: "Discover",
-  diners: "Diners Club",
+  diners: t("vaultcard.dinersClub"),
   jcb: "JCB",
   unionpay: "UnionPay",
   maestro: "Maestro",
   mir: "Mir",
   troy: "Troy",
-  other: "Card",
+  other: t("vaultcard.card"),
 };
 
 const MIN_DIGITS = 12;
@@ -94,15 +96,15 @@ export function groupedNumber(digits, brand) {
 export function numberProblem(text, finished = false) {
   const digits = digitsOf(text);
   if (digits === null) {
-    return "A card number is made of digits.";
+    return t("vaultcard.aCardNumberIsMade");
   }
   if (digits.length < MIN_DIGITS) {
-    return finished ? `A card number has ${MIN_DIGITS} to ${MAX_DIGITS} digits.` : null;
+    return finished ? t("vaultcard.aCardNumberHasMin", { MIN_DIGITS, MAX_DIGITS }) : null;
   }
   if (digits.length > MAX_DIGITS) {
-    return `A card number has ${MIN_DIGITS} to ${MAX_DIGITS} digits.`;
+    return t("vaultcard.aCardNumberHasMin", { MIN_DIGITS, MAX_DIGITS });
   }
-  return luhnOk(digits) ? null : "This number does not look right: check its digits.";
+  return luhnOk(digits) ? null : t("vaultcard.thisNumberDoesNotLook");
 }
 
 /** Whether the number is complete: a good number of a card's length. */
@@ -133,14 +135,14 @@ export function expiryProblem(text, today = new Date(), finished = false) {
     if (!finished && digits.length < 4 && /^[0-9 /.-]*$/.test(text)) {
       return null;
     }
-    return "Write the expiry as month and year, like 08/29.";
+    return t("vaultcard.writeTheExpiryAsMonth");
   }
   const now = today.getFullYear() * 12 + today.getMonth();
   if (expiry.year * 12 + expiry.month - 1 < now) {
-    return "This card has expired.";
+    return t("vaultcard.thisCardHasExpired");
   }
   if (expiry.year > today.getFullYear() + MOST_YEARS_AHEAD) {
-    return "This expiry is too far ahead to be a card's.";
+    return t("vaultcard.thisExpiryIsTooFar");
   }
   return null;
 }
@@ -169,7 +171,7 @@ export function expiryTyping(text, deleting = false) {
 
 /** What is wrong with a security code: it has three or four digits; null when it is good or empty (it is optional). */
 export function codeProblem(text) {
-  return text === "" || /^[0-9]{3,4}$/.test(text) ? null : "A security code has 3 or 4 digits.";
+  return text === "" || /^[0-9]{3,4}$/.test(text) ? null : t("vaultcard.aSecurityCodeHas3");
 }
 
 /** How a card is named for a list: `Travel · Visa •••• 4242`, without the nickname when it has none. */

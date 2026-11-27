@@ -1,10 +1,10 @@
 // What a conversation holds outside one run: the runs before it in the thread, each as the question and its answer, so a
 // follow-up reads as the next turn of one chat.
 
-import { t } from "./i18n.js";
+import { t, tCount } from "./i18n.js";
 import { api, query } from "./api.js";
 import { visibleInConversation } from "./chatnoise.js";
-import { compact, el, plural, repeatsAnswer } from "./dom.js";
+import { compact, el, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
@@ -105,7 +105,7 @@ export function workOrderNote(goal) {
  * run's own page does, how many failed or were cut off. */
 function stepsBlock(batch) {
   const kinds = countKinds(batch.tools);
-  const troubles = [batch.failed > 0 ? `${batch.failed} failed` : "", batch.cut > 0 ? `${batch.cut} cut off` : ""];
+  const troubles = [batch.failed > 0 ? t("history.failedFailed", { failed: batch.failed }) : "", batch.cut > 0 ? t("history.cutCutOff", { cut: batch.cut }) : ""];
   const said = troubles.filter((words) => words !== "").join(" · ");
   const head = el(
     "summary",
@@ -169,8 +169,8 @@ function flowNotShown(past, flow, error) {
       "div",
       { class: "note" },
       icon("alert"),
-      el("span", null, `What this task did could not be shown: ${error.message}`),
-      el("a", { class: "small", href: `#/runs/${past.id}` }, "Open task"),
+      el("span", null, t("history.whatThisTaskDidCould", { message: error.message })),
+      el("a", { class: "small", href: `#/runs/${past.id}` }, t("history.openTask")),
     ),
   );
   flow.hidden = false;
@@ -468,7 +468,7 @@ function turn(past, editFromHereOf, known, signal, reactions) {
     answerMessage({ actorId: past.agent_id ?? "dot", status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null, reactions, runId: past.id });
   let answer = ended
     ? answerAs(past.status)
-    : el("div", { class: "note" }, icon("clock"), el("span", null, "This task is still going."), el("a", { class: "small", href }, "Open task"));
+    : el("div", { class: "note" }, icon("clock"), el("span", null, t("history.thisTaskIsStillGoing")), el("a", { class: "small", href }, t("history.openTask")));
   // Once the run's events are read: a run that stopped for what only the owner gives waits on them, and says what
   // (item 1061), where its stored status alone said it failed; the pages it read on the web go under its answer (item
   // 1184). Both go in where the answer may be above what is read, so its place is kept (item 708, as for the flow).
@@ -497,7 +497,7 @@ function turn(past, editFromHereOf, known, signal, reactions) {
   const asked = followsReaction(past) || past.source === WELCOME_SOURCE
     ? null
     : past.source === RESUME_SOURCE
-      ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, "Continued where the task above was cut off"))
+      ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, t("history.continuedWhereTheTaskAbove")))
       : past.source === BACKGROUND_SOURCE
         ? backgroundNote(past.goal)
         : past.source === WORK_ORDER_SOURCE
@@ -534,19 +534,19 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, rea
   const left = earlier.length - shown.length;
   // A chat of more runs than the page reads says so, with no count and no first run (item 559): it knows neither.
   const note = cut
-    ? el("div", { class: "note" }, icon("list"), el("span", null, `Earlier tasks of this chat are not shown: the page reads its latest ${THREAD_LIMIT}.`))
+    ? el("div", { class: "note" }, icon("list"), el("span", null, t("history.earlierTasksOfThisChat", { THREAD_LIMIT })))
     : left === 0
       ? null
       : el(
           "div",
           { class: "note" },
           icon("list"),
-          el("span", null, `${plural(left, "earlier task is", "earlier tasks are")} not shown.`),
-          el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first task"),
+          el("span", null, t("history.partNotShown", { part: tCount(left, "history.countEarlierTaskIs", "history.countEarlierTasksAre") })),
+          el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, t("history.openTheFirstTask")),
         );
   const history = el(
     "div",
-    { class: "history", role: "region", "aria-label": "Earlier in this conversation" },
+    { class: "history", role: "region", "aria-label": t("history.earlierInThisConversation") },
     note,
     shown.map((past) => turn(past, editFromHereOf, read.get(past.id), signal, reactions)),
   );

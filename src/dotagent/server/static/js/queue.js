@@ -12,6 +12,7 @@ import { icon } from "./icons.js";
 import { viaOutbox } from "./outbox.js";
 import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, toast } from "./ui.js";
+import { t, tCount } from "./i18n.js";
 
 const QUEUE_CHANGED = "queue_changed";
 
@@ -59,14 +60,14 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     "button",
     { class: "queue-head", type: "button", "aria-controls": listId },
     icon("listOrdered"),
-    el("span", { class: "queue-title" }, "Queued"),
+    el("span", { class: "queue-title" }, t("queue.queued")),
     count,
     toggleIcon,
   );
-  const resume = el("button", { class: "btn sm ghost", type: "button" }, "Resume");
-  const paused = el("div", { class: "queue-paused", hidden: true }, el("span", null, "Paused until you resume it"), resume);
+  const resume = el("button", { class: "btn sm ghost", type: "button" }, t("queue.resume"));
+  const paused = el("div", { class: "queue-paused", hidden: true }, el("span", null, t("queue.pausedUntilYouResumeIt")), resume);
   const unreadText = el("span");
-  const readAgain = el("button", { class: "btn sm ghost", type: "button" }, "Read again");
+  const readAgain = el("button", { class: "btn sm ghost", type: "button" }, t("queue.readAgain"));
   const unread = el("div", { class: "queue-unread", hidden: true }, unreadText, readAgain);
   const list = el("ol", { class: "queue-list", id: listId });
   element.append(head, unread, paused, list);
@@ -225,8 +226,8 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         type: "button",
         "data-id": message.id,
         "data-part": way,
-        "aria-label": up ? "Move queued message up" : "Move queued message down",
-        title: up ? "Move up" : "Move down",
+        "aria-label": up ? t("queue.moveQueuedMessageUp") : t("queue.moveQueuedMessageDown"),
+        title: up ? t("queue.moveUp") : t("queue.moveDown"),
         disabled,
       },
       icon("chevron"),
@@ -255,13 +256,13 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     const words = oneLine(message.text);
     const text = el("span", { class: "queue-text", title: message.text }, words);
     const files = message.files.length;
-    const clip = files === 0 ? null : el("span", { class: "queue-files", title: `${files} file${files === 1 ? "" : "s"}` }, icon("paperclip"), String(files));
+    const clip = files === 0 ? null : el("span", { class: "queue-files", title: tCount(files, "queue.countFile", "queue.countFiles") }, icon("paperclip"), String(files));
     let actions;
     if (editing) {
       const cancel = el(
         "button",
-        { class: "queue-cancel", type: "button", "data-id": message.id, "data-part": "cancel", "aria-label": "Cancel editing queued message" },
-        "Cancel",
+        { class: "queue-cancel", type: "button", "data-id": message.id, "data-part": "cancel", "aria-label": t("queue.cancelEditingQueuedMessage") },
+        t("queue.cancel"),
       );
       cancel.addEventListener("click", () => {
         endEdit();
@@ -271,21 +272,21 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     } else {
       const edit = el(
         "button",
-        { class: "queue-icon", type: "button", "data-id": message.id, "data-part": "edit", "aria-label": "Edit queued message", title: "Edit in the composer" },
+        { class: "queue-icon", type: "button", "data-id": message.id, "data-part": "edit", "aria-label": t("queue.editQueuedMessage"), title: t("queue.editInTheComposer") },
         icon("pencil"),
       );
       edit.addEventListener("click", () => startEdit(message));
-      const steerTitle = active ? "Send to the task now, to steer it" : "Nothing here can be steered";
+      const steerTitle = active ? t("queue.sendToTheTaskNow") : t("queue.nothingHereCanBeSteered");
       const steerButton = el(
         "button",
         { class: "queue-steer", type: "button", "data-id": message.id, "data-part": "steer", title: steerTitle, disabled: !active },
         icon("cornerUpRight"),
-        el("span", { class: "label" }, "Steer"),
+        el("span", { class: "label" }, t("queue.steer")),
       );
       steerButton.addEventListener("click", () => steer(message));
       const remove = el(
         "button",
-        { class: "queue-icon", type: "button", "data-id": message.id, "data-part": "remove", "aria-label": "Remove queued message", title: "Remove from queue" },
+        { class: "queue-icon", type: "button", "data-id": message.id, "data-part": "remove", "aria-label": t("queue.removeQueuedMessage"), title: t("queue.removeFromQueue") },
         icon("x"),
       );
       remove.addEventListener("click", () =>
@@ -305,11 +306,11 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     element.hidden = messages.length === 0 && problem === null;
     head.hidden = messages.length === 0;
     unread.hidden = problem === null;
-    unreadText.textContent = problem === null ? "" : `The queue could not be read: ${problem}`;
-    element.setAttribute("aria-label", `${messages.length} queued message${messages.length === 1 ? "" : "s"}`);
+    unreadText.textContent = problem === null ? "" : t("queue.theQueueCouldNotBe", { problem });
+    element.setAttribute("aria-label", t("queue.lengthQueuedMessageValue", { length: messages.length, value: messages.length === 1 ? "" : "s" }));
     count.textContent = String(messages.length);
     head.setAttribute("aria-expanded", String(expanded));
-    head.setAttribute("aria-label", expanded ? "Collapse queued messages" : "Expand queued messages");
+    head.setAttribute("aria-label", expanded ? t("queue.collapseQueuedMessages") : t("queue.expandQueuedMessages"));
     element.toggleAttribute("data-collapsed", !expanded);
     list.hidden = !expanded;
     paused.hidden = !held;
@@ -347,7 +348,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       return;
     }
     if (event.data.error !== null) {
-      toast("error", `The next queued message could not start: ${event.data.error}`);
+      toast("error", t("queue.theNextQueuedMessageCould", { error: event.data.error }));
     }
     if (event.data.started_run_id !== null) {
       onStarted(event.data.started_run_id, event.data.after_run_id);
@@ -365,7 +366,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       const mine = ++reads;
       // While the run works the fast model is asked whether the message stands on its own (item 915), which takes a
       // few seconds: the queue says the message is on its way meanwhile (the pre-push review).
-      const sending = el("div", { class: "queue-sending small muted", role: "status" }, "Sending…");
+      const sending = el("div", { class: "queue-sending small muted", role: "status" }, t("queue.sending"));
       const hidden = element.hidden;
       element.hidden = false;
       element.append(sending);
@@ -384,8 +385,8 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       // A request of its own started at once in a chat of its own (item 915): said, with the way to it.
       if (typeof view.beside_run_id === "string") {
         const runId = view.beside_run_id;
-        toast("ok", "A request of its own: started at once in a chat of its own.", {
-          label: "Open",
+        toast("ok", t("queue.aRequestOfItsOwn"), {
+          label: t("queue.open"),
           run: () => {
             goTo(`#/runs/${runId}`);
           },

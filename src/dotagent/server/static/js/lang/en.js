@@ -1,7 +1,10 @@
 // The interface's own words in English (i18n.js): one key per sentence or label, `{name}` where a value goes in. A
 // key stands for one thing on every screen it is used on. The Turkish catalogue (tr.js) has the same keys.
 
-export const EN = {
+import { EN_APP } from "./en-app.js";
+import { EN_VIEWS } from "./en-views.js";
+
+const CORE = {
   // The line of what a run does now (workstatus.js).
   "work.typing": "Typing",
   "work.thinking": "Thinking",
@@ -69,11 +72,14 @@ export const EN = {
   "intent.sendToTask": "Send to task",
   "intent.held": "The task is on hold: write to let it go on",
   "intent.heldShort": "Write to let it go on",
-  "intent.steerPlaceholder": "Add to this task, or /btw to ask on the side",
-  "intent.steerPlaceholderShort": "Add to task (or /btw)",
-  "intent.queuePlaceholder": "Write the next task, or /btw to ask on the side",
-  "intent.queuePlaceholderShort": "Next task (or /btw)",
+  "intent.steerPlaceholder": "Tell the running task",
+  "intent.steerPlaceholderShort": "Tell the running task",
+  "intent.queuePlaceholder": "Queue a message",
+  "intent.queuePlaceholderShort": "Queue a message",
   // The composer (composer.js).
+  "composer.messageDot": "Message {name}",
+  "composer.askAgent": "Ask {name}",
+  "composer.messageDotPlain": "Message Dot",
   "composer.followUp": "Follow up",
   "composer.save": "Save",
   "composer.add": "Add",
@@ -837,6 +843,7 @@ export const EN = {
   "outcome.failedAlert": "The task failed",
   "outcome.cancelled": "Stopped",
   "outcome.cancelledEmpty": "The task was stopped before it wrote an answer.",
+  "outcome.cutOffEmpty": "The task was cut off because Dot shut down or the command that drove it ended.",
   "outcome.waiting": "Waiting on you",
   "outcome.waitingEmpty": "The task stopped for something only you can give.",
   "outcome.needs": "What Dot needs from you",
@@ -979,4 +986,28 @@ export const EN = {
   "asks.show": "Show what Dot asked",
   "asks.submitOne": "Submit answer",
   "asks.submitMany": "Submit answers",
+  // Settings › Maintenance › Speed (item 2003).
+  "speed.title": "Speed",
+  "speed.about": "Where the seconds of Dot's work went, stage by stage, read from what its runs recorded: n is how many there were, p50, p95 and p99 the times that half, 95 and 99 in 100 of them stayed within, then the longest, and how many took over 3 seconds.",
+  "speed.window24h": "Last 24 hours",
+  "speed.window7d": "Last 7 days",
+  "speed.refresh": "Refresh",
+  "speed.summaryDayOne": "1 run in the last 24 hours. Times are in seconds.",
+  "speed.summaryDay": "{count} runs in the last 24 hours. Times are in seconds.",
+  "speed.summaryWeekOne": "1 run in the last 7 days. Times are in seconds.",
+  "speed.summaryWeek": "{count} runs in the last 7 days. Times are in seconds.",
+  "speed.empty": "Nothing was recorded in this window.",
+  "speed.colWhat": "What",
+  "speed.colMax": "Longest",
+  "speed.colOver3": "Over 3 s",
+  "speed.stageStart": "Start of a run, to its first model call",
+  "speed.stageStartRead": "What a run's start reads",
+  "speed.stageGap": "Between two steps",
+  "speed.stageGapDaemon": "Between two steps, Dot's own time (less the model calls in between)",
+  "speed.stageModel": "Model calls, by model and purpose",
+  "speed.stageFirstToken": "First word of a step's reply",
+  "speed.stageTool": "Tool calls, their running time",
 };
+
+/** Every English key: the core words here, those of the screens in views/ and those of the other modules. */
+export const EN = { ...CORE, ...EN_VIEWS, ...EN_APP };
