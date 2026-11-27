@@ -666,7 +666,7 @@ earlier runs.
   its face on the row and an "As <name>" chip under its Details. Its model, reasoning level and approvals are the schedule's own where it
   chose them, else the bot's, else the configured ones: a yolo schedule of a bot that asks runs yolo, and one left
   on Default takes the bot's mode, which the form's Default names ("Default (the bot's: …)") and the row's Details
-  show. An
+  show. A
   bot that does not exist is refused (404), and Dot is named by no bot (422). Deleting the bot switches its
   schedules off, as Dot's ("switched off: its agent was deleted"). While you have paused the bot (item 465), its
   schedules fire nothing by themselves: a repeating one is skipped to its next time ("skipped: <name> is paused") and a
