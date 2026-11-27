@@ -6,7 +6,10 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2046](2046.md) | done | 2026-11-27 | A coding helper hands its pull request checks to the chat's background watcher |
 | [2045](2045.md) | done | 2026-11-27 | Measure the character line against the injection evals |
+| [2044](2044.md) | done | 2026-11-27 | Keep the Mac awake for an upcoming routine or watcher |
+| [2043](2043.md) | done | 2026-11-27 | Show when the Mac was last reachable |
 | [2038](2038.md) | done | 2026-11-27 | DotNext: the marks of an answer's references are drawn once |
 | [2037](2037.md) | done | 2026-11-27 | DotNext: a whole answer is parsed once, not each time its row is drawn |
 | [2036](2036.md) | done | 2026-11-27 | DotNext: a long chat's tables are measured once, and the scroll of a long chat is measured |

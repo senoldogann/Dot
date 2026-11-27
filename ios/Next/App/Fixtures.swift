@@ -24,8 +24,9 @@
         case failed = "n2-failed"
         /// The phone offline with nothing saved of the chat.
         case offline = "n2-offline"
-        /// No link, with the chat's copy saved on the phone (item 1931: the pill says Offline over it).
+        /// No link, with a cached chat and a known last contact.
         case offlineSaved = "n2-offline-saved"
+        case offlineList = "n2-offline-list"
         /// A chat deleted on the Mac while open.
         case deleted = "n2-deleted"
         /// The agents sheet (§19's one-line titles).
@@ -65,10 +66,15 @@
         /// The snapshot the scene draws.
         func snapshot(now: Double) -> EngineSnapshot {
             var snapshot: EngineSnapshot = .empty
-            let linked: Bool = self != .offline && self != .offlineSaved
+            let linked: Bool = self != .offline && self != .offlineSaved && self != .offlineList
             snapshot.transport = linked ? .up : .offline
             snapshot.online = linked
-            if self == .offlineSaved { snapshot.savedAt[Self.thread] = now - 240 }
+            if self == .offlineSaved || self == .offlineList {
+                snapshot.savedAt[Self.thread] = now - 240
+                snapshot.lastContact = Calendar.current.date(
+                    bySettingHour: 14, minute: 5, second: 0, of: Date(timeIntervalSince1970: now)
+                )?.timeIntervalSince1970
+            }
             let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : self == .offlineSaved ? .cached : .live
             if self == .long {
                 snapshot.chats[Self.thread] = ChatProjection.drawn(

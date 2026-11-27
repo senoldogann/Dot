@@ -85,8 +85,6 @@ struct ChatScreen: View {
     @State private var stopping: Bool = false
     /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
     @State private var stepsShown: Bool = false
-    /// The link line the pill shows, once a state lasted a second (item 1931: a blip does not flicker).
-    @State private var shownLink: LinkLine?
     /// The helper whose chat a row of the stream opened (item 1909).
     @State private var openedHelper: HelperChatRef?
     /// The answer of a side question (`/btw`), shown in an alert.
@@ -175,15 +173,6 @@ struct ChatScreen: View {
                 if RenderMeter.shown {
                     Text(verbatim: "\(drawings)").font(.system(size: 1)).opacity(0.01).accessibilityIdentifier("debug.renders")
                 }
-            }
-            .task(id: linkNow) {
-                // A problem shows once it lasted a few seconds, and goes at once: a reconnection that mends shows nowhere.
-                guard let next = linkNow else {
-                    shownLink = nil
-                    return
-                }
-                do { try await Task.sleep(for: linkLineDelay) } catch { return }
-                shownLink = next
             }
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
             .toolbar { chrome }
@@ -486,14 +475,14 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    status: shownLink == nil ? capsuleStatus : nil, activity: activityWords,
+                    status: model.visibleLink == nil ? capsuleStatus : nil, activity: activityWords,
                     since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil,
                     // The chat's queue on the Mac, which the segment's sheet lists; the phone's own messages still to go
                     // say so under their bubbles ("Pending", "Waiting for the link"), item 1931.
                     queued: view?.queue.messages.count ?? 0,
                     helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
-                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping && shownLink == nil,
-                    link: shownLink),
+                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping && model.visibleLink == nil,
+                    link: model.visibleLink),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
                 stop: { stop() },
                 openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
@@ -750,11 +739,6 @@ struct ChatScreen: View {
             Button(String(localized: "Changes and files", comment: "Chat header quick panel: what the run changed"), systemImage: "folder") { panel = .inspector }
             Button(String(localized: "Agents", comment: "Chat header quick panel: the chat's helpers"), systemImage: "person.2") { panel = .agents }
         }
-    }
-
-    /// The link line of this moment, before the second's wait (item 1931).
-    private var linkNow: LinkLine? {
-        linkLine(transport: model.transport, mac: model.macName ?? String(localized: "your Mac", comment: "The Mac when its name is not known"))
     }
 
     /// Whether the subtitle says the link: only a refused key or an old Dot, which no wait mends. Offline and an

@@ -4,7 +4,9 @@
 // reconnecting, when Dot cannot be reached for more than a moment; and the phone's key refused, with the way to pair
 // again. A link that is well says nothing: null.
 
-import { t } from "./i18n.js";
+import { t, uiLocale } from "./i18n.js";
+
+const LAST_CONTACT_CLOCK = new Intl.DateTimeFormat(uiLocale(), { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -17,6 +19,7 @@ const DAY_MS = 24 * HOUR_MS;
  * @property {number | null} copyFrom when the copy of the chats the page shows was kept (ms), null when it shows what Dot says
  * @property {number} waiting how many things done with no link wait to be sent
  * @property {boolean} reconnecting whether Dot has not been reachable for more than a moment while the phone has a link
+ * @property {number | null} lastContact last successful daemon contact (ms), if known
  * @property {boolean} refused whether Dot refused the phone's key
  * @property {number} now the time (ms)
  */
@@ -73,7 +76,7 @@ export function lineOf(facts, say = t) {
   if (facts.reconnecting) {
     return {
       kind: "reconnecting",
-      text: facts.waiting > 0 ? say("line.reconnectingWaiting", { count: facts.waiting }) : say("line.reconnecting"),
+      text: facts.lastContact === null ? say("line.macUnreachable") : say("line.macUnreachableSince", { time: LAST_CONTACT_CLOCK.format(facts.lastContact) }),
       action: null,
     };
   }

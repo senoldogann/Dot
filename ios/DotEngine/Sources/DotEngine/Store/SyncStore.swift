@@ -35,6 +35,8 @@ public struct EngineSnapshot: Sendable, Equatable {
     /// Messages the daemon took that the stream has not shown yet, by client key.
     public var accepted: [String: AcceptedMessage]
     public var transport: Transport
+    /// The most recent confirmed contact with the Mac, in Unix seconds.
+    public var lastContact: Double?
     public var online: Bool
     /// When the shown copy of a chat (or `list`) was saved, while it is the cache's.
     public var savedAt: [String: Double]
@@ -56,7 +58,7 @@ public struct EngineSnapshot: Sendable, Equatable {
     public var deletesAwaiting: Set<String>
 
     public static let empty: EngineSnapshot = EngineSnapshot(
-        list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, online: true, savedAt: [:],
+        list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, lastContact: nil, online: true, savedAt: [:],
         workingAt: [:], startedChats: [:], refusedDeletes: [:], reset: nil, heard: 0, deletesAwaiting: [])
 
     /// The list as the screens draw it: the chats a delete of this phone is on its way for are hidden at once (item 1964),
@@ -121,6 +123,7 @@ public actor SyncStore {
             first.list = ListReducer.restored(list.content)
             first.savedAt["list"] = list.savedAt
         }
+        first.lastContact = cache.loadLastContact()
         first.reset = cache.loadReset()
         self.state = first
     }
@@ -202,6 +205,13 @@ public actor SyncStore {
         guard state.reset != nil else { return }
         cache.saveReset(nil)
         state.reset = nil
+        publish()
+    }
+
+    func reached(at: Double) {
+        if let previous = state.lastContact, previous >= at { return }
+        state.lastContact = at
+        cache.saveLastContact(at)
         publish()
     }
 

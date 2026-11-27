@@ -59,6 +59,7 @@ here points at a test that no longer exists.
 - `tests/unit/test_css_tokens.py::test_the_daemon_page_tells_the_conversation_once_and_with_no_bubble_on_a_phone` — a
   rebase left `docs/daemon.md` with two copies of the conversation paragraph, one from before the new look (an 18 px
   corner, a quiet ring) and one that still said Dot's words sit in a soft bubble on a phone (item 1335's review).
+- `tests/smoke/test_work_awake.py::test_a_work_check_that_keeps_failing_lets_a_hold_run_out` — a work check that raised kept the Mac awake with no end, and logged a traceback every tick
 - `tests/unit/test_css_tokens.py::test_every_comment_of_a_sheet_closes_where_it_opens` — a merge left a line of a comment under one that had closed it, so the browser read the words as a selector and dropped the rule after it (item 1335).
 - `tests/smoke/test_panel_automations.py::test_the_task_tab_lists_the_chats_schedules_and_loops_and_switches_and_runs_them` — the
   pencil of a chat's Automations linked to `#/settings/schedules/<id>`, which no route matches, so a press dropped the
