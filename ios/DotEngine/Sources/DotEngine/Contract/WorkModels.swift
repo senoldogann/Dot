@@ -108,12 +108,18 @@ public struct ObjectiveNote: Codable, Sendable, Hashable {
 /// How an objective's work is done; the phone shows the step that comes next.
 public struct ObjectiveWorkflow: Codable, Sendable, Hashable {
     public let nextStep: String
+    /// The step was written by a run that had read content third parties can author: not the owner's words.
+    public let nextStepTainted: Bool
 
     enum CodingKeys: String, CodingKey {
         case nextStep = "next_step"
+        case nextStepTainted = "next_step_tainted"
     }
 
-    public init(nextStep: String) { self.nextStep = nextStep }
+    public init(nextStep: String, nextStepTainted: Bool) {
+        self.nextStep = nextStep
+        self.nextStepTainted = nextStepTainted
+    }
 }
 
 /// Something the owner wants Dot to move forward over time (`ObjectiveRecord`): what, why it matters and how progress
@@ -154,8 +160,9 @@ public struct ObjectiveRecord: Codable, Sendable, Hashable, Identifiable {
 
     public var isActive: Bool { status == "active" }
 
-    /// Whether anything on it was written after Dot read content third parties can author: not the owner's words.
-    public var hasOutsideWords: Bool { tainted || notes.contains { $0.tainted } }
+    /// Whether anything on it (its words, a line of progress or its next step) was written after Dot read content third parties can
+    /// author: not the owner's words.
+    public var hasOutsideWords: Bool { tainted || workflow.nextStepTainted || notes.contains { $0.tainted } }
 }
 
 /// A message between agents (`TeamMessage`): who sent it and to whom (Dot's id is `dot`), the words, the reply (`nil`

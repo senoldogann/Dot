@@ -1,7 +1,8 @@
 // The work orders of the Agents page (items 907 and 908): what Dot handed to the agents and where each piece stands,
-// under the objectives it keeps (the finished ones, done or let go, below the orders). Read only: the lead (Dot) hands work out and judges it, in its chats. An order is a
+// under the objectives it keeps. Read only: the lead (Dot) hands work out and judges it, in its chats. An order is a
 // line with its state, its agent and the task of its newest try; the objectives that are active stand above them,
-// each with why it matters, how progress is judged and its newest line of progress.
+// each with why it matters, how progress is judged and its newest line of progress (or its next step, while it has
+// none); the objectives done or let go stand below the orders.
 
 import { api } from "./api.js";
 import { ago, clip, el, plural } from "./dom.js";
@@ -18,7 +19,7 @@ const OUTSIDE = "Written after Dot read content from outside";
  * @typedef {import("./workwords.js").WorkOrder} WorkOrder
  * @typedef {{ order: WorkOrder, agent_name: string, objective_title: string | null }} OrderView
  * @typedef {{ at: number, text: string, tainted: boolean }} ObjectiveNote
- * @typedef {{ id: string, title: string, why: string, measure: string, status: string, notes: ObjectiveNote[], tainted: boolean, workflow: { next_step: string } }} Objective
+ * @typedef {{ id: string, title: string, why: string, measure: string, status: string, notes: ObjectiveNote[], tainted: boolean, workflow: { next_step: string, next_step_tainted: boolean } }} Objective
  */
 
 /** @param {Objective} objective */
@@ -45,7 +46,8 @@ function objectiveRow(objective) {
         ? null
         : el("div", { class: "row-text" }, `${new Date(newest.at * 1000).toLocaleDateString()}: ${clip(newest.text, NOTE_CHARS)}`),
       next === "" ? null : el("div", { class: "row-text" }, `Next: ${clip(next, NOTE_CHARS)}`),
-      objective.tainted || objective.notes.some((note) => note.tainted) ? el("div", { class: "row-meta" }, el("span", null, OUTSIDE)) : null,
+      objective.tainted || objective.workflow.next_step_tainted || objective.notes.some((note) => note.tainted)
+        ? el("div", { class: "row-meta" }, el("span", null, OUTSIDE)) : null,
     ),
   );
 }
