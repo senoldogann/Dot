@@ -15,6 +15,7 @@ from starlette.responses import StreamingResponse
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
+from dotagent.agent.helper_reports import HELPER_RELEASED_EVENT
 from dotagent.agent.learning_health import LEARNING_STALLED_EVENT
 from dotagent.agent.lessons import LESSON_EVENTS
 from dotagent.agent.loop import browser_of
@@ -50,7 +51,8 @@ FRAME_EVENT: str = "frame"
 # the phone hears it (``notify/push.py``): a question a run left, a draft written for the owner to send (item 314), a
 # campaign that ended by itself, a firing a schedule missed, learning that has stopped, what Dot tells the owner on its
 # own (the morning brief and the watchers, items 570 and 571); a chat rewound (item 282); and a draft sent or discarded,
-# which may come after its run's stream has ended (item 314); and a reaction put on a message of Dot's or taken back
+# which may come after its run's stream has ended (item 314); a helper its run let go, which the sidebar's rows say
+# (item 2010); and a reaction put on a message of Dot's or taken back
 # (item 586), which may come after the run's stream has ended too. A restart after an unexpected stop is pushed only:
 # it happens before any page is back on the stream.
 LIFECYCLE_KINDS: frozenset[str] = frozenset(
@@ -64,6 +66,7 @@ LIFECYCLE_KINDS: frozenset[str] = frozenset(
         HANDBACK_EVENT,
         QUEUE_CHANGED_EVENT,
         TERMINALS_CHANGED_EVENT,
+        HELPER_RELEASED_EVENT,
         *LESSON_EVENTS,
         QUESTION_LEFT_EVENT,
         DRAFT_CREATED_EVENT,
