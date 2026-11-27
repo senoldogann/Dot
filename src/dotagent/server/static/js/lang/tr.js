@@ -666,6 +666,8 @@ export const TR = {
   "timeline.stallNoAnswer": "Yanıt veremedi ({error}), bu yüzden görev duruyor.",
   "timeline.stallNext": "Sonraki adımlar: {steps}",
   // The lines of a conversation's messages (messages.js).
+  "messages.pending": "Bekliyor",
+  "messages.starting": "Başlıyor…",
   "messages.scheduleRepeating": "tekrarlanan bir zamanlamayla",
   "messages.scheduleLabel": "Zamanlama kuruldu: {name}, {when}. Zamanlamalar sayfasında açar.",
   "messages.scheduleLabelBare": "Zamanlama kuruldu: {name}. Zamanlamalar sayfasında açar.",

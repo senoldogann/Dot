@@ -1,3 +1,4 @@
+import AVFoundation
 import DotEngine
 import Foundation
 import Observation
@@ -200,6 +201,7 @@ final class AppModel {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
     }
     @ObservationIgnored let images: NSCache<NSString, UIImage> = NSCache()
+    @ObservationIgnored private let videoPreviews: NSCache<NSString, VideoPreviewBox> = NSCache()
     /// The app's own performance record, sent to the paired Mac (item 1926).
     @ObservationIgnored let perf: PerfReporter = PerfReporter(file: PerfReporter.defaultFile)
     /// Debug builds only: the time each probe message was sent, by its client key (`LatencyProbe`).
@@ -534,6 +536,49 @@ extension AppModel {
             return image
         } catch {
             logger.warning("a screenshot could not be read name=\(name, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    /// The picture of an image a message carried, kept in memory for the session (item 1992).
+    func attachmentPicture(_ id: String) async -> UIImage? {
+        let key: NSString = "att:\(id)" as NSString
+        if let held: UIImage = images.object(forKey: key) { return held }
+        guard let engine else { return nil }
+        do {
+            let data: Data = try await engine.api.attachmentPicture(id)
+            guard let image: UIImage = ImageSizing.decoded(data, longest: ImageSizing.display) else { return nil }
+            images.setObject(image, forKey: key)
+            return image
+        } catch {
+            logger.warning("an attached picture could not be read id=\(id, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    /// The asset a message's video or sound is played from, streamed from the Mac in ranges with the phone's key.
+    func attachmentAsset(_ id: String) -> AVURLAsset? {
+        guard let engine else { return nil }
+        let media: (url: URL, headers: [String: String]) = engine.api.attachmentMedia(id)
+        // The key AVFoundation reads for the headers of its requests: a player has no other way to carry a bearer token.
+        return AVURLAsset(url: media.url, options: ["AVURLAssetHTTPHeaderFieldsKey": media.headers])
+    }
+
+    /// The first frame and the length of a message's video, kept for the session.
+    func attachmentVideo(_ id: String) async -> VideoPreview? {
+        if let held: VideoPreviewBox = videoPreviews.object(forKey: id as NSString) { return held.preview }
+        guard let asset: AVURLAsset = attachmentAsset(id) else { return nil }
+        do {
+            let duration: Double = try await asset.load(.duration).seconds
+            let generator: AVAssetImageGenerator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 480, height: 480)
+            let frame: CGImage = try await generator.image(at: .zero).image
+            let preview: VideoPreview = VideoPreview(frame: UIImage(cgImage: frame), duration: duration.isFinite ? duration : nil)
+            videoPreviews.setObject(VideoPreviewBox(preview), forKey: id as NSString)
+            return preview
+        } catch {
+            logger.warning("an attached video could not be read id=\(id, privacy: .public) error=\(String(describing: error), privacy: .public)")
             return nil
         }
     }

@@ -17,6 +17,7 @@ import hashlib
 import hmac
 import ipaddress
 import os
+import re
 import secrets
 import time
 from pathlib import Path
@@ -54,6 +55,11 @@ _WAYS_IN: frozenset[str] = frozenset(
         f"{API_ROOT}/channels/imessage/remove",
     }
 )
+# The hooks (``docs/hooks.md``): a call to one, ``POST /api/hooks/<id>``, is signed with the hook's secret instead of
+# the token, so the guard lets that exact shape through without it (:func:`is_hook_call`); the rest of the hooks' routes
+# make and change a way into Dot, and answer the installation's token alone.
+HOOKS_PATH: str = f"{API_ROOT}/hooks"
+_HOOK_CALL: re.Pattern[str] = re.compile(rf"{HOOKS_PATH}/[0-9a-f]{{12}}")
 LOOKS_PREFIX: str = "/looks/"
 # Where the guard leaves, in the state of a request a phone's key let in, the id of that phone (item 678): what a route
 # reads to know the request came from a phone, whatever its Host header says, which any client may write.
@@ -87,7 +93,7 @@ SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     (
         "Content-Security-Policy",
         "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; "
-        "manifest-src 'self'; frame-src 'self'; "
+        "media-src blob:; manifest-src 'self'; frame-src 'self'; "
         # The desktop shell's bridge (Tauri IPC) is a connection the page makes; a browser never sees these sources.
         "connect-src 'self' ipc: http://ipc.localhost; "
         "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
@@ -254,8 +260,13 @@ def is_launcher_path(path: str) -> bool:
     return path.startswith(LAUNCHER_PATHS)
 
 
+def is_hook_call(path: str) -> bool:
+    """Whether ``path`` is the address of a call to a hook, which its signature lets in (:mod:`dotagent.hooks`)."""
+    return _HOOK_CALL.fullmatch(path) is not None
+
+
 def needs_token(path: str) -> bool:
-    return is_api_path(path) and path not in PUBLIC_PATHS
+    return is_api_path(path) and path not in PUBLIC_PATHS and not is_hook_call(path)
 
 
 def is_page_path(path: str) -> bool:
@@ -293,9 +304,14 @@ def has_dot_segment(path: str) -> bool:
 
 
 def needs_main_token(path: str) -> bool:
-    """Whether ``path`` answers the installation's token alone (item 670): what opens or closes a way into Dot, a phone
-    or a number of the iMessage channel."""
-    return path in _WAYS_IN or path.startswith(f"{PHONES_PATH}/")
+    """Whether ``path`` answers the installation's token alone (item 670): what opens or closes a way into Dot, a phone,
+    a number of the iMessage channel or a hook."""
+    return (
+        path in _WAYS_IN
+        or path.startswith(f"{PHONES_PATH}/")
+        or path == HOOKS_PATH
+        or path.startswith(f"{HOOKS_PATH}/")
+    )
 
 
 def from_a_phone(scope: Scope) -> bool:
@@ -409,15 +425,23 @@ def _ends_when_removed(receive: Receive, removed: asyncio.Event) -> Receive:
 
 class LocalGuard:
     """ASGI middleware that applies :func:`check_request` to every request and adds the security headers. ``phones``
-    are the phones that hold a key of their own (item 670); none when it is ``None``."""
+    are the phones that hold a key of their own (item 670); none when it is ``None``. ``hook_hosts`` are the hosts a
+    call to a hook may come in under besides ``reach`` (``[server] hook_hosts``), for that path alone."""
 
     def __init__(
-        self, app: ASGIApp, token: str, port: int, reach: frozenset[str], phones: PairedPhones | None = None
+        self,
+        app: ASGIApp,
+        token: str,
+        port: int,
+        reach: frozenset[str],
+        hook_hosts: frozenset[str],
+        phones: PairedPhones | None = None,
     ) -> None:
         self._app: ASGIApp = app
         self._token: str = token
         self._port: int = port
         self._reach: frozenset[str] = reach
+        self._hook_hosts: frozenset[str] = hook_hosts
         self._phones: PairedPhones | None = phones
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -444,7 +468,7 @@ class LocalGuard:
             authorization,
             self._token,
             self._port,
-            self._reach,
+            (self._reach | self._hook_hosts) if is_hook_call(path) else self._reach,
             phone,
         )
         if refusal is None:

@@ -4,6 +4,7 @@ application on the Mac. Every route finds its file with ``located_file``, so non
 panel shows."""
 
 import asyncio
+import mimetypes
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -65,6 +66,16 @@ def _web_page(path: Path) -> Path:
     if path.stat().st_size > MAX_WEB_PAGE_BYTES:
         raise InvalidValueError("the page is too large to be shown", {"path": str(path), "max": MAX_WEB_PAGE_BYTES})
     return path
+
+
+def _playable_type(name: str, kind: str) -> str:
+    """The media type a video or a sound is served as: the one its name says when it is a video or a sound type, else a
+    plain one of its kind (a file kept with no type of its own, or one a browser called something else)."""
+    guessed: str | None = mimetypes.guess_type(name)[0]
+    wanted: str = f"{kind}/"
+    if guessed is not None and guessed.startswith(wanted):
+        return guessed
+    return "video/mp4" if kind == "video" else "audio/mpeg"
 
 
 def files_router(ctx: ServerContext, looks: QuickLook) -> APIRouter:
@@ -141,6 +152,17 @@ def files_router(ctx: ServerContext, looks: QuickLook) -> APIRouter:
         (item 376)."""
         stored: StoredAttachment = await asyncio.to_thread(load_attachment, workspace, attachment_id)
         return await file_image(str(stored.path))
+
+    @router.get("/attachments/{attachment_id}/media")
+    async def attachment_media(attachment_id: str) -> FileResponse:
+        """A video or a sound attached to a message, served in ranges so that a player starts at once and seeks (item
+        1992): the phone's chat plays the video of a message here. Only a video or a sound is served, as the type its
+        name says: any other file is no media for a player."""
+        stored: StoredAttachment = await asyncio.to_thread(load_attachment, workspace, attachment_id)
+        if stored.kind not in ("video", "audio"):
+            raise InvalidValueError("the attachment is no video or sound", {"attachment_id": attachment_id})
+        found: Path = await asyncio.to_thread(located, str(stored.path))
+        return FileResponse(found, media_type=_playable_type(found.name, stored.kind))
 
     @router.post("/files/open", status_code=204)
     async def open_file(request: OpenRequest) -> None:

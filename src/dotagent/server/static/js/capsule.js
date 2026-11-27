@@ -6,7 +6,7 @@
 // tells does. The run is stopped from the composer's send alone, a Stop while the box is empty (item 120); once it is
 // pressed the line says it stops until the run ends.
 
-import { duration, el, setText } from "./dom.js";
+import { el, elapsed, setText } from "./dom.js";
 import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { flockState } from "./timeline.js";
@@ -65,7 +65,7 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
       markFor = work.dataset.state;
       workMark.replaceChildren(icon(blocked ? "bell" : "circleDashed"));
     }
-    const took = duration(Math.max(now - since, 0));
+    const took = elapsed(now - since);
     setText(
       workText,
       halting ? t("capsule.stopping") : blocked ? t("work.waitingForYou") : status === "queued" ? t("work.queued") : t("capsule.working", { took }),

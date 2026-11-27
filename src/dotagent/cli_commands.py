@@ -456,6 +456,30 @@ class ScheduleDeleteCommand(FrozenModel):
     schedule_id: str
 
 
+class HooksListCommand(FrozenModel):
+    name: Literal["hooks-list"]
+
+
+class HooksAddCommand(FrozenModel):
+    name: Literal["hooks-add"]
+    title: str = Field(min_length=1, max_length=80, pattern=r"\S")
+    schedule: str | None
+    agent: str | None
+    field: list[str]
+    per_minute: int
+    template: list[str]
+
+
+class HooksRotateCommand(FrozenModel):
+    name: Literal["hooks-rotate"]
+    hook_id: str
+
+
+class HooksRemoveCommand(FrozenModel):
+    name: Literal["hooks-remove"]
+    hook_id: str
+
+
 class ScheduleEnableCommand(FrozenModel):
     name: Literal["schedule-enable"]
     schedule_id: str
@@ -613,6 +637,10 @@ type Command = Annotated[
     | ScheduleDeleteCommand
     | ScheduleEnableCommand
     | ScheduleDisableCommand
+    | HooksListCommand
+    | HooksAddCommand
+    | HooksRotateCommand
+    | HooksRemoveCommand
     | CampaignListCommand
     | CampaignShowCommand
     | CampaignStopCommand

@@ -26,6 +26,7 @@ export const TABS = [
   { id: "keys", label: "AI services", icon: "key", words: "keys api providers openai anthropic" },
   { id: "phone", label: "Phone", icon: "smartphone", words: "tailscale pair devices iphone" },
   { id: "channels", label: "Channels", icon: "message", words: "imessage telegram whatsapp messaging" },
+  { id: "hooks", label: "Hooks", icon: "bolt", words: "webhooks signed calls http trigger" },
   { id: "system", label: "System", icon: "monitor", words: "daemon health emergency stop version update restart" },
   { id: "repair", label: "Self-repair", icon: "wrench", words: "problems fixes claude code sessions" },
   { id: "diagnostics", label: "Diagnostics", icon: "terminal", words: "processes logs disk usage" },
@@ -70,6 +71,7 @@ export const SETTINGS_GROUPS = [
       { tab: "keys", line: "The keys of the AI services" },
       { tab: "phone", line: "Dot on your phones", value: "phone" },
       { tab: "channels", line: "iMessage and the other ways to reach Dot" },
+      { tab: "hooks", line: "Signed calls from services that start work" },
     ],
   },
   {

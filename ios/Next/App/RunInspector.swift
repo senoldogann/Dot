@@ -11,7 +11,8 @@ import SwiftUI
 /// - the recap (`/runs/{id}/recap`) with Write a new one;
 /// - the cost (`/runs/{id}/stats`): time, where it went, tokens in (with the cached share) and out, steps, against the
 ///   cap and what like tasks spend; Dot holds no price per model, so there is no money (the footer says so);
-/// - the plan; the helpers, each opening its own chat;
+/// - the helpers, each opening its own chat (the plan is the pill's Plan n/m and its sheet, not a section here: the
+///   owner's word of 2026-11-27, item 1996);
 /// - the changes, each file's diff in Quick Look and, for a file as the runs left it, Undo (asked first);
 /// - the commands that run in the background with Stop (`DELETE /threads/{id}/terminals/{sid}`).
 struct RunInspector: View {
@@ -56,11 +57,6 @@ struct RunInspector: View {
                     EmptyState(
                         title: String(localized: "Nothing ran yet", comment: "Inspector: the chat has no run"), systemImage: "circle.dotted",
                         detail: String(localized: "What a run did and cost shows here once one started.", comment: "Inspector empty state detail"), actionTitle: nil, action: {})
-                }
-                if let plan = planSteps, !plan.isEmpty {
-                    InspectorSection(header: String(localized: "Plan", comment: "Inspector section: the run's plan"), footer: nil) {
-                        PlanSteps(steps: plan).padding(.vertical, Space.s)
-                    }
                 }
                 helpersSection
                 changesSection
@@ -376,14 +372,6 @@ struct RunInspector: View {
         String(
             localized: "Running for \(durationWords(Int(Date().timeIntervalSince1970 - startedAt), locale: locale))",
             comment: "Inspector: how long a background command has run; the argument is a duration")
-    }
-
-    private var planSteps: [PlanStep]? {
-        guard let run, let events = model.chats[thread]?.runs[run.id]?.events else { return nil }
-        guard let plan = events.last(where: { $0.kind == "plan" }) else { return nil }
-        return (plan.data["steps"]?.array ?? []).compactMap { step in
-            step["text"]?.string.map { PlanStep(text: $0, status: step["status"]?.string ?? "pending") }
-        }
     }
 
     /// The share of the model's context the newest step read.

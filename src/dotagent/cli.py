@@ -95,6 +95,10 @@ _FAMILIES: dict[str, str] = {
     "schedule-delete": "dotagent.cli_schedule",
     "schedule-enable": "dotagent.cli_schedule",
     "schedule-disable": "dotagent.cli_schedule",
+    "hooks-list": "dotagent.cli_hooks",
+    "hooks-add": "dotagent.cli_hooks",
+    "hooks-rotate": "dotagent.cli_hooks",
+    "hooks-remove": "dotagent.cli_hooks",
     "campaign-list": "dotagent.cli_campaign",
     "campaign-show": "dotagent.cli_campaign",
     "campaign-stop": "dotagent.cli_campaign",
@@ -472,6 +476,30 @@ def build_parser() -> argparse.ArgumentParser:
     schedule_disable = schedule_commands.add_parser("disable", help="switch a schedule off without deleting it")
     schedule_disable.add_argument("schedule_id", help="the id shown by 'dotx schedule list'")
 
+    hooks = commands.add_parser("hooks", help="addresses a service calls, signed, to start a schedule or an agent")
+    hooks_commands = hooks.add_subparsers(dest="hooks_action", required=True)
+    hooks_commands.add_parser("list", help="show every hook: its address, what it starts and its last calls")
+    hooks_add = hooks_commands.add_parser("add", help="make a hook; its secret is printed this once")
+    hooks_add.add_argument("--name", dest="title", required=True, help="a short label")
+    hooks_target = hooks_add.add_mutually_exclusive_group(required=True)
+    hooks_target.add_argument("--schedule", default=None, help="the schedule a call fires, by its id")
+    hooks_target.add_argument("--agent", default=None, help="the agent a call starts a run of, by its id")
+    hooks_add.add_argument(
+        "--field",
+        action="append",
+        default=[],
+        help="a field of the call's JSON the run is given, quoted as data (a dotted path such as pull_request.title; "
+        "repeat)",
+    )
+    hooks_add.add_argument("--per-minute", type=int, default=10, help="the calls it takes in a minute (1 to 120)")
+    hooks_add.add_argument(
+        "template", nargs="*", help="what the run does when the hook is called; {field} names a field"
+    )
+    hooks_rotate = hooks_commands.add_parser("rotate", help="give a hook a new secret, printed this once")
+    hooks_rotate.add_argument("hook_id", help="the id shown by 'dotx hooks list'")
+    hooks_remove = hooks_commands.add_parser("remove", help="delete a hook")
+    hooks_remove.add_argument("hook_id", help="the id shown by 'dotx hooks list'")
+
     campaign = commands.add_parser(
         "campaign", help="goals that Dot keeps working on in sessions until done ('dotx run --standing' starts one)"
     )
@@ -757,6 +785,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     memory_action: object = raw.pop("memory_action", None)
     harness_action: object = raw.pop("harness_action", None)
     schedule_action: object = raw.pop("schedule_action", None)
+    hooks_action: object = raw.pop("hooks_action", None)
     campaign_action: object = raw.pop("campaign_action", None)
     mcp_action: object = raw.pop("mcp_action", None)
     skills_action: object = raw.pop("skills_action", None)
@@ -783,6 +812,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"harness-{harness_action}"
     if raw["name"] == "schedule":
         raw["name"] = f"schedule-{schedule_action}"
+    if raw["name"] == "hooks":
+        raw["name"] = f"hooks-{hooks_action}"
     if raw["name"] == "campaign":
         raw["name"] = f"campaign-{campaign_action}"
     if raw["name"] == "mcp":

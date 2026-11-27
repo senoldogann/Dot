@@ -124,7 +124,7 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
   the floating working capsule with the scroll-to-bottom circle, the transcript pieces (bubble, answer, code block, tool
   call row and group, helper group, speaker line), helper and background-work rows and their sheets.
 - `App/`: the shell (the home of bots, PLAN §27: `Home.swift`, a bot's chat `BotChat.swift`, its profile
-  `BotProfile.swift`, faces `BotFace.swift`), the gallery, sample content. `scripts/e2e_bots.sh` runs `BotsLiveUITests`
+  `BotProfile.swift` and its Work pages `BotWorkPages.swift`, faces `BotFace.swift`), the gallery, sample content. `scripts/e2e_bots.sh` runs `BotsLiveUITests`
   on a throwaway daemon.
 - `Resources/`: the asset catalog (app icon, accent = the ink) and `Localizable.xcstrings`.
 - `Tests/`: `DotNextTests`. `scripts/`: the icon, the strings check, the screenshot harness.
