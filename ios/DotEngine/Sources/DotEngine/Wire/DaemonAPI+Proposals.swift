@@ -5,10 +5,12 @@ import Foundation
 // the nightly scout found (item 712, `routes_gallery.py`). The owner answers each; the Skills and Plugins pages are the
 // Mac's.
 
-/// A learned skill as a proposal would write it (`PlaybookDraft`): the kind of work, what it is for and its steps.
+/// A learned skill as a proposal would write it (`PlaybookDraft`): the kind of work, what it is for, when it fits and its
+/// steps.
 public struct SkillDraft: Codable, Sendable, Hashable {
     public let kind: String
     public let description: String
+    public let when: String
     public let steps: [String]
 }
 

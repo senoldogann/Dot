@@ -11,6 +11,10 @@ extracts them (`%@` a text argument, `%lld` a count).
 
 TR: dict[str, str] = {
     # Activity's skill and plugin proposals (item 2062).
+    "Install a plugin the review rates risky?": "İncelemenin riskli bulduğu eklenti kurulsun mu?",
+    "Use a skill written from outside content?": "Dış içerikten yazılmış beceri kullanılsın mı?",
+    "Use writes this as %@ and puts the others to rest.": "Kullan bunu %@ olarak yazar ve diğerlerini dinlendirir.",
+    "When: %@": "Ne zaman: %@",
     "A step may come from content others can write. Read it before you use it.": "Bir adım başkalarının yazabildiği içerikten gelmiş olabilir. Kullanmadan önce oku.",
     "Anthropic or its maker": "Anthropic ya da yapımcısı",
     "By %@ · %@": "Yayıncı: %1$@ · %2$@",
