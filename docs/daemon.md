@@ -821,7 +821,7 @@ the commands at work in the chat, which stand right under it. An interrupted cha
 while Dot is reachable. During a daemon outage the shared line under the bar shows *Mac asleep or unreachable
 since HH:MM*. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
-work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
+work are one capsule of glass, a single row just above the box with a round way down beside it (item 1991: it comes whenever the end of the conversation is away from the window, as on the iPhone, also in a chat that is over and past the start of its long answer; it leads to the answer while a finished chat's answer start is below the window, else to the end, and follows again), whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
 **Waiting on 2 helpers** (only while the run has stopped for them), **Chat updates interrupted**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 **Waiting on 2 helpers** while the run has stopped for them, **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
