@@ -225,8 +225,8 @@ def _told_by_its_schedule(run: RunRecord) -> bool:
 
 def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
     """The message an event of a run is worth, or ``None``: an approval or a question asked or left; a draft written
-    for the owner to send (item 314); a successful, failed or blocked end of a run with no parent, apart from a
-    scheduled run, which its schedule tells at its notice level; or the end of a campaign."""
+    for the owner to send (item 314); a successful, failed or blocked end of a run with no parent, or the end of one that waits on
+    the owner (item 2070), apart from a scheduled run, which its schedule tells at its notice level; or the end of a campaign."""
     if event.kind in _ASKED_KINDS:
         severity: object = event.data.get("severity")
         title: str = _ASKING_TITLE.get(str(severity), "Dot asks for approval")
