@@ -226,6 +226,8 @@ async def test_a_run_that_went_well_becomes_a_skill_offered_to_the_next_run_and_
         written: EventRecord | None = await home.runtime.store.last_event(first.id, PLAYBOOK_WRITTEN)
         assert written is not None
         assert (written.data["name"], written.data["host"], written.data["updated"]) == (SKILL_NAME, "this Mac", False)
+        # The lint of what was written is recorded beside it: a learned skill has no table of failures and fixes.
+        assert "it has no table of failures and their fixes" in written.data["lint"]
         file = playbooks_dir() / SKILL_NAME / SKILL_FILE
         assert file.is_file()
         body: str = file.read_text(encoding="utf-8")

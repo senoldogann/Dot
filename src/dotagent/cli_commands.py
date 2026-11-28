@@ -494,6 +494,13 @@ class SkillsListCommand(FrozenModel):
     name: Literal["skills-list"]
 
 
+class SkillsLintCommand(FrozenModel):
+    """`dotx skills lint`: what each skill named, or every one, lacks (docs/harness.md)."""
+
+    name: Literal["skills-lint"]
+    names: tuple[str, ...]
+
+
 class SkillsVersionsCommand(FrozenModel):
     """The versions of a learned skill (item 585)."""
 
@@ -648,6 +655,7 @@ type Command = Annotated[
     | CampaignAchievedCommand
     | McpListCommand
     | SkillsListCommand
+    | SkillsLintCommand
     | SkillsVersionsCommand
     | SkillsRestoreCommand
     | SkillsKeepCommand
