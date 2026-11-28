@@ -77,6 +77,7 @@ check "Ready: the mail draft discarded, the failed message waits" /api/drafts \
     'len(d) == 1 and d[0]["channel"] == "message" and d[0]["status"] == "failed"'
 check "Proposals: one in use, the one from outside content set aside" /api/harness \
     'd["adopted"] is not None and d["adopted"]["summary"].startswith("Run the tests") and [v["state"] for v in d["versions"] if v["summary"].startswith("Read the README")] == ["retired"]'
+check "Skills and plugins: the merge dropped" /api/skills/proposals 'd["items"] == []'
 check "Morning brief: switched off, its time kept" /api/brief 'd["enabled"] is False and d["time"] == "07:30"'
 check "Evening check-in: switched on" /api/checkin 'd["enabled"] is True'
 check "On its own: on, Downloads let go, the passport on the list" /api/initiative \

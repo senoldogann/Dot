@@ -10,6 +10,31 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # Activity's skill and plugin proposals (item 2062).
+    "A step may come from content others can write. Read it before you use it.": "Bir adım başkalarının yazabildiği içerikten gelmiş olabilir. Kullanmadan önce oku.",
+    "Anthropic or its maker": "Anthropic ya da yapımcısı",
+    "By %@ · %@": "Yayıncı: %1$@ · %2$@",
+    "Community": "Topluluk",
+    "Dot proposes; nothing changes until you choose.": "Dot önerir; sen seçene kadar hiçbir şey değişmez.",
+    "Dropped.": "Bırakıldı.",
+    "In use: the skill's new version is written.": "Kullanımda: becerinin yeni sürümü yazıldı.",
+    "Install": "Kur",
+    "Installed: the tasks that start from now on are offered its skills.": "Kuruldu: bundan sonra başlayan görevlere becerileri sunulur.",
+    "It cannot be used now: %@": "Şu an kullanılamaz: %@",
+    "Merge %@": "Birleştir: %@",
+    "Plugin proposal": "Eklenti önerisi",
+    "Plugin: %@": "Eklenti: %@",
+    "Rewrite %@": "Yeniden yaz: %@",
+    "Settings › Skills and Settings › Plugins": "Ayarlar › Beceriler ve Ayarlar › Eklentiler",
+    "Skill proposal": "Beceri önerisi",
+    "Skills and plugins": "Beceriler ve eklentiler",
+    "Skipped: the scout will not propose it again.": "Atlandı: keşifçi bunu bir daha önermeyecek.",
+    "The review rates its risk high. Read it before you install it.": "İnceleme riskini yüksek buldu. Kurmadan önce oku.",
+    "The review rates its risk medium. Read it before you install it.": "İnceleme riskini orta buldu. Kurmadan önce oku.",
+    "Update: %@": "Güncelleme: %@",
+    "What it does": "Ne yapar",
+    "What it needs": "Neye ihtiyaç duyar",
+    "Why it fits": "Neden uygun",
     # A tool row of Dot's own: cards shown in the chat (item 1967).
     "Show cards": "Kart göster",
     "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",

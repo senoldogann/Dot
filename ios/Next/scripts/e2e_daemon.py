@@ -64,8 +64,10 @@ from urllib.parse import SplitResult, parse_qs, urlsplit
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from dotagent.agent.manager import RunManager
+from dotagent.agent.review import PlaybookDraft
+from dotagent.agent.skill_proposals import SkillProposal, save_proposal
 from dotagent.config import load_config
-from dotagent.core.paths import ensure_layout
+from dotagent.core.paths import ensure_layout, playbooks_dir
 from dotagent.llm.types import (
     ChatRequest,
     DeltaSink,
@@ -680,6 +682,27 @@ async def seed_activity(runtime: Runtime) -> None:
         "- Read a repository's README before the first edit.",
         "",
         json.dumps({"tainted": True, "tainted_by": ["a web page"]}),
+    )
+    # A skill proposal (item 2062) whose skills this home does not have: it waits, says it cannot be used now, and Drop
+    # takes it away.
+    save_proposal(
+        playbooks_dir(),
+        SkillProposal(
+            id="skp_e2e_a1b2c3",
+            kind="merge",
+            names=("find flights", "book trains"),
+            draft=PlaybookDraft(
+                kind="plan a trip",
+                description="Plans a trip end to end",
+                when="a trip to plan",
+                steps=["Find the flights", "Book the trains"],
+            ),
+            reason="Both plan one trip",
+            words=None,
+            bases={"find flights": 1, "book trains": 1},
+            tainted=False,
+            created_at=time.time(),
+        ),
     )
     await store.add_todo(
         "Tidy the Downloads folder",
