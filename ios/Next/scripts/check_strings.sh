@@ -38,6 +38,9 @@ for key, entry in sorted(committed.items()):
     unit = entry.get("localizations", {}).get("tr", {}).get("stringUnit", {})
     if unit.get("state") != "translated" or not unit.get("value"):
         problems.append(f"no Turkish translation: {key!r}")
+    english = entry.get("localizations", {}).get("en", {}).get("stringUnit")
+    if english is not None and english.get("state") != "translated":
+        problems.append(f"English not marked translated (left out of en.lproj; run apply_translations.py): {key!r}")
     if not entry.get("comment"):
         problems.append(f"no translator comment: {key!r}")
 if raw:
