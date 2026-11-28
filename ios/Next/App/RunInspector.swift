@@ -108,6 +108,8 @@ struct RunInspector: View {
             if let approvals = run.approvals {
                 FactRow(title: String(localized: "Approval mode", comment: "Inspector row: the run's approval mode"), value: approvalWords(approvals))
             }
+            // The model the run worked on, which the chat's own choice below may not be (item 2071).
+            FactRow(title: String(localized: "Model used", comment: "Inspector row: the model the newest run worked on"), value: model.modelLabel(run.model))
         }
     }
 

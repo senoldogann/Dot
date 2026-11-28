@@ -8,6 +8,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 from dotagent.agent.account import RunAccount
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
 from dotagent.agent.authorization import StepDecision
+from dotagent.agent.chat_choices import MessageChoices
 from dotagent.agent.lanes import RoutedMessage
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import Disliked, RunLessons
@@ -561,6 +562,18 @@ class QueueMessageRequest(FrozenModel):
     accounts: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_ACCOUNTS)
     plan_first: bool = False
     key: MessageKey | None = None
+
+
+def sent_choices(request: StartRunRequest | QueueMessageRequest) -> MessageChoices:
+    """The choices a message's request names, as :func:`dotagent.agent.chat_choices.message_choices` takes them."""
+    return MessageChoices(
+        mode=request.mode,
+        model=request.model,
+        effort=request.effort,
+        speed=request.speed,
+        approvals=request.approvals,
+        goal_mode=request.goal_mode,
+    )
 
 
 def picks_of(plugins: Sequence[str], skills: Sequence[str], accounts: Sequence[str], plan_first: bool) -> RunPicks:

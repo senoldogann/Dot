@@ -147,7 +147,9 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    does since item 1350, `POST /api/runs`; a model that cannot answer is refused by name with a button that sends the
    message on the default model) and an agent's first message from the strip when it has no chat; the model and level of
    a chat in the inspector's sheet (**Model for this chat**, kept by the daemon as the web's composer keeps them,
-   `PATCH /api/threads/{id}`, and sent with each message together with the chat's mode and its agent); older messages
+   `PATCH /api/threads/{id}`; a follow-up that names none of them starts on them, as the daemon gives a message each
+   choice it leaves out from its chat, item 2071, and the Run section's **Model used** shows the model the newest run
+   worked on); older messages
    (reaching the top of a chat reads a page of older runs, `GET /api/runs?before=`, and keeps the reader's place); a
    tap on a step's line opens its arguments and result (clipped, and it says how much was left out); a hold on a
    message offers Quote, Copy, Select text, the seven reactions on what Dot said, and Edit from here on your own message

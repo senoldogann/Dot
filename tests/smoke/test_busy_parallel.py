@@ -180,7 +180,8 @@ async def test_a_request_of_its_own_starts_at_once_in_a_chat_of_its_own_and_the_
         assert len(_texts(failed)) == 2 and failed["beside_run_id"] is None
         # A message for one level, or with picks, is queued without asking: the queue carries what it chose.
         asked: int = len(model.asked)
-        await _send(client, run.thread_id, "Plan the trip.", plan_first=True)
+        # Plan first asks before the run acts: the chat keeps its first run's yolo (item 2071), so the message asks.
+        await _send(client, run.thread_id, "Plan the trip.", plan_first=True, approvals="ask")
         assert len(model.asked) == asked
         # The same message sent again with its key (its answer was lost) says the chat it started the first time.
         model.separate = True

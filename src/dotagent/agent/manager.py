@@ -5,7 +5,7 @@ import contextlib
 import json
 import sqlite3
 import time
-from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterator, Sequence
+from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterator, Sequence, Set
 from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from functools import partial
@@ -37,6 +37,7 @@ from dotagent.agent.campaign import (
     render_brief,
     sessions_without_progress,
 )
+from dotagent.agent.chat_choices import MessageChoices, ResumeChoices, message_choices, resume_choices
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.held_notes import dismiss_held_note, save_held_note
 from dotagent.agent.helper_check import check_helper_result
@@ -4384,17 +4385,27 @@ class RunManager:
         reason: HandOff | None = handoff_of(old)
         if reason is None:
             raise RunConflict("this run cannot be resumed", {"run_id": old.id, "status": old.status})
+        # The chat's model when the owner picked another one since the run started (item 2071), refused at once when
+        # its provider cannot answer, as a message on it would be.
+        chosen: ResumeChoices = resume_choices(
+            old.model, old.effort, old.speed, await self._runtime.store.chat_choices(old.thread_id)
+        )
+        if chosen.model != old.model:
+            await self.check_model_answers(parse_model_ref(chosen.model))
+            if chosen.effort is not None and not await self._level_offered(chosen.model, chosen.effort):
+                chosen = chosen.model_copy(update={"effort": None})
+            log.info("run_resumed_on_the_chats_model", run_id=old.id, model=chosen.model, was=old.model)
         resumption: Resumption = await self._resumption(old, reason, calls, automatic)
         cut_off: HandOff = reason
         run, _ = await self._launch(
             old.goal,
             old.mode,
-            old.model,
+            chosen.model,
             old.thread_id,
             RESUME_SOURCE,
             None,
-            old.effort,
-            old.speed,
+            chosen.effort,
+            chosen.speed,
             old.approvals,
             old.goal_mode,
             RunOpening(
@@ -5199,6 +5210,25 @@ class RunManager:
         if _offers(info, effort):
             return effort
         return effective_effort(info.efforts, effort)
+
+    async def chat_message_choices(self, thread_id: str, sent: MessageChoices, named: Set[str]) -> MessageChoices:
+        """The choices a message to the chat ``thread_id`` starts with (item 2071, :func:`message_choices`): each one
+        its request left out (``named`` are those it set) is the chat's. A level taken from the chat is given only when
+        the model it starts on (the chat's, or the default one) offers it, as the composer gives it (item 116): the
+        level a chat kept from its first run is the one that run resolved, which a model without levels refuses."""
+        chosen: MessageChoices = message_choices(sent, named, await self._runtime.store.chat_choices(thread_id))
+        if chosen.effort is None or "effort" in named or "model" in named:
+            return chosen
+        if await self._level_offered(chosen.model, chosen.effort):
+            return chosen
+        return chosen.model_copy(update={"effort": None})
+
+    async def _level_offered(self, model: str | None, effort: Effort) -> bool:
+        """Whether ``model`` (``None`` for the default one) offers the level ``effort``."""
+        info: ModelInfo = await self._runtime.router.model_info(
+            parse_model_ref(self._main_model if model is None else model)
+        )
+        return _offers(info, effort)
 
     async def _check_effort(self, ref: ModelRef, effort: Effort) -> None:
         """A level chosen for a run has to be one the model offers (a model with fewer than two has no choice)."""
