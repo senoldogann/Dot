@@ -139,7 +139,7 @@ is the answer (a small model that is offered both writes the call out as text).
   a schedule, an approval, an objective; the newest 60, item 924), each of which `recall` reads back with the ids next
   to it (the chat of a run, the runs of a chat, the run of a thing to do), so that a run that comes back to old work
   recalls it step by step rather than from a summary that lost it (`recall` fences what a run that read outside content
-  wrote and marks the reader untrusted); and a check lists names, paths and links in the summary that the conversation
+  wrote and marks the reader untrusted; a run deleted with its chat is read back from the run ledger, which keeps where it came from, its model, how it ended and when it was deleted and none of its words, item 2077; a record that is gone without a trace is an error that says it was deleted or is no id of Dot's); and a check lists names, paths and links in the summary that the conversation
   never had (an address cut short, with the ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
   it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
   `compacted` event names the model,
@@ -1094,8 +1094,9 @@ writes down what it was handed.
 accounts you signed in on Settings › Connectors ([Accounts](extending.md#accounts-googles-and-microsofts-own-sign-in)),
 through Gmail's, Google Calendar's and Microsoft Graph's own APIs, so that neither Mail, Outlook nor a browser has to be
 open. They are a run's only once an account is signed in: until then neither they nor their part of the prompt are in
-it. `account` is the address of one of the accounts: the run's prompt names them, and an address no account has is
-refused with their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`) or Outlook's
+it. `account` is the address of one of the accounts: the run's prompt names them, says that they take no other
+address, not even one of yours that its notes name (item 2073), and an address no account has is refused with
+their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`) or Outlook's
 (`from:ada`, `subject:invoice`) and, without any, lists the newest messages of the inbox; `mail_read` reads one whole:
 its people, its date, its text (the HTML of a message with no text made text) and the names of its files;
 `calendar_events` lists the events between two days or moments, in the Mac's time zone, each repeat on its own, with

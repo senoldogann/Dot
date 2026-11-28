@@ -25,7 +25,7 @@ from dotagent.cli_commands import RunCommand
 from dotagent.cli_handoff import daemon_of_this_home
 from dotagent.cli_run import cmd_run
 from dotagent.config import ServerConfig, load_default_config
-from dotagent.core.errors import NotFoundError, ServiceError
+from dotagent.core.errors import NotFoundError, RunConflict, ServiceError
 from dotagent.core.paths import ensure_layout, token_path
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config
 from dotagent.evals.scripted import ScriptedProvider
@@ -175,6 +175,30 @@ async def test_a_review_whose_chat_was_deleted_starts_in_a_new_chat(
     printed: str = capsys.readouterr().err
     assert "the chat thr_deleted_000000 is gone; the review starts in a new chat" in printed
     assert f"thread {run.thread_id}" in printed
+
+
+async def test_a_review_whose_chat_has_a_run_under_way_starts_in_a_new_chat(
+    own_home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A branch's review chat that still holds an earlier push's review (item 2065): the new review starts in a new
+    chat rather than being refused, and a run that is not a review is still refused."""
+    async with _daemon(own_home, [_WAITING, _FINISH]) as (runtime, manager):
+        busy: asyncio.Task[int] = asyncio.create_task(cmd_run(_command("yolo", False)))
+        deadline: float = time.monotonic() + 20.0
+        while not manager.active_run_ids():
+            assert time.monotonic() < deadline, "the first run did not start"
+            assert not busy.done()
+            await asyncio.sleep(0.05)
+        (first,) = await runtime.store.list_runs(10, None)
+        with pytest.raises(RunConflict):
+            await cmd_run(_command("ask", False).model_copy(update={"thread": first.thread_id}))
+        assert await cmd_run(_command("ask", True).model_copy(update={"thread": first.thread_id})) == 0
+        await manager.stop(first.id)
+        await asyncio.wait_for(busy, 20.0)
+        (review,) = [run for run in await runtime.store.list_runs(10, None) if run.source == "review"]
+    assert review.status == "done" and review.thread_id != first.thread_id
+    printed: str = capsys.readouterr().err
+    assert f"the chat {first.thread_id} has a run under way; the review starts in a new chat" in printed
 
 
 async def test_a_question_of_a_handed_run_is_answered_no_by_a_terminal_without_input(
