@@ -101,6 +101,15 @@ const ROUTES = [
     // page, it still goes back there.
     parent: () => null,
   },
+  // An agent's work, page by page, as the phone's bot profile lists it (item 2035).
+  {
+    tab: "agents",
+    layout: "page",
+    title: t("views.agentwork.work"),
+    pattern: /^\/agents\/([A-Za-z0-9_-]+)\/(orders|objectives|handoffs)$/,
+    load: () => import("./views/agentwork.js"),
+    parent: (params) => `/agents/${params[0]}`,
+  },
   { tab: "agents", layout: "page", title: t("main.handoffs"), pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
   // A team of the owner's (item 610): its agents' faces, a box for a message to it and its chats.
   { tab: "agents", layout: "page", title: t("main.team"), pattern: /^\/teams\/([A-Za-z0-9_-]+)$/, load: () => import("./views/teams.js"), parent: () => "/agents" },
@@ -294,7 +303,7 @@ function renderSignIn(message, keyFailed = false, refused = false) {
   // A key that Dot refused is said in the line's own words, with the way to pair again (item 1524): the code's field. The
   // line is a phone's, and the style shows it on a touch screen alone (shell.css): a touch screen can reach the page
   // after its first frames, when this is drawn, as the phone browser tests saw (item 966).
-  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: true, now: Date.now() }) : null;
+  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, lastContact: null, refused: true, now: Date.now() }) : null;
   const refusedLine =
     said === null
       ? null

@@ -177,16 +177,9 @@
   padding-inline: 0;
 }
 
-/* "Messages only" (item 1976): the run told as a conversation, as Grok Bot tells its work. What the run says on the way
-   to its calls is one of its messages, drawn as one, and a call that turns it to other work, which its own words did not
-   tell, is one of Dot's short messages too (`say-narration`, from the run's `narration` events); the steps fold out as
-   with "What it is doing", and the line under the conversation says what it does now and for how long. A line of a call
-   shows in this choice alone, never beside the steps it tells. */
-:root:not([data-work="messages"]) .say-narration,
-:root[data-work="messages"] .run-thread.steps-shown .say-narration {
-  display: none;
-}
-
+/* "Messages only" (item 1976): the run told as a conversation. What the run says on the way to its calls is one of its
+   messages; the steps fold out as with "What it is doing", and the one line under the conversation says what it does
+   now and for how long. A call is never a message of its own (owner 2026-11-27): it is that line's. */
 .work-status-time {
   display: none;
   flex: none;
@@ -4427,7 +4420,9 @@ dialog.computer-full::backdrop {
 
 /* One capsule on every width (the owner's word of 2026-11-27: the desktop composer works as the phone's does). The words
    take a line of their own over the controls once they are long, break a line or carry files (`data-shape="expanded"`,
-   composershape.js); while they are short the "+", the words, the model, the microphone and the send are one row. The
+   composershape.js); while they are short, in a box 340 px wide or wider (the box's own width), the "+", the words,
+   the model, the microphone and the send are one row, and a narrower box (an iPhone SE's) keeps the words over the
+   controls. The
    model's pill is the one choice in the bar: it opens the chat's settings, which hold the reasoning, the mode and the
    approvals (choices.js); YOLO's lock alone stays in sight, as the run asks nothing in it. */
 .composer-bar {
@@ -4508,26 +4503,35 @@ dialog.computer-full::backdrop {
   display: inline-block;
 }
 
-/* One row: the words beside the controls, the model its mark and its chevron alone (its name stays for a screen reader);
-   the chat's size keeps its ring, which a phone's composer does not have. */
-.composer[data-shape="compact"] .composer-bar {
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-  grid-template-areas: "plus field options meter send";
+/* The box is the container the one row asks of: a box narrower than 340 px (an iPhone SE's, 320 px wide) keeps the
+   words over the controls whatever their length, as a row of the "+", the model, the ring, the microphone and the send
+   left the words 26 px there (item 2015's fix). */
+.composer {
+  container: composer-box / inline-size;
 }
 
-.composer[data-shape="compact"] .composer-bar.has-mic {
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
-  grid-template-areas: "plus field options meter mic send";
-}
+@container composer-box (min-width: 340px) {
+  /* One row: the words beside the controls, the model its mark and its chevron alone (its name stays for a screen reader);
+     the chat's size keeps its ring, which a phone's composer does not have. */
+  .composer[data-shape="compact"] .composer-bar {
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    grid-template-areas: "plus field options meter send";
+  }
 
-.composer[data-shape="compact"] .composer-pill[data-pill="model"]:has(> .composer-pill-icon:not(:empty)) > :is(.composer-pill-value, .composer-pill-extra) {
-  position: absolute;
-  padding: 0;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  .composer[data-shape="compact"] .composer-bar.has-mic {
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+    grid-template-areas: "plus field options meter mic send";
+  }
+
+  .composer[data-shape="compact"] .composer-pill[data-pill="model"]:has(> .composer-pill-icon:not(:empty)) > :is(.composer-pill-value, .composer-pill-extra) {
+    position: absolute;
+    padding: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* The chat's settings over a window wider than a phone's (item 2015): the phone's sheet, as wide as a reading column,

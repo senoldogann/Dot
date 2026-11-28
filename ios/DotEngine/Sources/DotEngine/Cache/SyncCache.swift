@@ -95,6 +95,7 @@ public struct SyncCache: Sendable {
     // MARK: The daemon the copies are of
 
     private var daemonFile: URL { folder.appending(path: "daemon.json") }
+    private var lastContactFile: URL { folder.appending(path: "last-contact.json") }
     private var resetFile: URL { folder.appending(path: "reset.json") }
 
     /// The daemon the copies came from, kept apart from them so that it is known even before a list was saved.
@@ -104,6 +105,13 @@ public struct SyncCache: Sendable {
     }
 
     public func saveDaemon(_ identity: DaemonIdentity) { write(identity, to: daemonFile) }
+
+    func loadLastContact() -> Double? {
+        guard let data: Data = try? Data(contentsOf: lastContactFile) else { return nil }
+        return try? JSONDecoder().decode(Double.self, from: data)
+    }
+
+    func saveLastContact(_ at: Double) { write(at, to: lastContactFile) }
 
     /// The reset the owner has not been told of yet.
     public func loadReset() -> DaemonReset? {

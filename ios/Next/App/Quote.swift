@@ -101,7 +101,9 @@ struct SwipeToQuote: ViewModifier {
 
 /// The swipe as a UIKit pan on the message's own view, so that it sees the touches that begin on the message's text or its
 /// menu (a SwiftUI drag on a parent does not), and begins only for a pull to the right that is more across than down, from
-/// away from the screen's edge: a scroll or the back gesture never meets it.
+/// away from the screen's edge. iOS 26's navigation pulls a chat back from anywhere in it (the content pop gesture), which a
+/// swipe to the right on a message is too: the pull-back waits for this pan to fail, and this pan fails at once for a start
+/// at the edge, so the edge swipe still goes back while a swipe on a message quotes it (item 2030).
 struct SwipePan: UIGestureRecognizerRepresentable {
     let follow: (CGFloat) -> Void
     let release: (CGFloat) -> Void
@@ -118,7 +120,28 @@ struct SwipePan: UIGestureRecognizerRepresentable {
             return startX >= swipeEdge && velocity.x > 0 && velocity.x > abs(velocity.y) * 1.5
         }
 
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+        /// The scroll of the chat beside it, yes; the navigation's pull-back, never: both would run, and the chat would go
+        /// back while the message was quoted.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            !isPullBack(other, near: gestureRecognizer.view)
+        }
+
+        /// The navigation's pull-back (the edge's and iOS 26's from anywhere) waits for this pan to fail.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            isPullBack(other, near: gestureRecognizer.view)
+        }
+
+        /// Whether `other` is a pull-back of the navigation controller that holds `view`.
+        private func isPullBack(_ other: UIGestureRecognizer, near view: UIView?) -> Bool {
+            var responder: UIResponder? = view
+            while let current = responder {
+                if let navigation = current as? UINavigationController {
+                    return other === navigation.interactivePopGestureRecognizer || other === navigation.interactiveContentPopGestureRecognizer
+                }
+                responder = current.next
+            }
+            return false
+        }
     }
 
     func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }

@@ -135,7 +135,7 @@ async def test_a_schedule_the_run_made_is_a_line_that_leads_to_it(own_home: Path
                     await expect(once).to_have_text(f"Invite check · {when}")
                     await expect(once).to_have_attribute(
                         "aria-label",
-                        f"Schedule made: Invite check, {when}. Opens it on the Schedules page.",
+                        f"Routine made: Invite check, {when}. Opens it on the Routines page.",
                     )
                     # The lines are not someone speaking (item 859): Dot's words after them go on from those before,
                     # without a face of their own.

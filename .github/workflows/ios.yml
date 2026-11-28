@@ -162,7 +162,7 @@ jobs:
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
           case "$PART" in
-            chat) ONLY="-only-testing:DotNextTests -only-testing:DotNextUITests/ChatUITests -only-testing:DotNextUITests/SettingsUITests" ;;
+            chat) ONLY="-only-testing:DotNextTests -only-testing:DotNextUITests/ChatUITests -only-testing:DotNextUITests/ChatSettingsUITests -only-testing:DotNextUITests/SettingsUITests" ;;
             controls) ONLY="-only-testing:DotNextUITests/SettingsControlsUITests/testEveryControlOfTheNativePagesDoesSomething" ;;
             rows) ONLY="-only-testing:DotNextUITests/SettingsControlsUITests/testEveryRowOfSettingsOpensItsPage" ;;
             *) echo "no tests named for the part $PART" >&2; exit 2 ;;

@@ -216,7 +216,7 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await expect(bar.get_by_role("button", name="Task details")).to_be_visible()
                     # The one capsule over the composer (item 1383): the run's time, its helpers and what is queued.
                     capsule: Locator = page.locator(".dockbar-capsule")
-                    await expect(capsule.locator('[data-segment="status"]')).to_contain_text("Working")
+                    await expect(capsule.locator('[data-segment="status"]')).to_contain_text("Waiting on 2 helpers")
                     helpers_segment: Locator = capsule.locator('[data-segment="helpers"]')
                     await expect(helpers_segment).to_have_attribute(
                         "aria-label", re.compile(rf"^{len(_HELPERS)} helpers?\.")
@@ -231,7 +231,7 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await page.locator(".dock-sheet:not([hidden])").get_by_role("button", name="Details").click()
                     sheet: Locator = page.locator(".inspector[data-mode='drawer']")
                     await expect(sheet).to_have_attribute("data-open", "true")
-                    await expect(sheet.get_by_role("tab", name="Agents")).to_have_attribute("aria-selected", "true")
+                    await expect(sheet.get_by_role("tab", name="Bots")).to_have_attribute("aria-selected", "true")
                     await expect(sheet.locator(".inspector-grabber")).to_be_visible()
                     height: int = await page.evaluate("window.innerHeight")
                     box: FloatRect = await _box(sheet)
@@ -283,7 +283,7 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     assert round((await _box(sidebar))["width"]) == width
                     top: Locator = sidebar.locator(".side-top")
                     await expect(top.get_by_role("searchbox", name="Search chats")).to_be_visible()
-                    await expect(top.get_by_role("button", name="Your agents", exact=True)).to_be_visible()
+                    await expect(top.get_by_role("button", name="Your bots", exact=True)).to_be_visible()
                     foot: Locator = sidebar.locator(".side-foot")
                     await expect(foot.locator(".side-tool")).to_have_count(4)
                     await expect(foot.get_by_role("button", name="Connect apps")).to_be_visible()
@@ -302,8 +302,8 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     )
                     await page.evaluate(save_name, "Nova")
                     await expect(top.get_by_role("link", name="Write to Nova")).to_be_visible()
-                    await top.get_by_role("button", name="Your agents", exact=True).click()
-                    sheet: Locator = page.get_by_role("dialog", name="Your agents")
+                    await top.get_by_role("button", name="Your bots", exact=True).click()
+                    sheet: Locator = page.get_by_role("dialog", name="Your bots")
                     await expect(sheet.get_by_role("menuitem").first).to_contain_text("Nova")
                     await sheet.get_by_role("button", name="Cancel").click()
                     await page.evaluate(save_name, "Dot")
@@ -318,7 +318,7 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                 await expect(wide.locator(".stage-title .stage-name")).to_be_visible()
                 await expect(wide.locator(".stage-heading-title")).to_be_visible()
                 await expect(wide.locator(".stage-tools button:visible")).to_have_count(1)
-                await expect(wide.locator(".capsule")).to_contain_text("Working")
+                await expect(wide.locator(".capsule")).to_contain_text("Waiting on 2 helpers")
                 # The line names none of the run's calls (item 360): the conversation shows them. Before, it named
                 # the call the run waited on, the one that started its helpers.
                 await expect(wide.locator(".capsule")).not_to_contain_text("delegate")

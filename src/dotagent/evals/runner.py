@@ -90,6 +90,9 @@ def eval_config(config: AppConfig) -> AppConfig:
                     # A message sent while a run works asks the fast model whether it stands on its own (item 915):
                     # an attempt sends none, and a test of the queue means the queue.
                     "busy_parallel": False,
+                    # Dot's first words in a chat (item 2018) ask the fast model, which the script would answer with a
+                    # reply meant for the run.
+                    "first_words": False,
                     # The catalog opts into goal mode per task. The product default (on for an owner's task) must not
                     # turn every reference on: eval check plays the script, and a task that does not opt in has no
                     # verdict in that script.

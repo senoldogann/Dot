@@ -62,14 +62,19 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
     }
 }
 
-/// The capsule's link line (item 1931): a real state of the transport only (R-f §3): no link is Offline, a broken one
-/// Can't reach the Mac; `nil` for a link that is up or opening (bringing a chat up to date is no problem to tell, the
-/// owner's report of 2026-11-27), and for a refused key or an old Dot, which the chat's notice says. The screen shows it
-/// only once it lasted `linkLineDelay`. Pure.
-func linkLine(transport: Transport, mac: String) -> LinkLine? {
+@MainActor
+func listStatus(_ model: AppModel) -> String? {
+    switch model.transport {
+    case .offline, .reconnecting: model.visibleLink?.words
+    case .up, .connecting, .keyRefused, .daemonTooOld:
+        freshnessLine(freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
+    }
+}
+
+/// The same transport status for the capsule and the chat list.
+func linkLine(transport: Transport, lastContact: Double?) -> LinkLine? {
     switch transport {
-    case .offline: .offline
-    case .reconnecting: .unreachable(mac: mac)
+    case .offline, .reconnecting: LinkLine(lastContact: lastContact)
     case .keyRefused, .daemonTooOld, .connecting, .up: nil
     }
 }
@@ -291,6 +296,7 @@ struct ChatListView: View {
             }
             if let line = listLine {
                 Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).listRowBackground(Tone.ground)
+                    .accessibilityIdentifier("chats.link")
             }
             ForEach(model.pendingChats) { pending in
                 VStack(alignment: .leading, spacing: Space.xxs) {
@@ -407,8 +413,7 @@ struct ChatListView: View {
 
     /// The list's own line when it is not live (transport apart from freshness).
     private var listLine: String? {
-        freshnessLine(
-            freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
+        listStatus(model)
     }
 
     @ViewBuilder private func section(_ title: String, _ rows: [ThreadRow]) -> some View {
@@ -696,53 +701,12 @@ struct PushedNewChat: View {
         if let key = started {
             // Named by the daemon: its own id; before that the key (the starting chat).
             let thread: String = model.startedChats[key] ?? key
-            if model.startingChats[thread] != nil {
-                StartingChat(key: thread)
-            } else {
-                ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false).id(thread)
-            }
+            // The one chat screen from the first send (item 2025): the starting chat by its key, then, once the daemon names
+            // it, the chat itself; the screen keeps its identity (the key) across the swap, so nothing is pushed or redrawn.
+            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false).id(key)
         } else {
             BotNewChat(botId: botId, opened: { started = $0 })
         }
-    }
-}
-
-/// A new chat between its first send and the daemon's answer (item 1849): the owner's message where the chat shows it,
-/// with where it stands, under the chat's title; the list swaps it for the real chat, in place, once the daemon names it.
-struct StartingChat: View {
-    let key: String
-    @Environment(AppModel.self) private var model: AppModel
-    @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
-
-    var body: some View {
-        let text: String = model.startingChats[key] ?? ""
-        let delivery: Delivery = model.pendingChats.first { $0.key == key }?.delivery ?? .delivered
-        ScrollView {
-            VStack(alignment: .trailing, spacing: Space.xxs) {
-                OwnerMessage(text: text)
-                if let progress = model.outbox.first(where: { $0.id == key })?.attachmentUpload {
-                    AttachmentTransferLine(key: key, progress: progress)
-                } else {
-                    Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(refused(delivery) ? Tone.failure : Tone.tertiary)
-                    if case .rejected = delivery {
-                        Button(String(localized: "Try again", comment: "Under a refused message: sends it again")) { model.retry(key) }.textRole(.label)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.horizontal, Space.gutter)
-            .padding(.vertical, Space.m)
-        }
-        .background(Tone.ground)
-        .navigationTitle(text)
-        .navigationSubtitle(ChatStatus.starting.word)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
-    }
-
-    private func refused(_ delivery: Delivery) -> Bool {
-        if case .rejected = delivery { return true }
-        return false
     }
 }
 
@@ -791,6 +755,35 @@ struct LiveAgentsSheet: View {
             id: helper.runId, title: helper.shortTitle, state: state, startedAt: Date(timeIntervalSince1970: helper.startedAt),
             endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper, models: model.models),
             doing: helper.step.map { stepWords(tool: $0.tool, target: $0.target) } ?? (state.isLive ? ChatStatus.starting.word : nil))
+    }
+}
+
+/// A helper's chat to open as a sheet, by its thread.
+struct HelperChatRef: Identifiable, Hashable {
+    let thread: String
+    var id: String { thread }
+}
+
+/// A helper's chat as the bottom sheet (owner 2026-11-27): the same sheet the Agents sheet opens a helper in, from the
+/// helpers row of the stream too, with ✕ where the Agents sheet has its back.
+struct HelperChatSheet: View {
+    let thread: String
+    let close: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
+                            .accessibilityIdentifier("helperChat.close")
+                    }
+                }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Tone.sheet)
+        .tint(Tone.text)
     }
 }
 

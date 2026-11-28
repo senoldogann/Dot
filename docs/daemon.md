@@ -82,7 +82,7 @@ does not go on in since item 1350; item 1233 for an agent:
 its home chat, where a message to it goes on, the chat bound to it ever after; its page while it has none), and under them
 **All agents** (the page of every agent and team), **New agent** and **Campaigns** (Settings › Campaigns since item 1336). Until item
 1328 Dot and the agents stood as faces under the search, and Campaigns and Schedules as icons in the head (item 855); there is
-no **Schedules** icon now: its page is **Scheduled tasks** (item 1337), a row of Settings under Agents (`#/settings/schedules`; a
+no **Routines** icon now: its page is **Scheduled tasks** (item 1337), a row of Settings under Bots (`#/settings/schedules`; a
 Mac's nav and a phone's sheet), and the links to it in the Agents page, the teach toast and the notifications lead there. An agent made, changed or
 deleted on a page shows in the menu at once, and one a run made once that run ends. In the foot stand four small icon buttons
 (item 1328): **Settings** (item 999; named with your name for a screen reader), **Connect apps** ([Connect
@@ -242,7 +242,7 @@ its title, which counts its rows, and the folds are kept in that browser. The li
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
 and `due`. The composer works as the iPhone app's does, on every width (item 2015). It is one rounded box (item 1330): its corner
 is the token's (`--radius-composer`), its edge a hairline that grows stronger under the pointer and in focus, on the
-page's own surface. While the words are short (32 characters at most, on one line, with no file or pick) it is one row:
+page's own surface. While the words are short (32 characters at most, on one line, with no file or pick) and the box itself is at least 340 px wide (an iPhone SE's box, 320 px across, keeps the words on a line of their own whatever their length) it is one row:
 the **+**, the words, the model as its provider's mark and a chevron, the size of the chat (a ring, once a run has one),
 the microphone and the round send, on one centre line. Longer words, a line break or a file open it: the words on top,
 and under them the **+**, the model's mark with its name and, in grey, the mode when one is named, the reasoning's level
@@ -817,11 +817,14 @@ parts has something to say and goes when none has. The plan's part opens the pla
 composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side
 panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
 part closes it. It does not say what the run does now, which the conversation shows, nor count
-the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
+the commands at work in the chat, which stand right under it. An interrupted chat stream is reported in the capsule
+while Dot is reachable. During a daemon outage the shared line under the bar shows *Mac asleep or unreachable
+since HH:MM*. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
+**Waiting on 2 helpers** (only while the run has stopped for them), **Chat updates interrupted**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
+**Waiting on 2 helpers** while the run has stopped for them, **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
 for the secondary segments, then the Stop without its word, then the time without "Working", and at the narrowest a
@@ -1034,7 +1037,7 @@ search of the settings (item 1336: `/` takes the focus while the settings are op
 first match; it reads each page's name, its line and its words), then the settings' groups of rows (item 999, the phone's
 sheet), and at its foot **Back to chats**, to the chat last open (item 852). Every page that configures Dot is a row:
 **General**, **Appearance**, **Rules**, **Memory**, **Vault** and **Snapshots**; under **Agents**
-Agents, Models, Browser, Web search, **Scheduled tasks** (item 1337: what was the Schedules page), Campaigns and
+Bots, Models, Browser, Web search, **Scheduled tasks** (item 1337: what was the Schedules page), Campaigns and
 Self-improvement; under **Connections** Connectors, Plugins, Skills, AI services, Phone, Channels and Hooks; under
 **Maintenance** System, Self-repair, Diagnostics and Speed; under **About** Open source licences. A row is a small mark and its
 name, with what it holds at its right (how many notes Dot keeps, how many items the vault holds, how many schedules are
@@ -1358,15 +1361,25 @@ tells of.
 
 Ctrl-C stops the daemon: the runs that are going on are cancelled, and the browser and the other services are closed.
 
-While a run of its own, a run of a `dotx` command it relays, a schedule's run or a meeting works, the daemon keeps the
-Mac from idle sleep (item 1671, `[daemon] keep_awake`, on by default): it holds `caffeinate -i -w <its pid>` from the
-first work on until `[daemon] keep_awake_after_s` (60) seconds after the last one ended, which bridges a run and the
-next one its queue or a schedule starts, and looks every 2 s. It is a child `caffeinate` rather than a power assertion
-made in the daemon's own process: `-w` lets it go when the daemon ends however it ends, a crash too, and `pmset -g
-assertions` names it. It holds on power and on battery; the display still sleeps, and a closed lid still puts a MacBook
-to sleep. `GET /api/health` and `GET /api/status` say `awake`: `holding`, `idle` or `off`, and `dotx service status`
-says it in a line. The phone's `[server] keep_awake` (`caffeinate -s` while the Mac charges, item 271) is a hold of its
-own.
+Dot holds a temporary macOS idle-sleep assertion while a task or meeting is active, while a watcher is checking,
+and within three minutes of an enabled routine or watcher coming due. `[daemon] keep_awake` is on by default.
+Dot checks every two seconds and releases the assertion `[daemon] keep_awake_after_s` seconds after it last
+needed it (60 by default). Frequent checks can keep the assertion active across intervals.
+
+While the hold is active, run `pmset -g assertions`. In a macOS check on 2026-11-27, Dot's
+`caffeinate -i -w <pid>` adapter produced this entry. The PID after *Created for PID* identified the process
+holding it through Dot.
+
+```text
+pid 44382(caffeinate): [0x000c3b4300018de4] 00:00:00 PreventUserIdleSystemSleep named: "caffeinate command-line tool"
+    Created for PID: 44359.
+```
+
+`dotx service status`, `GET /api/health` and `GET /api/status` report whether the assertion is holding, idle or off.
+It works on battery and mains power and the display can still sleep. A Mac already asleep stays asleep.
+Closing a MacBook lid on battery, putting the Mac to sleep manually or powering it off still stops work.
+Dot changes no macOS power settings. The assertion ends with the daemon, including on a crash. The phone's
+`[server] keep_awake` option uses a separate `caffeinate -s` assertion while the Mac charges.
 
 The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any other address: `[server] host` is
 `127.0.0.1`, `localhost` or `::1`, written so (another spelling of a loopback address, such as `127.0.0.2` or `::1` in
