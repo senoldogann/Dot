@@ -63,7 +63,7 @@ struct HomeShell: View {
                 showsSettings = false
                 showsNewBot = false
                 showsApps = false
-                selection = BotRoute(bot: head.run.agentId ?? dotAgentId, thread: head.run.threadId)
+                selection = BotRoute(bot: head.run.agentId ?? dotAgentId, thread: head.run.threadId, find: nil)
             } catch {
                 if !Task.isCancelled {
                     PhonePush.log.warning("Could not open the notified run run=\(run, privacy: .public) error=\(String(describing: error), privacy: .private)")

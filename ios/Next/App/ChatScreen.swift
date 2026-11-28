@@ -185,7 +185,7 @@ struct ChatScreen: View {
             .navigationBarTitleDisplayMode(.inline)
             .modifier(HelperChats(thread: thread, helpers: helpers.map(\.threadId), opened: $openedHelper))
             .navigationDestination(item: $openedTask) { taskThread in
-                ChatScreen(thread: taskThread, initialPanel: nil, editsFirstQueued: false).environment(\.pushedFrom, thread)
+                ChatScreen(thread: taskThread, initialPanel: nil, editsFirstQueued: false, find: nil).environment(\.pushedFrom, thread)
             }
             .overlay(alignment: .topLeading) {
                 if RenderMeter.shown {
