@@ -4,10 +4,11 @@ Titles, URLs, element names, dialog messages and file names come from the page, 
 ``<web_content>`` fence; the header carries counts and indices produced by Dot itself.
 """
 
+import re
 from collections import Counter
 from collections.abc import Sequence
 
-from dotagent.browser.snapshot import fence_untrusted, fit_to_budget
+from dotagent.browser.snapshot import fed_lines, fence_untrusted, fit_to_budget
 from dotagent.browser.types import (
     ActOutcome,
     PageView,
@@ -19,7 +20,7 @@ from dotagent.browser.types import (
     TextWait,
 )
 from dotagent.core.outcomes import render_outcomes, render_step
-from dotagent.core.text import truncate_middle
+from dotagent.core.text import text_window, truncate_middle
 
 _TITLE_CHARS: int = 120
 _TAB_URL_CHARS: int = 160
@@ -29,6 +30,46 @@ _KEY_CHARS: int = 40
 _OPTION_CHARS: int = 60
 _MAX_NOTES: int = 12
 _OVERLAY_CHARS: int = 2000
+_PROSE_PREVIEW_CHARS: int = 120
+_PROSE: re.Pattern[str] = re.compile(r"( *- paragraph \[ref=(?:f\d+)?e\d+\]: )(.+)")
+_FIELD_LABEL: re.Pattern[str] = re.compile(
+    r'(?P<indent> *)- (?:textbox|searchbox|spinbutton|combobox|checkbox|radio) "(?P<label>[^"\\]+)" \[ref='
+)
+_TEXT_LABEL: re.Pattern[str] = re.compile(r"(?P<indent> *)- text: (?P<label>.+)")
+
+
+def _label_echo(line: str, following: str) -> bool:
+    """Playwright often repeats an HTML label as a ref-less text node immediately before its named control."""
+    label: re.Match[str] | None = _TEXT_LABEL.fullmatch(line)
+    field: re.Match[str] | None = _FIELD_LABEL.match(following)
+    return (
+        label is not None
+        and field is not None
+        and label["indent"] == field["indent"]
+        and label["label"] in (field["label"], f'"{field["label"]}"')
+    )
+
+
+def _without_label_echoes(lines: Sequence[str]) -> list[str]:
+    """Only full views carry adjacency information. Consecutive delta lines can come from anywhere."""
+    return [
+        line for index, line in enumerate(lines) if index + 1 == len(lines) or not _label_echo(line, lines[index + 1])
+    ]
+
+
+def _preview_prose(lines: Sequence[str]) -> tuple[str, bool]:
+    """Shorten prose in a full view. Deltas keep the changed text, including edits beyond the preview."""
+    compact: list[str] = []
+    shortened: bool = False
+    for line in lines:
+        prose: re.Match[str] | None = _PROSE.fullmatch(line)
+        if prose is not None and len(prose[2]) > _PROSE_PREVIEW_CHARS:
+            preview, _ = text_window(prose[2], 0, _PROSE_PREVIEW_CHARS)
+            compact.append(f"{prose[1]}{preview.rstrip()}…")
+            shortened = True
+        else:
+            compact.append(line)
+    return "\n".join(compact), shortened
 
 
 def _clip(text: str, limit: int) -> str:
@@ -95,8 +136,13 @@ def _view_block(view: PageView, body_budget: int) -> list[str]:
         lines.append("in front of the page:")
         lines.append(_clip(view.overlay, _OVERLAY_CHARS))
         lines.append("the page:")
-    body, dropped = fit_to_budget(view.body, body_budget)
+    compact, shortened = (
+        _preview_prose(_without_label_echoes(fed_lines(view.body))) if view.mode == "full" else (view.body, False)
+    )
+    body, dropped = fit_to_budget(compact, body_budget)
     lines.append(body if body else "(empty page)")
+    if shortened:
+        lines.append("Read a full paragraph with browser_read_text and its ref.")
     if dropped > 0:
         lines.append(f"… {dropped} more lines not shown; scroll, or use browser_find to locate an element")
     if view.notes:
