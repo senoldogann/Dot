@@ -493,7 +493,12 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     );
     const plan = isChat
       ? null
-      : sheetSwitch({ label: t("options.planFirst"), hint: t("choices.planFirstNext"), on: frame.picks.planFirst(), onToggle: () => frame.picks.setPlanFirst(!frame.picks.planFirst()) });
+      : sheetSwitch({ label: t("options.planFirst"), hint: t("choices.planFirstNext"), on: frame.picks.planFirst(), onToggle: () => {
+            frame.picks.setPlanFirst(!frame.picks.planFirst());
+            // The picks tell the composer, not this sheet: it is drawn again so the switch says what was picked.
+            modelMenu.repaint();
+          },
+        });
     const models = sections.build(modelArgs());
     return {
       body: [
