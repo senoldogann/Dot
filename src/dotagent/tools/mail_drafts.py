@@ -14,6 +14,7 @@ from dotagent.drafts.service import (
     MAX_BODY_CHARS,
     MAX_RECIPIENTS,
     MAX_SUBJECT_CHARS,
+    PROVIDER_NAMES,
     create_mailbox_draft,
     draft_problems,
     rewrite_mailbox_draft,
@@ -27,7 +28,6 @@ from dotagent.tools.context import ToolContext
 MAIL_DRAFT_TOOL: str = "mail_draft"
 _TIMEOUT_S: float = 90.0
 _SUMMARY_CHARS: int = 200
-_PROVIDER_NAMES: dict[str, str] = {"google": "Gmail", "microsoft": "Outlook"}
 
 
 class MailDraftArgs(ToolArgs):
@@ -123,7 +123,7 @@ def build_mail_draft_tool() -> RegisteredTool:
         place: str = (
             "nowhere"
             if draft.mailbox is None
-            else f"{_PROVIDER_NAMES[draft.mailbox.provider]} of {draft.mailbox.account}"
+            else f"{PROVIDER_NAMES[draft.mailbox.provider]} of {draft.mailbox.account}"
         )
         return ok(
             f"Draft {draft.id} is in the Drafts of {place} and on a card in the conversation. The owner sends it from "

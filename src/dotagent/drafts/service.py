@@ -57,10 +57,13 @@ _PHONE: re.Pattern[str] = re.compile(r"\+?[0-9][0-9 ().\-]{4,30}")
 # process, is not held by it: there the store's check of the draft's status, made before the write, is all there is.
 # A draft's lock is dropped once it is sent, discarded or gone, after which every write of it is a conflict.
 _MAILBOX_LOCKS: dict[str, asyncio.Lock] = {}
+# How many writers hold or wait for each draft's lock: asyncio releases a lock before it wakes the next waiter, so
+# ``locked()`` alone cannot say that nobody waits.
+_MAILBOX_USERS: dict[str, int] = {}
 _DECIDED: frozenset[str] = frozenset({"sent", "discarded"})
 
 
-_PROVIDER_NAMES: dict[str, str] = {"google": "Gmail", "microsoft": "Outlook"}
+PROVIDER_NAMES: dict[str, str] = {"google": "Gmail", "microsoft": "Outlook"}
 
 
 @asynccontextmanager
@@ -68,15 +71,19 @@ async def _writing(store: Store, draft_id: str) -> AsyncIterator[None]:
     """Hold the draft's lock; once it is let go, a draft that is decided (or gone) drops its lock, whatever the
     holder did, a conflict too."""
     lock: asyncio.Lock = _MAILBOX_LOCKS.setdefault(draft_id, asyncio.Lock())
+    _MAILBOX_USERS[draft_id] = _MAILBOX_USERS.get(draft_id, 0) + 1
     try:
         async with lock:
             yield
     finally:
+        _MAILBOX_USERS[draft_id] -= 1
+        if _MAILBOX_USERS[draft_id] == 0:
+            del _MAILBOX_USERS[draft_id]
         try:
             decided: bool = (await store.get_draft(draft_id)).status in _DECIDED
         except NotFoundError:
             decided = True
-        if decided and not lock.locked():
+        if decided and draft_id not in _MAILBOX_USERS:
             _MAILBOX_LOCKS.pop(draft_id, None)
 
 
@@ -222,7 +229,7 @@ async def _changed_in_mailbox(api: AccountApi, mailbox: DraftMailbox) -> bool:
 
 
 def changed_problem(mailbox: DraftMailbox) -> str:
-    name: str = _PROVIDER_NAMES[mailbox.provider]
+    name: str = PROVIDER_NAMES[mailbox.provider]
     return (
         f"it was changed in {name} after this card was shown, and Send here would write over that change: send it "
         f"from {name}, or discard this card"
@@ -273,7 +280,12 @@ async def _send_through_mailbox(accounts: Accounts, claimed: DraftRecord, mailbo
         if failure.context.get("status") == 404:
             error += "; the draft is no longer in the mailbox: it was sent or deleted there"
         log.warning(
-            "draft_not_sent", draft_id=claimed.id, channel=claimed.channel, provider=mailbox.provider, error=error
+            "draft_not_sent",
+            draft_id=claimed.id,
+            channel=claimed.channel,
+            provider=mailbox.provider,
+            error_type=type(failure).__name__,
+            status=failure.context.get("status"),
         )
         return MailboxSend(error=error, mailbox=written)
     return MailboxSend(error=None, mailbox=written)
@@ -329,7 +341,7 @@ async def rewrite_mailbox_draft(
         try:
             if await _changed_in_mailbox(api, mailbox):
                 raise RunConflict(
-                    f"the owner changed this draft in {_PROVIDER_NAMES[mailbox.provider]} after it was written: do "
+                    f"the owner changed this draft in {PROVIDER_NAMES[mailbox.provider]} after it was written: do "
                     "not write it again; tell them what you would change",
                     {"draft_id": draft.id},
                 )
@@ -409,7 +421,12 @@ async def _delete_from_mailbox(accounts: Accounts, mailbox: DraftMailbox) -> str
     except (AccountApiError, SignInError) as failure:
         if failure.context.get("status") == 404:
             return None
-        log.warning("mailbox_draft_kept", provider=mailbox.provider, error=failure.message)
+        log.warning(
+            "mailbox_draft_kept",
+            provider=mailbox.provider,
+            error_type=type(failure).__name__,
+            status=failure.context.get("status"),
+        )
         # A 5xx or a lost answer may come after the provider deleted it.
         status: object = failure.context.get("status")
         unknown: bool = isinstance(failure, AccountApiError) and (
