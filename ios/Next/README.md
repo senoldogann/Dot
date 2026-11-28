@@ -153,7 +153,8 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 Every user-visible string goes through `String(localized: "…", comment: "…")` and lives in
 `Resources/Localizable.xcstrings` with a Turkish translation (the owner reads Turkish). `StringCatalogTests` fails on a
 key without Turkish, without a comment, or stale; `scripts/check_strings.sh <derived data>` fails on a string of the code
-that the catalog lacks and on raw literals in SwiftUI calls. To add strings: build, run the check, copy the synced
+that the catalog lacks, on raw literals in SwiftUI calls, and on an English unit (a key that is not its English,
+`task.open`) not marked translated, which the build would leave out of `en.lproj`. To add strings: build, run the check, copy the synced
 catalog it names over `Resources/Localizable.xcstrings`, add the Turkish to `scripts/translations_tr.py`, run
 `python3 ios/Next/scripts/apply_translations.py`.
 

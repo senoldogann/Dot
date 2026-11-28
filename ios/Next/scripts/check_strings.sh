@@ -1,6 +1,7 @@
 #!/bin/sh
 # Fails when DotNext shows a string the String Catalog does not hold, holds a key the code no longer uses (stale), or
-# holds a key with no Turkish translation or no translator comment (the owner reads Turkish only).
+# holds a key with no Turkish translation or no translator comment (the owner reads Turkish only), or holds an English
+# unit not marked translated (a key that is not its English: the build leaves such a unit out of en.lproj).
 #
 # Usage: ios/Next/scripts/check_strings.sh <derived data folder of a DotNext build>
 #   The build writes the keys the compiler found (.stringsdata, SWIFT_EMIT_LOC_STRINGS). A copy of the catalog is
