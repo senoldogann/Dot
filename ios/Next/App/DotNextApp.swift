@@ -24,6 +24,8 @@ enum HomeScene: String, CaseIterable, Hashable, Sendable {
     case home
     case chats
     case settings
+    /// Activity standing alone, as Dot's profile opens it (`scripts/e2e_activity.sh`).
+    case activity
 }
 
 /// A scene the screenshot harness can open at launch with `-DotNextScene <name>` (debug builds only; see
@@ -118,6 +120,7 @@ struct RootView: View {
                     paired(HomeShell(opensFirstChat: false, settings: fixture.start))
                         .onAppear { model.showSettingsFixture(fixture) }
             #endif
+            case .home(.activity): paired(ActivityTab())
             case .home(let scene):
                 paired(HomeShell(opensFirstChat: false, settings: scene == .settings ? SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed) : nil))
             case .liveChat: paired(HomeShell(opensFirstChat: true, settings: nil))
@@ -169,7 +172,7 @@ struct RootView: View {
 
 extension RootView {
     /// The shell once a key is held; pairing before; a plain word while the key is read.
-    @ViewBuilder func paired(_ shell: HomeShell) -> some View {
+    @ViewBuilder func paired<Shell: View>(_ shell: Shell) -> some View {
         switch model.phase {
         case .loading: LoadingState(message: String(localized: "Reaching your Mac…", comment: "Chat list while the first list read is under way")).background(Tone.ground)
         case .unpaired: PairingView()

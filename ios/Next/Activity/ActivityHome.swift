@@ -2,7 +2,7 @@ import DotEngine
 import SwiftUI
 
 // Activity (item 1826, P1-gaps §8 under the phone scope of PLAN §26): what Dot did while the owner was away, the
-// drafts that wait, the proposals of Self-improvement, what is in motion today, and the ways Dot comes to the owner (the
+// drafts that wait, the proposals of Self-improvement and of skills and plugins, what is in motion today, and the ways Dot comes to the owner (the
 // morning brief, the evening check-in, its own initiative, the watchers), each on the daemon's own routes. The setup of
 // those (times, the watchers' choices) is the Mac's. `ActivityScreen` stands alone (PLAN §27: Dot's profile opens it
 // whole, an agent's profile scoped to its own work); `ActivityTab` is only its wrapper while the tab bar stays.
@@ -186,6 +186,7 @@ struct ActivityHome: View {
         if agent == nil {
             if let drafts = picture.drafts.value, !drafts.isEmpty { readySection(drafts) }
             if let harness = picture.harness.value, !harness.proposals.isEmpty { proposalsSection(harness) }
+            SkillPluginProposalsSection(wake: model.heard, say: actions.say)
         }
         if let whole = picture.activity.value { activitySections(agent.map { scoped(whole, to: $0) } ?? whole) }
         if agent == nil {

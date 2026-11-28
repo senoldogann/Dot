@@ -1335,6 +1335,17 @@
         }
       }
     },
+    "A step may come from content others can write. Read it before you use it.": {
+      "comment": "Skill proposal: the draft may carry outside content",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir adım başkalarının yazabildiği içerikten gelmiş olabilir. Kullanmadan önce oku."
+          }
+        }
+      }
+    },
     "A task failed": {
       "comment": "Remote notification: fixed words shown by iOS",
       "extractionState": "manual",
@@ -1862,6 +1873,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtlar"
+          }
+        }
+      }
+    },
+    "Anthropic or its maker": {
+      "comment": "Plugin proposal: the publisher is Anthropic or the maker of what its skills are about",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anthropic ya da yapımcısı"
           }
         }
       }
@@ -2533,6 +2555,17 @@
         }
       }
     },
+    "By %@ · %@": {
+      "comment": "Plugin proposal: its publisher and how far it is trusted",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yayıncı: %1$@ · %2$@"
+          }
+        }
+      }
+    },
     "Calendar": {
       "comment": "Watcher kind: an event about to start",
       "localizations": {
@@ -3167,6 +3200,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "İletişim"
+          }
+        }
+      }
+    },
+    "Community": {
+      "comment": "Plugin proposal: a community publisher",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Topluluk"
           }
         }
       }
@@ -4646,6 +4690,17 @@
         }
       }
     },
+    "Dot proposes; nothing changes until you choose.": {
+      "comment": "Activity: what the skill and plugin proposals do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot önerir; sen seçene kadar hiçbir şey değişmez."
+          }
+        }
+      }
+    },
     "Dot read your words differently from your choice.": {
       "comment": "Rules: the draft proposed a different answer from the one selected",
       "localizations": {
@@ -4945,7 +5000,7 @@
       }
     },
     "Drop": {
-      "comment": "Memory proposal: keep the owner's words",
+      "comment": "Memory proposal: keep the owner's words\nSkill proposal: drops it",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4973,6 +5028,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Damla"
+          }
+        }
+      }
+    },
+    "Dropped.": {
+      "comment": "Skill proposal: it was dropped",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bırakıldı."
           }
         }
       }
@@ -6590,6 +6656,17 @@
         }
       }
     },
+    "In use: the skill's new version is written.": {
+      "comment": "Skill proposal: it was used",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanımda: becerinin yeni sürümü yazıldı."
+          }
+        }
+      }
+    },
     "In use: the tasks that start from now on follow it.": {
       "comment": "Self-improvement: a version was put in use",
       "localizations": {
@@ -6634,6 +6711,28 @@
         }
       }
     },
+    "Install": {
+      "comment": "Plugin proposal: installs it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kur"
+          }
+        }
+      }
+    },
+    "Installed: the tasks that start from now on are offered its skills.": {
+      "comment": "Plugin proposal: it was installed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuruldu: bundan sonra başlayan görevlere becerileri sunulur."
+          }
+        }
+      }
+    },
     "Instructions": {
       "comment": "Agents: an agent's instructions\nBot profile: what the agent was told to do",
       "localizations": {
@@ -6663,6 +6762,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Faturalar ve defterler"
+          }
+        }
+      }
+    },
+    "It cannot be used now: %@": {
+      "comment": "Skill proposal: why it cannot be applied; the daemon's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şu an kullanılamaz: %@"
           }
         }
       }
@@ -7617,6 +7727,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "En yüksek bellek"
+          }
+        }
+      }
+    },
+    "Merge %@": {
+      "comment": "Activity: a proposal that merges learned skills; the argument names them",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Birleştir: %@"
           }
         }
       }
@@ -10039,6 +10160,28 @@
         }
       }
     },
+    "Plugin proposal": {
+      "comment": "Activity: the sheet of a plugin proposal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklenti önerisi"
+          }
+        }
+      }
+    },
+    "Plugin: %@": {
+      "comment": "Activity: the scout proposes a new plugin; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklenti: %@"
+          }
+        }
+      }
+    },
     "Point the camera at the code in Dot › Settings › Phone on your Mac.": {
       "comment": "QR scan: what to point at",
       "localizations": {
@@ -11080,6 +11223,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un kendi kodundaki her değişikliği gönderilmeden önce inceler. Bir sonraki gönderimden itibaren geçerlidir."
+          }
+        }
+      }
+    },
+    "Rewrite %@": {
+      "comment": "Activity: a proposal that rewrites a learned skill; the argument names it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden yaz: %@"
           }
         }
       }
@@ -12195,6 +12349,17 @@
         }
       }
     },
+    "Settings › Skills and Settings › Plugins": {
+      "comment": "Where on the Mac: the skills' and plugins' proposals",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Beceriler ve Ayarlar › Eklentiler"
+          }
+        }
+      }
+    },
     "Settings › System": {
       "comment": "Where on the Mac: the System page",
       "localizations": {
@@ -12532,8 +12697,19 @@
         }
       }
     },
+    "Skill proposal": {
+      "comment": "Activity: the sheet of a skill proposal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beceri önerisi"
+          }
+        }
+      }
+    },
     "Skills": {
-      "comment": "Composer picker header: the skills a run can use",
+      "comment": "Composer picker header: the skills a run can use\nPlugin proposal: the skills it brings",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -12543,8 +12719,19 @@
         }
       }
     },
+    "Skills and plugins": {
+      "comment": "Activity: the skill and plugin proposals",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beceriler ve eklentiler"
+          }
+        }
+      }
+    },
     "Skip": {
-      "comment": "Ask dock: skips a question or a kept step",
+      "comment": "Ask dock: skips a question or a kept step\nPlugin proposal: skips it",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -12583,6 +12770,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Atlandı"
+          }
+        }
+      }
+    },
+    "Skipped: the scout will not propose it again.": {
+      "comment": "Plugin proposal: it was skipped",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atlandı: keşifçi bunu bir daha önermeyecek."
           }
         }
       }
@@ -13997,6 +14195,28 @@
         }
       }
     },
+    "The review rates its risk high. Read it before you install it.": {
+      "comment": "Plugin proposal: the review's risk is high",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İnceleme riskini yüksek buldu. Kurmadan önce oku."
+          }
+        }
+      }
+    },
+    "The review rates its risk medium. Read it before you install it.": {
+      "comment": "Plugin proposal: the review's risk is medium",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İnceleme riskini orta buldu. Kurmadan önce oku."
+          }
+        }
+      }
+    },
     "The run ended": {
       "comment": "Notice at the end of a run that ended another way",
       "localizations": {
@@ -14921,6 +15141,17 @@
         }
       }
     },
+    "Update: %@": {
+      "comment": "Activity: the scout proposes an update of a plugin; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güncelleme: %@"
+          }
+        }
+      }
+    },
     "Updates": {
       "comment": "Maintenance section: updates and restarts",
       "localizations": {
@@ -14988,7 +15219,7 @@
       }
     },
     "Use": {
-      "comment": "Memory proposal: take the run's words\nSelf-improvement: puts a version in use",
+      "comment": "Memory proposal: take the run's words\nSelf-improvement: puts a version in use\nSkill proposal: writes the new version",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -15643,6 +15874,28 @@
         }
       }
     },
+    "What it does": {
+      "comment": "Plugin proposal: what it does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne yapar"
+          }
+        }
+      }
+    },
+    "What it needs": {
+      "comment": "Plugin proposal: what its skills need",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neye ihtiyaç duyar"
+          }
+        }
+      }
+    },
     "What should Dot remember?": {
       "comment": "Memory: the new note's field",
       "localizations": {
@@ -15804,6 +16057,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ayrıştırıcı testi neden yalnızca CI'da başarısız oluyor?"
+          }
+        }
+      }
+    },
+    "Why it fits": {
+      "comment": "Plugin proposal: why the scout proposes it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neden uygun"
           }
         }
       }
