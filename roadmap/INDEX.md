@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [2101](2101.md) | done | 2026-11-28 | Main's macOS gate: the phone tests count the WebDriverAgent tool alone, the full surface leaves out the Dot Next tools |
+| [2100](2100.md) | built | 2026-11-28 | Verification guards: a red main blocks merges, a weakened test says why, a commit without the hooks is seen |
 | [2095](2095.md) | done | 2026-11-28 | Desktop shell: opens at login, keeps its window's place, speaks the web UI's language, looks for updates daily |
 | [2091](2091.md) | done | 2026-11-28 | Evals from real runs graded on trajectory, skill ablation, cost per call |
 | [2090](2090.md) | done | 2026-11-28 | The lint of a skill Dot writes |

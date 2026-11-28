@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 _SCRIPT: Path = Path(__file__).resolve().parents[2] / "scripts" / "main_macos_green.py"
 
 
@@ -96,3 +98,39 @@ def test_a_red_night_keeps_main_red_though_its_gate_passed() -> None:
     gate = _run("gate.yml", "completed", "success")
     assert green.verdict([gate, _run("browser.yml", "completed", "failure", ("browser",))]) == "red"
     assert green.verdict([gate, _run("browser.yml", "completed", "success")]) == "green"
+
+
+def test_the_red_runs_are_the_failed_ones_by_the_id_of_their_page() -> None:
+    runs: list[object] = [
+        green.Run("gate.yml", "completed", "failure", "https://github.com/o/r/actions/runs/101", ("smoke",)),
+        green.Run("ios.yml", "completed", "success", "https://github.com/o/r/actions/runs/102", ()),
+        green.Run("browser.yml", "in_progress", "", "https://github.com/o/r/actions/runs/103", ()),
+    ]
+    assert green.red_run_ids(runs) == frozenset({101})
+    assert green.run_ids("- gate.yml: failure (smoke) https://github.com/o/r/actions/runs/19876543210\n") == frozenset(
+        {19876543210}
+    )
+
+
+def test_while_main_s_runs_are_to_come_the_open_issue_keeps_it_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A merge made while main's newest runs had not finished went in over the red of the commit before."""
+    pending: list[object] = [green.Run("gate.yml", "in_progress", "", "https://github.com/o/r/actions/runs/7", ())]
+    monkeypatch.setattr(green, "_main_sha", lambda: "abc")
+    monkeypatch.setattr(green, "_runs", lambda sha, current: pending)
+    monkeypatch.setattr(green, "_open_issue", lambda: 42)
+    monkeypatch.setattr(green, "_latest_report", lambda number: "failed: https://github.com/o/r/actions/runs/5\n")
+    assert green.red_now() == frozenset({5})
+    monkeypatch.setattr(green, "_open_issue", lambda: None)
+    assert green.red_now() == frozenset()
+    monkeypatch.setattr(green, "_open_issue", lambda: 42)
+    monkeypatch.setattr(green, "_latest_report", lambda number: "no link")
+    with pytest.raises(RuntimeError, match="links no run"):
+        green.red_now()
+
+
+def test_a_finished_green_commit_is_not_red_whatever_the_issue_says(monkeypatch: pytest.MonkeyPatch) -> None:
+    done: list[object] = [green.Run("gate.yml", "completed", "success", "https://github.com/o/r/actions/runs/8", ())]
+    monkeypatch.setattr(green, "_main_sha", lambda: "abc")
+    monkeypatch.setattr(green, "_runs", lambda sha, current: done)
+    monkeypatch.setattr(green, "_open_issue", lambda: 42)
+    assert green.red_now() == frozenset()

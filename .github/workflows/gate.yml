@@ -121,6 +121,42 @@ jobs:
           echo "prose alone: $prose"
           decide "$prose"
 
+  # Checks a model is not asked for (item 2100), on every pull request, prose alone included: every commit of the
+  # branch was made with the repository's hooks (scripts/hook_stamps.py: a commit with no stamp skipped them, and a push
+  # made with --no-verify skipped the review too), and a test it weakens is named, with why, in a `Test-change:` line of
+  # its commits (scripts/weakened_tests.py). Main's own copy of each script runs, so that a branch cannot loosen the
+  # check that reads it; the pull request that adds one, which main does not hold yet, runs its own. Both are stdlib
+  # Python and read git alone: the runner's Python runs them, with nothing installed.
+  guards:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Hook stamps and test changes
+        env:
+          BASE: ${{ github.base_ref }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch --quiet --filter=blob:none origin "+refs/heads/$BASE:refs/remotes/origin/$BASE" \
+            "+refs/pull/$PR/head:refs/remotes/origin/pr-head"
+          guards="$RUNNER_TEMP/guards"
+          mkdir -p "$guards"
+          for script in hook_stamps weakened_tests; do
+            if git cat-file -e "origin/$BASE:scripts/$script.py" 2>/dev/null; then
+              git show "origin/$BASE:scripts/$script.py" > "$guards/$script.py"
+            else
+              cp "scripts/$script.py" "$guards/$script.py"
+            fi
+          done
+          status=0
+          python3 "$guards/hook_stamps.py" --base "origin/$BASE" --head origin/pr-head || status=1
+          python3 "$guards/weakened_tests.py" check --base "origin/$BASE" --head origin/pr-head || status=1
+          exit "$status"
+
   checks:
     # A push and a release have no prose job and run everything; a pull request runs this when its change is more than
     # prose.
@@ -496,7 +532,7 @@ jobs:
   # passed or did not run, and fails when one failed: a skipped browser part, desktop check or audit is not a failure,
   # and a red one is. A pull request that changes prose alone reaches it with every heavy job skipped, and passes.
   ci:
-    needs: [prose, checks, gate, smoke, browser, desktop, zizmor]
+    needs: [prose, guards, checks, gate, smoke, browser, desktop, zizmor]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -504,6 +540,7 @@ jobs:
       - name: Every part passed, or did not run
         env:
           PROSE: ${{ needs.prose.result }}
+          GUARDS: ${{ needs.guards.result }}
           CHECKS: ${{ needs.checks.result }}
           GATE: ${{ needs.gate.result }}
           SMOKE: ${{ needs.smoke.result }}
@@ -512,7 +549,7 @@ jobs:
           ZIZMOR: ${{ needs.zizmor.result }}
         run: |
           fail=0
-          for name in PROSE CHECKS GATE SMOKE BROWSER DESKTOP ZIZMOR; do
+          for name in PROSE GUARDS CHECKS GATE SMOKE BROWSER DESKTOP ZIZMOR; do
             result="${!name}"
             echo "$name $result"
             case "$result" in

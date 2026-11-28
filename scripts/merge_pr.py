@@ -37,19 +37,47 @@ The pull request has to be one this automation opened. Its opener is read from G
 is signed in as. A pull request anyone else opened is left alone, one that only changes docs included: looking like
 docs is not a reason to update its branch or to merge it.
 
+Nothing is merged while main is red on macOS (item 2100): a red `main` is fixed before anything else is merged,
+and that rule was prose alone while pull requests went in over a red run. `main`'s state is read as
+`scripts/main_macos_green.py` reads it (:func:`main_macos_green.red_now`): its newest commit's runs of the gate, the
+last iPhone run and the last browser run, and while those are still to come the issue "main is red on macOS". The one
+pull request that goes in over a red `main` is the one that says it fixes it, with a line of its body
+`Fixes-main-red: <run id>` (or the run's link) naming a run that is red now; one that names an older red, or none,
+waits. A `main` whose state cannot be read is not merged over either.
+
 Usage: uv run python scripts/merge_pr.py <number> <rebase|squash>
 Exit 0: merged. Exit 2: brought up to main, run it again once its checks pass. Exit 1: it cannot be merged as it stands.
 """
 
+import importlib.util
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
+from types import ModuleType
 
 _METHODS: tuple[str, ...] = ("rebase", "squash")
 # How long before its run was made the merge a pull request's checks run on may have been made.
 MARGIN: timedelta = timedelta(minutes=15)
+# A line of a pull request's body that says it fixes a red main, and the runs it names.
+_FIXES_MAIN_RED = re.compile(r"^Fixes-main-red:(.*)$", re.MULTILINE | re.IGNORECASE)
+_RUN_NAMED = re.compile(r"(?:/actions/runs/|(?<![\w/]))(\d{5,})\b")
+
+
+def _sibling(name: str) -> ModuleType:
+    """The script ``name`` beside this one, loaded by its path, as this one is run by its path and tests load it so."""
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name(f"{name}.py"))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"scripts/{name}.py cannot be loaded")
+    module: ModuleType = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+main_macos_green: ModuleType = _sibling("main_macos_green")
 
 
 @dataclass(frozen=True)
@@ -103,6 +131,38 @@ def latest_gate_run(runs: list[GateRun], head: str) -> GateRun:
     if not runs:
         raise MergeRefused(f"no run of the gate for the head {head}: push it, or wait for its run to start")
     return runs[0]
+
+
+def declared_fixes(body: str) -> frozenset[int]:
+    """The runs a pull request's ``body`` says it fixes: each ``Fixes-main-red:`` line's run ids or run links."""
+    return frozenset(int(found) for line in _FIXES_MAIN_RED.findall(body) for found in _RUN_NAMED.findall(line))
+
+
+def red_main_refusal(red: frozenset[int], declared: frozenset[int]) -> str | None:
+    """Why a pull request may not be merged over main's ``red`` runs, given the runs it ``declared`` it fixes; ``None``
+    when main is not red or the pull request names one of the runs that make it red."""
+    if not red or red & declared:
+        return None
+    runs: str = ", ".join(str(run) for run in sorted(red))
+    named: str = (
+        f" Its Fixes-main-red line names {', '.join(str(run) for run in sorted(declared))}, which is no red run now."
+        if declared
+        else ""
+    )
+    return (
+        f"main is red on macOS (runs {runs}): fix main first, and merge again once it is green.{named} A pull request "
+        "that fixes it says so with a line `Fixes-main-red: <run id>` in its body, naming one of those runs"
+    )
+
+
+def _main_red() -> frozenset[int]:
+    """The runs that make main red on macOS now (:func:`main_macos_green.red_now`); a state that cannot be read
+    refuses the merge."""
+    try:
+        red: frozenset[int] = main_macos_green.red_now()
+    except RuntimeError as unread:
+        raise MergeRefused(f"whether main is red on macOS cannot be read: {unread}") from unread
+    return red
 
 
 def _run(argv: list[str]) -> str:
@@ -178,6 +238,13 @@ def opened_by_us(login: str, expected: str) -> bool:
     return bool(expected) and login.casefold() == expected.casefold()
 
 
+def _body(raw: str) -> str:
+    """The body of a pull request, as `gh pr view --json body` says it; empty when it has none."""
+    view: object = json.loads(raw)
+    body: object = view.get("body") if isinstance(view, dict) else None
+    return body if isinstance(body, str) else ""
+
+
 def _state_head_author(raw: str) -> tuple[str, str, str]:
     """The state, the head and the opener's login of a pull request, as `gh pr view --json
     headRefOid,state,author` says them. A missing opener is an empty login, which :func:`opened_by_us` refuses."""
@@ -215,9 +282,8 @@ def merge(number: int, method: str) -> int:
 
     A pull request opened by anyone but the account this automation acts as is left alone: no update of its branch
     and no merge."""
-    state, head, login = _state_head_author(
-        _run(["gh", "pr", "view", str(number), "--json", "headRefOid,state,author"])
-    )
+    view: str = _run(["gh", "pr", "view", str(number), "--json", "headRefOid,state,author,body"])
+    state, head, login = _state_head_author(view)
     expected: str = _actor()
     if not opened_by_us(login, expected):
         who: str = login or "an unknown actor"
@@ -231,6 +297,13 @@ def merge(number: int, method: str) -> int:
         raise MergeRefused(f"pull request {number} is {state}, not open")
     if not changed:
         raise MergeRefused(f"pull request {number} changes no file")
+    red: frozenset[int] = _main_red()
+    refusal: str | None = red_main_refusal(red, declared_fixes(_body(view)))
+    if refusal is not None:
+        raise MergeRefused(refusal)
+    if red:
+        print(f"main is red on macOS (runs {', '.join(str(run) for run in sorted(red))}); pull request {number} says "
+              "it fixes it")  # fmt: skip
     run: GateRun = latest_gate_run(_gate_runs(head), head)
     if run.status != "completed" or run.conclusion != "success":
         raise MergeRefused(

@@ -572,3 +572,53 @@ def test_a_push_of_the_budget_alone_runs_it(repo: Path, tmp_path: Path) -> None:
     done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
     assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
     assert "assert 33732 <= 1" in done.stderr
+
+
+def _on_main(repo: Path, files: dict[str, str]) -> None:
+    """Commits ``files`` on main, pushes it, and sets the branch `feature` on it, its own change kept."""
+    _git(repo, "checkout", "-q", "main")
+    for name, text in files.items():
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(text, encoding="utf-8")
+        _git(repo, "add", name)
+    _git(repo, "commit", "-q", "-m", "main moves")
+    _git(repo, "push", "-q", "origin", "main")
+    _git(repo, "checkout", "-q", "feature")
+    _git(repo, "rebase", "-q", "main")
+
+
+def test_a_commit_made_without_the_hooks_stops_the_push_before_the_review(repo: Path, tmp_path: Path) -> None:
+    """Item 2100: on 2026-11-28 a helper committed with the hooks switched off. The branch's commit, on a main that
+    holds the commit hook, has no stamp: no model is asked."""
+    _on_main(repo, {".claude/hooks/commit-msg.sh": "#!/bin/sh\n"})
+    done, asked = _run_hook(repo, tmp_path, _git(repo, "rev-parse", "HEAD"), _ZERO)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "made without the repository's hooks" in done.stderr and "Dot-Hooks: commit-msg" in done.stderr
+
+
+def test_a_test_weakened_with_no_test_change_line_stops_the_push_before_the_review(repo: Path, tmp_path: Path) -> None:
+    _on_main(repo, {"tests/test_count.py": "def test_count() -> None:\n    assert 1 + 1 == 2\n"})
+    _commit(repo, "tests/test_count.py", "def test_count() -> None:\n    pass\n", "Item 1: the count goes")
+    done, asked = _run_hook(repo, tmp_path, _git(repo, "rev-parse", "HEAD"), _ZERO)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "tests/test_count.py: assertion removed or changed: assert 1 + 1 == 2" in done.stderr
+    # Named as a review's findings are, so that Dot's repair night hands it to its session to answer.
+    named: str = done.stderr.split("the review is in ", 1)[1].split(". Fix", 1)[0]
+    assert named.endswith(".checks.md") and "assert 1 + 1 == 2" in Path(named).read_text(encoding="utf-8")
+
+
+def test_the_review_is_told_the_tests_the_change_edits_with_its_code_and_why(repo: Path, tmp_path: Path) -> None:
+    _on_main(
+        repo,
+        {"count.py": "HELPERS = 2\n", "tests/test_count.py": "def test_count() -> None:\n    assert HELPERS == 2\n"},
+    )
+    (repo / "count.py").write_text("HELPERS = 3\n", encoding="utf-8")
+    _git(repo, "add", "count.py")
+    reason: str = "Test-change: tests/test_count.py: item 1 starts a third helper, so two is the old code's count"
+    _commit(repo, "tests/test_count.py", "def test_count() -> None:\n    assert HELPERS == 3\n", f"Item 1\n\n{reason}")
+    done, asked = _run_hook(repo, tmp_path, _git(repo, "rev-parse", "HEAD"), _ZERO)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    goal: str = _goal_of(tmp_path, "first:model")
+    assert '## Test changes (REVIEW.md, "Test changes")' in goal
+    assert "- `tests/test_count.py`" in goal and "assertion removed or changed: `assert HELPERS == 2`" in goal
+    assert f"- {reason.removeprefix('Test-change: ')}" in goal

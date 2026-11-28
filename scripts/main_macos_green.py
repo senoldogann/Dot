@@ -23,6 +23,7 @@ Stdlib only, as the job that runs it installs nothing; GitHub is asked through `
 """
 
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -36,6 +37,7 @@ WORKFLOWS: tuple[str, ...] = (GATE, IOS, BROWSER)
 GREEN: frozenset[str] = frozenset({"success", "skipped"})
 # The job of each macOS workflow that runs ``report`` (gate.yml, ios.yml): its own run is read from its other jobs.
 REPORT_JOB: str = "main-health"
+_RUN_LINK: re.Pattern[str] = re.compile(r"/actions/runs/(\d+)")
 
 Verdict = Literal["green", "red", "pending"]
 
@@ -69,6 +71,18 @@ def report_body(sha: str, runs: list[Run]) -> str:
             lines.append(f"- {run.workflow}: {run.conclusion} ({jobs}) {run.url}")
     lines += ["", "Fix main before anything else is merged; the owner's Dot is not updated until it is green."]
     return "\n".join(lines)
+
+
+def run_ids(text: str) -> frozenset[int]:
+    """The ids of the runs whose pages ``text`` links (``.../actions/runs/<id>``)."""
+    return frozenset(int(found) for found in _RUN_LINK.findall(text))
+
+
+def red_run_ids(runs: list[Run]) -> frozenset[int]:
+    """The ids of the finished runs of ``runs`` that did not pass."""
+    return frozenset(
+        found for run in runs if run.status == "completed" and run.conclusion not in GREEN for found in run_ids(run.url)
+    )
 
 
 def _gh(arguments: list[str]) -> str:
@@ -186,6 +200,47 @@ def _report(sha: str, said: Verdict, runs: list[Run]) -> None:
             _gh(["issue", "comment", str(issue), "--body", body])
     elif said == "green" and issue is not None:
         _gh(["issue", "close", str(issue), "--comment", f"main's commit {sha} passed on macOS."])
+
+
+def _latest_report(number: int) -> str:
+    """The issue ``number``'s latest red report: its newest comment, or its body when it has none (each red verdict
+    after the first is a comment, :func:`_report`)."""
+    view: object = json.loads(_gh(["issue", "view", str(number), "--json", "body,comments"]))
+    if not isinstance(view, dict):
+        raise RuntimeError(f"the issue {number} came back as {view!r}")
+    comments: object = view.get("comments")
+    said: list[str] = (
+        [str(comment.get("body") or "") for comment in comments if isinstance(comment, dict)]
+        if isinstance(comments, list)
+        else []
+    )
+    return said[-1] if said else str(view.get("body") or "")
+
+
+def red_now() -> frozenset[int]:
+    """The runs that make main red on macOS now, empty while it is not (scripts/merge_pr.py, item 2100).
+
+    Main's newest commit decides when its runs are finished: red, its failed runs; green, none. While they are still to
+    come, the last verdict stands: the issue "main is red on macOS" open means the last one was red, and its runs are
+    those its latest report links (an earlier red's runs are not red now). An open issue whose latest report links no
+    run cannot be told, and raises."""
+    sha: str = _main_sha()
+    runs: list[Run] = _runs(sha, None)
+    said: Verdict = verdict(runs)
+    if said == "red":
+        return red_run_ids(runs)
+    if said == "green":
+        return frozenset()
+    issue: int | None = _open_issue()
+    if issue is None:
+        return frozenset()
+    linked: frozenset[int] = run_ids(_latest_report(issue))
+    if not linked:
+        raise RuntimeError(
+            f"the issue {issue} ({ISSUE_TITLE}) is open and its latest report links no run: read it, and close it or "
+            "fix main"
+        )
+    return linked
 
 
 def main(arguments: list[str]) -> int:

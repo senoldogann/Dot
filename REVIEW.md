@@ -238,6 +238,20 @@ here points at a test that no longer exists.
   by Save (its second pre-push review), and a Keychain item under that name, uncovered once Dot's copy was dropped,
   would have been sent to the new address (its third).
 
+## Test changes
+
+When the change edits tests, the hook gives the review a section listing them (`scripts/weakened_tests.py brief`, item
+2100), with what it saw weakened and the commits' `Test-change:` lines. For each file listed, the review says why the
+test changed and what its old assertion caught, and whether the new one still catches it, from the code, not the
+commit message alone:
+
+- A test weakened (an assertion removed or loosened, a test removed, a skip, xfail, fixme or rerun added, a timeout
+  raised) with no reason, or with one the code does not bear out, is **Important**.
+- A test changed to agree with the code, when the code is what is wrong ("the test was wrong" with nothing but the
+  author's word for it), is **Important**: the fix goes in the code.
+- A test's words or numbers changed to match a change another pull request makes to the code, not this one, is
+  **Important**: it breaks main when the two merge in either order.
+
 ## Evidence and format
 
 - Cite file and line for every finding; read the code instead of guessing from names

@@ -62,8 +62,14 @@ def test_only_the_account_this_automation_acts_as_counts_as_its_own() -> None:
     assert not merge_pr.opened_by_us("dot", "")
 
 
-def _install(monkeypatch: pytest.MonkeyPatch, answers: dict[tuple[str, ...], str], holds: bool) -> list[list[str]]:
-    """``_run`` answers ``answers`` (matched on a prefix of the command) and records every command."""
+def _install(
+    monkeypatch: pytest.MonkeyPatch,
+    answers: dict[tuple[str, ...], str],
+    holds: bool,
+    red: frozenset[int],
+) -> list[list[str]]:
+    """``_run`` answers ``answers`` (matched on a prefix of the command) and records every command; main is red on
+    macOS by the runs ``red`` (none: green)."""
     calls: list[list[str]] = []
 
     def run(argv: list[str]) -> str:
@@ -75,6 +81,7 @@ def _install(monkeypatch: pytest.MonkeyPatch, answers: dict[tuple[str, ...], str
 
     monkeypatch.setattr(merge_pr, "_run", run)
     monkeypatch.setattr(merge_pr, "_holds", lambda head, commit: holds)
+    monkeypatch.setattr(merge_pr, "_main_red", lambda: red)
     return calls
 
 
@@ -114,14 +121,14 @@ def test_a_docs_pull_request_opened_by_someone_else_is_left_alone(monkeypatch: p
             "title": "docs: dependency audit notes",
         }
     )
-    calls: list[list[str]] = _install(monkeypatch, _answers(view, "src/dotagent/agent/loop.py\n"), False)
+    calls: list[list[str]] = _install(monkeypatch, _answers(view, "src/dotagent/agent/loop.py\n"), False, frozenset())
     with pytest.raises(merge_pr.MergeRefused, match="left alone"):
         merge_pr.merge(888, "squash")
     assert _touched(calls) == []
 
 
 def test_a_pull_request_this_automation_opened_is_brought_up_to_main(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[list[str]] = _install(monkeypatch, _answers(_OURS, "src/dotagent/agent/loop.py\n"), False)
+    calls: list[list[str]] = _install(monkeypatch, _answers(_OURS, "src/dotagent/agent/loop.py\n"), False, frozenset())
     assert merge_pr.merge(7, "rebase") == 2
     assert _touched(calls) == [["gh", "pr", "update-branch", "7"]]
 
@@ -129,8 +136,54 @@ def test_a_pull_request_this_automation_opened_is_brought_up_to_main(monkeypatch
 def test_a_pull_request_this_automation_opened_is_merged_when_main_did_not_touch_its_files(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[list[str]] = _install(monkeypatch, _answers(_OURS, "docs/other.md\n"), False)
+    calls: list[list[str]] = _install(monkeypatch, _answers(_OURS, "docs/other.md\n"), False, frozenset())
     assert merge_pr.merge(7, "squash") == 0
     assert _touched(calls) == [
         ["gh", "pr", "merge", "7", "--squash", "--delete-branch", "--match-head-commit", "abc123"]
     ]
+
+
+def test_a_fix_names_the_red_runs_by_id_or_by_link_on_its_own_line() -> None:
+    body: str = (
+        "Fixes the phone tests.\n\nFixes-main-red: 19876543210\n"
+        "Fixes-main-red: https://github.com/o/r/actions/runs/19876543299/job/55512345678\n"
+        "Not a line of its own: Fixes-main-red: 19876543111\n"
+    )
+    assert merge_pr.declared_fixes(body) == frozenset({19876543210, 19876543299})
+    assert merge_pr.declared_fixes("item 2015, run 19876543210 was red") == frozenset()
+
+
+def test_a_red_main_refuses_all_but_a_fix_of_one_of_its_runs() -> None:
+    red: frozenset[int] = frozenset({19876543210, 19876543299})
+    assert merge_pr.red_main_refusal(frozenset(), frozenset()) is None
+    assert merge_pr.red_main_refusal(red, frozenset({19876543299})) is None
+    refused: str | None = merge_pr.red_main_refusal(red, frozenset())
+    assert refused is not None and "19876543210, 19876543299" in refused and "Fixes-main-red" in refused
+    stale: str | None = merge_pr.red_main_refusal(red, frozenset({11111111111}))
+    assert stale is not None and "11111111111, which is no red run now" in stale
+
+
+def test_main_red_on_macos_stops_the_merge_and_the_update_of_the_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """2026-11-28: pull requests were merged while main's macOS run was red; the rule was prose alone."""
+    calls: list[list[str]] = _install(monkeypatch, _answers(_OURS, "docs/other.md\n"), False, frozenset({19876543210}))
+    with pytest.raises(merge_pr.MergeRefused, match="main is red on macOS"):
+        merge_pr.merge(7, "squash")
+    assert _touched(calls) == []
+
+
+def test_the_pull_request_that_fixes_the_red_is_merged(monkeypatch: pytest.MonkeyPatch) -> None:
+    view: str = json.dumps({**json.loads(_OURS), "body": "Fixes the gate.\n\nFixes-main-red: 19876543210\n"})
+    calls: list[list[str]] = _install(monkeypatch, _answers(view, "docs/other.md\n"), False, frozenset({19876543210}))
+    assert merge_pr.merge(7, "squash") == 0
+    assert _touched(calls) == [
+        ["gh", "pr", "merge", "7", "--squash", "--delete-branch", "--match-head-commit", "abc123"]
+    ]
+
+
+def test_a_main_whose_state_cannot_be_read_is_not_merged_over(monkeypatch: pytest.MonkeyPatch) -> None:
+    def unread() -> frozenset[int]:
+        raise RuntimeError("gh api ... failed (1): HTTP 502")
+
+    monkeypatch.setattr(merge_pr.main_macos_green, "red_now", unread)
+    with pytest.raises(merge_pr.MergeRefused, match="cannot be read: gh api"):
+        merge_pr._main_red()

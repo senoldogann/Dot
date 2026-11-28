@@ -111,4 +111,6 @@ uvx zizmor@1.31.1 --min-severity low .
 - Its changelog entry is a file of its own, `changes/<item>.md`, and its roadmap item `roadmap/<item>.md`
   ([changes/README.md](changes/README.md), [roadmap/README.md](roadmap/README.md)): pull requests made side by side then
   add files instead of conflicting at the top of CHANGELOG.md and the end of ROADMAP.md.
-- Write the commit message as a sentence that says what the change does.
+- Write the commit message as a sentence that says what the change does. A commit that weakens a test (an assertion
+  removed or changed, a test removed, a skip, xfail, rerun or raised timeout) says why in a line of its body,
+  `Test-change: <file>: <what the old assertion caught and why it no longer holds>`; the gate fails without it.

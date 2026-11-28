@@ -200,6 +200,40 @@ newest finished run of `browser.yml` on main (item 1936: the night's run of the 
 until a later run of the whole suite passes; a commit with no gate run yet is not green. To see a branch's macOS run before its pull request merges, start it by hand:
 `gh workflow run gate.yml --ref <branch>` (every job) or `gh workflow run ios.yml --ref <branch>`.
 
+**Checks an agent cannot talk its way past** (item 2100). Each was prose until main went red over it on 2026-11-28:
+
+- *A red main blocks merges.* `scripts/merge_pr.py` reads main as `scripts/main_macos_green.py` does (its newest
+  commit's runs, and while they are still to come the open issue "main is red on macOS") and merges nothing over a red
+  one, but the pull request whose body has a line `Fixes-main-red: <run id>` (or the run's link) naming a run that is
+  red now (while main's runs are still to come, those of the issue's latest report). A main whose state cannot be read
+  is not merged over either. Only this script asks: the repair night's merge, Dependabot's and a `gh pr merge` by hand
+  do not.
+- *A weakened test says why.* A branch that removes or changes an assertion line, removes a test, adds a skip, xfail,
+  fixme, rerun or `pytest.mark.timeout` to a test that was there, or raises a timeout in a test file (`tests/`, the
+  Swift files of `ios/`'s test folders) names each such file in a `Test-change:` line of a commit's body, with the
+  reason: what the old assertion caught and why it no longer holds. A mark that guards a new test (in a new file, or in
+  the hunk that adds the test) is none, nor one moved, nor one written in a string or a comment.
+  `scripts/weakened_tests.py check` fails the gate's `guards` job without it (on every pull request, main's own copy of
+  the script, so a branch cannot loosen it) and stops the push in the pre-push hook. It reads the diff alone: an
+  assertion spread over lines is seen by its first, a skip in `conftest.py` or a rerun in `pyproject.toml` is not seen,
+  and a looser comparison on a line that asserts nothing is the review's to see. The review is given the tests the
+  change edits (`weakened_tests.py brief`) and answers for each, REVIEW.md's "Test changes".
+- *A commit made without the hooks is seen.* The commit hook `.claude/hooks/commit-msg.sh` adds the trailer
+  `Dot-Hooks: commit-msg`; a commit made with the hooks off (`git -c core.hooksPath=/dev/null commit`, `git commit
+  --no-verify`) has none, and `scripts/hook_stamps.py` makes the pre-push hook refuse it and the gate fail the pull
+  request that holds it, so a push made with the review skipped is seen too. Install the hook once, as a copy:
+  `cp .claude/hooks/commit-msg.sh "$(git rev-parse --git-path hooks)/commit-msg"`. `git rebase`, `git cherry-pick`
+  and `git commit --amend` keep the stamp and `git merge` runs the hook, so the merge train's and a repair session's
+  rebases keep it; GitHub's own commits (the merge `gh pr update-branch` makes, the merges onto main) are not held to
+  it, nor a commit made on a tree without the hook or written before 2026-11-28 12:00 UTC (a branch rebased from
+  before). `git revert --no-edit` runs no hook: amend the revert. A stamp shows the hooks were skipped; it is a
+  trailer, and proves nothing against one written by hand.
+
+The pre-push hook runs these from the checkout it is linked from (the owner's), on that checkout's `.venv`, so a
+change to them applies on this Mac once that checkout pulls it. What they find stops the push before the model review,
+written to `.git/claude-review/<commit>.checks.md` and named as a review's findings are, so that the repair night hands
+it to its session to answer ([Repair](repair.md)).
+
 The macOS runners are five at most, the most a free account runs
 together, and the Linux jobs do not take one. The job `ci` always runs and passes when every other job passed or was
 skipped: that is the status check `main`'s protection should require (`ci`), in place of `gate`, `gate (part 2)`,
