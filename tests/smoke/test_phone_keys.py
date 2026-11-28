@@ -161,6 +161,8 @@ async def test_a_phone_is_limited_and_the_macs_token_is_not(
         again: httpx.Response = await client.post(f"/keys/{NAME}/check", headers=phone)
         assert again.status_code == 429 and again.json()["context"]["retry_after_s"] > 0
         assert (await client.post(f"/keys/{NAME}/check", headers=mac)).status_code == 200
+        # A removal of a key Dot does not hold changes nothing and spends none of the phone's changes.
+        assert (await client.delete(f"/keys/{NAME}", headers=phone)).status_code == 404
         for _ in range(routes_keys.PHONE_CHANGES):
             assert (await client.post(f"/keys/{NAME}", json={"value": KEY}, headers=phone)).status_code == 200
         past: httpx.Response = await client.post(f"/keys/{NAME}", json={"value": KEY}, headers=phone)
@@ -177,3 +179,28 @@ async def test_a_refused_key_is_not_echoed(own_home: Path) -> None:
         spaced: str = "sk-or with a space 9f3k"
         refused: httpx.Response = await client.post(f"/keys/{NAME}", json={"value": spaced}, headers=phone)
         assert refused.status_code == 422 and "9f3k" not in refused.text
+
+
+async def test_a_check_that_began_before_a_change_records_nothing(
+    own_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A check of the old key that ends after a new key was saved would show its verdict against the new one (item
+    2054's security review)."""
+    started: asyncio.Event = asyncio.Event()
+    release: asyncio.Event = asyncio.Event()
+
+    async def slow(config: object, provider: str) -> CheckResult:
+        started.set()
+        await release.wait()
+        return CheckResult(name=f"{provider} api", ok=True, required=True, detail="took the old key")
+
+    monkeypatch.setattr(routes_keys, "check_provider_key", slow)
+    async with _served(own_home) as client:
+        mac: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
+        checking: asyncio.Task[httpx.Response] = asyncio.create_task(client.post(f"/keys/{NAME}/check", headers=mac))
+        await started.wait()
+        assert (await client.post(f"/keys/{NAME}", json={"value": KEY}, headers=mac)).status_code == 200
+        release.set()
+        assert (await checking).status_code == 200
+        listed: httpx.Response = await client.get("/keys", headers=mac)
+        assert next(key for key in listed.json()["keys"] if key["name"] == NAME)["check"] is None

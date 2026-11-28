@@ -65,7 +65,7 @@ def recent_times(times: tuple[float, ...], now: float, window_s: float) -> tuple
 
 
 def phone_label(phones: list[Phone], phone_id: str) -> str:
-    """The name of the listed phone ``phone_id`` as the owner's pairing gave it, else its id."""
+    """The name of the listed phone ``phone_id`` as its pairing gave it ("iPhone"), else its id."""
     for phone in phones:
         if phone.id == phone_id:
             return phone.name
@@ -88,7 +88,10 @@ def keys_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
     writing: asyncio.Lock = asyncio.Lock()
     # The last check of each key since the daemon started, by the variable's name; a change of the key forgets it.
     checks: dict[str, KeyCheck] = {}
-    # When each phone changed a key, and when a phone last asked each key's check.
+    # How many times each key changed since the daemon started: a check that began before a change does not record its
+    # answer, which was about the key before it.
+    changed: dict[str, int] = {}
+    # When each phone changed a key, and when each phone last asked each key's check (``<phone>/<name>``).
     changes: dict[str, tuple[float, ...]] = {}
     asked: dict[str, tuple[float, ...]] = {}
 
@@ -104,15 +107,20 @@ def keys_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
             raise NotFoundError("no provider takes a key of this name", {"name": name, "names": list(providers)})
         return provider
 
-    def admit(kept: dict[str, tuple[float, ...]], who: str, most: int, window_s: float, what: str) -> None:
-        """Refuse with 429 a request past ``most`` in ``window_s`` for ``who``, else remember it."""
-        now: float = time.time()
-        wait: float = wait_left(kept.get(who, ()), now, most, window_s)
+    def refuse_past(kept: dict[str, tuple[float, ...]], who: str, most: int, window_s: float, what: str) -> None:
+        """Refuse with 429 a request of ``who`` past ``most`` in ``window_s``."""
+        wait: float = wait_left(kept.get(who, ()), time.time(), most, window_s)
         if wait > 0.0:
             raise TooManyRequests(
                 f"a phone may {what}: try again in a moment", {"retry_after_s": round(wait, 1), "most": most}
             )
-        kept[who] = recent_times(kept.get(who, ()), now, window_s)
+
+    def count(kept: dict[str, tuple[float, ...]], who: str, window_s: float) -> None:
+        """Remember a request of ``who`` that its limit let through and that did what it asked."""
+        kept[who] = recent_times(kept.get(who, ()), time.time(), window_s)
+
+    def refuse_changes_past_limit(phone: str) -> None:
+        refuse_past(changes, phone, PHONE_CHANGES, PHONE_CHANGES_WINDOW_S, f"change {PHONE_CHANGES} keys in 10 minutes")
 
     async def tell_phone_change(phone: str, provider: str, done: str) -> None:
         """Tell the owner that the phone ``phone`` ``done`` (saved, removed) the key of ``provider``, and nothing of
@@ -122,8 +130,8 @@ def keys_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         await tell_owner(
             ctx.runtime.bus,
             f"The {label} key was {done} from a phone",
-            f"{name} {done} the {label} key. If it was not you, remove that phone on your Mac and put your own key "
-            "back.",
+            f"{name} (phone {phone}) {done} the {label} key. If it was not you, remove that phone on your Mac and put "
+            "your own key back.",
             KEYS_ROUTE,
             "system",
             "",
@@ -141,14 +149,17 @@ def keys_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         provider: str = provider_of(name)
         phone: str | None = _phone_of(http)
         if phone is not None:
-            admit(changes, phone, PHONE_CHANGES, PHONE_CHANGES_WINDOW_S, f"change {PHONE_CHANGES} keys in 10 minutes")
+            refuse_changes_past_limit(phone)
         async with writing:
             await asyncio.to_thread(write_env_value, env_file_path(), name, request.value)
             checks.pop(name, None)
-        await retire(provider)
+            changed[name] = changed.get(name, 0) + 1
+        # Told before anything else can fail: the key is changed from here on.
         log.info("key_saved", provider=provider, name=name, phone=phone)
         if phone is not None:
+            count(changes, phone, PHONE_CHANGES_WINDOW_S)
             await tell_phone_change(phone, provider, "saved")
+        await retire(provider)
         return await asyncio.to_thread(_view, provider, name, None)
 
     @router.delete("/keys/{name}")
@@ -157,19 +168,21 @@ def keys_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         provider: str = provider_of(name)
         phone: str | None = _phone_of(http)
         if phone is not None:
-            admit(changes, phone, PHONE_CHANGES, PHONE_CHANGES_WINDOW_S, f"change {PHONE_CHANGES} keys in 10 minutes")
+            refuse_changes_past_limit(phone)
         async with writing:
             removed: bool = await asyncio.to_thread(remove_env_value, env_file_path(), name)
             if removed:
                 checks.pop(name, None)
+                changed[name] = changed.get(name, 0) + 1
         if not removed:
             raise NotFoundError(
                 "Dot's .env file has no entry for this key", {"name": name, "env_file": str(env_file_path())}
             )
-        await retire(provider)
         log.info("key_removed", provider=provider, name=name, phone=phone)
         if phone is not None:
+            count(changes, phone, PHONE_CHANGES_WINDOW_S)
             await tell_phone_change(phone, provider, "removed")
+        await retire(provider)
         return await asyncio.to_thread(_view, provider, name, checks.get(name))
 
     @router.post("/keys/{name}/check")
@@ -177,10 +190,15 @@ def keys_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         """Ask the provider whether it takes the key in use: one call that costs nothing, or for Ollama's key one
         search of its hosted web search. The answer is kept as the key's last check."""
         provider: str = provider_of(name)
-        if _phone_of(http) is not None:
-            admit(asked, name, 1, PHONE_CHECK_EVERY_S, "ask a key's check once in 10 seconds")
+        phone: str | None = _phone_of(http)
+        if phone is not None:
+            # The provider's call is what the limit spares, so a check counts when it is asked, whatever it answers.
+            refuse_past(asked, f"{phone}/{name}", 1, PHONE_CHECK_EVERY_S, "ask a key's check once in 10 seconds")
+            count(asked, f"{phone}/{name}", PHONE_CHECK_EVERY_S)
+        before: int = changed.get(name, 0)
         result: CheckResult = await check_provider_key(config, provider)
-        checks[name] = KeyCheck(ok=result.ok, detail=result.detail, at=time.time())
+        if changed.get(name, 0) == before:
+            checks[name] = KeyCheck(ok=result.ok, detail=result.detail, at=time.time())
         return result
 
     return router

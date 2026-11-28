@@ -686,8 +686,10 @@ The daemon keeps the last check of each key since it started (item 2054, `check`
 key or a restart forgets it). Dot Next's Settings › AI services manages the keys from the phone: the list, where a key
 that a provider refused at its last check reads so, and a provider's page with where its key comes from, its last
 check, **Check key**, **Add key** or **Replace key** in a secure field and **Remove key**. A key goes to the Mac and never
-comes back to the phone, whole or in part beyond the last four characters the web shows. A phone may change keys at most
-5 times in 10 minutes and ask a key's check once in 10 seconds (429 past that); every key a phone saves or removes is
+comes back to the phone beyond the last four characters the web shows, and the check's words, which are the provider's
+own as the web shows them (OpenAI's refusal names a key by its own mask, its first three and last four characters). A phone may change keys at most
+5 times in 10 minutes (a removal of a key Dot does not hold changes nothing and does not count) and ask a key's check
+once in 10 seconds (429 past that); every key a phone saves or removes is
 told to you at once (the desktop notification, the push, your Messages channel), naming the provider and the phone, so
 that a phone that was taken cannot put a key of someone else's account in place of yours unseen. The web, on the
 installation's token, has none of these limits.

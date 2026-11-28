@@ -476,7 +476,10 @@ pane of System Settings) answers the installation's token alone, never a phone's
 names. A phone's key may save, replace, check and remove the API keys of the AI services (item 2054), never read one: a phone
 that is taken could put a key of someone else's account in place of yours, so every such change is told to you on the
 Mac and your other ways at once, naming the provider and the phone, and is limited to 5 in 10 minutes; remove the phone
-and put your own key back. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is
+(the tell names it by its id, as Settings › Phone lists it) and put your own key back. The tell reaches the Mac as a
+desktop notification while Dot's window is open, your Messages channel if it is on, and the Mac's list of tells; the
+push goes to the phones too, the one that made the change among them. The keys of the web search services (Settings ›
+Web search) are not among these: a phone saves them untold, as before. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is
 yours to use from the phone as from the Mac: a phone's key can start a run, a chat
 or a campaign in `yolo`, make a schedule, a loop of a chat (`/loop`) or an agent kept in `yolo`, switch one on or let
 one go on, and what such a run does is not held by these limits (it may do whatever your account may). Removing a phone
