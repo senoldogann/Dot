@@ -69,8 +69,8 @@ follow-ups), Models (the main and fast models from the daemon's list, and the co
 changed from the phone too: item 1770, a §24 picker sheet), Usage limits and caps (the plan's windows, today's tokens,
 the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
 switch on each row; edit, run now, delete; + makes a new one, item 1911, and a schedule's History lists its runs,
-each opening its chat), Rules (the approval mode tasks start in and what asks in it; free mode,
-switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, a new note, every note to read, edit, pin or
+each opening its chat), Rules (saved rules and their recent use, draft and preview a rule that asks or leaves the step
+to you, the starting approval mode and the switch to turn free mode off), Memory (the runs' proposed rewrites with Use and Drop, search, a new note, every note to read, edit, pin or
 forget, and the Trash to restore from), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
 Mark achieved as the daemon takes them), Health and version, Usage,
 Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on

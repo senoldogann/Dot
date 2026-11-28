@@ -1215,6 +1215,7 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
     "started %lld helpers": ("started %lld helper", "started %lld helpers"),
     "used %lld tools": ("used %lld tool", "used %lld tools"),
 
+
 }
 
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
@@ -1742,3 +1743,31 @@ TR.update(
 
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+
+# Rules on the phone (item 2055).
+TR.update(
+    {
+        "Goes ahead without asking": "Sormadan ilerler",
+        "Goes ahead, whatever it has read": "Ne okumuş olursa olsun ilerler",
+        "Ask me first": "Önce bana sor",
+        "Leave it to me": "Bana bırak",
+        "No rules yet": "Henüz kural yok",
+        "Never used": "Hiç kullanılmadı",
+        "Add rule": "Kural ekle",
+        "Tool": "Araç",
+        "Pattern": "Desen",
+        "None: it fits every time.": "Yok: her seferinde uyar.",
+        "Used lately": "Son zamanlarda kullanıldı",
+        "Steps decided": "Karar verdiği adımlar",
+        "Only the newest steps were checked.": "Yalnızca en yeni adımlar kontrol edildi.",
+        "When Dot wants to": "Dot şunu yapmak istediğinde",
+        "Describe what Dot wants to do": "Dot'un yapmak istediği şeyi yaz",
+        "Would have matched %lld of %lld steps.": "%2$lld adımın %1$lld tanesiyle eşleşirdi.",
+        "It would decide %lld of them.": "Bunların %lld tanesine karar verirdi.",
+        "Add it": "Ekle",
+        "Change the words": "Sözleri değiştir",
+        "When Dot wants to %@, it should ask me first.": "Dot %@ istediğinde, önce bana sor.",
+        "When Dot wants to %@, it should stop and let me do it.": "Dot %@ istediğinde, dur ve benim yapmama izin ver.",
+        "Dot read your words differently from your choice.": "Dot sözlerinizi seçiminizden farklı okudu.",
+    }
+)
