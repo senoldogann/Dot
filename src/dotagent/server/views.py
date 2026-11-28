@@ -17,6 +17,7 @@ from dotagent.agent.resume import CutOff
 from dotagent.agent.skill_history import VersionDetail
 from dotagent.agent.skill_proposals import ProposalView
 from dotagent.agent.team_load import BotLoad
+from dotagent.agent.team_review import ReviewEvery, TeamReview
 from dotagent.agent.templates import MOST_TEMPLATE_QUESTIONS, TEMPLATE_ANSWER_CHARS
 from dotagent.agent.welcome import LANGUAGE_CHARS
 from dotagent.browser.look import PageLook
@@ -1102,6 +1103,27 @@ class AgentSummary(FrozenModel):
     home: ThreadSummary | None = None
     # What it carries and why it is overloaded, if it is (item 2067).
     load: BotLoad | None = None
+
+
+class TeamReviewView(FrozenModel):
+    """The manager review (item 2068) as the pages show it: who reviews and how often, when the next review is due
+    (``None`` while it is off), whether one is under way, the newest review and the error of the last try that failed
+    ("" for none)."""
+
+    manager: str
+    every: ReviewEvery
+    last_at: float | None
+    next_at: float | None
+    running: bool
+    review: TeamReview | None
+    error: str
+
+
+class TeamReviewSettings(FrozenModel):
+    """The body of ``PUT /api/team-review``: the bot that reviews the team (Dot's id for Dot) and how often."""
+
+    manager: str
+    every: ReviewEvery
 
 
 class WorkOrderView(FrozenModel):

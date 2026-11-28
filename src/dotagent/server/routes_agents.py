@@ -7,9 +7,11 @@ from collections.abc import Sequence
 
 from fastapi import APIRouter
 
+from dotagent.agent import team_review_service
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
 from dotagent.agent.team_load import LOAD_WINDOW_S, BotLoad, bot_load
+from dotagent.agent.team_review import REVIEW_PERIODS, TeamReviewState
 from dotagent.agent.templates import (
     TEAMS,
     TEMPLATES,
@@ -40,6 +42,8 @@ from dotagent.server.views import (
     AgentWelcomeRequest,
     AgentWork,
     TeamMessage,
+    TeamReviewSettings,
+    TeamReviewView,
     TeamUse,
     TeamView,
     TemplateUse,
@@ -289,6 +293,65 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             )
             for agent in await store.list_agents()
         ]
+
+    reviews: set[asyncio.Task[None]] = set()
+
+    def review_view(state: TeamReviewState) -> TeamReviewView:
+        # Off: none is due; on and never tried: at the scheduler's next tick, now.
+        due: float | None = None
+        if state.every != "off":
+            due = time.time() if state.last_at is None else state.last_at + REVIEW_PERIODS[state.every]
+        return TeamReviewView(
+            manager=state.manager,
+            every=state.every,
+            last_at=state.last_at,
+            next_at=due,
+            running=team_review_service.running(store) or any(not task.done() for task in reviews),
+            review=state.review,
+            error=state.error,
+        )
+
+    @router.get("/team-review")
+    async def team_review() -> TeamReviewView:
+        """The manager review of the team (item 2068): its settings, the newest review and its proposals."""
+        return review_view(await team_review_service.load(store))
+
+    @router.put("/team-review")
+    async def set_team_review(settings: TeamReviewSettings) -> TeamReviewView:
+        """Choose the bot that reviews the team and how often (``off`` until the owner turns it on)."""
+        return review_view(await team_review_service.configure(store, settings.manager, settings.every))
+
+    async def reviewed() -> None:
+        """A review the owner asked for, in the background: its failure is stored as the state's error, and logged."""
+        try:
+            await team_review_service.review(
+                ctx.runtime,
+                time.time(),
+                lambda manager: team_review_service.reviewer_of(ctx.runtime, manager, time.time()),
+            )
+        except DotError as error:
+            log.warning("team_review_failed", error=error.message, context=error.context)
+
+    @router.post("/team-review/run", status_code=202)
+    async def run_team_review() -> TeamReviewView:
+        """Review the team now, whatever its settings say; 409 while a review is under way."""
+        if team_review_service.running(store) or any(not task.done() for task in reviews):
+            raise RunConflict("a review of the team is under way", {})
+        task: asyncio.Task[None] = asyncio.create_task(reviewed(), name="team-review")
+        reviews.add(task)
+        task.add_done_callback(reviews.discard)
+        return review_view(await team_review_service.load(store))
+
+    @router.post("/team-review/proposals/{proposal_id}/accept")
+    async def accept_team_proposal(proposal_id: str) -> TeamReviewView:
+        """Make the change a proposal of the newest review proposes, as the owner's own; 409 for one that no longer
+        fits the team or was decided already, 404 for one that is not there."""
+        return review_view(await team_review_service.accept(store, ctx.manager.desk, proposal_id, time.time()))
+
+    @router.post("/team-review/proposals/{proposal_id}/skip")
+    async def skip_team_proposal(proposal_id: str) -> TeamReviewView:
+        """Skip a proposal: nothing changes but its card."""
+        return review_view(await team_review_service.skip(store, proposal_id, time.time()))
 
     @router.get("/work-orders")
     async def list_work_orders() -> list[WorkOrderView]:

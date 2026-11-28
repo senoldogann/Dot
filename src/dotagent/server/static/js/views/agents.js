@@ -33,6 +33,7 @@ import { skillRow } from "./skills.js";
 import { getSnapshot, loadModels, onChange, onLifecycle, onStreamBack } from "../state.js";
 import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { teamReviewPart } from "../teamreview.js";
 import { workOrdersPart } from "../workorders.js";
 import { WORKING_STATES } from "../runstates.js";
 import { t, tCount, listAnd } from "../i18n.js";
@@ -1065,12 +1066,14 @@ function mountList(root, ctx) {
   });
   // What Dot handed out to the agents and the objectives it keeps (items 907, 908), read only.
   const work = workOrdersPart();
+  // The manager's review of the team (item 2068), above the orders: its cards change nothing until the owner accepts.
+  const review = teamReviewPart();
   // The page in parts (item 1136): the agents the owner has and the ready-made ones first, then the teams, the work
   // orders, one part at a time; the part shown is kept in this browser.
   const parts = [
     { id: "agents", label: t("views.agents.agents"), sections: [yours, templates] },
     { id: "teams", label: t("views.agents.teams"), sections: [yourTeams] },
-    { id: "orders", label: t("views.agents.orders"), sections: [work.element] },
+    { id: "orders", label: t("views.agents.orders"), sections: [review.element, work.element] },
   ];
   const kept = readPref(PART_KEY);
   const tabs = segmented(
@@ -1099,6 +1102,7 @@ function mountList(root, ctx) {
     yours,
     templates,
     yourTeams,
+    review.element,
     work.element,
   );
   showPart(tabs.value());
@@ -1124,6 +1128,7 @@ function mountList(root, ctx) {
   attempt(reloadTeams);
   attempt(loadTemplates);
   attempt(work.reload);
+  attempt(review.reload);
   return () => {
     disposed = true;
     clearInterval(ages);
@@ -1131,6 +1136,7 @@ function mountList(root, ctx) {
     stopBack();
     closeEditor();
     work.dispose();
+    review.dispose();
   };
 }
 
