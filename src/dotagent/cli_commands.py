@@ -405,6 +405,42 @@ class EvalSpeedCommand(FrozenModel):
     effort: Effort | None
 
 
+class EvalSuiteCommand(FrozenModel):
+    """`dotx eval suite`: the suite of real runs from the runs of the last ``days``, at most ``size`` cases."""
+
+    name: Literal["eval-suite"]
+    days: int = Field(ge=1)
+    size: int = Field(ge=1)
+
+
+class EvalRealCommand(FrozenModel):
+    """`dotx eval real`: the saved suite played against ``model``, ``repeat`` times."""
+
+    name: Literal["eval-real"]
+    model: str | None
+    repeat: int = Field(ge=1)
+
+
+class EvalAblateCommand(FrozenModel):
+    """`dotx eval ablate`: real goals played with and without ``skill`` (and, with ``parts``, each part of it left out)
+    or ``note``, on ``cases`` or those whose run read the skill, judged blind by ``judge``."""
+
+    name: Literal["eval-ablate"]
+    skill: str | None
+    note: str | None
+    cases: tuple[str, ...]
+    parts: bool
+    model: str | None
+    judge: str | None
+
+
+class EvalCostsCommand(FrozenModel):
+    """`dotx eval costs`: the tokens of each tool and skill call per day, over the runs of the last ``days``."""
+
+    name: Literal["eval-costs"]
+    days: int = Field(ge=1)
+
+
 class EvalReportCommand(FrozenModel):
     name: Literal["eval-report"]
     files: tuple[str, ...]
@@ -681,6 +717,10 @@ type Command = Annotated[
     | EvalMemoryCommand
     | EvalSpeedCommand
     | EvalReportCommand
+    | EvalSuiteCommand
+    | EvalRealCommand
+    | EvalAblateCommand
+    | EvalCostsCommand
     | StatsCommand
     | PerfCommand
     | DaemonCommand
