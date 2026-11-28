@@ -1215,7 +1215,6 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
     "started %lld helpers": ("started %lld helper", "started %lld helpers"),
     "used %lld tools": ("used %lld tool", "used %lld tools"),
 
-
 }
 
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
