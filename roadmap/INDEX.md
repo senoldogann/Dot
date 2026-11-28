@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [2084](2084.md) | done | 2026-11-28 | An agent file the web cannot read is called a bot file, as the test and the page say |
+| [2082](2082.md) | done | 2026-11-28 | Manage learned skills and installed plugins from Dot Next |
 | [2080](2080.md) | done | 2026-11-28 | The iPhone's question card keeps its arrows in place while paging; main's chat UI tests green again |
 | [2079](2079.md) | done | 2026-11-28 | A stuck tab with a navigation under way is said after one timeout, within browser_snapshot's limit |
 | [2077](2077.md) | done | 2026-11-28 | Recall reads back a run whose chat was deleted, and says a record it cannot find may be deleted |

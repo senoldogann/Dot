@@ -44,6 +44,19 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")
     }
 
+    func testInstalledPluginRevertAsksFirst() {
+        let app: XCUIApplication = launch("settings-home")
+        let plugins: XCUIElement = app.buttons["Installed plugins"]
+        XCTAssertTrue(plugins.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !plugins.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        plugins.tap()
+        let revert: XCUIElement = app.buttons["Revert"].firstMatch
+        XCTAssertTrue(revert.waitForExistence(timeout: 5))
+        revert.tap()
+        let trash: XCUIElement = app.staticTexts["The updated version goes to the Trash."]
+        XCTAssertTrue(trash.waitForExistence(timeout: 5))
+    }
+
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
     func testTheMacsEmergencyStopIsShownAndReleased() {
         let app: XCUIApplication = launch("settings-stopped")

@@ -85,6 +85,10 @@ struct SettingsSheet: View {
                 PageRow(page: .mac, systemImage: "desktopcomputer", title: String(localized: "Dot's computer", comment: "Settings row: the paired Mac Dot works on"), description: nil, detail: transportWord(model.transport))
                 PageRow(page: .schedules, systemImage: "clock", title: String(localized: "Scheduled tasks", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .memory, systemImage: "brain", title: String(localized: "Memory", comment: "Settings row"), description: nil, detail: nil)
+                NavigationRow(systemImage: "book", title: String(localized: "Skills", comment: "Settings: learned skills"),
+                              description: nil, detail: nil) { LearnedSkillsPage() }
+                NavigationRow(systemImage: "puzzlepiece", title: String(localized: "Installed plugins", comment: "Settings: installed plugins and their versions"),
+                              description: nil, detail: nil) { InstalledPluginsPage() }
                 PageRow(page: .agents, systemImage: "person.2", title: String(localized: "Agents", comment: "Title of the agents list"), description: nil, detail: nil)
                 PageRow(page: .campaigns, systemImage: "target", title: String(localized: "Campaigns", comment: "Settings row: goals Dot keeps working on"), description: nil, detail: nil)
             }
