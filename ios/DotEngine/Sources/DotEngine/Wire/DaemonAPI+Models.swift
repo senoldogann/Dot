@@ -1,6 +1,6 @@
 import Foundation
 
-// Settings › Models on the phone, as the web's page has them (item 1907): the security research kind, the fallbacks, the
+// Settings › Models on the phone, as the web's page has them (item 1907): the task models, the other-family check, the fallbacks, the
 // night's learning, Dot's own work and self-repair; the routes are the daemon's own (`routes_system.py`,
 // `routes_proactive.py`, `routes_repair.py`).
 
@@ -27,6 +27,12 @@ extension DaemonAPI {
     /// `PUT /api/models/kinds`: the model a run of `kind` starts on, "" for the main model.
     public func setKindModel(_ kind: String, model: String) async throws(DaemonRequestError) -> ModelsConfig {
         try await send("PUT", "/api/models/kinds", body: Self.json(KindBody(kind: kind, model: model)))
+    }
+
+    /// `PUT /api/models/check-other-family` (item 1929): the model of another family that checks goals and helpers'
+    /// results, "" to switch the check off.
+    public func setCheckOtherFamily(_ model: String) async throws(DaemonRequestError) -> ModelsConfig {
+        try await send("PUT", "/api/models/check-other-family", body: Self.json(LookBody(model: model)))
     }
 
     /// `PUT /api/models/standby`: the fallbacks, in their order.

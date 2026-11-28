@@ -53,6 +53,8 @@ When the request is ambiguous or the kind has no mapping, Dot uses the default f
 inherits its parent’s model. If a mapped model is unavailable at launch, Dot reports the failure. The existing
 `security` mapping applies to a start request that names no model and asks for security work on a host covered by
 `[recon] owned_hosts` or a bug bounty scope ([Security scan](security.md)).
+The phone's Settings › Models has the same **Task models** and **Other-family check model** rows (item 2088); its
+check model is picked from the models of a known family that answer review questions, as the route takes them.
 Under the roles, the page says how many schedules and agents run on each model, each chosen on its own page; and
 **Night's learning and self-repair** chooses the model of each role of the improvement loop ([The
 harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. **Usage**, before the list of every

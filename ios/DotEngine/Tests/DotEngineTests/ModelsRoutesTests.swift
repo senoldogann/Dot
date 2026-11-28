@@ -13,11 +13,17 @@ final class ModelsRoutesTests: XCTestCase {
         try JSONDecoder().decode([String: JSONValue].self, from: try XCTUnwrap(daemon.bodies(method, path).last))
     }
 
-    func testTheSecurityKindAndTheFallbacksAreWritten() async throws {
+    func testTheTaskKindsTheOtherFamilyCheckAndTheFallbacksAreWritten() async throws {
         let api: DaemonAPI = daemon.api()
         let kind: ModelsConfig = try await api.setKindModel("security", model: "m:deep")
         XCTAssertEqual(kind.kinds?["security"], "m:deep")
         XCTAssertEqual(try sent("PUT", "/api/models/kinds")["kind"]?.string, "security")
+        let writing: ModelsConfig = try await api.setKindModel("writing", model: "m:words")
+        XCTAssertEqual(writing.kinds?["writing"], "m:words")
+        XCTAssertEqual(try sent("PUT", "/api/models/kinds")["kind"]?.string, "writing")
+        let check: ModelsConfig = try await api.setCheckOtherFamily("m:other")
+        XCTAssertEqual(check.checkOtherFamily, "m:other")
+        XCTAssertEqual(try sent("PUT", "/api/models/check-other-family")["model"]?.string, "m:other")
         let standby: ModelsConfig = try await api.setStandby(["m:one", "m:two"])
         XCTAssertEqual(standby.standby, ["m:one", "m:two"])
         XCTAssertEqual(try sent("PUT", "/api/models/standby")["models"]?.array?.compactMap(\.string), ["m:one", "m:two"])
@@ -43,10 +49,12 @@ final class ModelsRoutesTests: XCTestCase {
 
     func testAModelSaysWhetherItSeesAndAnOlderStatusHasNoKinds() throws {
         let option: ModelOption = try JSONDecoder().decode(
-            ModelOption.self, from: Data(#"{"ref":"a:b","label":"b","efforts":[],"default_effort":null,"context_length":null,"vision":true}"#.utf8))
+            ModelOption.self, from: Data(#"{"ref":"a:b","label":"b","efforts":[],"default_effort":null,"context_length":null,"vision":true,"family":"gemini"}"#.utf8))
         XCTAssertEqual(option.vision, true)
+        XCTAssertEqual(option.family, "gemini")
         let older: ModelsConfig = try JSONDecoder().decode(
             ModelsConfig.self, from: Data(#"{"main":"a","vision":"b","fast":"c","review":"d","effort":"medium","helpers":[],"standby":[]}"#.utf8))
         XCTAssertNil(older.kinds)
+        XCTAssertNil(older.checkOtherFamily)
     }
 }

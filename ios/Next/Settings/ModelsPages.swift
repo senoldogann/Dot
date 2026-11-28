@@ -39,7 +39,7 @@ func modelLabel(_ ref: String, in options: [ProviderModels]) -> String {
 }
 
 /// Settings › Agents › Models, every model setting of the Mac's Settings › Models a phone may change (item 1907): the
-/// main, fast, vision and review models, the security research model (item 1889), the fallbacks in their order, Dot's own
+/// main, fast, vision and review models, the other-family check model (item 1929), the task models (items 1889 and 1928), the fallbacks in their order, Dot's own
 /// work, the night's learning, self-repair (its model, effort and fast mode) and the code review; the default level of
 /// reasoning as the Mac's config holds it, read only, as the web shows it. Each model is picked on the app's one model
 /// catalog. The chat size and the providers are set on the Mac.
@@ -56,6 +56,7 @@ struct ModelsPage: View {
             if let problem { FailureBanner(failure: problem, macPlace: macPlace, retry: nil) }
             LoadedPage(state: state, macPlace: macPlace, retry: { Task { await load() } }) { picture in
                 roles(picture)
+                taskModels(picture)
                 fallbacks(picture)
                 GroupedSection(
                     header: String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level"),
@@ -80,12 +81,11 @@ struct ModelsPage: View {
     // MARK: Sections
 
     @ViewBuilder private func roles(_ picture: ModelsPicture) -> some View {
-        let main: String = String(localized: "Main model", comment: "Models: the main model")
         GroupedSection(
             header: String(localized: "Dot thinks with", comment: "Models section: the main model and the roles"),
             footer: String(localized: "A new model applies from each task's next start; running tasks keep theirs.", comment: "Models: footer under the roles")
         ) {
-            pickRow(main, current: picture.config.main, use: .main, none: nil, picture: picture) { api, ref throws(DaemonRequestError) in
+            pickRow(String(localized: "Main model", comment: "Models: the main model"), current: picture.config.main, use: .main, none: nil, picture: picture) { api, ref throws(DaemonRequestError) in
                 try await api.setMainModel(ref)
             }
             pickRow(String(localized: "Fast model", comment: "Models: the role for quick small steps"), current: picture.config.fast, use: .fast, none: nil, picture: picture) {
@@ -98,9 +98,24 @@ struct ModelsPage: View {
                 api, ref throws(DaemonRequestError) in try await api.setRole(.review, model: ref)
             }
             pickRow(
-                String(localized: "Security research model", comment: "Models: the model security research in a scope starts on (item 1889)"),
-                current: picture.config.kinds?["security"] ?? "", use: .main, none: main, picture: picture
-            ) { api, ref throws(DaemonRequestError) in try await api.setKindModel("security", model: ref) }
+                String(localized: "Other-family check model", comment: "Models: the model of another family that checks goals and helpers' results (item 1929)"),
+                current: picture.config.checkOtherFamily ?? "", use: .otherFamilyCheck,
+                none: String(localized: "Off", comment: "Models: the other-family check is switched off"), picture: picture
+            ) { api, ref throws(DaemonRequestError) in try await api.setCheckOtherFamily(ref) }
+        }
+    }
+
+    /// The model each kind of task starts on when none is chosen for it (items 1889 and 1928), as the web's Task models.
+    @ViewBuilder private func taskModels(_ picture: ModelsPicture) -> some View {
+        GroupedSection(
+            header: String(localized: "Task models", comment: "Models section: the model each kind of task starts on"),
+            footer: String(localized: "Used when you haven’t chosen a model for the task. Helpers otherwise use their parent’s model.", comment: "Models: what the task models do")
+        ) {
+            ForEach(TaskKindRow.all, id: \.kind) { row in
+                pickRow(row.title, current: picture.config.kinds?[row.kind] ?? "", use: .main, none: row.none, picture: picture) { api, ref throws(DaemonRequestError) in
+                    try await api.setKindModel(row.kind, model: ref)
+                }
+            }
         }
     }
 
@@ -352,6 +367,26 @@ struct ModelsPage: View {
             problem = box.failure
             return box.failure
         }
+    }
+}
+
+/// A kind of task of `[models] kinds` and how the page names it, in the web's order (`views/system.js`).
+struct TaskKindRow: Sendable {
+    let kind: String
+    let title: String
+    let none: String
+
+    static var all: [TaskKindRow] {
+        let usual: String = String(localized: "Usual model", comment: "Models: a kind of task left on the model it would start on anyway")
+        return [
+            TaskKindRow(
+                kind: "security", title: String(localized: "Security research model", comment: "Models: the model security research in a scope starts on (item 1889)"),
+                none: String(localized: "Main model", comment: "Models: the main model")),
+            TaskKindRow(kind: "quick", title: String(localized: "Quick task model", comment: "Models: the model a short single lookup starts on"), none: usual),
+            TaskKindRow(kind: "deep", title: String(localized: "Deep task model", comment: "Models: the model an investigation, analysis or design task starts on"), none: usual),
+            TaskKindRow(kind: "writing", title: String(localized: "Writing model", comment: "Models: the model drafting or editing copy starts on"), none: usual),
+            TaskKindRow(kind: "code", title: String(localized: "Coding model", comment: "Models: the model a change to a repository starts on"), none: usual),
+        ]
     }
 }
 

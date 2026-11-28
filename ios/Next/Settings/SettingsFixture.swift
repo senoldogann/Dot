@@ -191,7 +191,8 @@
             case ("GET", "/api/phone/push-settings"), ("PUT", "/api/phone/push-settings"):
                 return (200, #"{"needs_you":true,"ready":true,"done":false}"#)
             case ("GET", "/api/models"): return (200, models)
-            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"), ("PUT", "/api/models/kinds"), ("PUT", "/api/models/standby"):
+            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"), ("PUT", "/api/models/kinds"), ("PUT", "/api/models/check-other-family"),
+                ("PUT", "/api/models/standby"):
                 return (200, modelsConfig)
             case ("GET", "/api/models/learning"), ("PUT", "/api/models/learning"):
                 return (200, #"{"proposer":"","composer":"claude_code:opus","selector":"","experience":"","review":"claude_code:opus"}"#)
@@ -341,7 +342,7 @@
         }
 
         private var modelsConfig: String {
-            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{},"kinds":{"security":"claude_code:opus"}}"#
+            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{},"kinds":{"security":"claude_code:opus","code":"claude_code:opus"},"check_other_family":"opencode_go:kimi-k3"}"#
         }
 
         private func status(engaged: Bool) -> String {
@@ -349,8 +350,11 @@
         }
 
         private var models: String {
+            let family: (String) -> String = { ref in
+                ["claude", "deepseek", "kimi", "gemma", "qwen"].first { ref.contains($0) } ?? ""
+            }
             let option: (String, String) -> String = { ref, label in
-                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":\#(ref == "claude_code:opus" ? #"["low","medium","high","xhigh","max"]"# : #"["low","medium","high"]"#),"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
+                #"{"ref":"\#(ref)","label":"\#(label)","family":"\#(family(ref))","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":\#(ref == "claude_code:opus" ? #"["low","medium","high","xhigh","max"]"# : #"["low","medium","high"]"#),"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
             }
             return "["
                 + #"{"provider":"claude_code","models":[\#(option("claude_code:sonnet", "Sonnet 5.5")),\#(option("claude_code:opus", "Opus 5.5"))],"error":null},"#

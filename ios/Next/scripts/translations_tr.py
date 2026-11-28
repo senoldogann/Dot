@@ -1877,3 +1877,15 @@ TR.update({
     "Your Mac remembers which task notifications to send to this phone.": "Mac’iniz bu telefona hangi görev bildirimlerini göndereceğini hatırlar.",
     "Done, failed or blocked": "Bitti, başarısız oldu veya ilerleyemedi",
 })
+
+# T2 (item 2088): task models and the other-family check on the phone's Models page.
+TR.update({
+    "Task models": "Görev modelleri",
+    "Used when you haven’t chosen a model for the task. Helpers otherwise use their parent’s model.": "Görev için model seçmediğinizde kullanılır. Yardımcılar aksi halde üst görevlerinin modelini kullanır.",
+    "Usual model": "Olağan model",
+    "Quick task model": "Hızlı görev modeli",
+    "Deep task model": "Derin görev modeli",
+    "Writing model": "Yazı modeli",
+    "Coding model": "Kodlama modeli",
+    "Other-family check model": "Başka aileden denetim modeli",
+})

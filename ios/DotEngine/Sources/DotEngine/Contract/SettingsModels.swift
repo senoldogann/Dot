@@ -109,9 +109,17 @@ public struct ModelsConfig: Codable, Sendable, Hashable {
     public let effort: String
     public let helpers: [String]
     public let standby: [String]
-    /// The model a run of a kind of task starts on when none is chosen for it (item 1889; `security`), absent from a
-    /// daemon before it and for a kind left to the main model.
+    /// The model a run of a kind of task starts on when none is chosen for it (items 1889 and 1928: `security`, `quick`,
+    /// `deep`, `writing`, `code`), absent from a daemon before it and for a kind left to the main model.
     public let kinds: [String: String]?
+    /// The model of another family that checks goals and helpers' results (item 1929), "" when off; `nil` from a daemon
+    /// before it.
+    public let checkOtherFamily: String?
+
+    enum CodingKeys: String, CodingKey {
+        case main, vision, fast, review, effort, helpers, standby, kinds
+        case checkOtherFamily = "check_other_family"
+    }
 
     public init(main: String, vision: String, fast: String, review: String, effort: String, helpers: [String], standby: [String]) {
         self.main = main
@@ -122,6 +130,7 @@ public struct ModelsConfig: Codable, Sendable, Hashable {
         self.helpers = helpers
         self.standby = standby
         self.kinds = nil
+        self.checkOtherFamily = nil
     }
 }
 
