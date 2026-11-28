@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2090](2090.md) | done | 2026-11-28 | The lint of a skill Dot writes |
 | [2089](2089.md) | done | 2026-11-28 | Desktop shell check-over: the menu bar item is set only when what it shows changes |
 | [2087](2087.md) | done | 2026-11-28 | main's smoke gate: the iMessage progress test no longer races the runner's speed, and a failed test leaves no run behind |
 | [2086](2086.md) | done | 2026-11-28 | main's iPhone tests green again: the English of a key that is not its English, and the keyboard's first-use tip |

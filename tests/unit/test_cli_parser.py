@@ -3,7 +3,13 @@
 import pytest
 
 from dotagent.cli import build_parser, parse_command
-from dotagent.cli_commands import EvalFromRunCommand, RunCommand, ServiceInstallCommand, StatsCommand
+from dotagent.cli_commands import (
+    EvalFromRunCommand,
+    RunCommand,
+    ServiceInstallCommand,
+    SkillsLintCommand,
+    StatsCommand,
+)
 
 
 def test_stats_takes_the_tool_health_view() -> None:
@@ -18,6 +24,12 @@ def test_eval_from_run_takes_a_run_and_an_out_path() -> None:
     assert isinstance(command, EvalFromRunCommand)
     assert command.run_id == "run-799"
     assert command.out == "/tmp/eval-draft.md"
+
+
+def test_skills_lint_takes_the_skills_it_lints() -> None:
+    linted = parse_command(build_parser(), ["skills", "lint", "memo", "learned-x"])
+    assert isinstance(linted, SkillsLintCommand)
+    assert linted.names == ("memo", "learned-x")
 
 
 @pytest.mark.parametrize("browser", ["own", "attach"])

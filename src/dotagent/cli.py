@@ -106,6 +106,7 @@ _FAMILIES: dict[str, str] = {
     "campaign-achieved": "dotagent.cli_campaign",
     "mcp-list": "dotagent.cli_mcp",
     "skills-list": "dotagent.cli_skills",
+    "skills-lint": "dotagent.cli_skills_lint",
     "skills-versions": "dotagent.cli_playbooks",
     "skills-restore": "dotagent.cli_playbooks",
     "skills-pin": "dotagent.cli_playbooks",
@@ -527,6 +528,12 @@ def build_parser() -> argparse.ArgumentParser:
     skills = commands.add_parser("skills", help="the skills and plugins the agent can use")
     skills_commands = skills.add_subparsers(dest="skills_action", required=True)
     skills_commands.add_parser("list", help="show every skill and plugin found, and the folders left out and why")
+    skills_lint = skills_commands.add_parser(
+        "lint",
+        help="say what each skill and learned skill lacks to be followed and checked: numbered steps, one objective "
+        "and a check each, a table of failures and fixes (changes nothing)",
+    )
+    skills_lint.add_argument("names", nargs="*", metavar="NAME", help="the skills to lint; every one if none is named")
     skills_versions = skills_commands.add_parser(
         "versions", help="the versions of a learned skill: when and from which run each was made, and what it changed"
     )
