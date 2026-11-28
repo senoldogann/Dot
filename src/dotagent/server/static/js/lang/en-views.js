@@ -2290,6 +2290,8 @@ export const EN_VIEWS = {
   "views.agents.actionsLength": "Actions ({length})",
   "views.agents.tickedOfLength": "{ticked} of {length}",
   "views.agents.defaultModelname": "Default ({modelName})",
+  "views.agents.mainModel": "Main model",
+  "views.agents.mainModelname": "Main model ({modelName})",
   "views.agents.defaultLevellabel": "Default ({levelLabel})",
   "views.agents.partPicked": "{part} picked",
   "views.agents.teamsLength": "Teams ({length})",

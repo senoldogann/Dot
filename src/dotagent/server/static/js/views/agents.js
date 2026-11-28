@@ -23,6 +23,7 @@ import { touchFirst, trackHeight } from "../layout.js";
 import { openMenu } from "../menu.js";
 import { readFolds, readPref, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
+import { modelSections } from "../modelpicker.js";
 import { aboutToggle, chatLoading, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
@@ -461,13 +462,33 @@ export function agentForm({ record, onSaved, onCancel }) {
     placeholder: t("views.agents.workInboundLeadsSendA"),
     "aria-label": t("views.agents.neverDoes"),
   });
-  const model = el(
-    "select",
-    { class: "select", "aria-label": t("views.agents.model") },
-    el("option", { value: "" }, defaults === null ? t("views.agents.defaultModel") : t("views.agents.defaultModelname", { modelName: modelName(defaults.models.main) })),
-    record === null || record.model === "" ? null : el("option", { value: record.model }, record.model),
-  );
-  model.value = record === null ? "" : record.model;
+  // The model, on the chat settings' list of models (the owner's report of 2026-11-28): the main model's row on top,
+  // the favourites, a section per provider that folds (the chosen model's open), a tick on the one chosen and a search;
+  // it writes the agent's own choice only, never which model a run takes.
+  let modelValue = record === null ? "" : record.model;
+  /** @type {{ provider: string, models: { ref: string, tools: boolean }[], why: null }[]} */
+  let modelGroups = [];
+  // "Main model", as the iPhone app's agent page says it, with the model it stands for once it is known.
+  const mainWords = defaults === null ? t("views.agents.mainModel") : t("views.agents.mainModelname", { modelName: modelName(defaults.models.main) });
+  const modelList = modelSections({
+    onPick: (ref) => {
+      modelValue = ref;
+      paintModels();
+      paintEffort();
+    },
+    // The agent's page makes no default: its main model's row has no Change.
+    onMakeDefault: () => false,
+  });
+  const notOffered = el("p", { class: "hint", hidden: true });
+  const model = el("div", { class: "agent-model-picker", role: "group", "aria-label": t("views.agents.model") });
+  function paintModels() {
+    const built = modelList.build({ groups: modelGroups, chosen: modelValue, fallback: null, blank: mainWords });
+    const known = modelGroups.some((group) => group.models.some((candidate) => candidate.ref === modelValue));
+    notOffered.hidden = modelValue === "" || known || modelGroups.length === 0;
+    notOffered.textContent = t("views.agents.chosenNotOfferedNow", { chosen: modelValue });
+    model.replaceChildren(built.search, notOffered, built.list);
+  }
+  paintModels();
   const effort = el("select", { class: "select", "aria-label": t("views.agents.reasoningLevel") }, el("option", { value: "" }, t("views.agents.default")));
   const effortField = field(t("views.agents.reasoning"), effort, "");
   effortField.hidden = true;
@@ -486,7 +507,7 @@ export function agentForm({ record, onSaved, onCancel }) {
   let models = [];
 
   function paintEffort() {
-    const info = models.find((candidate) => candidate.ref === model.value) ?? null;
+    const info = models.find((candidate) => candidate.ref === modelValue) ?? null;
     const keep = effort.value === "" ? (record === null ? "" : record.effort ?? "") : effort.value;
     if (info === null || info.efforts.length < 2) {
       effort.replaceChildren(el("option", { value: "" }, t("views.agents.default")));
@@ -502,18 +523,13 @@ export function agentForm({ record, onSaved, onCancel }) {
     effortField.hidden = false;
   }
 
-  model.addEventListener("change", paintEffort);
   const modelsListed = loadModels()
     .then((providers) => {
       models = allModels(providers).filter((candidate) => candidate.tools);
-      const chosen = model.value;
-      const known = new Set(models.map((candidate) => candidate.ref));
-      model.replaceChildren(
-        model.firstElementChild,
-        ...(chosen !== "" && !known.has(chosen) ? [el("option", { value: chosen }, t("views.agents.chosenNotOfferedNow", { chosen }))] : []),
-        ...models.map((candidate) => el("option", { value: candidate.ref }, modelName(candidate.ref))),
-      );
-      model.value = chosen;
+      modelGroups = providers
+        .map((provider) => ({ provider: provider.provider, models: provider.models.filter((candidate) => candidate.tools), why: null }))
+        .filter((group) => group.models.length > 0);
+      paintModels();
       paintEffort();
     })
     .catch((error) => {
@@ -561,8 +577,8 @@ export function agentForm({ record, onSaved, onCancel }) {
       role: role.value.trim(),
       instructions: instructions.value.trim(),
       refuses: refuses.value.trim(),
-      model: model.value,
-      effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
+      model: modelValue,
+      effort: chosenLevel(models, modelValue, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
       // Every tool, said as null, when the boxes widen the agent (toolPicks): every box ticked, unless they are the tools
       // it names, unchanged, and All tools was not ticked. An empty list keeps the tools an agent has (the code review's
@@ -597,7 +613,7 @@ export function agentForm({ record, onSaved, onCancel }) {
         Object.assign(field(t("views.agents.instructions"), instructions, ""), { className: "field wide" }),
         Object.assign(field(t("views.agents.neverDoes"), refuses, t("views.agents.oneLineEachTheEdges")), { className: "field wide" }),
         lookField,
-        field(t("views.agents.model"), model, ""),
+        Object.assign(field(t("views.agents.model"), model, ""), { className: "field wide" }),
         effortField,
         field(t("views.agents.approvals"), approvals, ""),
         toolsField,
