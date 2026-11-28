@@ -420,9 +420,14 @@ async def test_the_draft_lock_map_empties_once_the_writers_of_a_decided_draft_fi
                 run.id, "mail", ["bob@example.com"], [], "Hi", "Body", None
             )
 
+            inflight: list[int] = [0]
+
             async def write() -> None:
                 async with _writing(runtime.store, draft.id):
+                    inflight[0] += 1
+                    assert inflight[0] == 1, "two writers held the draft's lock at once"
                     await asyncio.sleep(0.01)
+                    inflight[0] -= 1
 
             await runtime.store.discard_draft(draft.id, None)
             await asyncio.gather(*(write() for _ in range(5)))
