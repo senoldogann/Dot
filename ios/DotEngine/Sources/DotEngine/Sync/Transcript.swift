@@ -163,6 +163,44 @@ public struct PlanStep: Sendable, Equatable, Hashable {
     }
 }
 
+/// How a plan's run stands, for the plan's sheet: at work, done, failed or stopped (the owner's report of 2026-11-28: a
+/// failed run's plan still showed its step in progress).
+public enum PlanEnd: Sendable, Equatable {
+    case working
+    case done
+    case failed
+    case stopped
+
+    /// From the run's status (`RunRecord.status`); a run not known yet works.
+    public init(runStatus: String?) {
+        switch runStatus {
+        case "done": self = .done
+        case "failed": self = .failed
+        case "cancelled": self = .stopped
+        default: self = .working
+        }
+    }
+}
+
+/// The plan as it stands once its run ended: a step still in progress when the run failed is `failed`, when it was
+/// stopped `stopped`; at work or done, the plan as the run left it. Pure.
+public func planAtEnd(_ steps: [PlanStep], end: PlanEnd) -> [PlanStep] {
+    let settled: String
+    switch end {
+    case .working, .done: return steps
+    case .failed: settled = "failed"
+    case .stopped: settled = "stopped"
+    }
+    return steps.map { $0.status == "in_progress" ? PlanStep(text: $0.text, status: settled) : $0 }
+}
+
+/// The step a plan stands at (1-based): the one in progress, failed or stopped, else the first not done; `nil` when every
+/// step is done or skipped. Pure.
+public func planCurrentStep(_ steps: [PlanStep]) -> Int? {
+    if let index = steps.firstIndex(where: { ["in_progress", "failed", "stopped"].contains($0.status) }) { return index + 1 }
+    return steps.firstIndex(where: { $0.status == "pending" }).map { $0 + 1 }
+}
+
 /// Who settled an ask, as far as the phone can tell (the daemon's `approval_decided` does not say who).
 public enum AskDecider: Sendable, Equatable, Hashable {
     /// The owner on this phone.

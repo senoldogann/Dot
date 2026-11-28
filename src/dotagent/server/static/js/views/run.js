@@ -57,7 +57,8 @@ import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
 import { LAST_CHAT_KEY, openingOf, readPref, removePref } from "../prefs.js";
 import { PAGE_ANSWER_EVENT } from "../pageframe.js";
-import { planBubble, planContent, planStep, planTargets } from "../planbubble.js";
+import { planBubble, planContent, planHeadView, planStep, planTargets } from "../planbubble.js";
+import { planAtEnd, planEnd } from "../planwords.js";
 import { createReactions, REACTION_EVENTS } from "../reactions.js";
 import { approvalLabel, heldChoice } from "../runmodes.js";
 import { emptyBoxWords } from "../composershape.js";
@@ -428,14 +429,21 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     const done = steps.filter((step) => step.status === "done").length;
     planNow = { steps, targets, done };
     paintCapsule();
-    bubble?.paint(steps, targets);
+    bubble?.paint(steps, targets, status);
     inspector.setCount("plan", steps.length === 0 ? "" : `${done}/${steps.length}`);
     if (steps.length === 0) {
       planBody.replaceChildren(el("div", { class: "hint" }, NO_PLAN));
       return;
     }
-    // The native replaceChildren writes a null as the text "null", so a plan without targets passes nothing for them.
-    planBody.replaceChildren(...(targets === "" ? [] : [planTargets(targets)]), ...steps.map(planStep));
+    // The steps as the run left them (a step in progress when it failed or was stopped says so, item 2049). The native
+    // replaceChildren writes a null as the text "null", so a plan without targets passes nothing for them.
+    const end = planEnd(status);
+    const shown = planAtEnd(steps, end);
+    planBody.replaceChildren(
+      planHeadView(shown, end),
+      ...(targets === "" ? [] : [planTargets(targets)]),
+      el("div", { class: "plan-timeline" }, ...shown.map(planStep)),
+    );
   }
 
   function paintStats() {
@@ -1107,12 +1115,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   sheets.add("helpers", { anchor: dockBar.segment("helpers"), title: () => t("run.helpers"), build: helpersSheet });
   sheets.add("plan", {
     anchor: dockBar.segment("plan"),
-    title: () => t("capsule.plan", { done: planNow.done, total: planNow.steps.length }),
+    title: () => t("planbubble.plan"),
     build: () =>
       planContent({
         steps: planNow.steps,
         targets: planNow.targets,
-        head: false,
+        status,
         openTab: () => {
           sheets.close("plan");
           inspector.openTab("plan");
@@ -1121,7 +1129,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   });
   // The plan over the composer (item 644): its part in the capsule opens it as a bubble above the dock.
   bubble = planBubble({ anchor: capsule.plan, frame: dock, onOpenTab: () => inspector.openTab("plan") });
-  bubble.paint(planNow.steps, planNow.targets);
+  bubble.paint(planNow.steps, planNow.targets, status);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it, at once while its
   // model is at a step, after the tool at work otherwise (item 509).
@@ -1928,6 +1936,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       return;
     }
     status = update.status;
+    // The plan follows the run's end: a step in progress when it failed or was stopped says so (item 2049).
+    if (planNow.steps.length > 0) {
+      paintPlan(planNow.steps, planNow.targets);
+    }
     if (update.model !== null) {
       model = update.model;
     }

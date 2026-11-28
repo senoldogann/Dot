@@ -232,7 +232,7 @@ final class ChatUITests: XCTestCase {
         let chip: XCUIElement = app.buttons["capsule.plan"]
         XCTAssertTrue(chip.waitForExistence(timeout: 10))
         XCTAssertEqual(chip.label, "Plan, 1 of 3 steps done")
-        XCTAssertFalse(app.staticTexts["Plan · 1 of 3 done"].exists, "no plan card in the stream")
+        XCTAssertFalse(app.staticTexts["1 of 3 done"].exists, "no plan card in the stream")
         let status: XCUIElement = app.descendants(matching: .any).matching(identifier: "capsule.status").firstMatch
         let stop: XCUIElement = app.buttons["capsule.stop"]
         let people: XCUIElement = app.buttons["capsule.helpers"]
@@ -253,12 +253,46 @@ final class ChatUITests: XCTestCase {
         bar.lifetime = .keepAlways
         add(bar)
         chip.tap()
-        XCTAssertTrue(app.staticTexts["Plan · 1 of 3 done"].waitForExistence(timeout: 5), "the checklist in a sheet")
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Find free afternoon slots at the dentist")).firstMatch.exists)
+        // The owner's report of 2026-11-28: a head with the count, where the run stands and a bar; the steps on a line.
+        XCTAssertTrue(app.staticTexts["1 of 3 done"].waitForExistence(timeout: 5), "the plan in a sheet")
+        XCTAssertEqual(app.staticTexts["plan.state"].label, "Working on step 2")
+        let steps: XCUIElementQuery = app.descendants(matching: .any).matching(identifier: "plan.step")
+        XCTAssertEqual(steps.count, 3)
+        XCTAssertTrue(steps.element(boundBy: 1).label.hasPrefix("Find free afternoon slots at the dentist"))
+        XCTAssertTrue(steps.element(boundBy: 1).label.hasSuffix("in progress"), steps.element(boundBy: 1).label)
+        // Sized to its content: three steps are no tall empty sheet.
+        let window: CGRect = app.windows.firstMatch.frame
+        let planBar: XCUIElement = app.navigationBars["Plan"]
+        XCTAssertGreaterThan(planBar.frame.minY, window.height * 0.4, "the sheet takes the height its steps need: \(planBar.frame)")
         let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         sheet.name = "plan-sheet"
         sheet.lifetime = .keepAlways
         add(sheet)
+    }
+
+    /// The owner's report of 2026-11-28: once the run failed, its plan's step in progress shows failed and the head says
+    /// where it failed; no step stays in progress. Light, dark and the largest accessibility size, for the report.
+    func testAFailedRunsPlanSaysWhereItFailed() {
+        for (name, extra) in [
+            ("light", [String]()), ("dark", ["-colorScheme", "dark"]),
+            ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]),
+        ] {
+            let app: XCUIApplication = launch("n2-failed", defaults: extra)
+            let chip: XCUIElement = app.buttons["capsule.plan"]
+            XCTAssertTrue(chip.waitForExistence(timeout: 10), name)
+            chip.tap()
+            let state: XCUIElement = app.staticTexts["plan.state"]
+            XCTAssertTrue(state.waitForExistence(timeout: 5), name)
+            XCTAssertEqual(state.label, "Failed at step 2", name)
+            let steps: XCUIElementQuery = app.descendants(matching: .any).matching(identifier: "plan.step")
+            XCTAssertTrue(steps.element(boundBy: 1).label.hasSuffix("failed"), "\(name): \(steps.element(boundBy: 1).label)")
+            XCTAssertFalse(steps.allElementsBoundByIndex.contains { $0.label.hasSuffix("in progress") }, "\(name): no step stays in progress")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "plan-failed-\(name)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
     }
 
     /// The owner, 2026-11-26: an answer's links and files show in its words, not listed under it. A GitHub pull
