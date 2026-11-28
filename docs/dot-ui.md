@@ -62,6 +62,7 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | Harness | `harness.js` | Self-improvement around the model: the harness and what it changes. |
 | Self-repair | `repair.js` | The problems Dot found in its own record and the Claude Code sessions that fixed them. |
 | Providers | `keys.js` | The model providers and the judge's service. |
+| Providers | `customProvider.js` | The form that adds or changes a custom provider (item 1949). |
 | Channels | `channels.js` | The owner's messaging apps as ways to reach Dot. |
 | Hooks | `hooks.js` | Addresses a service calls, signed, to start a scheduled task or a bot ([Hooks](hooks.md)). |
 | Phone | `phone.js` | Dot on a phone through Tailscale, a step at a time. |
