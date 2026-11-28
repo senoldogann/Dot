@@ -994,9 +994,12 @@ async def test_an_answer_that_comes_in_is_read_aloud_in_the_chosen_language_when
         await page.context.close()
 
 
-async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_words_on_a_phone_and_a_run_page_has_one(
+async def test_the_microphone_stands_by_the_send_at_every_width_and_a_run_page_has_one(
     browser: Browser, address: str, runtime: Runtime, replies: Replies
 ) -> None:
+    """The composer has one shape on a desk and a phone (item 2015, DotNext's): short words share one row with the
+    microphone and the send; long words take a line of their own, and the microphone stands under them at the right,
+    beside the send. The new chat's composer and a run's page's both have it."""
     for width in (1280, 390):
         page: Page = await _open(browser, address, width)
         for place in ("the new chat", "a run's page"):
@@ -1014,28 +1017,24 @@ async def test_the_microphone_stands_by_the_send_on_a_desk_and_under_the_words_o
             words: Locator = composer.locator("textarea")
             # The microphone is a finger's size on a phone.
             expected: float = 36 if width < 720 else 32
-            if width < 720:
-                # A phone's box is the words with, on the line under them, the microphone as tall as the send, right
-                # beside it (items 1121 and 1330): the choices are always in the bar, nothing waits for a touch.
-                await expect(composer).not_to_have_attribute("data-quiet", "")
-                await expect(composer.locator(".mic-button")).to_be_visible()
-                await expect(send).to_be_visible()
-                box, sent, field = await _rects(composer, ".mic-button", ".btn.send", ".composer-field")
-                assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
-                assert abs(box["height"] - sent["height"]) < 1.5, f"{place} {width}: it is not as tall as the send"
-                assert box["y"] >= field["y"] + field["height"] - 1, f"{place} {width}: it is not under the words"
-                assert box["x"] + box["width"] <= sent["x"] + 1, f"{place} {width}: it is not left of the send"
-                assert abs((box["y"] + box["height"] / 2) - (sent["y"] + sent["height"] / 2)) < 2, (
-                    f"{place} {width}: it is not on the send's line"
-                )
-                await _fits(page, f"{width} {place}")
-                continue
-            # On a desk the words have a line of their own (item 1249): the microphone stands under them at the right,
-            # and the send right of it, on its line, from the start (item 1330). All three are read in one frame.
             await expect(composer).not_to_have_attribute("data-quiet", "")
+            await expect(composer.locator(".mic-button")).to_be_visible()
             await expect(send).to_be_visible()
+            # Short words: one row, the microphone right of the words and left of the send, on their centre line. All
+            # three are read in one frame.
             await words.fill("a word")
-            await expect(send).to_be_visible()
+            await expect(composer).to_have_attribute("data-shape", "compact")
+            box, sent, field = await _rects(composer, ".mic-button", ".btn.send", ".composer-field")
+            assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
+            assert box["x"] >= field["x"] + field["width"] - 1, f"{place} {width}: it is not right of the words"
+            assert box["x"] + box["width"] <= sent["x"] + 1, f"{place} {width}: it is not left of the send"
+            for other, name in ((sent, "the send's"), (field, "the words'")):
+                assert abs((box["y"] + box["height"] / 2) - (other["y"] + other["height"] / 2)) < 2, (
+                    f"{place} {width}: it is not on {name} line"
+                )
+            # Long words: a line of their own, the microphone under them at the right and the send right of it.
+            await words.fill("Look at this repository and tell me what it does")
+            await expect(composer).to_have_attribute("data-shape", "expanded")
             box, sent, field = await _rects(composer, ".mic-button", ".btn.send", ".composer-field")
             assert abs(box["width"] - expected) < 1.5, f"{place} {width}: the microphone is {box['width']} px wide"
             assert box["y"] >= field["y"] + field["height"] - 1, f"{place} {width}: it is not under the words"
