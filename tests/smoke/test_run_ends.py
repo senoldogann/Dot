@@ -19,7 +19,7 @@ import pytest
 import pytest_asyncio
 
 from dotagent.agent import manager as manager_module
-from dotagent.agent.attachments import RunInbox, UserInput
+from dotagent.agent.attachments import RunInbox
 from dotagent.agent.gate import RunGate
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
@@ -67,16 +67,17 @@ class _SteeredAtTheEnd(RunManager):
         result: str,
         needs: str,
         error: JsonObject | None,
-        inbox: asyncio.Queue[UserInput],
-        restated: tuple[int, ...] = (),
-    ) -> None:
+        inbox: RunInbox,
+        restated: tuple[int, ...],
+        goal_blocked: bool,
+    ) -> bool:
         try:
             self.steer(run.id, "One more thing.", ())
         except RunConflict:
             self.refused.append(True)
         else:
             self.refused.append(False)
-        await super()._record_end(run, status, result, needs, error, inbox, restated)
+        return await super()._record_end(run, status, result, needs, error, inbox, restated, goal_blocked)
 
 
 class _StoreFailsAtTheEnd(RunManager):
@@ -89,9 +90,10 @@ class _StoreFailsAtTheEnd(RunManager):
         result: str,
         needs: str,
         error: JsonObject | None,
-        inbox: asyncio.Queue[UserInput],
-        restated: tuple[int, ...] = (),
-    ) -> None:
+        inbox: RunInbox,
+        restated: tuple[int, ...],
+        goal_blocked: bool,
+    ) -> bool:
         raise StoreError("the database is locked", {"run_id": run.id})
 
 
@@ -336,13 +338,23 @@ async def test_the_end_of_a_run_masks_the_secrets_dot_holds_in_its_answer_its_ne
                 None, None, None,
             )  # fmt: skip
             error: JsonObject = {"message": f"refused {held}", "context": {"url": f"https://x.test/{held}"}}
-            await manager._record_end(run, "failed", f"The password is {held}.", f"Ask for {held}", error, RunInbox())
+            await manager._record_end(
+                run,
+                "failed",
+                f"The password is {held}.",
+                f"Ask for {held}",
+                error,
+                RunInbox(),
+                restated=(),
+                goal_blocked=True,
+            )
             stored: RunRecord = await runtime.store.get_run(run.id)
             finished = await runtime.store.last_event(run.id, "run_finished")
             assert finished is not None
             assert held not in stored.result
             assert held not in json.dumps(finished.data)
             assert finished.data["needs"] == "Ask for ***"
+            assert finished.data["goal_blocked"] is True
         finally:
             await manager.shutdown()
 

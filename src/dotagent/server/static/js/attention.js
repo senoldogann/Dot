@@ -21,7 +21,8 @@ const FINISHED_TITLE = { done: t("attention.aTaskIsDone"), failed: t("attention.
 const ASKING_TITLE = { question: t("attention.dotHasAQuestion"), handoff: t("attention.dotNeedsYourHelp") };
 const DRAFT_TITLE = { mail: t("attention.dotDraftedAnEmail"), message: t("attention.dotDraftedAMessage") };
 
-const FINISHED_FACE = { done: "done", failed: "failed" };
+const FINISHED_FACE = { done: "done", failed: "failed", blocked: "waiting" };
+const TASK_BODY = t("attention.openDotToSeeIt");
 // The line breaks of Python's str.splitlines, so that the first line of a result is the one the push shows.
 // biome-ignore lint/suspicious/noControlCharactersInRegex: the control characters are the line breaks str.splitlines knows
 const LINE_BREAK = /\r\n|[\n\v\f\r\x1c-\x1e\x85\u2028\u2029]/;
@@ -180,9 +181,8 @@ function tell({ title, body, tag, route, state, counted }) {
 }
 
 function tellAboutApproval(event) {
-  const { approval_id: id, severity, summary, args } = event.data;
-  const text = severity === "question" && typeof args.question === "string" ? args.question : summary;
-  tell({ title: ASKING_TITLE[severity] ?? t("attention.dotAsksForApproval"), body: shorten(text), tag: `approval-${id}`, route: `#/runs/${event.run_id}`, state: "waiting", counted: false });
+  const { approval_id: id, severity } = event.data;
+  tell({ title: ASKING_TITLE[severity] ?? t("attention.dotAsksForApproval"), body: TASK_BODY, tag: `approval-${id}`, route: `#/runs/${event.run_id}`, state: "waiting", counted: false });
 }
 
 /** The first line of `text` that is not blank; nothing when there is none. */
@@ -190,7 +190,7 @@ function firstLine(text) {
   return text.split(LINE_BREAK).find((line) => line.trim() !== "") ?? "";
 }
 
-/** The notification of a run's end: how it ended and the first line of its answer. */
+/** The notification of a scheduled run's end at the schedule's own notice level. */
 function endNote(runId, status, result) {
   return {
     title: FINISHED_TITLE[status] ?? t("attention.aTaskHasEnded"),
@@ -203,6 +203,10 @@ function endNote(runId, status, result) {
 }
 
 async function tellAboutEnd(event) {
+  const status = event.data.goal_blocked === true ? "blocked" : event.data.status;
+  if (status !== "done" && status !== "failed" && status !== "blocked") {
+    return;
+  }
   const { run } = await api.get(`/runs/${event.run_id}`);
   // A schedule's run is told by its schedule, at the level it has (item 461, `schedule_run_ended`); a campaign's
   // session carries the same source and is told here.
@@ -210,7 +214,14 @@ async function tellAboutEnd(event) {
   if (run.parent_run_id !== null || toldByItsSchedule || !worthATell(run.id)) {
     return;
   }
-  tell(endNote(run.id, event.data.status, event.data.result));
+  tell({
+    title: status === "blocked" ? t("attention.aTaskIsBlocked") : FINISHED_TITLE[status],
+    body: TASK_BODY,
+    tag: `run-${run.id}`,
+    route: `#/runs/${run.id}`,
+    state: FINISHED_FACE[status],
+    counted: true,
+  });
 }
 
 /** A draft a run wrote for the owner to send (item 314), in the words the phone hears (`notify/push.py`). */
@@ -244,7 +255,7 @@ function tellAboutMissedFiring(event) {
   tell({ title: t("attention.aScheduleDidNotRun"), body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed", counted: false });
 }
 
-/** The end of a schedule's run that its level tells (item 461), in the words of every run's end. */
+/** The end of a schedule's run that its level tells (item 461). */
 function tellAboutScheduledEnd(event) {
   const { run_id: runId, status, result } = event.data;
   if (!worthATell(runId)) {

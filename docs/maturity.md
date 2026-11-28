@@ -55,6 +55,7 @@ content of a run is copied here, only counts and dates.
 | Meetings (Google Meet) | unproven | Both tries, on 2026-11-12, failed before Dot was admitted | Meet never worked live |
 | Meetings (Teams, Zoom) | unproven | Not built | |
 | The iPhone app (DotNext) | unproven | Being rewritten; not yet passed its parity list on the real phone | |
+| DotNext APNs and lock-screen Live Activity | unproven | Wire tests and a fake APNs transport | Verify registration, Turkish notices and Live Activity start, progress and end on the owner's signed iPhone |
 | A schedule's or watcher's check (item 1855) | unproven | New: tests only | |
 | Dollar estimates (item 1856) | unproven | New: tests only | |
 <!-- maturity:end -->
