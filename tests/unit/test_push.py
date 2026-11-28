@@ -435,6 +435,10 @@ def test_the_end_of_a_run_that_waits_on_the_owner_says_it_waits_not_done() -> No
     # Told with what waits on the owner, so that a phone's switch of that kind decides it, not the one of what ended.
     told: PushMessage | None = push_message(waiting, _run(None))
     assert told is not None and message_group("run_finished", told) == "needs_you"
+    blocked: PushMessage | None = push_message(
+        _event("run_finished", {"status": "failed", "goal_blocked": True, "result": "x"}), _run(None)
+    )
+    assert blocked is not None and message_group("run_finished", blocked) == "needs_you"
     done: PushMessage | None = push_message(_event("run_finished", {"status": "done", "result": "Done."}), _run(None))
     assert done is not None and message_group("run_finished", done) == "done"
     # A failed run that said what it needs waits on the owner too (item 1061), as the web and the phone show it.
