@@ -559,8 +559,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   picture is dragged; Close, Escape, a tap beside the picture or a swipe down close it); a Markdown file (`.md`, `.markdown`) formatted as an answer is, with its headings, lists, tables and
   code, and as it is written a click away (item 269), its HTML never drawn; a source file (Python, JavaScript,
   TypeScript, shell, Rust, Go, Swift, SQL, YAML and the like, by its extension) as code, its lines numbered and its
-  words coloured by their kind (keywords, strings, numbers, comments), its language and its path over it (item 624); any
-  other text as text, never as a page; a web page (`.html`, `.htm`, up to 10 MB) drawn as a browser draws it, without
+  words coloured by their kind (keywords, strings, numbers, comments), its language and its path over it (item 624),
+  in the change view's code view (item 2017; a JSON file laid out, a Markdown file's source numbered too); any
+  other text as text, never as a page. Code, a Markdown file and a grid are drawn a page at a time as they scroll into
+  sight (item 2099), so a file of 200 KB or a table of 5,000 rows opens at once; a web page (`.html`, `.htm`, up to 10 MB) drawn as a browser draws it, without
   its scripts (item 1077): kept in `looks/` and served as Quick Look's drawings are, in a frame sandboxed with nothing
   allowed, so no script of it runs (one could take the frame to another site) and no refresh moves it, and it reaches
   no server, nor the pictures and styles beside it on the disk; its source is a click away (**Source**). On a page without the panel (the new chat's, an agent's) the file opens in a

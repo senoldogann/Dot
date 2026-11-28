@@ -3091,9 +3091,25 @@ dialog.modal.file-dialog .file-picture img {
   overflow-wrap: anywhere;
 }
 
-/* Source files read by an agent (the file panel's editor view). */
-.file-view[data-kind="text"]:has(.file-code-editor) .file-body {
+/* A source file and a Markdown file's source in the file panel: the change view's code view (item 2017) fills the
+   panel and is what scrolls, so its rows are drawn as it scrolls to them; the file's language and path above it. */
+.file-body:has(> .code-view) {
+  display: flex;
+  flex-direction: column;
   padding: 0;
+}
+
+.file-body > .code-view {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.file-body > .code-view + .hint {
+  padding: var(--space-2) var(--space-3);
 }
 
 .file-code-path {
@@ -3120,64 +3136,6 @@ dialog.modal.file-dialog .file-picture img {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.file-code-editor {
-  width: max-content;
-  min-width: 100%;
-  margin: 0;
-  padding: var(--space-3) 0 var(--space-4);
-  overflow-wrap: normal;
-  white-space: normal;
-}
-
-.file-code-editor code {
-  display: block;
-}
-
-.file-code-row {
-  display: flex;
-  min-width: max-content;
-  min-height: 1em;
-}
-
-.file-code-gutter {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  flex: 0 0 48px;
-  padding: 0 12px 0 4px;
-  border-right: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--muted);
-  text-align: right;
-  user-select: none;
-}
-
-.file-code-content {
-  display: block;
-  min-width: max-content;
-  padding-inline: var(--space-4);
-  white-space: pre;
-}
-
-.file-code-keyword {
-  color: var(--bad);
-  font-weight: var(--weight-label);
-}
-
-.file-code-string {
-  color: var(--ok);
-}
-
-.file-code-comment {
-  color: var(--muted);
-  font-style: italic;
-}
-
-.file-code-number,
-.file-code-literal {
-  color: var(--accent-strong);
 }
 
 /* A document's headings, a Markdown file's (item 269) and a slide's title stand out from their text more than an
@@ -3415,7 +3373,7 @@ dialog.modal.file-dialog .file-picture img {
   left: var(--space-2);
 }
 
-.code-more {
+.lazy-more {
   height: 1px;
 }
 

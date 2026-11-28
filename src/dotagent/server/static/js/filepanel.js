@@ -12,7 +12,11 @@ import { copyButton } from "./copybutton.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { segmented } from "./panels.js";
-import { prose } from "./prose.js";
+import { codeView, fileLines } from "./codeview.js";
+import { changeFormat, prettyJSON } from "./diffview.js";
+import { appendInPages } from "./lazylist.js";
+import { parseBlocks } from "./markdown.js";
+import { blockNode } from "./prose.js";
 import { showImage, toast } from "./ui.js";
 import { t } from "./i18n.js";
 
@@ -28,6 +32,10 @@ const KINDS = {
 };
 // The most cells a grid draws, the empty ones among them included.
 const GRID_CELLS = 40_000;
+// How many rows of a grid are drawn at a time, the next as the reader scrolls to them.
+const GRID_ROWS_AT_A_TIME = 200;
+// How many blocks of a Markdown file are drawn at a time (the owner's report of 2026-11-28: a report of 200 KB).
+const MARKDOWN_BLOCKS_AT_A_TIME = 120;
 // How far below the view the pages of a PDF are drawn before they come into it.
 const PAGE_MARGIN = "800px 0px";
 // A value a grid aligns to the right, as a spreadsheet does a number.
@@ -103,9 +111,10 @@ function cellContent(cell) {
 
 /**
  * A sheet as a grid of the rows and the columns that hold anything, under their numbers and letters, drawn to at most
- * GRID_CELLS cells. `onPick(cell)` runs when a cell that holds anything is clicked.
+ * GRID_CELLS cells, `GRID_ROWS_AT_A_TIME` rows at a time as `root` scrolls to them. `onPick(cell)` runs when a cell that
+ * holds anything is clicked.
  */
-function sheetGrid(sheet, onPick) {
+function sheetGrid(sheet, onPick, root) {
   const columns = [...new Set(sheet.cells.map((cell) => cell.column))].sort((a, b) => a - b);
   const rows = new Map();
   for (const cell of sheet.cells) {
@@ -117,30 +126,28 @@ function sheetGrid(sheet, onPick) {
   const numbers = [...rows.keys()];
   const drawn = numbers.slice(0, Math.max(1, Math.floor(GRID_CELLS / Math.max(columns.length, 1))));
   const picked = [];
+  const rowNode = (row) =>
+    el(
+      "tr",
+      null,
+      el("th", { scope: "row" }, String(row)),
+      columns.map((column) => {
+        const cell = rows.get(row).get(column);
+        if (cell === undefined) {
+          return el("td");
+        }
+        picked.push(cell);
+        return el("td", { class: cellClass(cell), title: cell.formula ?? undefined, dataset: { cell: String(picked.length - 1) } }, cell.value ?? cell.formula);
+      }),
+    );
+  const tbody = el("tbody");
   const table = el(
     "table",
     { class: "file-grid" },
     el("thead", null, el("tr", null, el("th", { class: "corner" }), columns.map((column) => el("th", { scope: "col" }, columnLetters(column))))),
-    el(
-      "tbody",
-      null,
-      drawn.map((row) =>
-        el(
-          "tr",
-          null,
-          el("th", { scope: "row" }, String(row)),
-          columns.map((column) => {
-            const cell = rows.get(row).get(column);
-            if (cell === undefined) {
-              return el("td");
-            }
-            picked.push(cell);
-            return el("td", { class: cellClass(cell), title: cell.formula ?? undefined, dataset: { cell: String(picked.length - 1) } }, cell.value ?? cell.formula);
-          }),
-        ),
-      ),
-    ),
+    tbody,
   );
+  appendInPages(tbody, drawn.length, GRID_ROWS_AT_A_TIME, (index) => rowNode(drawn[index]), root);
   table.addEventListener("click", (event) => {
     const target = event.target.closest("td[data-cell]");
     if (target !== null) {
@@ -159,7 +166,7 @@ function cutNote(sheet, maxCells, noun) {
   return hint(t("filepanel.theNounHoldsMoreThan", { noun, toLocaleString: maxCells.toLocaleString(), cut_at_row: sheet.cut_at_row }));
 }
 
-function sheetView(sheet, maxCells, noun, line) {
+function sheetView(sheet, maxCells, noun, line, root) {
   if (sheet.cells.length === 0 && sheet.cut_at_row === null) {
     return [hint(t("filepanel.thisSheetIsEmpty"))];
   }
@@ -167,7 +174,7 @@ function sheetView(sheet, maxCells, noun, line) {
     line.hidden = false;
     line.replaceChildren(el("strong", null, cellAddress(cell)), el("span", null, cellContent(cell)));
   };
-  return [...sheetGrid(sheet, pick), cutNote(sheet, maxCells, noun)];
+  return [...sheetGrid(sheet, pick, root), cutNote(sheet, maxCells, noun)];
 }
 
 function workbookView(preview, toolbar, body) {
@@ -175,7 +182,7 @@ function workbookView(preview, toolbar, body) {
   const show = (index) => {
     line.hidden = true;
     const sheet = preview.sheets[index];
-    body.replaceChildren(el("div", { class: "file-sheet" }, sheetView(sheet, preview.max_cells, "workbook", line)));
+    body.replaceChildren(el("div", { class: "file-sheet" }, sheetView(sheet, preview.max_cells, "workbook", line, body)));
     body.scrollTo(0, 0);
   };
   const unread = preview.sheet_count - preview.sheets.length;
@@ -202,7 +209,7 @@ function workbookView(preview, toolbar, body) {
 function tableView(preview, toolbar, body) {
   const line = el("div", { class: "file-cell-line", hidden: true, "aria-live": "polite" });
   toolbar.replaceChildren(line);
-  body.replaceChildren(el("div", { class: "file-sheet" }, sheetView(preview.sheet, preview.max_cells, "table", line)));
+  body.replaceChildren(el("div", { class: "file-sheet" }, sheetView(preview.sheet, preview.max_cells, "table", line, body)));
 }
 
 // ------------------------------------------------------------------------------------------------ documents and slides
@@ -372,74 +379,36 @@ function officeView(file, lookAddress, views, toolbar, body) {
 }
 
 // ------------------------------------------------------------------------------------------------ text
-// A source file, by its extension, reads as code (item 624): its lines numbered and its words coloured by their kind.
-const CODE_FILE = /\.(?:py|pyi|js|mjs|cjs|jsx|ts|tsx|json|css|scss|html|xml|sh|bash|zsh|rs|go|java|kt|kts|c|h|cc|cpp|hpp|cs|php|rb|sql|toml|yaml|yml|ini|swift|dart|vue|svelte)$/i;
-const CODE_LANGUAGES = {
-  py: "python", pyi: "python", js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "javascript",
-  ts: "typescript", tsx: "typescript", json: "json", css: "css", scss: "scss", html: "html", xml: "xml",
-  sh: "shell", bash: "shell", zsh: "shell", rs: "rust", go: "go", java: "java", kt: "kotlin", kts: "kotlin",
-  c: "c", h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp", cs: "csharp", php: "php", rb: "ruby", sql: "sql",
-  toml: "toml", yaml: "yaml", yml: "yaml", ini: "ini", swift: "swift", dart: "dart", vue: "vue", svelte: "svelte",
-};
-const CODE_KEYWORDS = new Set(
-  "and as assert async await break case catch class const continue def del elif else except export extends finally for from function global if import in interface is let match new nonlocal not or pass raise return static struct switch throw try type var while with yield pub fn impl use mod where enum trait self this True False None null undefined true false".split(" "),
-);
-const CODE_COMMENT_LANGUAGES = new Set(["python", "ruby", "shell", "yaml", "toml", "ini"]);
+// A source file, by its extension, reads as code (item 624), drawn by the change view's code view (item 2017): its
+// lines numbered, its words coloured by diffview.js's scanner, a JSON file laid out.
+const CODE_FILE = /\.(?:py|pyi|js|mjs|cjs|jsx|ts|tsx|mts|cts|json|jsonl|webmanifest|css|scss|html|xml|sh|bash|zsh|rs|go|java|kt|kts|c|h|cc|cpp|hpp|cs|php|rb|sql|toml|yaml|yml|ini|swift|dart|vue|svelte|plist|svg)$/i;
 
-function codeTokenClass(token, language) {
-  if (/^["'`]/.test(token)) {
-    return "file-code-string";
-  }
-  if (token.startsWith("//") || token.startsWith("/*") || (token.startsWith("#") && CODE_COMMENT_LANGUAGES.has(language))) {
-    return "file-code-comment";
-  }
-  if (/^\d/.test(token)) {
-    return "file-code-number";
-  }
-  if (/^(?:true|false|null|undefined|None|True|False)$/.test(token)) {
-    return "file-code-literal";
-  }
-  return CODE_KEYWORDS.has(token) ? "file-code-keyword" : null;
-}
-
-// The words of a line: strings, comments as the language writes them (a "#" in Python, the shells and the files of
-// settings, "//" and "/* */" in the others, so that Python's "//" is division and Rust's "#[" no comment), names,
-// numbers, spaces and the single marks between them.
-const HASH_TOKENS = /(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|#[^\n]*|\b[A-Za-z_$][\w$]*\b|\b\d+(?:\.\d+)?\b|\s+|.)/g;
-const SLASH_TOKENS = /(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/.*|\/\*.*?\*\/|\b[A-Za-z_$][\w$]*\b|\b\d+(?:\.\d+)?\b|\s+|.)/g;
-
-function codeLine(line, language) {
-  const tokens = line.match(CODE_COMMENT_LANGUAGES.has(language) ? HASH_TOKENS : SLASH_TOKENS) ?? [];
-  const children = tokens.map((token) => {
-    const className = codeTokenClass(token, language);
-    return className === null ? document.createTextNode(token) : el("span", { class: className }, token);
-  });
-  return children.length === 0 ? [document.createTextNode(" ")] : children;
-}
-
-function codeView(file, toolbar, body, cut) {
+function codeFileView(file, toolbar, body, cut) {
+  const format = changeFormat(file.name);
+  const language = format.kind === "code" ? format.language : format.kind;
   const extension = file.name.match(/\.([^.]+)$/)?.[1]?.toLowerCase() ?? "";
-  const language = CODE_LANGUAGES[extension] ?? "code";
   const path = file.path ?? file.name;
   const breadcrumb = path.split(/[\\/]/).filter(Boolean).join(" / ");
   fill(
     toolbar,
     el("div", { class: "file-code-path", title: path },
-      el("span", { class: "file-code-language" }, language),
+      el("span", { class: "file-code-language" }, language ?? extension),
       el("span", { class: "file-code-breadcrumb" }, breadcrumb),
     ),
   );
-  const code = el("code");
-  const lines = file.preview.text.replace(/\r\n?/g, "\n").split("\n");
-  for (const [index, line] of lines.entries()) {
-    code.append(
-      el("span", { class: "file-code-row" },
-        el("span", { class: "file-code-gutter", "aria-hidden": "true" }, String(index + 1)),
-        el("span", { class: "file-code-content" }, ...codeLine(line, language)),
-      ),
-    );
-  }
-  fill(body, el("pre", { class: "file-text file-code-editor", "aria-label": t("filepanel.languageSourceCode", { language }) }, code), cut);
+  const text = format.kind === "json" ? (prettyJSON(file.preview.text) ?? file.preview.text) : file.preview.text;
+  const view = codeView(fileLines(text.replace(/\r\n?/g, "\n")), language, false);
+  view.setAttribute("aria-label", t("filepanel.languageSourceCode", { language: language ?? extension }));
+  fill(body, view, cut);
+}
+
+/** A Markdown file formatted as an answer is, its blocks drawn `MARKDOWN_BLOCKS_AT_A_TIME` at a time as `root`
+ * scrolls to them. */
+function markdownBody(text, root) {
+  const blocks = parseBlocks(text);
+  const holder = el("div", { class: "prose" });
+  appendInPages(holder, blocks.length, MARKDOWN_BLOCKS_AT_A_TIME, (index) => blockNode(blocks[index]), root);
+  return el("div", { class: "file-markdown" }, holder);
 }
 
 // A web page, by its extension (item 1077).
@@ -457,7 +426,7 @@ function webPageView(file, views, toolbar, body, cut) {
     // Drawn, the page fills the panel as a drawing of Quick Look does.
     body.dataset.view = id;
     if (id === "source") {
-      codeView(file, toolbar, body, cut);
+      codeFileView(file, toolbar, body, cut);
       return;
     }
     fill(toolbar);
@@ -502,7 +471,7 @@ function textView(file, views, toolbar, body) {
     return;
   }
   if (CODE_FILE.test(file.name)) {
-    codeView(file, toolbar, body, cut);
+    codeFileView(file, toolbar, body, cut);
     return;
   }
   const source = () => el("pre", { class: "file-text" }, file.preview.text);
@@ -510,7 +479,7 @@ function textView(file, views, toolbar, body) {
     fill(body, source(), cut);
     return;
   }
-  const show = (id) => fill(body, id === "formatted" ? el("div", { class: "file-markdown" }, prose(file.preview.text)) : source(), cut);
+  const show = (id) => fill(body, id === "formatted" ? markdownBody(file.preview.text, body) : codeView(fileLines(file.preview.text), "markdown", false), cut);
   const tabs = segmented(
     [
       { id: "formatted", label: t("filepanel.formatted"), hint: t("filepanel.showTheMarkdownFormatted") },
