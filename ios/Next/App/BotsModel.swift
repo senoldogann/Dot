@@ -56,12 +56,47 @@ extension AppModel {
         }
         let made: Result<AgentRecord, SettingsFailureBox> = await write { api throws(DaemonRequestError) in try await api.createAgent(request) }
         guard case .success(let record) = made else { return made }
+        await welcome(record)
+        await loadAgents()
+        return .success(record)
+    }
+
+    /// Makes a bot from a template with the owner's answers to its questions, then starts its first meeting as
+    /// `createBot` does; with `schedule`, adds the schedule the template suggests, switched off (item 464). A meeting or a
+    /// schedule that could not be added leaves the bot made, and its chat says why (`welcomeProblems`).
+    func createBot(from template: BotTemplate, answers: [String], schedule: Bool) async -> Result<AgentRecord, SettingsFailureBox> {
+        let made: Result<AgentRecord, SettingsFailureBox> = await write { api throws(DaemonRequestError) in try await api.useBotTemplate(template.id, answers: answers) }
+        guard case .success(let record) = made else { return made }
+        await welcome(record)
+        if schedule, !template.cron.isEmpty,
+            case .failure(let box) = await write({ api throws(DaemonRequestError) in try await api.addSuggestedSchedule(template, bot: record) })
+        {
+            welcomeProblems[record.id] = .other(
+                String(
+                    localized: "Its schedule was not added: \(failureWords(box.failure, macPlace: agentsOnTheMac))",
+                    comment: "New bot from a template: the suggested schedule could not be added; the argument is why"))
+        }
+        await loadAgents()
+        return .success(record)
+    }
+
+    /// Starts a new bot's first meeting (item 993) in the phone's language; a meeting that could not start is said in its
+    /// chat (`welcomeProblems`).
+    private func welcome(_ record: AgentRecord) async {
         let language: String = Locale(identifier: "en").localizedString(forLanguageCode: Locale.current.language.languageCode?.identifier ?? "en") ?? "English"
         if case .failure(let box) = await write({ api throws(DaemonRequestError) in try await api.welcome(agent: record.id, language: language) }) {
             welcomeProblems[record.id] = box.failure
         }
-        await loadAgents()
-        return .success(record)
+    }
+
+    /// Reads the owner's teams again, for the home's group chats; a failure keeps what was read and is said on the home
+    /// (`agentsProblem`, whose Try again reads both).
+    func loadTeams() async {
+        switch await read({ api throws(DaemonRequestError) in try await api.teams() }) {
+        case .loaded(let read): teams = read
+        case .failed(let failure): agentsProblem = failure
+        case .loading: break
+        }
     }
 
     func renameBot(_ record: AgentRecord, to name: String) async -> SettingsFailure? {

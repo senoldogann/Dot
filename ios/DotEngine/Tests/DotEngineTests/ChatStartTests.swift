@@ -50,6 +50,18 @@ final class ChatStartTests: XCTestCase {
         XCTAssertEqual(sent["plan_first"]?.bool, false)
     }
 
+    func testAGroupChatNamesItsTeamAndNoAgent() async throws {
+        let sent: [String: JSONValue] = try await sentRun(ChatStart(team: "team-1"))
+        XCTAssertEqual(sent["team_id"]?.string, "team-1")
+        XCTAssertNil(sent["agent_id"], "a team's chat begins with team_id alone")
+        XCTAssertEqual(sent["standing"]?.bool, false)
+    }
+
+    func testAStartKeptByAnEarlierBuildReadsAsNoTeam() throws {
+        let kept: Data = Data(#"{"choices":{"mode":"auto","speed":"standard"},"planFirst":false}"#.utf8)
+        XCTAssertNil(try JSONDecoder().decode(ChatStart.self, from: kept).teamId)
+    }
+
     func testANewChatKeptByAnEarlierBuildStillReads() throws {
         let kept: Data = Data(
             #"{"id":"k1","action":{"newChat":{"text":"hi","images":[],"uploaded":[]}},"kind":"run","createdAt":1,"attempts":0,"phase":"waiting"}"#.utf8)

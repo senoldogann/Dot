@@ -2,7 +2,7 @@ import DotEngine
 import SwiftUI
 
 // The home (PLAN §27, item 1881): bots, not tabs. Dot large and centred, then one row per agent; the owner's avatar icon
-// opens the one settings sheet, "+" makes a bot; at the bottom the apps button and the search of bots, chats and words.
+// opens the one settings sheet, "+" makes a bot or a group chat (a team); at the bottom the apps button and the search of bots, chats and words.
 
 /// The app's shell: the home, a bot's chat pushed from it (the iPad: the home as the sidebar, the chat as the detail),
 /// and the sheets the home opens.
@@ -17,6 +17,8 @@ struct HomeShell: View {
     @State private var showsSettings: Bool = false
     @State private var showsNewBot: Bool = false
     @State private var showsApps: Bool = false
+    @State private var showsNewTeam: Bool = false
+    @State private var openTeam: TeamToOpen?
 
     var body: some View {
         if let settings {
@@ -29,7 +31,8 @@ struct HomeShell: View {
     private var home: some View {
         AdaptiveSplit(selection: $selection) {
             HomeList(
-                selection: $selection, openSettings: { showsSettings = true }, newBot: { showsNewBot = true }, openApps: { showsApps = true })
+                selection: $selection, openSettings: { showsSettings = true }, newBot: { showsNewBot = true }, newTeam: { showsNewTeam = true },
+                openApps: { showsApps = true }, openTeam: { openTeam = TeamToOpen(id: $0) })
         } detail: { route in
             // One screen per route, as the phone's push makes it: a bot's held and chosen chats never carry to another
             // bot on the iPad's detail column (item 1923's review).
@@ -54,7 +57,16 @@ struct HomeShell: View {
                 }, close: { showsNewBot = false })
         }
         .sheet(isPresented: $showsApps) { ConnectAppsSheet(opensDetail: nil) }
+        .sheet(isPresented: $showsNewTeam) {
+            NewTeamSheet(
+                made: { team in
+                    showsNewTeam = false
+                    openTeam = TeamToOpen(id: team.id)
+                }, close: { showsNewTeam = false })
+        }
+        .sheet(item: $openTeam) { team in TeamSheet(id: team.id, close: { openTeam = nil }) }
         .task { await model.loadAgents() }
+        .task { await model.loadTeams() }
         // Back on the home: the agents' home chats (outside the list's window) are read again, so a chat read stops
         // counting as unread.
         .onChange(of: selection == nil) { _, home in if home { Task { await model.loadAgents() } } }
@@ -65,12 +77,19 @@ struct HomeShell: View {
     }
 }
 
-/// The bot list.
+/// A group chat the home opens in a sheet.
+struct TeamToOpen: Identifiable, Hashable {
+    let id: String
+}
+
+/// The bot list, then the owner's group chats.
 struct HomeList: View {
     @Binding var selection: BotRoute?
     let openSettings: () -> Void
     let newBot: () -> Void
+    let newTeam: () -> Void
     let openApps: () -> Void
+    let openTeam: (String) -> Void
     @Environment(AppModel.self) private var model: AppModel
     @State private var query: String = ""
     @State private var searching: Bool = false
@@ -90,7 +109,10 @@ struct HomeList: View {
                     if let problem = problem ?? model.agentsProblem {
                         FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: {
                             self.problem = nil
-                            Task { await model.loadAgents() }
+                            Task {
+                                await model.loadAgents()
+                                await model.loadTeams()
+                            }
                         })
                             .padding(.horizontal, Space.gutter)
                     }
@@ -127,8 +149,15 @@ struct HomeList: View {
             }
             ToolbarItem(placement: .principal) { Color.clear.frame(width: 1, height: 1).accessibilityHidden(true) }
             ToolbarItem(placement: .topBarTrailing) {
-                Button(String(localized: "New bot", comment: "Home: makes a new bot"), systemImage: "plus", action: newBot)
-                    .accessibilityIdentifier("home.newBot")
+                Menu {
+                    Button(String(localized: "New bot", comment: "Home: makes a new bot"), systemImage: "person.crop.circle.badge.plus", action: newBot)
+                        .accessibilityIdentifier("home.newBot.bot")
+                    Button(String(localized: "New group chat", comment: "Home: makes a group chat with some bots"), systemImage: "person.3", action: newTeam)
+                        .accessibilityIdentifier("home.newTeam")
+                } label: {
+                    Label(String(localized: "New", comment: "Home: the + menu (a new bot or group chat)"), systemImage: "plus")
+                }
+                .accessibilityIdentifier("home.newBot")
             }
         }
         .task(id: query) {
@@ -182,6 +211,20 @@ struct HomeList: View {
                 .background(selection?.bot == bot.id ? Tone.nested : Color.clear)
                 .contextMenu { menu(bot) }
                 .id(bot.id)
+            }
+        }
+        if !model.teams.isEmpty {
+            Text(String(localized: "Group chats", comment: "Home: the header of the owner's teams"))
+                .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Space.gutter).padding(.top, Space.m)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(model.teams, id: \.record.id) { team in
+                Button { openTeam(team.record.id) } label: {
+                    ListRow(systemImage: "person.3", title: team.record.name, description: nil, accessory: .chevron)
+                }
+                .buttonStyle(RowPressStyle())
+                .accessibilityIdentifier("home.team.\(team.record.name)")
             }
         }
         if bots.count == 1, model.list.freshness == .live {
@@ -490,6 +533,13 @@ struct NewBotSheet: View {
                     BotFace(id: name.isEmpty ? "new" : name, look: nil, size: 72).frame(maxWidth: .infinity).padding(.vertical, Space.s)
                     if let problem {
                         FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: nil)
+                    }
+                    GroupedSection(header: nil, footer: nil) {
+                        NavigationRow(
+                            systemImage: "square.on.square", title: String(localized: "Start from a template", comment: "New bot: opens the bots to start from"),
+                            description: nil, detail: nil
+                        ) { BotTemplatesPage(made: made) }
+                        .accessibilityIdentifier("newBot.templates")
                     }
                     GroupedSection(header: String(localized: "Name", comment: "Rename alert: the field of the chat's new name"), footer: nil) {
                         TextField(String(localized: "Researcher, Editor, Trader…", comment: "New bot: example names in the name field"), text: $name)

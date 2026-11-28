@@ -8,6 +8,28 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # The home's "+": a bot from a template and a group chat (item 2061).
+    "Add its schedule": "Zamanlamasını ekle",
+    "Added switched off: read its goal, then switch it on.": "Kapalı eklenir: hedefini oku, sonra aç.",
+    "Agents › Your teams": "Ajanlar › Takımların",
+    "Dot leads the team: it hands each bot its part and puts their answers together.": "Takımı Dot yönetir: her bota kendi payını verir ve cevaplarını birleştirir.",
+    "First, a few answers": "Önce birkaç cevap",
+    "Group chat": "Grup sohbeti",
+    "Group chats": "Grup sohbetleri",
+    "Its bots are made where you have none of the name; the ones you have join as they are.": "Bu adda botun yoksa oluşturulur; olanlar oldukları gibi katılır.",
+    "Its schedule was not added: %@": "Zamanlaması eklenmedi: %@",
+    "Launch, Research desk…": "Lansman, Araştırma masası…",
+    "Make a bot first, or start from a ready team below.": "Önce bir bot oluştur ya da aşağıdaki hazır takımlardan biriyle başla.",
+    "Make this bot": "Bu botu oluştur",
+    "Message the team": "Takıma yaz",
+    "Needs: %@": "Gerekenler: %@",
+    "New group chat": "Yeni grup sohbeti",
+    "Ready teams": "Hazır takımlar",
+    "Start from a template": "Şablondan başla",
+    "Templates": "Şablonlar",
+    "The message was not kept. Try sending it again.": "Mesaj saklanamadı. Yeniden göndermeyi dene.",
+    "What is it for? (optional)": "Ne için? (isteğe bağlı)",
+    "Your answers go into its instructions. Leave one empty to skip it.": "Cevapların talimatlarına eklenir. Atlamak için boş bırak.",
     # A tool row of Dot's own: cards shown in the chat (item 1967).
     "Show cards": "Kart göster",
     "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",

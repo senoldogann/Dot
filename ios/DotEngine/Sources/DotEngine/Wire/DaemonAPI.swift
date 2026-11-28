@@ -202,6 +202,8 @@ public struct NewChatMessage: Codable, Sendable, Hashable {
 
     /// The agent the chat is with; `nil` (left out of the body) for Dot.
     public let agentId: String?
+    /// The owner's team the chat is with (item 610): Dot leads its bots; `nil` (left out) for any other chat.
+    public let teamId: String?
 
     public init(goal: String, key: String, attachments: [String], start: ChatStart, agentId: String?) {
         self.goal = goal
@@ -216,24 +218,36 @@ public struct NewChatMessage: Codable, Sendable, Hashable {
         self.goalMode = start.choices.goalMode
         self.planFirst = start.planFirst
         self.agentId = agentId
+        self.teamId = start.teamId
     }
 
     enum CodingKeys: String, CodingKey {
         case goal, key, attachments, mode, standing, model, effort, speed, approvals
         case agentId = "agent_id"
+        case teamId = "team_id"
         case goalMode = "goal_mode"
         case planFirst = "plan_first"
     }
 }
 
-/// What a new chat starts with (PLAN §24): the choices picked before its first message, and "plan first".
+/// What a new chat starts with (PLAN §24): the choices picked before its first message, and "plan first"; a group
+/// chat names its team (`teamId`, `nil` for any other chat, and for a start kept by an older app).
 public struct ChatStart: Codable, Sendable, Hashable {
     public let choices: ChatChoices
     public let planFirst: Bool
+    public let teamId: String?
 
     public init(choices: ChatChoices, planFirst: Bool) {
         self.choices = choices
         self.planFirst = planFirst
+        self.teamId = nil
+    }
+
+    /// A new chat with the owner's team `id`, on the daemon's choices.
+    public init(team id: String) {
+        self.choices = .daemons
+        self.planFirst = false
+        self.teamId = id
     }
 
     public static let daemons: ChatStart = ChatStart(choices: .daemons, planFirst: false)
