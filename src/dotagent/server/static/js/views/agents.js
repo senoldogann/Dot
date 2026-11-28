@@ -363,14 +363,14 @@ async function exportAgent(record) {
 /** An agent made from its file (item 315); the daemon refuses a file that is not one, or that names tools not here. */
 async function importAgent(file) {
   if (file.size > MOST_AGENT_FILE_BYTES) {
-    throw new Error(`${file.name} is larger than an agent file can be.`);
+    throw new Error(t("views.agents.botFileTooLarge", { name: file.name }));
   }
   const text = await file.text();
   let parsed;
   try {
     parsed = JSON.parse(text);
   } catch (error) {
-    throw new Error(`${file.name} is not an agent file: ${error.message}`);
+    throw new Error(t("views.agents.invalidBotFile", { name: file.name, reason: error.message }));
   }
   const saved = await api.post("/agents/import", parsed);
   rememberLook(saved.id, saved.look);

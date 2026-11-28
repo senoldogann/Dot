@@ -34,6 +34,8 @@ export const TR_VIEWS = {
   "views.agents.yours": "Sizin",
   "views.agents.nameIsSavedAsName2": "{name}, {name2} olarak kaydedildi.",
   "views.agents.nameIsImported": "{name} içe aktarıldı.",
+  "views.agents.botFileTooLarge": "{name}, bir bot dosyası için izin verilen boyutu aşıyor.",
+  "views.agents.invalidBotFile": "{name} bir bot dosyası değil: {reason}",
   "views.agents.allActions": "Tüm eylemler",
   "views.agents.everyActionAndAnyAdded": "her eylem ve sonradan eklenenler",
   "views.agents.scout": "Kaşif",

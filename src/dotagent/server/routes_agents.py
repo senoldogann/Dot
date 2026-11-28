@@ -93,7 +93,7 @@ def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
     unknown: list[str] = sorted(set(request.tools or ()) - known)
     if unknown:
         raise InvalidValueError(
-            f"an agent names actions that do not exist here: {', '.join(unknown)}", {"tools": ", ".join(unknown)}
+            f"a bot names actions that do not exist here: {', '.join(unknown)}", {"tools": ", ".join(unknown)}
         )
     return request
 
