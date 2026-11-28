@@ -3259,6 +3259,17 @@
         }
       }
     },
+    "Coding model": {
+      "comment": "Models: the model a change to a repository starts on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kodlama modeli"
+          }
+        }
+      }
+    },
     "Collapsed": {
       "comment": "VoiceOver value of a closed disclosure\nVoiceOver value of a closed group\nVoiceOver: a folded section of This chat is closed",
       "localizations": {
@@ -3927,6 +3938,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reddedildi"
+          }
+        }
+      }
+    },
+    "Deep task model": {
+      "comment": "Models: the model an investigation, analysis or design task starts on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Derin görev modeli"
           }
         }
       }
@@ -10017,6 +10039,17 @@
         }
       }
     },
+    "Other-family check model": {
+      "comment": "Models: the model of another family that checks goals and helpers' results (item 1929)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başka aileden denetim modeli"
+          }
+        }
+      }
+    },
     "Over the 200 MiB limit": {
       "comment": "On a video chip when the exported video is still too big",
       "localizations": {
@@ -10784,6 +10817,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sırada · %lld · sıra bekletiliyor"
+          }
+        }
+      }
+    },
+    "Quick task model": {
+      "comment": "Models: the model a short single lookup starts on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hızlı görev modeli"
           }
         }
       }
@@ -13800,6 +13844,17 @@
         }
       }
     },
+    "Task models": {
+      "comment": "Models section: the model each kind of task starts on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görev modelleri"
+          }
+        }
+      }
+    },
     "Tasks": {
       "comment": "Title of the sheet of a chat's tasks",
       "localizations": {
@@ -15659,6 +15714,17 @@
         }
       }
     },
+    "Used when you haven’t chosen a model for the task. Helpers otherwise use their parent’s model.": {
+      "comment": "Models: what the task models do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görev için model seçmediğinizde kullanılır. Yardımcılar aksi halde üst görevlerinin modelini kullanır."
+          }
+        }
+      }
+    },
     "User input needed": {
       "comment": "Ask dock header: Dot waits for the owner's answer",
       "localizations": {
@@ -15677,6 +15743,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sayfayı telefondan kullanmak Mac'inde kapalı: Ayarlar › Tarayıcı › Görevi tutarken sayfayı ekrandan kullan."
+          }
+        }
+      }
+    },
+    "Usual model": {
+      "comment": "Models: a kind of task left on the model it would start on anyway",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olağan model"
           }
         }
       }
@@ -16806,6 +16883,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yazıya dökülüyor…"
+          }
+        }
+      }
+    },
+    "Writing model": {
+      "comment": "Models: the model drafting or editing copy starts on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazı modeli"
           }
         }
       }

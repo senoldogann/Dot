@@ -529,18 +529,20 @@ final class FakeDaemon: @unchecked Sendable {
     private func modelsReply(method: String, parts: [String], body: Data?) -> Reply? {
         let fields: [String: JSONValue] = (try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data())) ?? [:]
         func ok(_ json: String) -> Reply { Reply(status: 200, body: Data(json.utf8), stream: false, lost: false) }
-        let config: (String, [String]) -> String = { kind, standby in
+        let config: (String, String, [String], String) -> String = { kind, model, standby, check in
             let list: String = standby.map { "\"\($0)\"" }.joined(separator: ",")
-            let kinds: String = kind.isEmpty ? "{}" : #"{"security":"\#(kind)"}"#
-            return #"{"main":"m:main","vision":"m:see","fast":"m:fast","review":"m:review","effort":"medium","helpers":[],"standby":[\#(list)],"kinds":\#(kinds)}"#
+            let kinds: String = model.isEmpty ? "{}" : #"{"\#(kind)":"\#(model)"}"#
+            return #"{"main":"m:main","vision":"m:see","fast":"m:fast","review":"m:review","effort":"medium","helpers":[],"standby":[\#(list)],"kinds":\#(kinds),"check_other_family":"\#(check)"}"#
         }
         if method == "POST", let found: [String] = Self.match(parts, ["api", "agents", "*", "pause"]) { return ok(Self.agentJSON(found[0], pausedAt: "1795750115.4")) }
         if method == "POST", let found: [String] = Self.match(parts, ["api", "agents", "*", "resume"]) { return ok(Self.agentJSON(found[0], pausedAt: "null")) }
         switch (method, parts) {
         case ("PUT", ["api", "models", "kinds"]):
-            return ok(config(fields["model"]?.string ?? "", []))
+            return ok(config(fields["kind"]?.string ?? "", fields["model"]?.string ?? "", [], ""))
+        case ("PUT", ["api", "models", "check-other-family"]):
+            return ok(config("", "", [], fields["model"]?.string ?? ""))
         case ("PUT", ["api", "models", "standby"]):
-            return ok(config("", (fields["models"]?.array ?? []).compactMap(\.string)))
+            return ok(config("", "", (fields["models"]?.array ?? []).compactMap(\.string), ""))
         case ("GET", ["api", "models", "learning"]):
             return ok(#"{"proposer":"","composer":"m:compose","selector":"","experience":"","review":"m:review"}"#)
         case ("PUT", ["api", "models", "learning"]):

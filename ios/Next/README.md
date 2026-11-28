@@ -69,7 +69,8 @@ names, the language, the clock, Queue or Steer, the confirmation of deleting a c
 (light, dark or system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their
 own and word break, the tool calls in chat, response streaming, the reading width), Chat (haptics, reactions'
 follow-ups), Models (the main and fast models from the daemon's list, and the code review's model with its reasoning,
-changed from the phone too: item 1770, a §24 picker sheet; the providers added on the Mac, read only, item 1949), Usage limits and caps (the plan's windows, today's tokens,
+changed from the phone too: item 1770, a §24 picker sheet; the other-family check model and the Task models of
+`[models.kinds]`, as the web's page has them, item 2088; the providers added on the Mac, read only, item 1949), Usage limits and caps (the plan's windows, today's tokens,
 the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
 switch on each row; edit, run now, delete; + makes a new one, item 1911, and a schedule's History lists its runs,
 each opening its chat), Rules (saved rules and their recent use, draft and preview a rule that asks or leaves the step

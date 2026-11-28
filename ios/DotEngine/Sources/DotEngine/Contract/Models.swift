@@ -619,9 +619,12 @@ public struct ModelOption: Codable, Sendable, Hashable {
     public let free: Bool?
     /// It can see images: the vision model must (item 232).
     public let vision: Bool?
+    /// The model's lineage (`llm/families.py`), which an other-family check needs; `nil` when unknown or from an older
+    /// daemon.
+    public let family: String?
 
     enum CodingKeys: String, CodingKey {
-        case ref, label, efforts, tools, free, vision
+        case ref, label, efforts, tools, free, vision, family
         case defaultEffort = "default_effort"
         case contextLength = "context_length"
         case fastMode = "fast_mode"
