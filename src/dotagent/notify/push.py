@@ -244,12 +244,13 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
         needs: object = event.data.get("needs")
         needed: str = needs.strip() if isinstance(needs, str) else ""
         status: object = event.data.get("status")
+        if event.data.get("waiting") is True or (status == "failed" and needed != ""):
+            # Done as far as it can go, waiting on the owner (item 2070; such an end carries ``goal_blocked`` too), or
+            # failed having said what it needs from them (item 1061): "waiting for you", not "done", "failed" nor
+            # "blocked", as the web and the phone show it.
+            return task_notice(WAITING_TITLE, run.id, "waiting")
         if event.data.get("goal_blocked") is True or status == "blocked":
             return task_notice("A task is blocked", run.id, "waiting")
-        if event.data.get("waiting") is True or (status == "failed" and needed != ""):
-            # Done as far as it can go, waiting on the owner (item 2070), or failed having said what it needs from them
-            # (item 1061): "waiting for you", not "done" nor "failed", as the web and the phone show it.
-            return task_notice(WAITING_TITLE, run.id, "waiting")
         if status == "done":
             return task_notice(_FINISHED_TITLE["done"], run.id, "done")
         if status == "failed":

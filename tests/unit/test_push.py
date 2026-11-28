@@ -428,6 +428,7 @@ def test_the_end_of_a_run_that_waits_on_the_owner_says_it_waits_not_done() -> No
             "result": "Four forms are filled.",
             "needs": "Press Submit in the four tabs.",
             "waiting": True,
+            "goal_blocked": True,
         },
     )
     assert push_message(waiting, _run(None)) == task_notice(WAITING_TITLE, "run-1", "waiting")
