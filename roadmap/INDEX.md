@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2117](2117.md) | done | 2026-11-28 | The phone's string check names a catalog key missing from the Turkish table |
 | [2101](2101.md) | done | 2026-11-28 | Main's macOS gate: the phone tests count the WebDriverAgent tool alone, the full surface leaves out the Dot Next tools |
 | [2095](2095.md) | done | 2026-11-28 | Desktop shell: opens at login, keeps its window's place, speaks the web UI's language, looks for updates daily |
 | [2091](2091.md) | done | 2026-11-28 | Evals from real runs graded on trajectory, skill ablation, cost per call |

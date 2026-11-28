@@ -699,6 +699,17 @@
         }
       }
     },
+    "%lld of %lld done": {
+      "comment": "Plan sheet head; the arguments are the steps done and all steps",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld tamamlandı"
+          }
+        }
+      }
+    },
     "%lld of %lld on": {
       "comment": "Activity: how many watchers are switched on, of all",
       "localizations": {
@@ -5726,6 +5737,17 @@
         }
       }
     },
+    "Failed at step %lld": {
+      "comment": "Plan sheet: the run failed at a step; the argument is its number",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. adımda başarısız oldu"
+          }
+        }
+      }
+    },
     "Failed with code %lld.": {
       "comment": "Diagnosis: an unclassified failure; the argument is the code",
       "localizations": {
@@ -5997,6 +6019,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bitenler"
+          }
+        }
+      }
+    },
+    "Finishing": {
+      "comment": "Plan sheet: every step is done and the run is ending",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitiriliyor"
           }
         }
       }
@@ -13491,6 +13524,17 @@
         }
       }
     },
+    "Stopped at step %lld": {
+      "comment": "Plan sheet: the run was stopped at a step; the argument is its number",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. adımda durduruldu"
+          }
+        }
+      }
+    },
     "Stopped every task": {
       "comment": "Toast: the message was a stop and stopped every task of the chat",
       "localizations": {
@@ -14643,6 +14687,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışma başarısız oldu"
+          }
+        }
+      }
+    },
+    "The run is done": {
+      "comment": "Plan sheet: the run ended done",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışma tamamlandı"
           }
         }
       }
@@ -16755,6 +16810,17 @@
         }
       }
     },
+    "Working on step %lld": {
+      "comment": "Plan sheet: the step the run works on; the argument is its number",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. adım üzerinde çalışıyor"
+          }
+        }
+      }
+    },
     "Working on the Mac": {
       "comment": "Work line: a step on the Mac's screen",
       "localizations": {
@@ -17948,6 +18014,17 @@
         }
       }
     },
+    "stopped": {
+      "comment": "VoiceOver: a plan step where the run was stopped",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "durduruldu"
+          }
+        }
+      }
+    },
     "takes %@": {
       "comment": "Manager review: the routines a new bot of a split takes over",
       "localizations": {
@@ -18254,83 +18331,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan bir göreve 👎 ona ulaşır, ✋ sen yazana kadar bekletir, 📌 bir not tutar. Hangi tepkinin ne yaptığı Mac'te ayarlanır."
-          }
-        }
-      }
-    },
-    "%lld of %lld done": {
-      "comment": "Plan sheet head; the arguments are the steps done and all steps",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld / %lld tamamlandı"
-          }
-        }
-      }
-    },
-    "Failed at step %lld": {
-      "comment": "Plan sheet: the run failed at a step; the argument is its number",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld. adımda başarısız oldu"
-          }
-        }
-      }
-    },
-    "Finishing": {
-      "comment": "Plan sheet: every step is done and the run is ending",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bitiriliyor"
-          }
-        }
-      }
-    },
-    "Stopped at step %lld": {
-      "comment": "Plan sheet: the run was stopped at a step; the argument is its number",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld. adımda durduruldu"
-          }
-        }
-      }
-    },
-    "The run is done": {
-      "comment": "Plan sheet: the run ended done",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Çalışma tamamlandı"
-          }
-        }
-      }
-    },
-    "Working on step %lld": {
-      "comment": "Plan sheet: the step the run works on; the argument is its number",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld. adım üzerinde çalışıyor"
-          }
-        }
-      }
-    },
-    "stopped": {
-      "comment": "VoiceOver: a plan step where the run was stopped",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "durduruldu"
           }
         }
       }
