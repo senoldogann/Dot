@@ -5958,6 +5958,12 @@ class Store:
         return record
 
     @_writing
+    async def set_draft_mailbox(self, draft_id: str, mailbox: DraftMailbox) -> None:
+        """Keep the draft's place in a mailbox as Dot last wrote it there (item 2047)."""
+        await self._db.execute("UPDATE drafts SET mailbox = ? WHERE id = ?", (mailbox.model_dump_json(), draft_id))
+        await self._db.commit()
+
+    @_writing
     async def settle_draft(self, draft_id: str, error: str | None) -> DraftRecord:
         """End the send of a draft: ``sent``, or ``failed`` with the application's ``error``."""
         await self._db.execute(

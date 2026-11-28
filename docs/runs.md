@@ -1120,28 +1120,31 @@ on Graph's own address, as they carry the account's token. They only read: nothi
 research runs have them too, and the policy sees a read through the network (`network`, `low`).
 
 An email for you to send from one of these accounts is a `mail_draft` (item 2047): a draft in that account's own Drafts
-(Gmail's drafts API, Graph's messages), a reply in the thread of a message `mail_search` found (`reply_to`, its id: Gmail
-gets the thread and the `In-Reply-To` and `References` headers, Graph's `createReply` makes it) or a new mail. Its card
-is the one of [Drafts](#drafts), with the account it goes from and **Open in Gmail** or **Open in Outlook**, the
+(Gmail's drafts API, Graph's messages), a reply in the thread of a message `mail_search` found (`reply_to`, its id:
+Gmail gets the thread and the `In-Reply-To` and `References` headers, Graph's `createReply` makes it) or a new mail. Its
+card is the one of [Drafts](#drafts), with the account it goes from and **Open in Gmail** or **Open in Outlook**, the
 draft's own address there, so you can change it and send it in the mailbox too. **Send email** on the card writes the
-card's words into that draft and sends it through the account (Gmail's `drafts.send`, Graph's `send`), so send from
-one place: an edit made in the mailbox is replaced by the card's words when you press Send on the card. **Discard**
-deletes it from the mailbox; one already gone from it (sent or deleted there) is dropped all the same, and so is one
-the mailbox could not be asked to delete (the account signed out, the provider refused), whose card then says it stays
-in that account's Drafts. As with
+card's words into that draft and sends it through the account (Gmail's `drafts.send`, Graph's `send`). Send from one
+place: Dot keeps the draft's version as it last wrote it (Gmail's message id, which every save changes; Graph's
+`changeKey`) and reads it again first, so a draft you changed in Gmail or Outlook after the card was shown is not
+written over: the card says "Not sent: it was changed in Gmail after this card was shown…", and a run asked to write it
+again is refused the same way. **Discard** deletes it from the mailbox; one already gone from it (sent or deleted there)
+is dropped all the same, and so is one the mailbox could not be asked to delete (the account signed out, the provider
+refused), whose card then says it stays in that account's Drafts, or may stay after a 5xx or a lost answer. As with
 `draft_message`, nothing goes out before your press, whatever the run's approvals, a `yolo` run's too: the policy sees a
 draft (`notes_write`, `safe`) and a key in it is refused. A run writes again a draft of its chat that still waits by
 calling `mail_draft` with `draft`, its id; it is read again under the draft's lock, which Send and Discard hold too, so
-a draft you sent or discarded meanwhile is a conflict before anything is written to the mailbox, and the run's words
-do not go out in place of the card's. The lock holds within the daemon's process (its runs and its routes); a run of
-`dotx chat` or `dotx resume` runs in its own process, where the check of the draft's status before the write is all
-there is. Only tasks and chats have the tool, in the `accounts` group (a research run's
-prompt does not name it). A write to the mailbox is made again only after a 429, the provider's word that it did not
-take it: after a 5xx or a lost connection it may have, and a second call could make the draft twice or send it twice,
-so the card says "Not sent" with "whether it took the call is not known" and you look in the Sent folder first. An account signed in before item 2047
-was asked only to read: its drafts are refused (403) with what to do, sign in to it again in Settings › Connectors ›
-Accounts. The tests run against a stand-in of both APIs (`tests/smoke/test_mail_drafts.py`). Another address's email is
-still a `draft_message`.
+a draft you sent or discarded meanwhile is a conflict before anything is written to the mailbox, and the run's words do
+not go out in place of the card's. The lock holds within the daemon's process (its runs and its routes); a run of `dotx
+chat` or `dotx resume` runs in its own process, where the check of the draft's status before the write is all there is.
+Only tasks and chats have the tool, in the `accounts` group (a research run's prompt does not name it). A write to the
+mailbox is made again only after a 429, the provider's word that it did not take it: after a 5xx or a lost connection it
+may have, and a second call could make the draft twice or send it twice, so the card says "Not sent" with "whether it
+took the call is not known" and you look in the Sent folder first. A sign-in reads only: a draft is made only in an
+account you allowed drafts and sending (Settings › Connectors › Accounts, on the Mac,
+[Accounts](extending.md#accounts-googles-and-microsofts-own-sign-in)); another is refused before anything is asked of
+the mailbox, with that advice. The tests run against a stand-in of both APIs (`tests/smoke/test_mail_drafts.py`).
+Another address's email is still a `draft_message`.
 
 What they return is written by others, since anyone can send you a mail or an invitation: it comes inside an
 `<account_content …>` fence and marks the run untrusted, as a web page does ([Safety](safety.md)). A token the

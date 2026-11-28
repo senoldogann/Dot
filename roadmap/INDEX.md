@@ -24,7 +24,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2055](2055.md) | done | 2026-11-28 | Read rules and add a rule that asks or hands a step back from Dot Next |
 | [2050](2050.md) | done | 2026-11-28 | The old iPhone app's dictation loses no word on a pause either |
 | [2048](2048.md) | done | 2026-11-28 | A pause in a dictation loses no word, on the phone and the web |
-| [2047](2047.md) | done | 2026-11-27 | Drafts in the owner's own Gmail and Outlook |
+| [2047](2047.md) | done | 2026-11-28 | Drafts in the owner's own Gmail and Outlook |
 | [2046](2046.md) | done | 2026-11-27 | A coding helper hands its pull request checks to the chat's background watcher |
 | [2045](2045.md) | done | 2026-11-27 | Measure the character line against the injection evals |
 | [2044](2044.md) | done | 2026-11-27 | Keep the Mac awake for an upcoming routine or watcher |

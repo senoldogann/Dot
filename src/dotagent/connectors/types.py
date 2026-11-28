@@ -89,8 +89,10 @@ class OutgoingMail(FrozenModel):
 
 
 class MailboxDraft(FrozenModel):
-    """A draft in the owner's mailbox: the provider's id of it, and the address that opens it in the provider's own
-    web app, where the owner may change and send it too."""
+    """A draft in the owner's mailbox: the provider's id of it, its version (Gmail's message id, which every save of a
+    draft changes; Graph's ``changeKey``), and the address that opens it in the provider's own web app, where the owner
+    may change and send it too."""
 
     remote_id: str
+    version: str
     link: str

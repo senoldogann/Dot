@@ -1,5 +1,6 @@
 """Routes of the official sign-ins of Google and Microsoft (item 422): the providers, whether the owner's client is
-set and the accounts signed in; a sign-in started for a browser on this Mac; an account signed out. The browser comes
+set and the accounts signed in; a sign-in started for a browser on this Mac, and the one that allows an account drafts
+and sending (item 2047); an account signed out. The browser comes
 back to ``/oauth/callback`` (:mod:`dotagent.server.routes_mcp`), which hands it to the accounts first. No token, code
 or address is logged."""
 
@@ -60,6 +61,19 @@ def accounts_router(ctx: ServerContext) -> APIRouter:
                 {"provider": provider},
             )
         return SignInLink(link=await ctx.runtime.accounts.start(provider, ctx.port, time.time()))
+
+    @router.post("/accounts/{provider}/{address}/drafts")
+    async def allow_drafts(provider: ProviderId, address: str, request: Request) -> SignInLink:
+        """The address of the provider's page that asks the account ``address`` to allow drafts and sending (item
+        2047), for a browser on this Mac as a sign-in: the account is signed in again with them, and keeps them until
+        it is signed in again without."""
+        if not on_this_mac(request):
+            raise SignInError(
+                "allow drafts on the Mac itself: the sign-in comes back to the Mac's own address, which a phone does "
+                "not reach",
+                {"provider": provider},
+            )
+        return SignInLink(link=await ctx.runtime.accounts.start_drafts(provider, address, ctx.port, time.time()))
 
     @router.delete("/accounts/{provider}/{address}")
     async def sign_out(provider: ProviderId, address: str) -> SignedOutView:

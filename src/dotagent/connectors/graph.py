@@ -288,6 +288,8 @@ async def outlook_events(api: AccountApi, start: dt.datetime, end: dt.datetime, 
 
 class _Drafted(ProviderAnswer):
     id: str
+    # Graph's version of an item, which every change of it moves.
+    changeKey: str
     webLink: str = ""
 
 
@@ -308,7 +310,8 @@ def outlook_draft_body(mail: OutgoingMail) -> JsonObject:
 def outlook_draft_of(answer: object, url: str) -> MailboxDraft:
     drafted: _Drafted = read_answer(_Drafted, answer, MAIL_NAME, url)
     # The address goes to the owner's screens as a link: only an https one.
-    return MailboxDraft(remote_id=drafted.id, link=drafted.webLink if drafted.webLink.startswith("https://") else "")
+    link: str = drafted.webLink if drafted.webLink.startswith("https://") else ""
+    return MailboxDraft(remote_id=drafted.id, version=drafted.changeKey, link=link)
 
 
 def _message_url(message_id: str) -> str:
@@ -329,6 +332,13 @@ async def create_outlook_draft(api: AccountApi, mail: OutgoingMail, reply_to: st
 async def update_outlook_draft(api: AccountApi, remote_id: str, mail: OutgoingMail) -> MailboxDraft:
     url: str = _message_url(remote_id)
     return outlook_draft_of(await api.write(MAIL_NAME, "PATCH", url, outlook_draft_body(mail)), url)
+
+
+async def outlook_draft_version(api: AccountApi, remote_id: str) -> str:
+    """The draft's ``changeKey`` as Graph holds it now: every change of it, in Outlook too, moves it."""
+    url: str = _message_url(remote_id)
+    answer: object = await api.get(MAIL_NAME, url, [("$select", "id,changeKey")], {})
+    return read_answer(_Drafted, answer, MAIL_NAME, url).changeKey
 
 
 async def send_outlook_draft(api: AccountApi, remote_id: str) -> None:

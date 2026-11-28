@@ -346,7 +346,7 @@ def gmail_draft_of(answer: object, url: str, address: str) -> MailboxDraft:
     """The draft Gmail's answer to ``url`` names, and the address that opens it in Gmail for ``address``."""
     draft: _Draft = read_answer(_Draft, answer, GMAIL_NAME, url)
     link: str = f"https://mail.google.com/mail/u/{quote(address, safe='@')}/#drafts?compose={quote(draft.message.id)}"
-    return MailboxDraft(remote_id=draft.id, link=link)
+    return MailboxDraft(remote_id=draft.id, version=draft.message.id, link=link)
 
 
 async def gmail_reply(api: AccountApi, message_id: str) -> GmailReply:
@@ -373,6 +373,12 @@ async def update_gmail_draft(api: AccountApi, remote_id: str, mail: OutgoingMail
     url: str = f"{GMAIL}/drafts/{quote(remote_id, safe='')}"
     answer: object | None = await api.write(GMAIL_NAME, "PUT", url, gmail_draft_body(mail, reply))
     return gmail_draft_of(answer, url, api.address)
+
+
+async def gmail_draft_version(api: AccountApi, remote_id: str) -> str:
+    """The draft's version as Gmail holds it now: the id of its message, which every save in Gmail changes."""
+    url: str = f"{GMAIL}/drafts/{quote(remote_id, safe='')}"
+    return read_answer(_Draft, await api.get(GMAIL_NAME, url, [("format", "minimal")], {}), GMAIL_NAME, url).message.id
 
 
 async def send_gmail_draft(api: AccountApi, remote_id: str) -> None:

@@ -678,7 +678,7 @@
     },
     "DraftMailbox": {
       "additionalProperties": false,
-      "description": "Where an email draft also is in the owner's own mailbox (item 2047): the account signed in (``provider``,\n``account``), the provider's id of the draft, the message it answers (None for a new mail), and the address that\nopens it in Gmail or Outlook on the web. Its Send goes through that account; without one, through Mail.",
+      "description": "Where an email draft also is in the owner's own mailbox (item 2047): the account signed in (``provider``,\n``account``), the provider's id of the draft and its version, the message it answers (None for a new mail), and\nthe address that opens it in Gmail or Outlook on the web. Its Send goes through that account; without one, through\nMail.",
       "properties": {
         "account": {
           "title": "Account",
@@ -710,12 +710,17 @@
             }
           ],
           "title": "Reply To"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
         }
       },
       "required": [
         "provider",
         "account",
         "remote_id",
+        "version",
         "reply_to",
         "link"
       ],

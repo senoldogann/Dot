@@ -1,6 +1,7 @@
 // The official sign-ins of Google and Microsoft (item 422), at the head of Settings › Connectors: whether the client
 // the owner registered is set, the accounts signed in, each with Sign out, and Sign in, which opens the provider's page
-// in a new tab and follows the sign-in until the account is there.
+// in a new tab and follows the sign-in until the account is there. A sign-in reads only; Allow drafts and sending beside
+// an account signs it in again with the scopes that write its drafts and send them (item 2047).
 
 import { api } from "./api.js";
 import { el } from "./dom.js";
@@ -35,6 +36,27 @@ export function accountsCard() {
     return el("span", { class: "account-mark", "aria-hidden": "true" }, logo === undefined ? provider.name.slice(0, 1) : markContent({ logo, glyph: null }));
   }
 
+  /** Allow drafts and sending (item 2047): a sign-in of its own for the account, which asks the provider for the draft
+   * scopes; a sign-in otherwise reads only. */
+  function allowDrafts(provider, account) {
+    const allow = el("button", { class: "btn sm", type: "button", title: t("accounts.allowDraftsHint") }, t("accounts.allowDrafts"));
+    allow.addEventListener("click", () =>
+      attempt(async () => {
+        allow.disabled = true;
+        try {
+          const started = await api.post(`/accounts/${provider.id}/${encodeURIComponent(account.address)}/drafts`, null);
+          window.open(started.link, "_blank", "noopener,noreferrer");
+          toast("ok", t("accounts.sayYesOnNameS", { name: provider.name }));
+          until = Date.now() + FOLLOW_FOR_MS;
+          follow();
+        } finally {
+          allow.disabled = false;
+        }
+      }),
+    );
+    return allow;
+  }
+
   function row(provider) {
     const signIn = el(
       "button",
@@ -60,6 +82,7 @@ export function accountsCard() {
         "div",
         { class: "account-row" },
         el("span", { class: "grow" }, account.address),
+        account.drafts ? el("span", { class: "hint" }, t("accounts.draftsAllowed")) : allowDrafts(provider, account),
         el(
           "button",
           {

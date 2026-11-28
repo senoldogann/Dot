@@ -647,12 +647,16 @@ class ObjectiveRecord(FrozenModel):
 
 class DraftMailbox(FrozenModel):
     """Where an email draft also is in the owner's own mailbox (item 2047): the account signed in (``provider``,
-    ``account``), the provider's id of the draft, the message it answers (None for a new mail), and the address that
-    opens it in Gmail or Outlook on the web. Its Send goes through that account; without one, through Mail."""
+    ``account``), the provider's id of the draft and its version, the message it answers (None for a new mail), and
+    the address that opens it in Gmail or Outlook on the web. Its Send goes through that account; without one, through
+    Mail."""
 
     provider: Literal["google", "microsoft"]
     account: str
     remote_id: str
+    # The draft's version as Dot last wrote it (Gmail's message id, Graph's changeKey): one that moved since was
+    # changed in the mailbox, and Dot does not write over it.
+    version: str
     reply_to: str | None
     link: str
 

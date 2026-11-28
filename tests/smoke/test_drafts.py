@@ -335,9 +335,21 @@ async def test_a_draft_in_the_owners_gmail_names_its_account_and_opens_there(log
             assert (await _ended(runtime, run.id)).status == "done"
             link: str = "https://mail.google.com/mail/u/ada@gmail.com/#drafts?compose=17a"
             for mailbox in (
-                DraftMailbox(provider="google", account="ada@gmail.com", remote_id="r-7", reply_to="m-1", link=link),
                 DraftMailbox(
-                    provider="microsoft", account="ada@outlook.com", remote_id="D1", reply_to=None, link="javascript:x"
+                    provider="google",
+                    account="ada@gmail.com",
+                    remote_id="r-7",
+                    version="17a",
+                    reply_to="m-1",
+                    link=link,
+                ),
+                DraftMailbox(
+                    provider="microsoft",
+                    account="ada@outlook.com",
+                    remote_id="D1",
+                    version="ck1",
+                    reply_to=None,
+                    link="javascript:x",
                 ),
             ):
                 draft: DraftRecord = await runtime.store.add_draft(

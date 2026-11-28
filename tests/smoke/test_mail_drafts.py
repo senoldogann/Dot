@@ -21,8 +21,9 @@ import pytest
 import pytest_asyncio
 
 from dotagent.connectors.types import OutgoingMail
-from dotagent.core.errors import AccountApiError, RunConflict
+from dotagent.core.errors import AccountApiError, RunConflict, SignInError
 from dotagent.core.types import JsonObject
+from dotagent.drafts import service
 from dotagent.drafts.service import (
     DRAFT_CREATED_EVENT,
     DraftWords,
@@ -65,18 +66,31 @@ class _MemoryKeychain:
 
 
 class _Mailboxes:
-    """Gmail's and Graph's drafts as far as the tool and the card need them; each call is recorded."""
+    """Gmail's and Graph's drafts as far as the tool and the card need them; each write is recorded. A sign-in whose
+    code is ``drafts-code`` (the one that allows drafts) is granted the draft scopes, any other reads only."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, JsonObject | None]] = []
-        # The status Graph answers a draft's creation with: 403 for a sign-in made before item 2047.
+        # The status Graph answers a draft's creation with: 403 for a grant without the draft scopes.
         self.graph_create_status: int = 201
-        # The status Gmail answers a draft's send with: a 503 may come after it took the call.
+        # The status Gmail answers a draft's send with, and Graph a delete: a 503 may come after it took the call.
         self.gmail_send_status: int = 200
+        self.graph_delete_status: int = 204
+        # The drafts' versions as the mailboxes hold them: Gmail's message id, Graph's changeKey.
+        self.gmail_version: str = ""
+        self.graph_version: str = ""
 
-    def _token(self, request: httpx.Request, mark: str) -> httpx.Response:
+    def _token(self, request: httpx.Request, mark: str, draft_scopes: tuple[str, ...]) -> httpx.Response:
+        form: dict[str, list[str]] = parse_qs(request.content.decode())
+        scopes: tuple[str, ...] = ("openid", "email", *(draft_scopes if form["code"] == ["drafts-code"] else ()))
         return httpx.Response(
-            200, json={"access_token": f"at-{mark}", "refresh_token": f"rt-{mark}", "expires_in": 3600}
+            200,
+            json={
+                "access_token": f"at-{mark}",
+                "refresh_token": f"rt-{mark}",
+                "expires_in": 3600,
+                "scope": " ".join(scopes),
+            },
         )
 
     def _record(self, request: httpx.Request) -> JsonObject | None:
@@ -97,11 +111,16 @@ class _Mailboxes:
                     "payload": {"headers": [{"name": "Message-Id", "value": _ORIGINAL_ID}]},
                 },
             )
+        if request.method == "GET" and path == f"{_GMAIL}/drafts/r-7":
+            assert request.url.params["format"] == "minimal"
+            return httpx.Response(200, json={"id": "r-7", "message": {"id": self.gmail_version, "threadId": "t-1"}})
         self._record(request)
         if request.method == "POST" and path == f"{_GMAIL}/drafts":
+            self.gmail_version = "17a"
             return httpx.Response(200, json={"id": "r-7", "message": {"id": "17a", "threadId": "t-1"}})
         if request.method == "PUT" and path == f"{_GMAIL}/drafts/r-7":
-            return httpx.Response(200, json={"id": "r-7", "message": {"id": "17b", "threadId": "t-1"}})
+            self.gmail_version = f"{self.gmail_version[:-1]}{chr(ord(self.gmail_version[-1]) + 1)}"
+            return httpx.Response(200, json={"id": "r-7", "message": {"id": self.gmail_version, "threadId": "t-1"}})
         if request.method == "POST" and path == f"{_GMAIL}/drafts/send":
             if self.gmail_send_status == 503:
                 return httpx.Response(503, json={"error": {"code": 503, "message": "Backend Error"}})
@@ -110,24 +129,34 @@ class _Mailboxes:
 
     def _graph(self, request: httpx.Request) -> httpx.Response:
         assert request.headers["authorization"] == "Bearer at-m"
-        self._record(request)
         raw: bytes = request.url.raw_path.split(b"?")[0]
+        if request.method == "GET" and raw == b"/v1.0/me/messages/D%2F1":
+            return httpx.Response(200, json={"id": "D/1", "changeKey": self.graph_version})
+        self._record(request)
         if request.method == "POST" and raw == b"/v1.0/me/messages/AAMk%2F1%3D/createReply":
             if self.graph_create_status == 403:
                 return httpx.Response(
                     403, json={"error": {"code": "ErrorAccessDenied", "message": "Access is denied."}}
                 )
-            return httpx.Response(201, json={"id": "D/1", "webLink": "https://outlook.live.com/owa/?ItemID=D1"})
+            self.graph_version = "ck1"
+            return httpx.Response(
+                201, json={"id": "D/1", "changeKey": "ck1", "webLink": "https://outlook.live.com/owa/?ItemID=D1"}
+            )
         if request.method == "DELETE" and raw == b"/v1.0/me/messages/D%2F1":
+            if self.graph_delete_status == 503:
+                return httpx.Response(503, json={"error": {"code": "ServiceUnavailable", "message": "Try later."}})
             return httpx.Response(204)
         raise AssertionError(f"a Graph call the stand-in does not take: {request.method} {request.url}")
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         url: str = str(request.url)
         if url == GOOGLE.token_url:
-            return self._token(request, "g")
+            return self._token(request, "g", GOOGLE.draft_scopes)
         if url == MICROSOFT.token_url:
-            return self._token(request, "m")
+            # Microsoft names Graph's scopes by their whole address.
+            return self._token(
+                request, "m", tuple(f"https://graph.microsoft.com/{scope}" for scope in MICROSOFT.draft_scopes)
+            )
         if url == GOOGLE.profile_url:
             return httpx.Response(200, json={"email": "ada@gmail.com"})
         if url == MICROSOFT.profile_url:
@@ -155,16 +184,30 @@ def clients(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DOT_MS_CLIENT_ID", "client-ms")
 
 
-async def _accounts(store: Store, mailboxes: _Mailboxes) -> Accounts:
-    """One account of each provider, signed in through the sign-in itself."""
+async def _came_back(accounts: Accounts, link: str, code: str) -> None:
+    came: CameBack | None = await accounts.come_back(
+        parse_qs(urlsplit(link).query)["state"][0], code, None, None, time.time()
+    )
+    assert came is not None and came.kind == "signed_in", came
+
+
+async def _signed_in(store: Store, mailboxes: _Mailboxes) -> Accounts:
+    """One account of each provider, signed in through the sign-in itself, which reads only."""
     accounts: Accounts = Accounts(store, cast(Keychain, _MemoryKeychain()), httpx.MockTransport(mailboxes))
     provider: ProviderId
     for provider in ("google", "microsoft"):
-        link: str = await accounts.start(provider, 8765, time.time())
-        came: CameBack | None = await accounts.come_back(
-            parse_qs(urlsplit(link).query)["state"][0], "the-code", None, None, time.time()
-        )
-        assert came is not None and came.kind == "signed_in", came
+        await _came_back(accounts, await accounts.start(provider, 8765, time.time()), "the-code")
+    return accounts
+
+
+async def _drafts_allowed(store: Store, mailboxes: _Mailboxes) -> Accounts:
+    """The accounts of :func:`_signed_in`, each then allowed drafts and sending through its own sign-in."""
+    accounts: Accounts = await _signed_in(store, mailboxes)
+    pairs: tuple[tuple[ProviderId, str], ...] = (("google", "ada@gmail.com"), ("microsoft", "ada@outlook.com"))
+    for provider, address in pairs:
+        link: str = await accounts.start_drafts(provider, address, 8765, time.time())
+        assert parse_qs(urlsplit(link).query)["login_hint"] == [address]
+        await _came_back(accounts, link, "drafts-code")
     return accounts
 
 
@@ -224,7 +267,7 @@ async def test_a_gmail_reply_draft_is_in_its_thread_rewritten_and_sent_only_by_t
 ) -> None:
     assert group_of(MAIL_DRAFT_TOOL) == ACCOUNTS_GROUP
     mailboxes: _Mailboxes = _Mailboxes()
-    accounts: Accounts = await _accounts(store, mailboxes)
+    accounts: Accounts = await _drafts_allowed(store, mailboxes)
     run: RunRecord = await _chat_run(store)
     made: ToolResult = await _call(
         store,
@@ -289,12 +332,14 @@ async def test_a_gmail_reply_draft_is_in_its_thread_rewritten_and_sent_only_by_t
     assert (final["Cc"], final["In-Reply-To"]) == ("cy@example.com", _ORIGINAL_ID)
     assert mailboxes.calls[1][2] == {"id": "r-7"}
 
+    assert draft.id not in service._MAILBOX_LOCKS, "a sent draft keeps no lock"
 
-async def test_an_outlook_draft_is_deleted_by_the_owners_discard_and_an_old_sign_in_is_told_to_consent(
+
+async def test_a_sign_in_reads_only_until_the_owner_allows_drafts_and_an_outlook_draft_is_discarded(
     store: Store, clients: None
 ) -> None:
     mailboxes: _Mailboxes = _Mailboxes()
-    accounts: Accounts = await _accounts(store, mailboxes)
+    accounts: Accounts = await _signed_in(store, mailboxes)
     run: RunRecord = await _chat_run(store)
     arguments: JsonObject = {
         "account": "ada@outlook.com",
@@ -303,6 +348,16 @@ async def test_an_outlook_draft_is_deleted_by_the_owners_discard_and_an_old_sign
         "body": "Will pay Monday.",
         "reply_to": "AAMk/1=",
     }
+    # A sign-in reads only: nothing is asked of the mailbox, and the run reads how the owner allows drafts.
+    with pytest.raises(SignInError, match="presses Allow drafts and sending beside it"):
+        await _call(store, accounts, run, arguments)
+    assert mailboxes.calls == []
+    views = {view.id: view for view in await accounts.providers()}
+    assert [account.drafts for account in views["microsoft"].accounts] == [False]
+
+    accounts = await _drafts_allowed(store, mailboxes)
+    views = {view.id: view for view in await accounts.providers()}
+    assert [account.drafts for account in views["microsoft"].accounts] == [True]
     made: ToolResult = await _call(store, accounts, run, arguments)
     assert "Drafts of Outlook of ada@outlook.com" in made.text
     method, _, body = mailboxes.calls[0]
@@ -316,21 +371,41 @@ async def test_an_outlook_draft_is_deleted_by_the_owners_discard_and_an_old_sign
     }
     [draft] = await store.thread_drafts(run.thread_id)
     assert draft.mailbox is not None and draft.mailbox.link == "https://outlook.live.com/owa/?ItemID=D1"
+
+    # The owner changed it in Outlook after the card was shown: Send here does not write over it, and says so.
+    mailboxes.graph_version = "ck-owner"
+    mailboxes.calls.clear()
+    words: DraftWords = DraftWords(to=draft.to, cc=(), subject=draft.subject, body=draft.body)
+    refused: DraftRecord = await send_draft(store, EventBus(store), accounts, 30.0, draft.id, words)
+    assert refused.status == "failed" and refused.error is not None
+    assert refused.error.startswith("it was changed in Outlook after this card was shown"), refused.error
+    assert mailboxes.calls == [], "nothing was written to or sent from the mailbox"
+    # A run does not write over it either.
+    with pytest.raises(RunConflict, match="the owner changed this draft in Outlook"):
+        await rewrite_mailbox_draft(
+            store, EventBus(store), accounts, draft.id, OutgoingMail(to=draft.to, cc=(), subject="x", body="y")
+        )
+
+    # A delete answered 503 may have gone through: the card is dropped and says the draft may stay.
+    mailboxes.graph_delete_status = 503
     discarded: DraftRecord = await discard_draft(store, EventBus(store), accounts, draft.id)
     assert discarded.status == "discarded" and mailboxes.calls[-1][:2] == ("DELETE", "/v1.0/me/messages/D%2F1")
+    assert discarded.error is not None and discarded.error.startswith(
+        "The draft may stay in the Drafts of ada@outlook.com"
+    )
+    assert draft.id not in service._MAILBOX_LOCKS
 
-    # A sign-in made before Dot asked to write drafts: Graph refuses, and the run reads how the owner gives it.
+    # A grant that lacks the draft scopes all the same (taken back at the provider): Graph refuses, the run is told.
     mailboxes.graph_create_status = 403
-    with pytest.raises(AccountApiError, match=r"sign in to it again in Settings › Connectors › Accounts"):
+    with pytest.raises(AccountApiError, match="presses Allow drafts and sending beside it"):
         await _call(store, accounts, run, arguments)
-    assert await store.thread_drafts(run.thread_id) == []
 
 
 async def test_a_send_answered_5xx_is_not_known_a_sent_draft_is_not_written_again_and_a_signed_out_one_is_dropped(
     store: Store, clients: None
 ) -> None:
     mailboxes: _Mailboxes = _Mailboxes()
-    accounts: Accounts = await _accounts(store, mailboxes)
+    accounts: Accounts = await _drafts_allowed(store, mailboxes)
     run: RunRecord = await _chat_run(store)
     arguments: JsonObject = {"account": "ada@gmail.com", "to": ["bob@example.com"], "subject": "Hi", "body": "Hello."}
     await _call(store, accounts, run, arguments)
@@ -344,7 +419,7 @@ async def test_a_send_answered_5xx_is_not_known_a_sent_draft_is_not_written_agai
     assert "whether it took the call is not known" in failed.error, failed.error
     assert [call[1] for call in mailboxes.calls].count(f"{_GMAIL}/drafts/send") == 1
 
-    # Sent on a second press, it is no longer written again by a run: a conflict before any call to the mailbox.
+    # The card's own write moved the draft's version: Send again is not taken for the owner's change.
     mailboxes.gmail_send_status = 200
     assert (await send_draft(store, EventBus(store), accounts, 30.0, draft.id, words)).status == "sent"
     before: int = len(mailboxes.calls)
@@ -357,6 +432,8 @@ async def test_a_send_answered_5xx_is_not_known_a_sent_draft_is_not_written_agai
             OutgoingMail(to=("bob@example.com",), cc=(), subject="Hi", body="Other words."),
         )
     assert len(mailboxes.calls) == before
+    # The conflict on a sent draft made a lock and let it go.
+    assert draft.id not in service._MAILBOX_LOCKS
 
     # A draft whose account was signed out since: Discard drops the card and says the draft stays in that mailbox.
     gone: DraftRecord = await store.add_draft(
@@ -366,7 +443,7 @@ async def test_a_send_answered_5xx_is_not_known_a_sent_draft_is_not_written_agai
         [],
         "Hi",
         "Hello.",
-        DraftMailbox(provider="google", account="gone@gmail.com", remote_id="r-9", reply_to=None, link=""),
+        DraftMailbox(provider="google", account="gone@gmail.com", remote_id="r-9", version="1", reply_to=None, link=""),
     )
     dropped: DraftRecord = await discard_draft(store, EventBus(store), accounts, gone.id)
     assert dropped.status == "discarded" and dropped.error is not None

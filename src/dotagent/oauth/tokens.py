@@ -19,11 +19,20 @@ class Tokens(FrozenModel):
 
 
 class Account(FrozenModel):
-    """An account signed in: its provider, its address, and when it was signed in to."""
+    """An account signed in: its provider, its address, when it was signed in to, and whether its sign-in allowed
+    drafts and sending (item 2047; False for one kept before)."""
 
     provider: ProviderId
     address: str
     connected_at: float
+    drafts: bool = False
+
+
+def granted(wanted: tuple[str, ...], scope: str) -> bool:
+    """Whether a token's ``scope`` (the token endpoint's space-separated list) holds every one of ``wanted``; Microsoft
+    may name a Graph scope by its whole address (``https://graph.microsoft.com/Mail.Send``)."""
+    given: list[str] = scope.split()
+    return all(any(name == one or name.endswith(f"/{one}") for name in given) for one in wanted)
 
 
 class _Answer(BaseModel):

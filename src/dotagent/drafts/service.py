@@ -8,7 +8,8 @@ sends it through the account; its Discard deletes it from the mailbox. Without a
 
 import asyncio
 import re
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 
 from pydantic import Field
 
@@ -16,7 +17,15 @@ from dotagent.channels.handles import names_a_handle, paired_handles
 from dotagent.connectors import google, graph
 from dotagent.connectors.http import AccountApi
 from dotagent.connectors.types import MailboxDraft, OutgoingMail
-from dotagent.core.errors import AccountApiError, DesktopError, DotError, InvalidValueError, RunConflict, SignInError
+from dotagent.core.errors import (
+    AccountApiError,
+    DesktopError,
+    DotError,
+    InvalidValueError,
+    NotFoundError,
+    RunConflict,
+    SignInError,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.script import run_osascript
@@ -46,18 +55,29 @@ _PHONE: re.Pattern[str] = re.compile(r"\+?[0-9][0-9 ().\-]{4,30}")
 # lock holds within one process: the daemon's runs and its routes, so such a run's write cannot land between Send's
 # write of the card's words and the send itself. A run of `dotx chat` or `dotx resume`, which runs in the command's own
 # process, is not held by it: there the store's check of the draft's status, made before the write, is all there is.
-# A draft's lock is dropped once it is sent or discarded, after which every write of it is a conflict.
+# A draft's lock is dropped once it is sent, discarded or gone, after which every write of it is a conflict.
 _MAILBOX_LOCKS: dict[str, asyncio.Lock] = {}
 _DECIDED: frozenset[str] = frozenset({"sent", "discarded"})
 
 
-def _mailbox_lock(draft_id: str) -> asyncio.Lock:
-    return _MAILBOX_LOCKS.setdefault(draft_id, asyncio.Lock())
+_PROVIDER_NAMES: dict[str, str] = {"google": "Gmail", "microsoft": "Outlook"}
 
 
-def _release_decided(draft: DraftRecord) -> None:
-    if draft.status in _DECIDED:
-        _MAILBOX_LOCKS.pop(draft.id, None)
+@asynccontextmanager
+async def _writing(store: Store, draft_id: str) -> AsyncIterator[None]:
+    """Hold the draft's lock; once it is let go, a draft that is decided (or gone) drops its lock, whatever the
+    holder did, a conflict too."""
+    lock: asyncio.Lock = _MAILBOX_LOCKS.setdefault(draft_id, asyncio.Lock())
+    try:
+        async with lock:
+            yield
+    finally:
+        try:
+            decided: bool = (await store.get_draft(draft_id)).status in _DECIDED
+        except NotFoundError:
+            decided = True
+        if decided and not lock.locked():
+            _MAILBOX_LOCKS.pop(draft_id, None)
 
 
 class DraftWords(FrozenModel):
@@ -172,16 +192,41 @@ def mailbox_problem(failure: DotError, account: str) -> str:
     """What the owner reads of a call to their mailbox that failed: the provider's words, and for a 403, which is a
     sign-in made before Dot asked to write drafts (item 2047), how to give it that."""
     if failure.context.get("status") == 403:
-        return (
-            f"{failure.message}. The sign-in of {account} does not let Dot write drafts: sign in to it again in "
-            "Settings › Connectors › Accounts and allow what the provider's page asks"
-        )
+        return f"{failure.message}. {drafts_advice(account)}"
     return failure.message
 
 
-async def _mailbox_api(accounts: Accounts, mailbox: DraftMailbox) -> AccountApi:
-    account: Account = await accounts.account_of(mailbox.account)
+def drafts_advice(account: str) -> str:
+    """How the owner lets Dot write drafts in ``account`` (item 2047)."""
+    return (
+        f"The sign-in of {account} does not let Dot write drafts: the owner presses Allow drafts and sending beside it "
+        "in Settings › Connectors › Accounts, on the Mac, and says yes on the provider's page"
+    )
+
+
+async def _drafting_api(accounts: Accounts, address: str) -> AccountApi:
+    """The calls of the account ``address``, whose sign-in must allow drafts (item 2047): a sign-in reads only."""
+    account: Account = await accounts.account_of(address)
+    if not account.drafts:
+        raise SignInError(drafts_advice(account.address), {"provider": account.provider})
     return AccountApi(accounts, account.provider, account.address)
+
+
+async def _changed_in_mailbox(api: AccountApi, mailbox: DraftMailbox) -> bool:
+    """Whether the draft was changed in the mailbox (in Gmail or Outlook, by the owner) since Dot last wrote it."""
+    if api.provider == "google":
+        now: str = await google.gmail_draft_version(api, mailbox.remote_id)
+    else:
+        now = await graph.outlook_draft_version(api, mailbox.remote_id)
+    return now != mailbox.version
+
+
+def changed_problem(mailbox: DraftMailbox) -> str:
+    name: str = _PROVIDER_NAMES[mailbox.provider]
+    return (
+        f"it was changed in {name} after this card was shown, and Send here would write over that change: send it "
+        f"from {name}, or discard this card"
+    )
 
 
 async def write_mailbox_draft(
@@ -198,13 +243,27 @@ async def write_mailbox_draft(
     return await graph.update_outlook_draft(api, remote_id, mail)
 
 
-async def _send_through_mailbox(accounts: Accounts, claimed: DraftRecord, mailbox: DraftMailbox) -> str | None:
-    """Write the card's words into the mailbox's draft, then send it through the account; why it failed, None when it
-    went. A send whose answer was lost may have gone: the words say so."""
+class MailboxSend(FrozenModel):
+    """What came of a Send through a mailbox: why it failed (None when it went), and the draft's place as it stands
+    after it, whose version moved when the card's words were written before a send that failed."""
+
+    error: str | None
+    mailbox: DraftMailbox
+
+
+async def _send_through_mailbox(accounts: Accounts, claimed: DraftRecord, mailbox: DraftMailbox) -> MailboxSend:
+    """Write the card's words into the mailbox's draft, then send it through the account. A draft changed in the
+    mailbox since Dot wrote it is not written over; a send whose answer was lost may have gone: the words say so."""
+    written: DraftMailbox = mailbox
     mail: OutgoingMail = OutgoingMail(to=claimed.to, cc=claimed.cc, subject=claimed.subject, body=claimed.body)
     try:
-        api: AccountApi = await _mailbox_api(accounts, mailbox)
-        await write_mailbox_draft(api, mail, mailbox.reply_to, mailbox.remote_id)
+        api: AccountApi = await _drafting_api(accounts, mailbox.account)
+        # The owner's edit in the mailbox is not written over by the card's words.
+        if await _changed_in_mailbox(api, mailbox):
+            log.warning("draft_not_sent", draft_id=claimed.id, channel=claimed.channel, provider=mailbox.provider)
+            return MailboxSend(error=changed_problem(mailbox), mailbox=mailbox)
+        made: MailboxDraft = await write_mailbox_draft(api, mail, mailbox.reply_to, mailbox.remote_id)
+        written = mailbox.model_copy(update={"version": made.version, "link": made.link})
         if api.provider == "google":
             await google.send_gmail_draft(api, mailbox.remote_id)
         else:
@@ -216,8 +275,8 @@ async def _send_through_mailbox(accounts: Accounts, claimed: DraftRecord, mailbo
         log.warning(
             "draft_not_sent", draft_id=claimed.id, channel=claimed.channel, provider=mailbox.provider, error=error
         )
-        return error
-    return None
+        return MailboxSend(error=error, mailbox=written)
+    return MailboxSend(error=None, mailbox=written)
 
 
 async def create_mailbox_draft(
@@ -232,14 +291,18 @@ async def create_mailbox_draft(
     """An email draft of ``run_id`` in the mailbox of the account ``address`` (item 2047), an answer to the message
     ``reply_to`` in its thread when it names one, and its card in the run's conversation; it waits for the owner. A
     sign-in that may not write drafts is refused with how to give it that."""
-    account: Account = await accounts.account_of(address)
-    api: AccountApi = AccountApi(accounts, account.provider, account.address)
+    api: AccountApi = await _drafting_api(accounts, address)
     try:
         made: MailboxDraft = await write_mailbox_draft(api, mail, reply_to, None)
     except AccountApiError as failure:
-        raise AccountApiError(mailbox_problem(failure, account.address), failure.context) from failure
+        raise AccountApiError(mailbox_problem(failure, api.address), failure.context) from failure
     mailbox: DraftMailbox = DraftMailbox(
-        provider=account.provider, account=account.address, remote_id=made.remote_id, reply_to=reply_to, link=made.link
+        provider=api.provider,
+        account=api.address,
+        remote_id=made.remote_id,
+        version=made.version,
+        reply_to=reply_to,
+        link=made.link,
     )
     record: DraftRecord = await store.add_draft(run_id, "mail", mail.to, mail.cc, mail.subject, mail.body, mailbox)
     await bus.emit(run_id, DRAFT_CREATED_EVENT, record.model_dump(mode="json"), True)
@@ -251,8 +314,9 @@ async def rewrite_mailbox_draft(
 ) -> DraftRecord:
     """The mailbox's draft ``draft_id``, which must still take an answer, with ``mail`` in place of its words, in the
     mailbox and on its card. It is read again under the draft's lock, so that a draft the owner sent or discarded
-    meanwhile is a conflict before anything is written to the mailbox."""
-    async with _mailbox_lock(draft_id):
+    meanwhile is a conflict before anything is written to the mailbox, and so is one the owner changed in the
+    mailbox since Dot wrote it."""
+    async with _writing(store, draft_id):
         draft: DraftRecord = await store.get_draft(draft_id)
         mailbox: DraftMailbox | None = draft.mailbox
         if mailbox is None:
@@ -261,13 +325,24 @@ async def rewrite_mailbox_draft(
             )
         if draft.status not in ("waiting", "failed"):
             raise RunConflict(f"the draft is {draft.status}, not waiting", {"draft_id": draft.id})
-        api: AccountApi = await _mailbox_api(accounts, mailbox)
+        api: AccountApi = await _drafting_api(accounts, mailbox.account)
         try:
+            if await _changed_in_mailbox(api, mailbox):
+                raise RunConflict(
+                    f"the owner changed this draft in {_PROVIDER_NAMES[mailbox.provider]} after it was written: do "
+                    "not write it again; tell them what you would change",
+                    {"draft_id": draft.id},
+                )
             made: MailboxDraft = await write_mailbox_draft(api, mail, mailbox.reply_to, mailbox.remote_id)
         except AccountApiError as failure:
             raise AccountApiError(mailbox_problem(failure, mailbox.account), failure.context) from failure
         rewritten: DraftRecord = await store.rewrite_draft(
-            draft.id, mail.to, mail.cc, mail.subject, mail.body, mailbox.model_copy(update={"link": made.link})
+            draft.id,
+            mail.to,
+            mail.cc,
+            mail.subject,
+            mail.body,
+            mailbox.model_copy(update={"link": made.link, "version": made.version}),
         )
     await bus.emit(rewritten.run_id, DRAFT_DECIDED_EVENT, rewritten.model_dump(mode="json"), True)
     return rewritten
@@ -291,15 +366,18 @@ async def send_draft(
         problems.append(paired_problem(paired))
     if problems:
         raise InvalidValueError(f"the draft cannot be sent: {'; '.join(problems)}", {"draft_id": draft_id})
-    async with _mailbox_lock(draft_id):
+    async with _writing(store, draft_id):
         claimed: DraftRecord = await store.claim_draft(draft_id, to, cc, words.subject.strip(), words.body)
-        error: str | None = (
-            await _send_through_mailbox(accounts, claimed, claimed.mailbox)
-            if claimed.mailbox is not None
-            else await _send_through_application(claimed, timeout_s)
-        )
+        error: str | None
+        if claimed.mailbox is None:
+            error = await _send_through_application(claimed, timeout_s)
+        else:
+            through: MailboxSend = await _send_through_mailbox(accounts, claimed, claimed.mailbox)
+            error = through.error
+            if through.mailbox != claimed.mailbox:
+                # The card's words were written: a later Send or rewrite compares the mailbox with them.
+                await store.set_draft_mailbox(draft_id, through.mailbox)
         settled: DraftRecord = await store.settle_draft(draft_id, error)
-    _release_decided(settled)
     if error is None:
         log.info("draft_sent", draft_id=draft_id, channel=settled.channel, recipients=len(to) + len(cc))
     await bus.emit(settled.run_id, DRAFT_DECIDED_EVENT, settled.model_dump(mode="json"), True)
@@ -310,13 +388,12 @@ async def discard_draft(store: Store, bus: EventBus, accounts: Accounts, draft_i
     """The owner's press of Discard: the draft is dropped and nothing goes out. One in the owner's mailbox is deleted
     from it first; one already gone from it (sent or deleted there) is dropped all the same, and so is one the mailbox
     could not be asked to delete (the account signed out, the provider's refusal): the card says it stays there."""
-    async with _mailbox_lock(draft_id):
+    async with _writing(store, draft_id):
         draft: DraftRecord = await store.get_draft(draft_id)
         left: str | None = None
         if draft.mailbox is not None and draft.status in ("waiting", "failed"):
             left = await _delete_from_mailbox(accounts, draft.mailbox)
         discarded: DraftRecord = await store.discard_draft(draft_id, left)
-    _release_decided(discarded)
     await bus.emit(discarded.run_id, DRAFT_DECIDED_EVENT, discarded.model_dump(mode="json"), True)
     return discarded
 
@@ -324,7 +401,7 @@ async def discard_draft(store: Store, bus: EventBus, accounts: Accounts, draft_i
 async def _delete_from_mailbox(accounts: Accounts, mailbox: DraftMailbox) -> str | None:
     """Delete the mailbox's draft; why it stays there, None when it is gone."""
     try:
-        api: AccountApi = await _mailbox_api(accounts, mailbox)
+        api: AccountApi = await _drafting_api(accounts, mailbox.account)
         if api.provider == "google":
             await google.delete_gmail_draft(api, mailbox.remote_id)
         else:
