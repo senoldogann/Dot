@@ -11,7 +11,7 @@ func dotToolWords(_ tool: String) -> String? {
     case "finish": String(localized: "Finish", comment: "Tool row of Dot's own tool: the run gives its answer")
     case "use_tools": String(localized: "Turn on more actions", comment: "Tool row of Dot's own tool: the run asks for more of its tools")
     case "work_orders": String(localized: "Work orders", comment: "Tool row of Dot's own tool: the agents' work orders")
-    case "delegate": String(localized: "Delegate", comment: "Tool row of Dot's own tool: a part handed to a helper")
+    case "delegate": String(localized: "Handed to a helper", comment: "Tool row of Dot's own tool: a part handed to a helper (never 'delegate')")
     case "message_agent": String(localized: "Message agent", comment: "Tool row of Dot's own tool: a message to another agent")
     case "consult": String(localized: "Ask a helper", comment: "Tool row of Dot's own tool: a question to a helper")
     case "create_agent": String(localized: "Make agent", comment: "Tool row of Dot's own tool: a new agent")

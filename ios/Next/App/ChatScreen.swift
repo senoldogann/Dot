@@ -815,7 +815,7 @@ struct ChatScreen: View {
         }
     }
 
-    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting on N helpers" only while
+    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting for N helpers" only while
     /// the main run has stopped and every open call of its step waits on a helper (`waitsOnHelpers`, the owner's report of
     /// 2026-11-27; N the helpers it still waits for); `nil` while it works itself, even with helpers at work beside it,
     /// which the capsule says as "Working" with the turn's clock and the helpers' own segment.
@@ -823,7 +823,7 @@ struct ChatScreen: View {
         guard capsuleStatus == .working, let run = activeRun, let chat, waitsOnHelpers(of: chat, run: run.id) else { return nil }
         let waited: Int = newestRunHelpers.filter { helperState($0.status).isLive && $0.blocking }.count
         guard waited > 0 else { return nil }
-        return String(localized: "Waiting on \(waited) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
+        return String(localized: "Waiting for \(waited) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
     }
 
     /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none. Zen filters the

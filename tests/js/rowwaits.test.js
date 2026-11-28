@@ -5,8 +5,8 @@ import test from "node:test";
 import { waitsOn } from "../../src/dotagent/server/static/js/rowwaits.js";
 
 test("a run at work that waits on its helpers says how many, live", () => {
-  assert.deepEqual(waitsOn({ latest_status: "running", helpers: 2, background: [] }), { words: "Waiting on 2 helpers…", live: true });
-  assert.deepEqual(waitsOn({ latest_status: "running", helpers: 1, background: [] }), { words: "Waiting on 1 helper…", live: true });
+  assert.deepEqual(waitsOn({ latest_status: "running", helpers: 2, background: [] }), { words: "Waiting for 2 helpers…", live: true });
+  assert.deepEqual(waitsOn({ latest_status: "running", helpers: 1, background: [] }), { words: "Waiting for 1 helper…", live: true });
 });
 
 test("a run at work that waits on none says nothing of its own, whatever works in the background", () => {

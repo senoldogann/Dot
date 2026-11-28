@@ -1170,6 +1170,28 @@
         }
       }
     },
+    "A helper failed: %@": {
+      "comment": "Tool row: work handed to a helper that failed; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir yardımcı başarısız oldu: %@"
+          }
+        }
+      }
+    },
+    "A helper finished: %@": {
+      "comment": "Tool row: work handed to a helper, ended; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir yardımcı bitirdi: %@"
+          }
+        }
+      }
+    },
     "A helper of another task": {
       "comment": "Activity: a run another run delegated",
       "localizations": {
@@ -3766,50 +3788,6 @@
         }
       }
     },
-    "Delegate": {
-      "comment": "Tool row of Dot's own tool: a part handed to a helper",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Görev devret"
-          }
-        }
-      }
-    },
-    "Delegated task “%@” failed": {
-      "comment": "Tool row: a task handed to a helper that failed; the argument is its goal",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” görevi devredildi, başarısız oldu"
-          }
-        }
-      }
-    },
-    "Delegated task “%@” finished": {
-      "comment": "Tool row: a task handed to a helper, ended; the argument is its goal",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” görevi devredildi ve bitti"
-          }
-        }
-      }
-    },
-    "Delegating “%@”": {
-      "comment": "Tool row: a task handed to a helper, at work; the argument is its goal",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” devrediliyor"
-          }
-        }
-      }
-    },
     "Delete": {
       "comment": "Confirmation button that deletes a chat\nSchedule menu: delete",
       "localizations": {
@@ -6260,13 +6238,24 @@
         }
       }
     },
-    "Handing a part to a subagent": {
-      "comment": "Work line: work handed to a helper",
+    "Handed to a helper": {
+      "comment": "Tool row of Dot's own tool: a part handed to a helper (never 'delegate')\nWork line: work handed to a helper (plain words: never 'subagent' or 'delegate')",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bir kısmı alt ajana veriyor"
+            "value": "Bir yardımcıya verildi"
+          }
+        }
+      }
+    },
+    "Handed to a helper: %@": {
+      "comment": "Tool row: work handed to a helper, at work; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir yardımcıya verildi: %@"
           }
         }
       }
@@ -6355,6 +6344,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bekletiliyor"
+          }
+        }
+      }
+    },
+    "Helper": {
+      "comment": "Background work kind: a helper agent\nBackground work kind: a helper let go to the background",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcı"
           }
         }
       }
@@ -12973,17 +12973,6 @@
         }
       }
     },
-    "Subagent": {
-      "comment": "Background work kind: a helper agent\nBackground work kind: a helper let go to the background",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alt ajan"
-          }
-        }
-      }
-    },
     "Subject": {
       "comment": "Draft card: the email's subject\nDraft: the subject of a mail",
       "localizations": {
@@ -15251,6 +15240,35 @@
         }
       }
     },
+    "Waiting for %lld helpers": {
+      "comment": "Capsule: the run waits for its helpers; the argument is how many still work\nChat row: the run waits for its helpers; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Waiting for %lld helper"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Waiting for %lld helpers"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yardımcı bekleniyor"
+          }
+        }
+      }
+    },
     "Waiting for Dot's check": {
       "comment": "Work order: the attempt ended and the lead has not judged it",
       "localizations": {
@@ -15324,35 +15342,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtını bekliyor"
-          }
-        }
-      }
-    },
-    "Waiting on %lld helpers": {
-      "comment": "Capsule: the run waits for its helpers; the argument is how many still work\nChat row: the run waits on helpers; the argument is how many",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Waiting on %lld helper"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Waiting on %lld helpers"
-                }
-              }
-            }
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld yardımcıyı bekliyor"
           }
         }
       }

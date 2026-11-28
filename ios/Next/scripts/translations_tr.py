@@ -279,7 +279,6 @@ TR: dict[str, str] = {
     "Stop %@": "%@ durdur",
     "Stopped": "Durduruldu",
     "Stopping…": "Durduruluyor…",
-    "Subagent": "Alt ajan",
     "The Mac's screen": "Mac'in ekranı",
     "The live screen comes in a later version.": "Canlı ekran sonraki bir sürümde gelecek.",
     "%@, failed": "%@, başarısız",
@@ -964,14 +963,12 @@ TR: dict[str, str] = {
     "Plan %lld/%lld": "Plan %lld/%lld",
     "Plan, %lld of %lld steps done": "Plan, %lld / %lld adım bitti",
     "Waiting for a helper": "Bir yardımcıyı bekliyor",
-    "Waiting on %lld helpers": "%lld yardımcıyı bekliyor",
     "Helpers, %lld of %lld done": "Yardımcılar, %lld / %lld bitti",
     "Browsed dentist.example/booking": "dentist.example/booking sayfasına bakıldı",
     # C2 (items 1768-1769): Dot's own tools' phrases (the web's tr.js), the live work line, Appearance's code and terminal.
     'Finish': 'Bitir',
     'Turn on more actions': 'Daha fazla eylemi aç',
     'Work orders': 'İş emirleri',
-    'Delegate': 'Görev devret',
     'Message agent': 'Ajana mesaj',
     'Ask a helper': 'Yardımcıya sor',
     'Make agent': 'Ajan oluştur',
@@ -1003,7 +1000,6 @@ TR: dict[str, str] = {
     'Wait': 'Bekle',
     'Waiting to start': 'Başlamayı bekliyor',
     'Typing': 'Yazıyor',
-    'Handing a part to a subagent': 'Bir kısmı alt ajana veriyor',
     'Waiting for %@': '%@ bekleniyor',
     'Waiting for you': 'Seni bekliyor',
     'Stopping': 'Durduruluyor',
@@ -1027,9 +1023,6 @@ TR: dict[str, str] = {
     'On: a long line wraps. Off: it scrolls sideways.': 'Açık: uzun satır alta kayar. Kapalı: yana kaydırılır.',
     'Custom font size': 'Özel yazı boyutu',
     'Ran %lld commands': '%lld komut çalıştırdı',
-    'Delegating “%@”': '“%@” devrediliyor',
-    'Delegated task “%@” finished': '“%@” görevi devredildi ve bitti',
-    'Delegated task “%@” failed': '“%@” görevi devredildi, başarısız oldu',
     # G2: Connect apps (items 1861-1862)
     'Connect apps': 'Uygulamaları bağla',
     '%lld connected': '%lld bağlı',
@@ -1220,7 +1213,6 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
     "%lld tasks": ("%lld task", "%lld tasks"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),
     "Back, %lld bots unread": ("Back, %lld bot unread", "Back, %lld bots unread"),
-    "Waiting on %lld helpers": ("Waiting on %lld helper", "Waiting on %lld helpers"),
     "Delete %lld chats with everything they hold?": ("Delete %lld chat with everything it holds?", "Delete %lld chats with everything they hold?"),
     "Folded, %lld models": ("Folded, %lld model", "Folded, %lld models"),
     "ran %lld commands": ("ran %lld command", "ran %lld commands"),
@@ -1758,6 +1750,18 @@ TR.update(
 )
 EN_PLURALS.update({"New · %lld lines": ("New · %lld line", "New · %lld lines")})
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+# Delegation in plain words (item 2002): never "delegate", "child" or "subagent".
+TR.update(
+    {
+        "Handed to a helper": "Bir yardımcıya verildi",
+        "Handed to a helper: %@": "Bir yardımcıya verildi: %@",
+        "A helper finished: %@": "Bir yardımcı bitirdi: %@",
+        "A helper failed: %@": "Bir yardımcı başarısız oldu: %@",
+        "Helper": "Yardımcı",
+        "Waiting for %lld helpers": "%lld yardımcı bekleniyor",
+    }
+)
+EN_PLURALS.update({"Waiting for %lld helpers": ("Waiting for %lld helper", "Waiting for %lld helpers")})
 # Chat settings as inset groups, the capsule without a spinner (the owner's report of 2026-11-27).
 
 # HS1 (2026-11-27): empty states in the app's own type.

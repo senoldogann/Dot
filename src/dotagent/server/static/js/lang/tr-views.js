@@ -274,7 +274,7 @@ export const TR_VIEWS = {
   "views.campaigns.browserDotSOwn": "Tarayıcı: Dot'un kendisi",
   "views.campaigns.browserDotSDefault": "Tarayıcı: Dot'un varsayılanı",
   "views.campaigns.reasoningAskedlabel": "Akıl yürütme {askedLabel}",
-  "views.campaigns.usageOfItsSessionsAnd": "Oturumlarının ve yardımcılara devrettikleri görevlerin kullanımı",
+  "views.campaigns.usageOfItsSessionsAnd": "Oturumlarının ve yardımcılara verdikleri görevlerin kullanımı",
   "views.campaigns.startedDatetime": "Başladı {dateTime}",
   "views.campaigns.sessionNumber": "Oturum {number}",
   "views.campaigns.skipped": "Atlandı",
