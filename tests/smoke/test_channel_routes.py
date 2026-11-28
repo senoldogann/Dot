@@ -203,7 +203,9 @@ async def _end_runs(manager: RunManager) -> None:
     """Stop every run still at work and wait for its end, so that a test that failed while its run worked leaves no run
     to ask the scripted model, once it is cleared, for a turn it no longer has, nor to end in a later test."""
     for run_id in manager.active_run_ids():
-        manager.cancel(run_id)
+        # A run that ended while an earlier one was waited for is not at work any more, and cancel refuses it.
+        if run_id in manager.active_run_ids():
+            manager.cancel(run_id)
         await manager.wait(run_id)
 
 
