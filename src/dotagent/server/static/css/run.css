@@ -4149,6 +4149,27 @@ dialog.computer-full::backdrop {
   color: var(--muted);
 }
 
+/* An agent's model on its page (the owner's report of 2026-11-28): the chat settings' list of models inside the form's
+   card, its cards a step off the card's own ground, the search above the list, the list kept to a scroll of its own. */
+.agent-model-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agent-model-picker .model-sections {
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+.agent-model-picker .sheet-card {
+  background: var(--surface-2);
+}
+
+.agent-model-picker .sheet-search {
+  background: var(--surface-2);
+}
+
 .sheet-search-field {
   flex: 1 1 auto;
   min-width: 0;

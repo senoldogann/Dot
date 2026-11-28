@@ -2291,6 +2291,8 @@ export const TR_VIEWS = {
   "views.agents.actionsLength": "Eylemler ({length})",
   "views.agents.tickedOfLength": "{length} içinden {ticked}",
   "views.agents.defaultModelname": "Varsayılan ({modelName})",
+  "views.agents.mainModel": "Ana model",
+  "views.agents.mainModelname": "Ana model ({modelName})",
   "views.agents.defaultLevellabel": "Varsayılan ({levelLabel})",
   "views.agents.partPicked": "{part} seçildi",
   "views.agents.teamsLength": "Ekipler ({length})",
