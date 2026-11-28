@@ -449,6 +449,11 @@ extension DaemonAPI {
         try await send("POST", "/api/queue/\(message)/steer", body: nil)
     }
 
+    /// Starts a queued message now (item 2106): the run at work on its chat stops and the message starts in its place.
+    public func sendQueuedNow(_ message: String) async throws(DaemonRequestError) -> QueueView {
+        try await send("POST", "/api/queue/\(message)/now", body: nil)
+    }
+
     public func resumeQueue(thread: String) async throws(DaemonRequestError) -> QueueView {
         try await send("POST", "/api/threads/\(thread)/queue/resume", body: nil)
     }

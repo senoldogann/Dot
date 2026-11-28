@@ -625,7 +625,9 @@ async def test_a_queued_follow_up_sent_on_with_steer_is_drawn_as_the_owners_mess
     await expect(page.locator(".toast")).to_contain_text("Queued")
     row: Locator = page.locator(".queue-row", has_text="My reaction")
     await expect(row).to_be_visible()
-    await row.get_by_role("button", name="Steer").click()
+    # ⌘⇧Enter with the box empty steers the queue's first message into the run at work (the row's Send now starts it as
+    # a run of its own instead, item 2106).
+    await page.locator(".dock textarea").press("ControlOrMeta+Shift+Enter")
     # The press is theirs: its words stand in the conversation of the run at work as their message, and the note the run
     # read around them is no line.
     sent: Locator = page.locator(".user-message .bubble", has_text=THUMB_DOWN)

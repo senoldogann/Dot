@@ -795,7 +795,8 @@ finished one. While the run works and the box is empty, the box's send is the ru
 danger colour with a square) and cancels it; a word typed turns it back into the send, and while a queued message is edited the send saves it. That Stop is the only one (items
 1174 and 1320; the loops of the chat have **Stop repeating** of their own, below). The box shows no choice of what a
 send does (item 1320): while the run works a message waits in the chat's queue, **After this
-task**, where its **Steer** sends it into the run at once (see [How a run works](runs.md#how-a-run-works)), unless
+task**, where its **Send now** stops the run and starts it in its place (item 2106; ⌘⇧Enter with the box empty steers
+it into the run instead, see [How a run works](runs.md#how-a-run-works)), unless
 Settings › General › Messages has it steer the run now, **Add to task**; the send, its tooltip, its name to a screen
 reader and the box's placeholder say which. A message that starts the chat's next run (the run before it ended) is in the chat the moment it is sent (item 1999, as the iPhone app does it): its words leave the box, its bubble stands under the conversation with a quiet **Pending** at its right edge, and under it the agent's typing dots say **Starting…** until the page of the new run is open; a send Dot refuses takes the bubble away and gives the words back to the box. The run's choices (its model, reasoning and options) shown from the
 button beside the "+" stand at the right, by the microphone and the send, on every page. Where one way alone is open (a held run, a campaign's
@@ -805,8 +806,9 @@ disabled at the ends of the queue, each a button a key presses too; there is no 
 the swipe that scrolls the chat), its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
 gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its own
 picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the message's),
-**Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter sends what the box holds the other way than
-the send does, or the queue's next message to the run when the box is empty. Settings › General › Messages chooses the
+**Send now**, which stops the run at work and starts the message in its place (item 2106), and × to take it out.
+⌘⇧Enter sends what the box holds the other way than the send does, or steers the queue's next message into the run
+when the box is empty. Settings › General › Messages chooses the
 send's way (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
 box (items 352 and 360, drawn since item 1335 as a plain bar on a hairline, no glass and no shadow) says in a few quiet words that the run waits to start, that it waits
@@ -830,7 +832,7 @@ say): the composer's send, its box empty, is the one Stop. A row too narrow for 
 for the secondary segments, then the same closer together, and at the narrowest a second line that keeps the status
 in words, never a scroll or a cut. A tap on a segment opens what its pane showed in a sheet from the foot of the screen, one at a time,
 closed by a tap outside it, by Escape, by its handle or by a swipe down: the queue with its up and down arrows (44 px,
-never a drag), pencil, **Steer** and ×; the loops with how often and when next, and **Stop repeating**; the commands
+never a drag), pencil, **Send now** and ×; the loops with how often and when next, and **Stop repeating**; the commands
 with their words wrapped whole, how long they ran and **Stop**; the helpers with what the task waits on, what each does
 now, **Details** and **Stop**; the plan. The status opens the panel's Task tab. What Dot asks is its own card over the
 capsule, never in it, and the capsule goes on saying the run waits for you; the Continue of a task that was cut off is a
@@ -1590,6 +1592,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /runs/{id}/loop` (`{"every": "30m", "text": …}`)                         | a loop of the run's chat (item 281): a schedule of the chat, returned |
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |
 | `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message, its files too when `attachments` names them (item 376; left out, they stay); send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue, each message's `files` named |
+| `POST /queue/{id}/now`                                                            | start a queued message as its chat's next run now (item 2106): the run at work there stops and the message starts in its place, the rest of the queue after it; with none at work it starts at once, a stop's or a crash's hold let go; 409 for a run a `dotx` command drives; answers with the queue |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `PUT /attachments/stream?name=…&media_type=…` (the file as the raw body)         | the same for a video, a sound or a large file (item 1933): the body is written to disk in chunks as it arrives, never held whole in memory, up to 200 MiB for a video or a sound and 20 MiB for any other file (422 past it); a body that is cut or refused leaves no file. Answers as `POST /attachments` does |
 | `GET /attachments/{id}/image`                                                  | the picture of an image kept for a message (item 376), for its small chip in the box that edits a queued message |

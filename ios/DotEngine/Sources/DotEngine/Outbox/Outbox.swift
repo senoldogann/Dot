@@ -411,6 +411,9 @@ public actor Outbox {
         case .steerQueued(_, let message):
             _ = try await api.steerQueued(message)
             return .done(item)
+        case .sendQueuedNow(_, let message):
+            _ = try await api.sendQueuedNow(message)
+            return .done(item)
         case .editQueued(_, let message, let text, let attachments):
             _ = try await api.editQueued(message, text: text, attachments: attachments)
             return .done(item)

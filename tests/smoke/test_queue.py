@@ -389,6 +389,100 @@ async def test_a_queued_message_steered_reaches_the_run_at_work_and_leaves_the_q
         assert len(await runtime.store.list_runs(10, first.thread_id)) == 1
 
 
+async def test_a_queued_message_sent_now_stops_the_run_at_work_and_starts_before_the_rest_once(
+    login_env: dict[str, str],
+) -> None:
+    """Item 2106: the queue's Send now stops the run at work and starts the message in its place, instead of steering it
+    into that run or waiting for it; the stop holds nothing, the rest of the queue follows the message, and the message
+    starts once and is not steered."""
+    model: _GatedModel = _GatedModel()
+    async with _served(login_env, model) as (runtime, manager, address), _changes(runtime) as changes:
+        first: RunRecord = await _start(manager)
+        summary: QueuedMessage = await _queue(manager, first, SUMMARY, "yolo")
+        mail: QueuedMessage = await _queue(manager, first, MAIL, "ask")
+        await model.asked()
+        async with httpx.AsyncClient(
+            base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}, timeout=30
+        ) as client:
+            answer: httpx.Response = await client.post(f"/api/queue/{mail.id}/now")
+        assert answer.status_code == 200, answer.text
+        assert (await _ended(manager, first.id)).status == "cancelled"
+        second: RunRecord = await _started(changes, runtime, first)
+        assert (second.goal, second.approvals) == (MAIL, "ask")
+        assert await _queued(runtime, first) == [(summary.id, SUMMARY)]
+        assert not await runtime.store.queue_held(first.thread_id)
+        assert await runtime.store.events_of_kind(first.id, "steer", 10) == []
+        await model.release()
+        assert (await _ended(manager, second.id)).status == "done"
+        third: RunRecord = await _started(changes, runtime, second)
+        assert third.goal == SUMMARY
+        await model.release()
+        assert (await _ended(manager, third.id)).status == "done"
+        goals: list[str] = [run.goal for run in reversed(await runtime.store.list_runs(10, first.thread_id))]
+        assert goals == [GOAL, MAIL, SUMMARY]
+
+
+async def test_a_queued_message_sent_now_with_no_run_at_work_lets_the_held_queue_go_and_starts(
+    login_env: dict[str, str],
+) -> None:
+    """Item 2106: a queue a stop held starts the message sent now at once; what else waits keeps waiting after it."""
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager), _changes(runtime) as changes:
+        first: RunRecord = await _start(manager)
+        summary: QueuedMessage = await _queue(manager, first, SUMMARY, "yolo")
+        mail: QueuedMessage = await _queue(manager, first, MAIL, "yolo")
+        manager.cancel(first.id)
+        assert (await _ended(manager, first.id)).status == "cancelled"
+        await _held(changes, runtime, first)
+        assert await manager.send_queued_now(mail.id) == first.thread_id
+        second: RunRecord = await _started(changes, runtime, first)
+        assert second.goal == MAIL
+        assert await _queued(runtime, first) == [(summary.id, SUMMARY)]
+        await model.release()
+        assert (await _ended(manager, second.id)).status == "done"
+        third: RunRecord = await _started(changes, runtime, second)
+        assert third.goal == SUMMARY
+        await model.release()
+        assert (await _ended(manager, third.id)).status == "done"
+
+
+async def test_a_queued_message_sent_now_beside_a_run_of_another_process_is_refused_and_changes_nothing(
+    login_env: dict[str, str],
+) -> None:
+    """Item 2106's review: Send now beside a run this process cannot stop (a dotx command's) is refused before the queue
+    is touched: its order and its hold stay as they were."""
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager), _changes(runtime) as changes:
+        first: RunRecord = await _start(manager)
+        summary: QueuedMessage = await _queue(manager, first, SUMMARY, "yolo")
+        mail: QueuedMessage = await _queue(manager, first, MAIL, "yolo")
+        manager.cancel(first.id)
+        assert (await _ended(manager, first.id)).status == "cancelled"
+        await _held(changes, runtime, first)
+        # A run another process drives, as the store holds it: at work, with no handle here.
+        elsewhere: RunRecord = await runtime.store.create_run(
+            first.thread_id,
+            "Run from the Terminal.",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "cli",
+            "medium",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        with pytest.raises(RunConflict, match="not one this process can stop"):
+            await manager.send_queued_now(mail.id)
+        assert await _queued(runtime, first) == [(summary.id, SUMMARY), (mail.id, MAIL)]
+        assert await runtime.store.queue_held(first.thread_id)
+        await runtime.store.finish_run(elsewhere.id, "done", "Done.")
+
+
 async def test_the_queue_keeps_the_owners_order_and_text_and_the_start_of_the_daemon_holds_it(
     login_env: dict[str, str],
 ) -> None:
@@ -638,7 +732,7 @@ async def _shot(page: Page, path: Path) -> None:
 
 
 @pytest.mark.browser
-async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_above_the_composer(
+async def test_the_chats_page_queues_moves_edits_steers_sends_now_and_resumes_messages_above_the_composer(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
     model: _GatedModel = _GatedModel()
@@ -650,7 +744,7 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                 async with _changes(runtime) as changes:
                     first: RunRecord = await _start(manager)
                     # The run waits at its first step from here on: what is steered cuts that step short (item 509).
-                    waiting: _Reply = await model.asked()
+                    await model.asked()
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
                     )
@@ -766,21 +860,18 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                         await head.click()
                         await expect(queue.locator(".queue-list")).to_be_visible()
 
-                    # Steer sends a message to the run now; with the box empty, the key steers the next one.
+                    # With the box empty, the key steers the queue's first message into the run now: the step at
+                    # work is cut short and asked again with it (item 509).
+                    await box.press("ControlOrMeta+Shift+Enter")
+                    await expect(texts).to_have_text([SHORT_SUMMARY, CLOSE])
+                    await model.asked()
+
+                    # Send now (item 2106) stops the run at work and starts the message in its place, with the choices
+                    # it was sent with; the rest of the queue waits after it, and the page follows the chat there.
                     if phone:
                         await open_sheet(page, "queue")
-                    await rows.nth(0).get_by_role("button", name="Steer").click()
-                    await expect(texts).to_have_text([SHORT_SUMMARY, CLOSE])
-                    # The run reads each at once: the step at work is cut short and asked again with it (item 509).
-                    waiting = await model.asked()
-                    await box.press("ControlOrMeta+Shift+Enter")
-                    await expect(texts).to_have_text([CLOSE])
-                    waiting = await model.asked()
-
-                    # The run ends done with both read: the queue's next message starts after it, with the choices it
-                    # was sent with, and the page follows it there.
-                    waiting.go.set()
-                    assert (await _ended(manager, first.id)).status == "done"
+                    await rows.nth(1).get_by_role("button", name="Send now").click()
+                    assert (await _ended(manager, first.id)).status == "cancelled"
                     second: RunRecord = await _started(changes, runtime, first)
                     assert (second.goal, second.model, second.approvals, second.source) == (
                         CLOSE,
@@ -789,40 +880,53 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                         UI_SOURCE,
                     )
                     await expect(page).to_have_url(f"{address}/#/runs/{second.id}")
+                    assert not await runtime.store.queue_held(first.thread_id)
+                    assert await _texts(runtime, first) == [SHORT_SUMMARY]
+                    if phone:
+                        await expect(page.locator('[data-segment="queue"]')).to_have_attribute("aria-label", "1 queued")
+                    else:
+                        await expect(texts).to_have_text([SHORT_SUMMARY])
+                    steers: list[EventRecord] = await runtime.store.events_of_kind(first.id, "steer", 10)
+                    assert [event.data["text"] for event in steers] == [MAIL]
+
+                    # With text in the box, the key steers it past the queue; a Stop holds the queue until Resume.
+                    await model.asked()
+                    await box.fill(FILE)
+                    await box.press("Enter")
+                    await expect(box).to_have_value("")
+                    assert await _texts(runtime, first) == [SHORT_SUMMARY, FILE]
+                    await box.fill(NOW)
+                    await box.press("ControlOrMeta+Shift+Enter")
+                    await model.asked()
+                    await expect(box).to_have_value("")
+                    assert await _texts(runtime, first) == [SHORT_SUMMARY, FILE]
+                    await send.click()
+                    assert (await _ended(manager, second.id)).status == "cancelled"
+                    if phone:
+                        # A held queue says so in the capsule, and the sheet has the Resume.
+                        await expect(page.locator('[data-segment="queue"]')).to_have_attribute("aria-label", "2 paused")
+                        await open_sheet(page, "queue")
+                    await expect(queue.locator(".queue-paused")).to_be_visible()
+                    await expect(send).to_have_attribute("aria-label", "Follow up")
+                    # With no run at work, Send now starts a message at once; Resume lets the whole queue go on.
+                    await expect(rows.nth(0).get_by_role("button", name="Send now")).to_be_enabled()
+                    await _shot(page, tmp_path / f"queue-paused-{width}-{scheme}.png")
+                    await queue.get_by_role("button", name="Resume").click()
+                    third: RunRecord = await _started(changes, runtime, second)
+                    assert third.goal == SHORT_SUMMARY
+                    await expect(page).to_have_url(f"{address}/#/runs/{third.id}")
+                    await model.release()
+                    assert (await _ended(manager, third.id)).status == "done"
+                    fourth: RunRecord = await _started(changes, runtime, third)
+                    assert fourth.goal == FILE
+                    await expect(page).to_have_url(f"{address}/#/runs/{fourth.id}")
                     await expect(queue).to_be_hidden()
                     if phone:
                         # With the last message gone the segment goes, and the sheet with it.
                         await expect(page.locator('[data-segment="queue"]')).to_be_hidden()
                         await expect(page.locator(".dock-sheet:not([hidden])")).to_have_count(0)
-                    steers: list[EventRecord] = await runtime.store.events_of_kind(first.id, "steer", 10)
-                    assert [event.data["text"] for event in steers] == [MAIL, SHORT_SUMMARY]
-
-                    # With text in the box, the key steers it past the queue; a Stop holds the queue until Resume.
-                    await box.fill(FILE)
-                    await box.press("Enter")
-                    await expect(texts).to_have_text([FILE])
-                    await box.fill(NOW)
-                    await box.press("ControlOrMeta+Shift+Enter")
-                    await model.asked()
-                    await expect(box).to_have_value("")
-                    await expect(texts).to_have_text([FILE])
-                    await send.click()
-                    assert (await _ended(manager, second.id)).status == "cancelled"
-                    if phone:
-                        # A held queue says so in the capsule, and the sheet has the Resume.
-                        await expect(page.locator('[data-segment="queue"]')).to_have_attribute("aria-label", "1 paused")
-                        await open_sheet(page, "queue")
-                    await expect(queue.locator(".queue-paused")).to_be_visible()
-                    await expect(send).to_have_attribute("aria-label", "Follow up")
-                    await expect(rows.nth(0).get_by_role("button", name="Steer")).to_be_disabled()
-                    await _shot(page, tmp_path / f"queue-paused-{width}-{scheme}.png")
-                    await queue.get_by_role("button", name="Resume").click()
-                    third: RunRecord = await _started(changes, runtime, second)
-                    assert third.goal == FILE
-                    await expect(page).to_have_url(f"{address}/#/runs/{third.id}")
-                    await expect(queue).to_be_hidden()
                     await model.release()
-                    assert (await _ended(manager, third.id)).status == "done"
+                    assert (await _ended(manager, fourth.id)).status == "done"
                     await page.close()
         finally:
             await browser.close()

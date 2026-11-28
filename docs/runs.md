@@ -457,15 +457,19 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
   shutdown of the daemon does not, and once the run it cut off is resumed and the new run ends done, the queue goes on.
-  The daemon keeps the queue, so it goes on with no page open, and a queued message can be sent to the run at work
-  (steered) instead. A message starts once, and only after the run at work on the chat has ended, in whichever process
+  The daemon keeps the queue, so it goes on with no page open. **Send now** on a queued message (item 2106,
+  `POST /api/queue/{id}/now`) does not wait: the run at work on the chat stops, and that stop starts the message as the
+  chat's next run instead of holding the queue, the rest of the queue after it; with no run at work it starts at once,
+  a hold of a stop or a crash let go for it (a hold for a free task stays). It starts once, whether the stop or the
+  run's own end gets there first; a run a `dotx` command drives is not stopped from there (409). ⌘⇧Enter with the box
+  empty sends the queue's first message to the run at work instead (steered, `POST /api/queue/{id}/steer`). A message starts once, and only after the run at work on the chat has ended, in whichever process
   that run worked: the daemon moves the queue of a chat whose run a `dotx` command drove once it sees that run end, and
   holds it when it starts after such an end. While a message's run is starting, editing it, taking it out or steering it
   is refused (409). A campaign's chat has no queue: a message there steers its session. In the page, a queued message
   moves a place up or down from its own two arrows, the end ones disabled, which call the same reorder as before
   (`PUT /threads/{id}/queue`, item 1348); a row is not dragged. On a phone the queue is not a pane over the composer
   (item 1383): the capsule over the box says **3 queued** (**3 paused** while a stop holds it), and a tap on that
-  segment opens the same rows, arrows, edit, **Steer**, × and **Resume** in a sheet from the foot of the screen.
+  segment opens the same rows, arrows, edit, **Send now**, × and **Resume** in a sheet from the foot of the screen.
 - `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
   the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
@@ -629,9 +633,10 @@ draws no line for it, on the run's own page or in the turns before a later run: 
 - A ✋ is told at once. The run holds before its next step (a tool at work finishes first, as for any message): the
   conversation says so ("You held the task (✋): it waits for your next message."), and the box of the page sends
   what you write to the run at once, not into the queue behind a run that waits for it. The hold ends when you
-  write to the run (a message of yours, the answer to a question it left, a queued reaction you send on with
-  Steer, a message sent to the chat from another screen: it waits in the queue as any does, and the run goes on),
-  when you take the ✋ back, or when you stop the run. A run held and forgotten stops after `[reactions]
+  write to the run (a message of yours, the answer to a question it left, a queued reaction you send on into it
+  with ⌘⇧Enter and the box empty, a message sent to the chat from another screen: it waits in the queue as any does,
+  and the run goes on), when you take the ✋ back, or when you stop the run; the queued reaction's **Send now** stops
+  the held run and starts the reaction as the chat's next run (item 2106). A run held and forgotten stops after `[reactions]
   hold_minutes` (60): it ends cancelled, as one you stop does, with a result that says why and what it did kept in
   the chat, so that held runs never keep the places the daemon has for runs (`[agent] max_concurrent_runs`). The
   time it waits counts toward the run's limits as the wait for an answer does. A run on one of OpenCode's models
@@ -643,8 +648,8 @@ what is wrong; ask me if you cannot tell what." (🔁: "do it again, another way
 something the run said in a step, "your message" stands for "your answer"). It starts as a run of the web UI with
 what the chat's box chose (its mode, model, reasoning level, approvals, goal mode and agent, as a message typed
 there), and the page goes on at the run it starts, as it does for a message typed in the box (item 451). When a run
-works in the chat it waits in the chat's queue as a message does: edit it (files too), take it out, or Steer it,
-which sends it on to the run at work. The files you put on it go with it, whether it starts as the chat's next run or
+works in the chat it waits in the chat's queue as a message does: edit it (files too), take it out, start it now
+with Send now, or steer it (⌘⇧Enter with the box empty), which sends it on to the run at work. The files you put on it go with it, whether it starts as the chat's next run or
 is sent on. Sent on, its words stand in the conversation as your message, on the run's page and in the turns before a
 later run, while the run reads a note that vouches for nothing. Started as the chat's next run in Dot's words for the
 reaction, it is no message of yours: the conversation draws none for it, on its page or in the turns before a later

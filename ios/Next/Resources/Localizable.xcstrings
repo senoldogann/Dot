@@ -11345,7 +11345,7 @@
       }
     },
     "Send now": {
-      "comment": "Queue sheet: sends a queued message into the running task now",
+      "comment": "Queue sheet: stops the running task and starts a queued message now",
       "localizations": {
         "tr": {
           "stringUnit": {

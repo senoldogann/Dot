@@ -30,6 +30,8 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case reorder(thread: String, ids: [String])
         case removeQueued(thread: String, message: String)
         case steerQueued(thread: String, message: String)
+        /// A queued message started now (item 2106): the run at work stops and the message starts in its place.
+        case sendQueuedNow(thread: String, message: String)
         /// A queued message changed (§20: edited in the composer); `attachments` `nil` keeps its files.
         case editQueued(thread: String, message: String, text: String, attachments: [String]?)
         case resumeQueue(thread: String)
@@ -109,6 +111,7 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         switch action {
         case .message(let thread, _, _, _, _), .steer(_, let thread, _, _, _), .decision(_, _, let thread, _, _, _), .stop(_, let thread),
             .stopHelper(_, _, let thread), .reorder(let thread, _), .removeQueued(let thread, _), .steerQueued(let thread, _),
+            .sendQueuedNow(let thread, _),
             .editQueued(let thread, _, _, _), .resumeQueue(let thread), .rename(let thread, _), .pin(let thread, _), .delete(let thread),
             .react(_, let thread, _, _, _), .choices(let thread, _):
             thread

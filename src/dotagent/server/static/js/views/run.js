@@ -1434,6 +1434,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     frame.setSendLabel(editing ? t("composer.save") : sendWord);
     paintIntent();
     queue.setActive(active && !elsewhere);
+    queue.setForeign(active && elsewhere);
     if (active && ticker === null) {
       // The run's figures, and the time of every delegated run that works (in the conversation and in the Agents tab),
       // count on every second.

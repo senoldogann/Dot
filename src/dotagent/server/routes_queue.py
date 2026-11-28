@@ -1,5 +1,6 @@
 """Routes for the queue of a chat (item 148): the messages sent while a run worked there, which start as the chat's next
-runs one after the other; each can be edited, moved, sent to the run at work now (steer) or taken out, and a queue that
+runs one after the other; each can be edited, moved, sent to the run at work now (steer), started now in place of the
+run at work (item 2106) or taken out, and a queue that
 a stop, a failure or a crash of the daemon held goes on when the owner resumes it. Each answers with the queue as it
 then is."""
 
@@ -185,6 +186,12 @@ def queue_router(ctx: ServerContext) -> APIRouter:
         """Send a queued message to the run at work on its chat now, and take it out of the queue; 409 when no run
         works there."""
         return await view(await ctx.manager.steer_queued(message_id))
+
+    @router.post("/queue/{message_id}/now")
+    async def send_queued_now(message_id: str) -> QueueView:
+        """Start a queued message as its chat's next run now (item 2106): the run at work there is stopped and the
+        message starts in its place, the rest of the queue after it; 409 for a run another process drives."""
+        return await view(await ctx.manager.send_queued_now(message_id))
 
     @router.post("/queue/{message_id}/move")
     async def move_queued(message_id: str, request: MoveRequest) -> RoutedMessage:

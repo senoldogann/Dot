@@ -1,7 +1,8 @@
 // The queue of a chat (item 148): what is sent while a run works waits above the composer and starts
 // as the chat's next run, one message after the other, once the run before it has ended done. A message can be moved
-// (its up and down arrows, which a finger, a pointer and the keys press alike), edited in the composer, sent to the run at work now (Steer) or
-// taken out. A stop, a failure or a crash of the daemon holds the queue until Resume; a run that a stop of the daemon
+// (its up and down arrows, which a finger, a pointer and the keys press alike), edited in the composer, started now in
+// place of the run at work, which stops (Send now, item 2106), or taken out; ⌘⇧Enter with the box empty steers the
+// first one into the run at work. A stop, a failure or a crash of the daemon holds the queue until Resume; a run that a stop of the daemon
 // cut leaves it to go on once the run, continued, ends done. The daemon keeps the queue, so it goes on with no page
 // open, and every open page shows it as it changes; a queue the page could not read says so, with Read again.
 
@@ -27,7 +28,7 @@ function oneLine(text) {
  * after `afterRunId`, and `onEdit()` of the start and the end of an edit, which the composer's send names Save while
  * it lasts.
  *
- * Returns `{ element, add(body), steerFirst(), setActive(on), editing(), saveEdit(text), cancelEdit(), count(),
+ * Returns `{ element, add(body), steerFirst(), setActive(on), setForeign(on), editing(), saveEdit(text), cancelEdit(), count(),
  * expand(), dispose() }`: `add` queues a message (the body of `POST /threads/{id}/queue`), `editing()` is the id of the
  * message the composer edits or null, `saveEdit` keeps the composer's text as that message's, `count()` is how many
  * messages wait and `expand()` opens their list. `onChange({ count, held, problem, sending })` is called on every change
@@ -41,6 +42,8 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
   let messages = [];
   let held = false;
   let active = false;
+  // A run another process drives (a `dotx` command) works on the chat: Send now cannot stop it from here.
+  let foreign = false;
   let expanded = true;
   let busy = false;
   // A message is on its way into the queue (`add`).
@@ -179,6 +182,12 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     });
   }
 
+  // Send now (item 2106): the run at work stops and the message starts in its place, the rest of the queue after it;
+  // the page follows the chat to that run as it does to any run the queue starts (`onStarted`).
+  function sendNow(message) {
+    return act(() => api.post(`/queue/${message.id}/now`, null));
+  }
+
   function startEdit(message) {
     if (editingId === null) {
       // The message the box holds while the edit lasts is not the draft: the draft the composer keeps stays as it was,
@@ -276,14 +285,20 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         icon("pencil"),
       );
       edit.addEventListener("click", () => startEdit(message));
-      const steerTitle = active ? t("queue.sendToTheTaskNow") : t("queue.nothingHereCanBeSteered");
-      const steerButton = el(
+      const nowButton = el(
         "button",
-        { class: "queue-steer", type: "button", "data-id": message.id, "data-part": "steer", title: steerTitle, disabled: !active },
-        icon("cornerUpRight"),
-        el("span", { class: "label" }, t("queue.steer")),
+        {
+          class: "queue-steer",
+          type: "button",
+          "data-id": message.id,
+          "data-part": "now",
+          title: foreign ? t("queue.sendNowElsewhere") : active ? t("queue.sendNowStops") : t("queue.sendNowStarts"),
+          disabled: foreign,
+        },
+        icon("arrowUp"),
+        el("span", { class: "label" }, t("queue.sendNow")),
       );
-      steerButton.addEventListener("click", () => steer(message));
+      nowButton.addEventListener("click", () => sendNow(message));
       const remove = el(
         "button",
         { class: "queue-icon", type: "button", "data-id": message.id, "data-part": "remove", "aria-label": t("queue.removeQueuedMessage"), title: t("queue.removeFromQueue") },
@@ -292,7 +307,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       remove.addEventListener("click", () =>
         act(() => api.del(`/queue/${message.id}`), { method: "DELETE", path: `/queue/${message.id}`, body: null }),
       );
-      actions = el("span", { class: "queue-actions" }, edit, steerButton, remove);
+      actions = el("span", { class: "queue-actions" }, edit, nowButton, remove);
     }
 
     const item = el("li", { class: "queue-row" }, move, text, clip, actions);
@@ -407,6 +422,10 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     steerFirst: () => (messages.length > 0 && active ? steer(messages[0]) : Promise.resolve()),
     setActive: (on) => {
       active = on;
+      paint();
+    },
+    setForeign: (on) => {
+      foreign = on;
       paint();
     },
     editing: () => editingId,

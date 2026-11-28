@@ -410,6 +410,12 @@ final class FakeDaemon: @unchecked Sendable {
         if method == "POST", Self.match(parts, ["api", "runs"]) != nil {
             return startChat(body: body)
         }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "queue", "*", "steer"]) {
+            return steerQueued(found[0])
+        }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "queue", "*", "now"]) {
+            return sendQueuedNow(found[0])
+        }
         if method == "POST", let found: [String] = Self.match(parts, ["api", "runs", "*", "steer"]) {
             let run: String = found[0]
             return steer(run: run, body: body)
@@ -592,6 +598,47 @@ final class FakeDaemon: @unchecked Sendable {
             QueueView(held: chats[thread]?.held ?? false, messages: chats[thread]?.queue ?? [], besideRunId: nil, besideThreadId: nil)
         }
         return Reply(status: 201, body: Self.json(view), stream: false, lost: false)
+    }
+
+    /// Takes a queued message out of its chat's queue: its chat and words, or `nil` for none.
+    private func takeQueued(_ id: String) -> (thread: String, text: String)? {
+        lock.withLock {
+            for (thread, chat) in chats {
+                if let message: QueuedMessageView = chat.queue.first(where: { $0.id == id }) {
+                    chats[thread]?.queue.removeAll { $0.id == id }
+                    return (thread, message.text)
+                }
+            }
+            return nil
+        }
+    }
+
+    private func activeRun(of thread: String) -> RunRecord? {
+        lock.withLock { runs.values.first { $0.threadId == thread && $0.parentRunId == nil && $0.isActive } }
+    }
+
+    /// `POST /api/queue/{id}/steer`: the message leaves the queue and is a steer of the run at work.
+    private func steerQueued(_ id: String) -> Reply {
+        guard let (thread, text) = takeQueued(id) else { return Self.refused(404, "no such queued message") }
+        guard let run: RunRecord = activeRun(of: thread) else { return Self.refused(409, "no run works on the chat to steer") }
+        say(run.id, "steer", ["text": .string(text), "files": .array([])])
+        bump(thread, tell: true)
+        let view: QueueView = lock.withLock { QueueView(held: false, messages: chats[thread]?.queue ?? [], besideRunId: nil, besideThreadId: nil) }
+        return Reply(status: 200, body: Self.json(view), stream: false, lost: false)
+    }
+
+    /// `POST /api/queue/{id}/now` (item 2106): the run at work is stopped and the message starts as the chat's next run.
+    private func sendQueuedNow(_ id: String) -> Reply {
+        guard let (thread, text) = takeQueued(id) else { return Self.refused(404, "no such queued message") }
+        if let run: RunRecord = activeRun(of: thread) { say(run.id, "run_finished", ["status": .string("cancelled")]) }
+        let started: String = lock.withLock {
+            nextId += 1
+            return "run_n\(nextId)"
+        }
+        addRun(started, thread: thread, goal: text, status: "running", parent: nil)
+        say(started, "run_started", [:])
+        let view: QueueView = lock.withLock { QueueView(held: false, messages: chats[thread]?.queue ?? [], besideRunId: nil, besideThreadId: nil) }
+        return Reply(status: 200, body: Self.json(view), stream: false, lost: false)
     }
 
     /// A new chat (`POST /api/runs`): a chat of its own and its first run, started once per key.

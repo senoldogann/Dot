@@ -640,6 +640,9 @@ class RunManager:
         # How many times each chat was stopped whole (:meth:`stop_chat`, item 1984), so that a request the fast model
         # was asked about before a stop starts no task after it.
         self._chat_stops: dict[str, int] = {}
+        # Runs stopped for a queued message sent now (:meth:`send_queued_now`): their end starts the queue's first
+        # message instead of holding the queue.
+        self._sent_now: set[str] = set()
         # Runs stored and being launched, each with the event set once its handle is registered or its start failed
         # (:meth:`wait`).
         self._launching: dict[str, asyncio.Event] = {}
@@ -3475,6 +3478,52 @@ class RunManager:
         await self._queue_changed(taken.thread_id, None, None, None)
         return taken.thread_id
 
+    async def send_queued_now(self, message_id: str) -> str:
+        """Start a queued message as its chat's next run now, without waiting for the run at work (item 2106, the
+        queue's **Send now**); returns its chat. The message goes first in the queue, and the run of this process at
+        work on the chat is stopped (:meth:`stop`): that stop starts the message (:meth:`_follow_queue`) instead of
+        holding the queue as a stop does, and the rest of the queue follows it as before. With no run at work the
+        message starts at once, an owner's or a crash's hold let go for it; a hold for a free task of a chat with
+        several (item 2012) stays, and the message starts first when one is free. The message starts once, through
+        the queue's claim (:meth:`_drain`), whether the stop or the run's own end gets there first. A run at work that
+        another process drives (a ``dotx`` command) is refused: its end moves the queue in that process."""
+        store: Store = self._runtime.store
+        message: QueuedMessage = await store.get_queued(message_id)
+        thread_id: str = message.thread_id
+        newest: list[RunRecord] = await store.list_runs(1, thread_id)
+        # Refused before anything changes: the queue stays as it was.
+        if newest and newest[0].status in WORKING_STATUSES and self._active_on(thread_id) is None:
+            raise RunConflict(
+                "the run at work on the chat is not one this process can stop (a dotx command drives it, or it is "
+                "starting): send the message now again once it has started or ended",
+                {"thread_id": thread_id, "run_id": newest[0].id, "message_id": message_id},
+            )
+        ids: list[str] = [queued.id for queued in await store.list_queued(thread_id)]
+        if ids[0] != message_id:
+            await store.order_queue(thread_id, [message_id, *(other for other in ids if other != message_id)])
+        # The press is the owner's word that the queue goes on.
+        if await store.queue_hold_reason(thread_id) in ("owner", "crash"):
+            await store.release_queue(thread_id)
+        handle: RunHandle | None = self._active_on(thread_id)
+        if handle is not None:
+            self._sent_now.add(handle.run_id)
+            try:
+                await self.stop(handle.run_id)
+            except RunConflict:
+                # It ended in that moment. An end still to be followed finds the mark and starts the message; one
+                # followed already may have held the queue again, which the press lets go here.
+                if await store.queue_hold_reason(thread_id) in ("owner", "crash"):
+                    await store.release_queue(thread_id)
+            else:
+                await self._queue_changed(thread_id, None, None, None)
+                log.info("queued_message_sent_now", thread_id=thread_id, message_id=message_id, stopped=handle.run_id)
+                return thread_id
+        await self._queue_changed(thread_id, None, None, None)
+        if newest:
+            await self._drain(thread_id, newest[0].id)
+        log.info("queued_message_sent_now", thread_id=thread_id, message_id=message_id, stopped=None)
+        return thread_id
+
     async def _put_back(self, message: QueuedMessage) -> None:
         """Put a message taken to steer the run at work back where it was, now that the run ended in that moment, and
         move the queue on as the end of that run does (:meth:`_follow_queue`), since that end may have found the queue
@@ -5503,11 +5552,17 @@ class RunManager:
         step (:meth:`_tell_ended_commands`); any other end holds the queue until the owner resumes it, since what failed
         would likely fail the next message too and a stop stops the chat, and leaves such a command to the next run of
         the chat, which is told at its first step. A delegated run and a campaign's session leave it alone, and so does
-        a process that leaves the queues to the daemon (:meth:`leave_queues`)."""
+        a process that leaves the queues to the daemon (:meth:`leave_queues`). A run stopped for a queued message sent
+        now (:meth:`send_queued_now`) starts that message, however it ended."""
+        sent_now: bool = run.id in self._sent_now
+        self._sent_now.discard(run.id)
         if run.parent_run_id is not None or run.campaign_id is not None or self._leaves_queues:
             return
         store: Store = self._runtime.store
-        if status == "done":
+        if sent_now and status != "done":
+            # Stopped for the queue's first message (:meth:`send_queued_now`): it starts now.
+            await self._drain(run.thread_id, run.id)
+        elif status == "done":
             # A crash held the queue until this continuation ended. An owner hold stays until the owner resumes it.
             if run.source == RESUME_SOURCE:
                 await store.release_hold(run.thread_id, "crash")

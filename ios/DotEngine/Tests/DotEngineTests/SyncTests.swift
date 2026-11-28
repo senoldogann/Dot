@@ -382,6 +382,24 @@ final class SyncTests: XCTestCase {
         XCTAssertEqual(items.filter { if case .owner(_, "And add it to my calendar", _, _) = $0 { true } else { false } }.count, 1, "shown once")
     }
 
+    /// Item 2106: Send now on a queued message stops the run at work and starts the message as a run of its own; the overlay
+    /// says Sent until that run is in the picture, then goes.
+    func testAQueuedMessageSentNowStartsItsOwnRunAndTheOverlayGoesOnceItShows() async throws {
+        _ = try await openLive()
+        _ = try await rig.engine.send("Use the short form", thread: "thr_1", photos: [], picks: .none)
+        let queued: EngineSnapshot = try await snapshot(of: rig.store, "the message waits in the chat's queue") {
+            $0.outbox.isEmpty && $0.pending(in: "thr_1").map(\.delivery) == [.queued(position: 1)]
+        }
+        let id: String = try XCTUnwrap(queued.chats["thr_1"]?.view?.queue.messages.first?.id)
+        _ = try await rig.engine.perform(.sendQueuedNow(thread: "thr_1", message: id))
+        let shown: EngineSnapshot = try await snapshot(of: rig.store, "the new run is in the picture and the overlay gone") {
+            $0.outbox.isEmpty && $0.accepted.isEmpty && $0.chats["thr_1"]?.view?.runs.contains { $0.goal == "Use the short form" } == true
+        }
+        XCTAssertEqual(shown.chats["thr_1"]?.view?.runs.first { $0.id == "run_1" }?.status, "cancelled", "the run at work was stopped")
+        XCTAssertEqual(shown.chats["thr_1"]?.view?.queue.messages, [])
+        XCTAssertEqual(daemon.steers("run_1"), [], "sent now, not steered")
+    }
+
     // MARK: The cache
 
     func testTheCacheShowsTheChatAtOnceAfterAKillAndAnotherDaemonVersionDropsIt() async throws {

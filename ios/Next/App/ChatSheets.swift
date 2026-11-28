@@ -80,8 +80,8 @@ struct QueueSheet: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("queue.row")
             .accessibilityHint(String(localized: "Edits it in the composer", comment: "VoiceOver hint of a queued message"))
-            Button { model.perform(.steerQueued(thread: thread, message: message.id)) } label: {
-                Label(String(localized: "Send now", comment: "Queue sheet: sends a queued message into the running task now"), systemImage: "arrow.up")
+            Button { model.perform(.sendQueuedNow(thread: thread, message: message.id)) } label: {
+                Label(String(localized: "Send now", comment: "Queue sheet: stops the running task and starts a queued message now"), systemImage: "arrow.up")
                     .textRole(.footnote).fontWeight(.semibold).foregroundStyle(Tone.onAction)
                     .padding(.horizontal, Space.m).frame(minHeight: 34).background(Tone.action, in: Capsule())
                     .frame(minHeight: Metric.hit).contentShape(Rectangle())
@@ -91,7 +91,7 @@ struct QueueSheet: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "Queued \(at + 1) of \(ids.count): \(message.text)", comment: "VoiceOver: a queued message; the arguments are its place, the count and its words"))
         .accessibilityActions {
-            Button(String(localized: "Send now", comment: "Queue sheet: sends a queued message into the running task now")) { model.perform(.steerQueued(thread: thread, message: message.id)) }
+            Button(String(localized: "Send now", comment: "Queue sheet: stops the running task and starts a queued message now")) { model.perform(.sendQueuedNow(thread: thread, message: message.id)) }
             Button(String(localized: "Edit", comment: "Under a refused message: puts its words back in the composer")) { edit(message) }
             if at > 0 {
                 Button(String(localized: "Move up", comment: "VoiceOver action: moves a queued message one place earlier")) {

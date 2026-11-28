@@ -140,7 +140,7 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of
    "Done · 1 min ago", and the chat's row in the list, item 1466; while the chat is open the app asks for the list of helpers
    every 8 seconds as long as one is live, and keeps the last count, dimmed, with no link),
-   the chat's loops and the queue, each a button that opens its own sheet (the queue's has an up and a down arrow, Send now and Remove for each message,
+   the chat's loops and the queue, each a button that opens its own sheet (the queue's has an up and a down arrow, Send now, which stops the run at work and starts the message in its place, item 2106, and Remove for each message,
    and Resume when a stop held it), never stacked and not drawn when there is nothing to say,
    a run inspector (no plan: the pill's Plan n/m opens it, item 1996; helpers with the ones at work first, each group newest first with its count, item 1467, the chat's schedules and loops with switches), the Schedules list and the models; the
    web UI stays as it is and opens full screen from Settings › Open web UI. The second slice (item 1361) adds a new chat
