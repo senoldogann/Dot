@@ -1405,6 +1405,17 @@
         }
       }
     },
+    "Add its schedule": {
+      "comment": "Template: also adds the schedule it suggests",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zamanlamasını ekle"
+          }
+        }
+      }
+    },
     "Add schedule": {
       "comment": "Tool row of Dot's own tool: a schedule added",
       "localizations": {
@@ -1434,6 +1445,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yapılacak ekle"
+          }
+        }
+      }
+    },
+    "Added switched off: read its goal, then switch it on.": {
+      "comment": "Template: the suggested schedule starts off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı eklenir: hedefini oku, sonra aç."
           }
         }
       }
@@ -1511,6 +1533,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan ajanlar"
+          }
+        }
+      }
+    },
+    "Agents › Your teams": {
+      "comment": "Where on the Mac: where teams are changed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanlar › Takımların"
           }
         }
       }
@@ -2271,7 +2304,7 @@
       }
     },
     "Bots": {
-      "comment": "Title of the home: the list of bots",
+      "comment": "Group chat: the bots of the team\nTitle of the home: the list of bots",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2623,7 +2656,7 @@
       }
     },
     "Chats": {
-      "comment": "Title of the chat list",
+      "comment": "Group chat: the team's chats\nTitle of the chat list",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4412,6 +4445,17 @@
         }
       }
     },
+    "Dot leads the team: it hands each bot its part and puts their answers together.": {
+      "comment": "Group chat: how a team's chat works",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takımı Dot yönetir: her bota kendi payını verir ve cevaplarını birleştirir."
+          }
+        }
+      }
+    },
     "Dot learns from its own tasks how to work better on this Mac; you choose the habits and tips it follows.": {
       "comment": "Activity: what the proposals of Self-improvement are",
       "localizations": {
@@ -5546,6 +5590,17 @@
         }
       }
     },
+    "First, a few answers": {
+      "comment": "Template: its questions to answer before the bot is made",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce birkaç cevap"
+          }
+        }
+      }
+    },
     "Five parts separated by spaces: minute, hour, day of the month, month, day of the week, in your Mac's time zone. Very frequent schedules are refused.": {
       "comment": "New schedule footer: the cron form",
       "localizations": {
@@ -5945,6 +6000,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zemin · kart ve grup · iç içe ve basılı · sayfa · Saydamlığı Azalt için opak cam."
+          }
+        }
+      }
+    },
+    "Group chat": {
+      "comment": "Group chat: the title before its team is read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grup sohbeti"
+          }
+        }
+      }
+    },
+    "Group chats": {
+      "comment": "Home: the header of the owner's teams",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grup sohbetleri"
           }
         }
       }
@@ -6576,6 +6653,17 @@
         }
       }
     },
+    "Its bots are made where you have none of the name; the ones you have join as they are.": {
+      "comment": "New group chat: what a ready team's Use does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu adda botun yoksa oluşturulur; olanlar oldukları gibi katılır."
+          }
+        }
+      }
+    },
     "Its browser's page is shown here only while a task is going on.": {
       "comment": "Live picture: why an ended run shows no page (web computer.js)",
       "localizations": {
@@ -6627,6 +6715,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalıştıkça çalışmaları burada görünür."
+          }
+        }
+      }
+    },
+    "Its schedule was not added: %@": {
+      "comment": "New bot from a template: the suggested schedule could not be added; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zamanlaması eklenmedi: %@"
           }
         }
       }
@@ -6814,6 +6913,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Açılış"
+          }
+        }
+      }
+    },
+    "Launch, Research desk…": {
+      "comment": "New group chat: example names",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lansman, Araştırma masası…"
           }
         }
       }
@@ -7200,6 +7310,17 @@
         }
       }
     },
+    "Make a bot first, or start from a ready team below.": {
+      "comment": "New group chat: the owner has no bot yet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce bir bot oluştur ya da aşağıdaki hazır takımlardan biriyle başla."
+          }
+        }
+      }
+    },
     "Make a bot with + to give a job its own chat.": {
       "comment": "Home: the hint when the owner has no agent yet",
       "localizations": {
@@ -7240,6 +7361,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekip oluştur"
+          }
+        }
+      }
+    },
+    "Make this bot": {
+      "comment": "Template: makes the bot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu botu oluştur"
           }
         }
       }
@@ -7394,6 +7526,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mesaj taslağı"
+          }
+        }
+      }
+    },
+    "Message the team": {
+      "comment": "Group chat: the placeholder of the new chat's box",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takıma yaz"
           }
         }
       }
@@ -7608,7 +7751,7 @@
       }
     },
     "Name": {
-      "comment": "Rename alert: the field of the chat's new name\nSchedule edit: the name\nThis Mac: the Mac's name",
+      "comment": "New group chat: the field of its name\nRename alert: the field of the chat's new name\nSchedule edit: the name\nThis Mac: the Mac's name",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7662,8 +7805,19 @@
         }
       }
     },
+    "Needs: %@": {
+      "comment": "Template: what its bot needs of the Mac; the argument is that",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gerekenler: %@"
+          }
+        }
+      }
+    },
     "New": {
-      "comment": "Self-improvement: a version nobody tried yet",
+      "comment": "Home: the + menu (a new bot or group chat)\nSelf-improvement: a version nobody tried yet",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7685,12 +7839,23 @@
       }
     },
     "New chat": {
-      "comment": "Chat list toolbar: starts a new chat\nComponent gallery (debug builds): a heading or sample text",
+      "comment": "Chat list toolbar: starts a new chat\nComponent gallery (debug builds): a heading or sample text\nGroup chat: the box that starts a new chat with the team",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Yeni sohbet"
+          }
+        }
+      }
+    },
+    "New group chat": {
+      "comment": "Home: makes a group chat with some bots",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni grup sohbeti"
           }
         }
       }
@@ -10222,6 +10387,17 @@
         }
       }
     },
+    "Ready teams": {
+      "comment": "New group chat: the teams to start from",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hazır takımlar"
+          }
+        }
+      }
+    },
     "Reasoning": {
       "comment": "Chat settings row: the model's reasoning level\nModel picker: the level of reasoning",
       "localizations": {
@@ -11290,7 +11466,7 @@
       }
     },
     "Send": {
-      "comment": "Draft: sends it\nVoiceOver: the composer's send button",
+      "comment": "Draft: sends it\nGroup chat: starts the new chat\nVoiceOver: the composer's send button",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -12242,6 +12418,17 @@
         }
       }
     },
+    "Start from a template": {
+      "comment": "New bot: opens the bots to start from",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şablondan başla"
+          }
+        }
+      }
+    },
     "Start one with the pencil above.": {
       "comment": "Chat list empty state detail",
       "localizations": {
@@ -12892,6 +13079,17 @@
         }
       }
     },
+    "Templates": {
+      "comment": "New bot: the bots to start from",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şablonlar"
+          }
+        }
+      }
+    },
     "Terminal": {
       "comment": "Appearance section: how a command's output is drawn",
       "localizations": {
@@ -13339,6 +13537,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mesaj bu telefona kaydedilemedi. Tekrar dene."
+          }
+        }
+      }
+    },
+    "The message was not kept. Try sending it again.": {
+      "comment": "Group chat: the new chat could not be put in the outbox",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesaj saklanamadı. Yeniden göndermeyi dene."
           }
         }
       }
@@ -15110,6 +15319,17 @@
         }
       }
     },
+    "What is it for? (optional)": {
+      "comment": "New group chat: the field of its purpose",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne için? (isteğe bağlı)"
+          }
+        }
+      }
+    },
     "What is left on Default takes your Mac's setting, or the agent's, when it runs.": {
       "comment": "New schedule: what Default means",
       "localizations": {
@@ -15903,7 +16123,7 @@
       }
     },
     "Your answer": {
-      "comment": "Ask dock: the field of a question's answer",
+      "comment": "Ask dock: the field of a question's answer\nTemplate: the field of an answer",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -15920,6 +16140,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtın telefon çevrimiçi olunca gider"
+          }
+        }
+      }
+    },
+    "Your answers go into its instructions. Leave one empty to skip it.": {
+      "comment": "Template: what the answers do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cevapların talimatlarına eklenir. Atlamak için boş bırak."
           }
         }
       }

@@ -105,7 +105,11 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
 
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
-   per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
+   per agent with its face and its latest line, "+" making a new agent that greets in its chat (from its name and job, or
+   from a template, item 2061: `GET /api/agent-templates`, its questions answered and its suggested schedule added switched
+   off, as the web's Agents page makes one) or a group chat (a team of the owner's bots, or a ready team, item 2061:
+   `POST /api/teams`, `/api/agent-teams/{id}/use`; the home lists the teams under "Group chats", and a team's sheet lists
+   its bots and chats and starts a chat with the team, `team_id`; a team is changed or removed on the Mac), a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
    Work (Work orders, Objectives, with those done or let go below the active ones, and Hand-offs with the two faces and "From → To", each to read, and
    laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; neither the web nor the phone

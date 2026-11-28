@@ -65,6 +65,17 @@ case "$only" in
         'any(r["source"] == "welcome" and "Call no tool" in r["goal"] for r in d)'
     ;;
 esac
+# The "+": a bot made from a template greeted, and a group chat of Scribe whose box started a chat with the team.
+case "$only" in
+*/BotsLiveUITests | *testThePlus*)
+    curl -fsS -H "$main" "$base/api/teams" | check "the group chat Desk holds Scribe" \
+        'any(t["record"]["name"] == "Desk" and [m["name"] for m in t["members"]] == ["Scribe"] for t in d)'
+    curl -fsS -H "$main" "$base/api/runs?limit=40" | check "the team's box started a run of its own" \
+        'any(r["goal"] == "Plan the launch" for r in d)'
+    curl -fsS -H "$main" "$base/api/runs?limit=40" | check "the template's bot had its first meeting" \
+        'sum(1 for r in d if r["source"] == "welcome") >= 1'
+    ;;
+esac
 # The profile's menu paused Scribe, the agent the daemon was seeded with.
 case "$only" in
 */BotsLiveUITests | *testABotsWork*)

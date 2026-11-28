@@ -101,6 +101,7 @@ final class BotsLiveUITests: XCTestCase {
         shot(app, "home")
 
         app.buttons["home.newBot"].tap()
+        app.buttons["home.newBot.bot"].tap()
         let name: XCUIElement = app.textFields["newBot.name"]
         XCTAssertTrue(name.waitForExistence(timeout: 10))
         name.typeText("Scout")
@@ -266,6 +267,50 @@ final class BotsLiveUITests: XCTestCase {
             XCTAssertLessThanOrEqual(row.frame.maxX, window.maxX, "\(name): inside the screen")
         }
         XCTAssertEqual(first.frame.minX + first.frame.width / 2, window.midX, accuracy: 1, "\(name): equal insets left and right")
+    }
+
+    /// The "+" (PLAN §27): a bot from a template, its question answered and its schedule added switched off; then a group
+    /// chat of Scribe, the seeded bot, whose box starts a chat with the team. The script reads both on the daemon's side.
+    func testThePlusMakesABotFromATemplateAndAGroupChat() throws {
+        let app: XCUIApplication = try launch()
+        XCTAssertTrue(app.buttons["home.bot.dot"].waitForExistence(timeout: 20), "Dot, featured on the home")
+        app.buttons["home.newBot"].tap()
+        app.buttons["home.newBot.bot"].tap()
+        let templates: XCUIElement = app.buttons["newBot.templates"]
+        XCTAssertTrue(templates.waitForExistence(timeout: 10))
+        templates.tap()
+        let first: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'template.'")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 20), "the templates the Mac offers")
+        shot(app, "templates")
+        let made: String = String(first.label.split(separator: ",").first ?? "")
+        first.tap()
+        let make: XCUIElement = app.buttons["template.make"]
+        XCTAssertTrue(make.waitForExistence(timeout: 10))
+        shot(app, "template")
+        make.tap()
+        XCTAssertTrue(app.buttons[made].waitForExistence(timeout: 30), "the new bot's chat opens under its pill: \(made)")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        XCTAssertTrue(app.buttons["home.newBot"].waitForExistence(timeout: 20))
+        app.buttons["home.newBot"].tap()
+        app.buttons["home.newTeam"].tap()
+        let name: XCUIElement = app.textFields["newTeam.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        name.tap()
+        name.typeText("Desk")
+        let scribe: XCUIElement = app.switches["newTeam.bot.Scribe"]
+        XCTAssertTrue(scribe.waitForExistence(timeout: 10), "the seeded bot to pick")
+        scribe.tap()
+        shot(app, "new-team")
+        app.buttons["newTeam.create"].tap()
+        let box: XCUIElement = app.textFields["team.message"].exists ? app.textFields["team.message"] : app.textViews["team.message"]
+        XCTAssertTrue(box.waitForExistence(timeout: 20), "the team's sheet opens on its box")
+        box.tap()
+        box.typeText("Plan the launch")
+        shot(app, "team")
+        app.buttons["team.send"].tap()
+        XCTAssertTrue(app.staticTexts["Plan the launch"].waitForExistence(timeout: 30), "the team's new chat opens with the message")
+        shot(app, "team-chat")
     }
 
     func testABotsWorkIsReadInItsProfileAndTheMenuPausesAndResumesIt() throws {

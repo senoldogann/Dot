@@ -64,6 +64,33 @@ extension AppModel {
         return .success(record)
     }
 
+    /// Makes a bot from a template with the owner's answers to its questions, then starts its first meeting as
+    /// `createBot` does; with `schedule`, adds the schedule the template suggests, switched off (item 464). A meeting or a
+    /// schedule that could not be added leaves the bot made, and its chat says why (`welcomeProblems`).
+    func createBot(from template: BotTemplate, answers: [String], schedule: Bool) async -> Result<AgentRecord, SettingsFailureBox> {
+        let made: Result<AgentRecord, SettingsFailureBox> = await write { api throws(DaemonRequestError) in try await api.useBotTemplate(template.id, answers: answers) }
+        guard case .success(let record) = made else { return made }
+        let language: String = Locale(identifier: "en").localizedString(forLanguageCode: Locale.current.language.languageCode?.identifier ?? "en") ?? "English"
+        if case .failure(let box) = await write({ api throws(DaemonRequestError) in try await api.welcome(agent: record.id, language: language) }) {
+            welcomeProblems[record.id] = box.failure
+        }
+        if schedule, !template.cron.isEmpty,
+            case .failure(let box) = await write({ api throws(DaemonRequestError) in try await api.addSuggestedSchedule(template, bot: record) })
+        {
+            welcomeProblems[record.id] = .other(
+                String(
+                    localized: "Its schedule was not added: \(failureWords(box.failure, macPlace: agentsOnTheMac))",
+                    comment: "New bot from a template: the suggested schedule could not be added; the argument is why"))
+        }
+        await loadAgents()
+        return .success(record)
+    }
+
+    /// Reads the owner's teams again, for the home's group chats; a failure keeps what was read.
+    func loadTeams() async {
+        if case .loaded(let read) = await read({ api throws(DaemonRequestError) in try await api.teams() }) { teams = read }
+    }
+
     func renameBot(_ record: AgentRecord, to name: String) async -> SettingsFailure? {
         switch await write({ api throws(DaemonRequestError) in try await api.updateAgent(record.id, AgentRequest.renamed(record, to: name)) }) {
         case .success:
