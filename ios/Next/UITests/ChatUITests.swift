@@ -263,7 +263,6 @@ final class ChatUITests: XCTestCase {
         // Sized to its content: three steps are no tall empty sheet.
         let window: CGRect = app.windows.firstMatch.frame
         let planBar: XCUIElement = app.navigationBars["Plan"]
-        print("plan sheet: bar \(planBar.frame) window \(window)")
         XCTAssertGreaterThan(planBar.frame.minY, window.height * 0.4, "the sheet takes the height its steps need: \(planBar.frame)")
         let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         sheet.name = "plan-sheet"
