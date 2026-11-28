@@ -40,6 +40,44 @@ final class ActivityTests: XCTestCase {
         XCTAssertEqual(ActivityDaemon.seen.last?.query, "since=1000.0")
     }
 
+    func testPushRegistersEachTokenOnItsOwnPairedRoute() async throws {
+        let device: PhonePushToken = try XCTUnwrap(PhonePushToken(Data(repeating: 0xab, count: 32)))
+        let activity: PhonePushToken = try XCTUnwrap(PhonePushToken(Data(repeating: 0x0f, count: 40)))
+        let routes: [String] = [
+            "POST /api/phone/apns", "POST /api/phone/live-start-token", "POST /api/phone/apns/activity",
+            "DELETE /api/phone/apns/activity", "DELETE /api/phone/live-start-token",
+        ]
+        for route in routes { ActivityDaemon.answer(route, 204, "") }
+        let daemon: DaemonAPI = api()
+        try await daemon.registerDevicePush(device, environment: .sandbox)
+        try await daemon.registerLiveStart(activity)
+        try await daemon.registerFleetPush(activity)
+        try await daemon.forgetFleetPush(activity)
+        try await daemon.forgetLiveStart()
+        let requests: [ActivityDaemon.Seen] = ActivityDaemon.seen
+        XCTAssertEqual(requests.map(\.line), routes)
+        let deviceBody: [String: JSONValue] = try JSONDecoder().decode([String: JSONValue].self, from: XCTUnwrap(requests.first?.body))
+        XCTAssertEqual(deviceBody, ["device_token": .string(String(repeating: "ab", count: 32)), "start_token": .null, "environment": .string("sandbox")])
+        let fleetBody: [String: String] = try JSONDecoder().decode([String: String].self, from: XCTUnwrap(requests.dropFirst(2).first?.body))
+        XCTAssertEqual(fleetBody, ["run_id": "fleet", "token": String(repeating: "0f", count: 40)])
+        XCTAssertEqual(requests.dropFirst(3).first?.query, "token=" + String(repeating: "0f", count: 40))
+        XCTAssertNil(PhonePushToken(Data(repeating: 0, count: 31)))
+        XCTAssertNil(PhonePushToken(Data(repeating: 0, count: 257)))
+        XCTAssertEqual(PhonePushEnvironment(entitlement: "production"), .production)
+        XCTAssertEqual(PhonePushEnvironment(entitlement: "development"), .sandbox)
+        XCTAssertNil(PhonePushEnvironment(entitlement: ""))
+    }
+
+    func testAppleAndWidgetLinksAcceptOnlyAnExactRunRoute() throws {
+        let run: String = "run_a9_2"
+        XCTAssertEqual(PhoneRunLink.run(inRoute: "#/runs/" + run), run)
+        XCTAssertEqual(PhoneRunLink.run(inURL: try XCTUnwrap(PhoneRunLink.url(forRun: run))), run)
+        XCTAssertNil(PhoneRunLink.run(inRoute: "#/runs/" + run + "/anything"))
+        XCTAssertNil(PhoneRunLink.run(inRoute: "#/runs/" + run + "?x=1"))
+        XCTAssertNil(PhoneRunLink.run(inURL: try XCTUnwrap(URL(string: "dotnext://run/" + run + "#elsewhere"))))
+        XCTAssertNil(PhoneRunLink.run(inURL: try XCTUnwrap(URL(string: "dotagent://run/" + run))))
+    }
+
     func testMarkingReadSendsTheMomentShown() async throws {
         ActivityDaemon.answer("POST /api/away/read", 200, #"{"read_at":1795584148.06}"#)
         let read: AwayRead = try await api().markAwayRead(until: 1_795_584_148.06)

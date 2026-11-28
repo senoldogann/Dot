@@ -1236,17 +1236,6 @@
         }
       }
     },
-    "A message Dot wrote for you to send": {
-      "comment": "Push kind description",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un senin göndermen için yazdığı bir mesaj"
-          }
-        }
-      }
-    },
     "A message written while Dot works waits here and starts after the run.": {
       "comment": "Queue sheet empty state detail",
       "localizations": {
@@ -1342,6 +1331,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir kampanyanın oturumu"
+          }
+        }
+      }
+    },
+    "A task failed": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev başarısız oldu"
+          }
+        }
+      }
+    },
+    "A task is blocked": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev ilerleyemedi"
+          }
+        }
+      }
+    },
+    "A task is done": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev bitti"
           }
         }
       }
@@ -4199,13 +4224,13 @@
         }
       }
     },
-    "Done or failed": {
+    "Done, failed or blocked": {
       "comment": "Push kind: a task ended",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bitti ya da başarısız oldu"
+            "value": "Bitti, başarısız oldu veya ilerleyemedi"
           }
         }
       }
@@ -4228,17 +4253,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot"
-          }
-        }
-      }
-    },
-    "Dot Next gets notifications once it replaces the old Dot app on this iPhone; until then the old app keeps them. These switches are kept on your Mac for this phone.": {
-      "comment": "Notifications footer: no push before the swap (owner's decision)",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot Next bildirimleri bu iPhone'daki eski Dot uygulamasının yerini aldığında alır; o zamana kadar bildirimler eski uygulamada kalır. Bu anahtarlar Mac'inde bu telefon için saklanır."
           }
         }
       }
@@ -4364,6 +4378,18 @@
         }
       }
     },
+    "Dot asks for approval": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot onay istiyor"
+          }
+        }
+      }
+    },
     "Dot asks only before a payment, a message or mail sent for you, or a public post": {
       "comment": "Approval mode yolo, its hint",
       "localizations": {
@@ -4419,6 +4445,18 @@
         }
       }
     },
+    "Dot has a question": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un bir sorusu var"
+          }
+        }
+      }
+    },
     "Dot is asking you": {
       "comment": "Ask dock title: a question",
       "localizations": {
@@ -4448,6 +4486,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot bir Mac ile eşleşmemiş. Ayarlar › Ses'te Bu cihaz'ı seç."
+          }
+        }
+      }
+    },
+    "Dot is working": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot çalışıyor"
           }
         }
       }
@@ -4503,6 +4553,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot bu adımı senin yapmanı istiyor"
+          }
+        }
+      }
+    },
+    "Dot needs your help": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un yardımınıza ihtiyacı var"
           }
         }
       }
@@ -4812,17 +4874,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mesaj taslağı"
-          }
-        }
-      }
-    },
-    "Drafts ready": {
-      "comment": "Push kind: a draft waits to be sent",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taslaklar hazır"
           }
         }
       }
@@ -9150,6 +9201,18 @@
         }
       }
     },
+    "Open Dot to see it.": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görmek için Dot'u açın."
+          }
+        }
+      }
+    },
     "Open Tailscale": {
       "comment": "Pairing screen: opens the Tailscale app",
       "localizations": {
@@ -12454,6 +12517,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbet başlatılıyor…"
+          }
+        }
+      }
+    },
+    "Starting…": {
+      "comment": "Live Activity: waiting for the first task update",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başlıyor…"
           }
         }
       }
@@ -16059,6 +16134,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'in bu telefonun anahtarını reddetti. Yeniden eşleştir."
+          }
+        }
+      }
+    },
+    "Your Mac remembers which task notifications to send to this phone.": {
+      "comment": "Notifications footer: these preferences belong to this phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac’iniz bu telefona hangi görev bildirimlerini göndereceğini hatırlar."
           }
         }
       }

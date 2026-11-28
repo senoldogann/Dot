@@ -178,6 +178,8 @@ export const EN_APP = {
   "attachments.removeTheFilesThatFailed": "Remove the files that failed to upload, or attach them again",
   // attention.js
   "attention.aTaskIsDone": "A task is done",
+  "attention.aTaskIsBlocked": "A task is blocked",
+  "attention.openDotToSeeIt": "Open Dot to see it.",
   "attention.aTaskFailed": "A task failed",
   "attention.aTaskWasStopped": "A task was stopped",
   "attention.dotHasAQuestion": "Dot has a question",
