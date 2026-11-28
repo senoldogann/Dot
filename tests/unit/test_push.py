@@ -408,6 +408,13 @@ async def test_a_busy_push_service_is_asked_once_more(tmp_path: Path, monkeypatc
     assert answers == []
 
 
+def test_a_blocked_end_is_told_under_needs_you() -> None:
+    blocked: PushMessage | None = push_message(
+        _event("run_finished", {"status": "failed", "goal_blocked": True, "result": "x"}), _run(None)
+    )
+    assert blocked is not None and message_group("run_finished", blocked) == "needs_you"
+
+
 def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_session_is_told_here() -> None:
     """Item 461: a run a schedule started is told by its schedule, at its level (``schedule_run_ended``); a campaign's
     session carries the same source and keeps the run's own notice."""
@@ -435,10 +442,6 @@ def test_the_end_of_a_run_that_waits_on_the_owner_says_it_waits_not_done() -> No
     # Told with what waits on the owner, so that a phone's switch of that kind decides it, not the one of what ended.
     told: PushMessage | None = push_message(waiting, _run(None))
     assert told is not None and message_group("run_finished", told) == "needs_you"
-    blocked: PushMessage | None = push_message(
-        _event("run_finished", {"status": "failed", "goal_blocked": True, "result": "x"}), _run(None)
-    )
-    assert blocked is not None and message_group("run_finished", blocked) == "needs_you"
     done: PushMessage | None = push_message(_event("run_finished", {"status": "done", "result": "Done."}), _run(None))
     assert done is not None and message_group("run_finished", done) == "done"
     # A failed run that said what it needs waits on the owner too (item 1061), as the web and the phone show it.

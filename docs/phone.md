@@ -802,12 +802,12 @@ Which of the three kinds of push the phone is told (item 1421). The switches are
 app through APNs; the Live Activity is not a kind of push and goes as before. A phone that never set them is told all
 three.
 
-- `needs_you`: something waits for your answer: an approval, a question (also one a run left), a secret, a hand-off;
+- `needs_you`: something waits for your answer: an approval, a question (also one a run left), a secret, a hand-off, the end of a run that is blocked or waits on you;
   and Dot's own failures that you are to look at (a schedule that did not run or was switched off, learning that
   stopped, a restart after an unexpected stop), so that switching the ends of tasks off does not silence them.
 - `ready`: something is ready for you to look over: a draft written for you to send, and what Dot tells you on its own
   (the morning brief, what a watcher found).
-- `done`: a run's successful, failed or blocked end, or the notice of a schedule's run or a campaign.
+- `done`: a run's successful or failed end that does not wait on you, or the notice of a schedule's run or a campaign.
   A schedule's level of notices decides, as before, whether its run's end is told; this switch decides whether the
   phone hears what was told.
 
