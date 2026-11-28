@@ -9,6 +9,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2101](2101.md) | done | 2026-11-28 | Main's macOS gate: the phone tests count the WebDriverAgent tool alone, the full surface leaves out the Dot Next tools |
 | [2099](2099.md) | done | 2026-11-28 | The web's file panel draws code, Markdown and grids a page at a time, through item 2017's code view |
 | [2098](2098.md) | done | 2026-11-28 | A file's preview on the iPhone reads by its format: Markdown formatted, tables as grids, the end clear of the controls |
+| [2095](2095.md) | done | 2026-11-28 | Desktop shell: opens at login, keeps its window's place, speaks the web UI's language, looks for updates daily |
 | [2091](2091.md) | done | 2026-11-28 | Evals from real runs graded on trajectory, skill ablation, cost per call |
 | [2090](2090.md) | done | 2026-11-28 | The lint of a skill Dot writes |
 | [2089](2089.md) | done | 2026-11-28 | Desktop shell check-over: the menu bar item is set only when what it shows changes |

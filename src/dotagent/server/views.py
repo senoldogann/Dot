@@ -210,6 +210,21 @@ class AssistantRequest(FrozenModel):
     introduced: bool | None = None
 
 
+class DesktopAppView(FrozenModel):
+    """``[desktop_app]`` as the config file holds it: whether the desktop shell opens at login, and the language of its
+    own words."""
+
+    start_at_login: bool
+    language: Literal["en", "tr"]
+
+
+class DesktopAppRequest(FrozenModel):
+    """A change of ``[desktop_app]``; what is left out stays as it is."""
+
+    start_at_login: bool | None = None
+    language: Literal["en", "tr"] | None = None
+
+
 # The first steps of a Dot that has just started with an empty store (item 811): the owner's name, the passwords of the
 # vault, iMessage, the phone, the connected apps and a first chat.
 type FirstStepId = Literal["name", "passwords", "imessage", "phone", "apps", "chat"]
