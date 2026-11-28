@@ -12,6 +12,11 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # The Dot Next app's own asks (item 2051), in the web's words.
+    "iPhone calendar": "iPhone takvimi",
+    "Add to iPhone calendar": "iPhone takvimine ekle",
+    "Add iPhone reminder": "iPhone anımsatıcısı ekle",
+    "iPhone location": "iPhone konumu",
     # Activity's skill and plugin proposals (item 2062).
     "Install a plugin the review rates risky?": "İncelemenin riskli bulduğu eklenti kurulsun mu?",
     "Use a skill written from outside content?": "Dış içerikten yazılmış beceri kullanılsın mı?",

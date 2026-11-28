@@ -78,6 +78,9 @@ AUTO: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "auto"})
         ("watch_video", "video"),
         ("mail_search", "accounts"),
         ("calendar_events", "accounts"),
+        ("phone_calendar_add", "phone_app"),
+        ("phone_location", "phone_app"),
+        ("phone_status", "phone"),
         ("mcp__github__create_issue", "mcp__github"),
         ("mcp__team-wiki__search__all", "mcp__team-wiki"),
     ],
@@ -110,6 +113,8 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "meetings",
         "video",
         "terminal",
+        # The Dot Next app's calendars, reminders and location (item 2051).
+        "phone_app",
         "desktop",
     )
     # A research run makes no agent (item 307), so it has no team group; message_agent is core. It reads the owner's
@@ -129,6 +134,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "skills",
         "meetings",
         "video",
+        "phone_app",
         "desktop",
     )
     core: tuple[ToolSpec, ...] = offered_specs(TASK_SPECS, frozenset({CORE_GROUP}))
@@ -192,6 +198,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "memory_admin",
         "office",
         "pages",
+        "phone_app",
         "images",
         "appearance",
         "worktree",
@@ -297,6 +304,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "(watch_video)",
         "- terminal: programs that ask questions, REPLs and servers that stay up, on a terminal of their own "
         "(terminal_open, terminal_send, terminal_read, terminal_close)",
+        "- phone_app: the owner's iPhone through the Dot Next app, while it is open: its calendars, reminders and "
+        "place (phone_calendar_events, phone_calendar_add, phone_reminder_add, phone_location)",
         "- desktop: the Mac's applications, windows, clipboard and AppleScript, and Safari's pages (desktop_apps, "
         "desktop_open_app, desktop_snapshot, desktop_screenshot, desktop_act, desktop_read, desktop_clipboard_read, "
         "desktop_clipboard_write, apple_script, safari_open, safari_read, safari_act)",

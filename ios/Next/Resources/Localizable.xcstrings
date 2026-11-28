@@ -1635,6 +1635,17 @@
         }
       }
     },
+    "Add iPhone reminder": {
+      "comment": "Tool row: a reminder added on the iPhone through Dot Next",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone anımsatıcısı ekle"
+          }
+        }
+      }
+    },
     "Add it": {
       "comment": "Rules: confirm adding the previewed draft",
       "localizations": {
@@ -1664,6 +1675,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zamanlama ekle"
+          }
+        }
+      }
+    },
+    "Add to iPhone calendar": {
+      "comment": "Tool row: an event added to the iPhone's calendar through Dot Next",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone takvimine ekle"
           }
         }
       }
@@ -17461,6 +17483,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "sağlık acil durdur sürüm"
+          }
+        }
+      }
+    },
+    "iPhone calendar": {
+      "comment": "Tool row: the iPhone's calendars read through Dot Next",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone takvimi"
+          }
+        }
+      }
+    },
+    "iPhone location": {
+      "comment": "Tool row: the iPhone's location asked through Dot Next",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone konumu"
           }
         }
       }

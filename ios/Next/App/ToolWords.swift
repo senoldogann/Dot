@@ -55,6 +55,14 @@ func isDotTool(_ entry: ToolEntry) -> Bool {
 /// A tool's name in words as the web says it: `draft_reply` reads "Draft reply", a connected app's
 /// `mcp__microsoft-learn__search` reads "Microsoft Learn · Search".
 func toolName(_ tool: String) -> String {
+    // The Dot Next app's own asks (item 2051), in the web's words (`tools.js`).
+    switch tool {
+    case "phone_calendar_events": return String(localized: "iPhone calendar", comment: "Tool row: the iPhone's calendars read through Dot Next")
+    case "phone_calendar_add": return String(localized: "Add to iPhone calendar", comment: "Tool row: an event added to the iPhone's calendar through Dot Next")
+    case "phone_reminder_add": return String(localized: "Add iPhone reminder", comment: "Tool row: a reminder added on the iPhone through Dot Next")
+    case "phone_location": return String(localized: "iPhone location", comment: "Tool row: the iPhone's location asked through Dot Next")
+    default: break
+    }
     let parts: [Substring] = tool.split(separator: "__", omittingEmptySubsequences: false).map { $0 }
     if parts.count >= 3, parts[0] == "mcp" {
         let server: String = String(parts[1])

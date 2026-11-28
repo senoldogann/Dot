@@ -23,6 +23,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2065](2065.md) | done | 2026-11-28 | A code review whose chat has a run under way starts in a new chat instead of failing |
 | [2062](2062.md) | done | 2026-11-28 | DotNext's Activity answers Dot's skill and plugin proposals |
 | [2055](2055.md) | done | 2026-11-28 | Read rules and add a rule that asks or hands a step back from Dot Next |
+| [2051](2051.md) | done | 2026-11-28 | The iPhone's calendars, reminders and location, from Dot Next |
 | [2050](2050.md) | done | 2026-11-28 | The old iPhone app's dictation loses no word on a pause either |
 | [2048](2048.md) | done | 2026-11-28 | A pause in a dictation loses no word, on the phone and the web |
 | [2046](2046.md) | done | 2026-11-27 | A coding helper hands its pull request checks to the chat's background watcher |

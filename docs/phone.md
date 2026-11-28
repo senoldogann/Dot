@@ -865,6 +865,65 @@ the app's own `open_min`, `dot_in_mb`, `dot_out_mb`, `requests`, `reconnects` (t
 Errors: 403 for the Mac's token (a record is a phone's own; one phone never reads another's); 404 for a phone removed
 while its `POST` was on its way. Removing a phone drops its record.
 
+### Dot's asks to the phone (item 2051)
+
+A run reads the calendars of the owner's iPhone, adds an event or a reminder there, and asks where the phone is, with
+four tools in the group `phone_app`: `phone_calendar_events`, `phone_calendar_add`, `phone_reminder_add` and
+`phone_location`. Dot Next does them on the phone, through EventKit and Core Location (when in use). A run has these tools
+only while a phone is paired (`phones.json` lists one; a run does not start while that file cannot be read, as the
+daemon does not, and the error says to fix or delete it); the group is off at a run's first step, as every group but core,
+and is turned on with `use_tools`.
+
+The daemon cannot open a connection to the phone, so the phone holds one open to the daemon: while Dot Next is on the
+screen it calls `GET /api/phone/asks/next`, which answers the next ask meant for that phone (200) or nothing after 20
+seconds (204), and calls again at once. The answer of an ask goes to `POST /api/phone/asks/{id}` as `{"answer": ...}`
+(204). Only a paired phone's own key reaches either (403 for the Mac's token); an ask is the phone's that took it (404
+for another phone's, or one whose run stopped waiting), and an answer that cannot be read is a 422 (below). iOS lets the
+app's requests go only while it is in front: when it goes to the background the request ends, and a run that asks then
+is told at once that the iPhone cannot be reached and why (Dot Next answers only while it is open). An ask the phone
+does not take within 6 seconds, or does not answer within 75 (the first time, the owner answers iOS's permission
+question first), fails with words that say so; for an add, that whether it was done is not known. The asks live in the
+daemon's memory (`dotagent.phone.asks.PhoneLink`): a restart drops them, and the runs that waited are told.
+
+The asks, each with an `id` and a `kind`; a moment is ISO 8601 with its offset (the Mac's time zone, as a run gives it),
+a day is `yyyy-MM-dd`:
+
+- `calendar_events`: `start`, `end` (moments), `query` (words of the title, place or notes; empty for every event),
+  `limit` (1 to 100).
+- `calendar_add`: `title`, `start`, `end`, `all_day` (with days, `end` the day after the last), `location`, `notes`,
+  `calendar` (a calendar's name; empty for the phone's default for new events).
+- `reminder_add`: `title`, `due` (a moment, a day or `null`), `notes`, `list` (empty for the default list). A due moment
+  also sets an alert at it.
+- `location`: nothing more.
+
+The answers, by `kind`:
+
+- `events`: `events`, each with `id`, `title`, `start`, `end`, `all_day`, `location`, `notes`, `calendar`,
+  `organizer`, and `more` (the time holds more than were listed). The run reads them fenced as content others wrote, as
+  the calendars of the signed-in accounts, so it is tainted by them.
+- `created`: `id` (the event's or the reminder's on the phone) and `calendar` (the calendar or list it went to). The run
+  reads the name fenced, and is tainted by it: a shared or subscribed calendar is named by someone else.
+- `location`: `latitude`, `longitude`, `accuracy_m`, `at` (a moment).
+- `refused`: `reason` (`denied`: the owner said no, or took it back in iOS Settings › Apps › Dot Next; `restricted`:
+  the phone's restrictions forbid it; `failed`: it tried and could not, such as no calendar of that name) and
+  `message`. A permission refused or restricted is said to the run in Dot's own words, with where the owner gives it
+  back; a failure's `message` reaches it fenced, and taints it, since it may list calendars' names.
+
+A time the run could not read (an all-day event whose `start` or `end` is not a day, a moment with no offset, an event
+that ends before it starts, a location's `at` that is not a moment), or an answer of another kind than the ask, makes
+the answer a 422 and ends the run's wait at once: it reads, in Dot's own words, that the answer could not be read and
+that Dot Next and Dot may be of different versions.
+
+Each permission is asked by iOS the first time an ask needs it, never when the app starts: full access to the calendars
+(reading needs it, so an add asks for it too), full access to Reminders, and the location while the app is in use. The
+words iOS shows are in Info.plist in English and in `tr.lproj/InfoPlist.strings` in Turkish.
+
+To the policy a read (`phone_calendar_events`, `phone_location`) is a `read` and an add (`phone_calendar_add`,
+`phone_reminder_add`) is an `app_control` of medium risk, with no flag: it goes through the run's approval mode as any
+other change in one of the owner's apps (cautious and Supervised ask, balanced and aggressive do it, yolo and free mode
+ask nothing), and a research run is offered no add. The web and the phone name each call in the same words in a chat's
+work log (*iPhone calendar*, *Add to iPhone calendar*, *Add iPhone reminder*, *iPhone location*).
+
 ### GET /api/needs-you
 
 Everything that waits on you, in one list, for the app's list and badge (item 1422): the approvals a run waits for, its

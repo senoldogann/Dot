@@ -4,8 +4,9 @@ The core group holds what most runs need: the files, the shell, the web, searchi
 skills, the helper models and the meta tools (the plan, questions, finish). The other groups are named after what they
 reach: ``browser`` (Chrome), ``desktop`` (the Mac's applications and AppleScript), ``schedule`` (goals that run later),
 ``memory_admin`` (correcting and forgetting notes), ``pages`` (pages of HTML shown in the conversation), ``drafts`` (an
-email or a message for the owner to send), ``accounts`` (the mail and calendars of the accounts the owner signed in) and
-one group per MCP server, ``mcp__<server>``. Which groups are on is up to
+email or a message for the owner to send), ``accounts`` (the mail and calendars of the accounts the owner signed in),
+``phone_app`` (the calendars, reminders and location of the owner's iPhone through Dot Next) and one group per MCP
+server, ``mcp__<server>``. Which groups are on is up to
 the loop; everything here is pure.
 """
 
@@ -23,6 +24,8 @@ BROWSER_GROUP: str = "browser"
 ACCOUNTS_GROUP: str = "accounts"
 # Dot's own list (item 715), on from the start of a run of its own initiative (item 912).
 TODOS_GROUP: str = "todos"
+# The Dot Next app's calendars, reminders and location (item 2051), a run's only while a phone is paired.
+PHONE_APP_GROUP: str = "phone_app"
 # Handing a reply to the chat that sent the mail (item 926), on from the start of a schedule's and a watcher's run.
 REPLIES_GROUP: str = "replies"
 
@@ -73,6 +76,12 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "track_coding_work": "worktree",
     # The owner's saved contact details (item 621).
     "vault_contacts": "vault",
+    # The Dot Next app on the owner's iPhone (item 2051): its calendars, reminders and location, apart from the
+    # WebDriverAgent tools of the phone_ prefix.
+    "phone_calendar_events": PHONE_APP_GROUP,
+    "phone_calendar_add": PHONE_APP_GROUP,
+    "phone_reminder_add": PHONE_APP_GROUP,
+    "phone_location": PHONE_APP_GROUP,
     # Dot's own list of work for later (item 715).
     "pass_reply": REPLIES_GROUP,
     "todo_add": TODOS_GROUP,
@@ -99,6 +108,9 @@ _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
     "meetings": "the owner's Google Meet call: joining it to take notes and answer, reading them, posting on their yes",
     "phone": "the owner's iPhone over WebDriverAgent: whether it answers and whether it is locked",
+    PHONE_APP_GROUP: (
+        "the owner's iPhone through the Dot Next app, while it is open: its calendars, reminders and place"
+    ),
     "desktop": "the Mac's applications, windows, clipboard and AppleScript, and Safari's pages",
     "schedule": "goals that run later, once or on a cron expression",
     "terminal": "programs that ask questions, REPLs and servers that stay up, on a terminal of their own",

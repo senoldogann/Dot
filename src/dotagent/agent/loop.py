@@ -252,7 +252,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import agent_folder
+from dotagent.core.paths import agent_folder, phones_path
 from dotagent.core.text import CHARS_PER_TOKEN, redact_known, truncate_middle
 from dotagent.core.together import await_together
 from dotagent.core.types import FrozenModel, JsonObject
@@ -314,6 +314,7 @@ from dotagent.scheduler.timing import format_local
 from dotagent.scopes import authorising_if_readable
 from dotagent.secrets import known_secrets
 from dotagent.server import REVIEW_SOURCE
+from dotagent.server.phones import any_paired
 from dotagent.skills.catalog import load_skills, playbook_root, unreported
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.endings import (
@@ -383,6 +384,7 @@ from dotagent.tools.office import (
     READ_CHAT_TOOL,
     SEND_TO_CHAT_TOOL,
 )
+from dotagent.tools.phone_app import PHONE_APP_TOOLS
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.recall import RECALL_TOOL
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
@@ -2980,7 +2982,8 @@ async def withheld_tools(
 ) -> frozenset[str]:
     """The tools of ``offered`` that ``run`` is not given now, by what Dot holds as it starts, the same for a run of
     Dot's own loop and one on the owner's Claude plan (items 1063 and 1068): the browser's while Settings › Browser
-    keeps every run off it (item 354); the mail and calendars (item 424) without an account ``signed_in``; the logins
+    keeps every run off it (item 354); the mail and calendars (item 424) without an account ``signed_in``; the Dot Next
+    app's calendars, reminders and location (item 2051) with no phone paired; the logins
     of 1Password (item 493) while it is not connected, and those of Dot's own vault (item 621) while it holds none;
     messaging and work orders with no teammate, unless the run may make one (item 99: then they stay, so a teammate
     made mid-run can be messaged at once); the objectives in an agent's run (item 908: they are Dot's own); the skill
@@ -2997,6 +3000,8 @@ async def withheld_tools(
         names.add(CONSULT_TOOL)
     if not signed_in:
         names |= {name for name in offered if group_of(name) == ACCOUNTS_GROUP}
+    if not await asyncio.to_thread(any_paired, phones_path()):
+        names |= PHONE_APP_TOOLS
     if not team and CREATE_AGENT_TOOL not in offered:
         names |= {MESSAGE_AGENT_TOOL, *WORK_ORDER_TOOLS}
     if run.agent_id is not None:

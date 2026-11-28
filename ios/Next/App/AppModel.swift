@@ -51,6 +51,8 @@ final class AppModel {
     private(set) var heard: Int = 0
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
+    /// Dot's asks to this phone (item 2051): its calendars, reminders and place, taken while the app is in front.
+    @ObservationIgnored private var asks: PhoneAskLoop?
     @ObservationIgnored private var push: PhonePush?
     var requestedRun: String?
     @ObservationIgnored private(set) var visiblePushThread: String?
@@ -327,6 +329,9 @@ final class AppModel {
             }
         }
         Task { await engine.supervisor.start() }
+        let asks: PhoneAskLoop = PhoneAskLoop(api: api, handler: PhoneAsks(), clock: SystemClock())
+        self.asks = asks
+        Task { await asks.start() }
         perf.start()
         perf.appeared()
         Task { await perf.send(with: api) }
@@ -385,6 +390,8 @@ final class AppModel {
         requestedRun = nil
         visiblePushThread = nil
         await engine.supervisor.stop()
+        await asks?.stop()
+        asks = nil
         await engine.outbox.clear()
         await engine.store.clear()
         watching?.cancel()
@@ -409,6 +416,7 @@ final class AppModel {
             push?.show(list)
             PhaseMeter.resume()
             perf.appeared()
+            Task { await asks?.start() }
             Task {
                 await engine.supervisor.enterForeground()
                 // The record of the times away goes now, with the app open: nothing is sent from the background.
@@ -418,6 +426,7 @@ final class AppModel {
             PhaseMeter.enter("background")
             perf.disappeared()
             Task { await engine.supervisor.enterBackground() }
+            Task { await asks?.stop() }
         default: break
         }
     }
