@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 from dotagent.core.types import FrozenModel
+from dotagent.store.models import RunStatus
 
 # The words that are a stop and nothing else, folded (item 1982: "dur" and "stop", the owner's word of 2026-11-27).
 STOP_WORDS: frozenset[str] = frozenset({"dur", "durdur", "durun", "stop", "halt"})
@@ -93,6 +94,7 @@ class ChatTask(FrozenModel):
 
     thread_id: str
     newest_run_id: str
+    status: RunStatus
     goal: str
     at_work: bool
     asked: str | None

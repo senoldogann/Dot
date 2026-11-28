@@ -76,6 +76,10 @@ final class ContractSchemaTests: XCTestCase {
         try check(QueueView.self, "QueueView")
         try check(RunRecord.self, "RunRecord")
         try check(ApprovalRecord.self, "ApprovalRecord")
+        try check(TasksView.self, "TasksView")
+        try check(ChatTaskView.self, "ChatTaskView")
+        try check(RoutedMessage.self, "RoutedMessage")
+        try check(ThreadRecord.self, "ThreadRecord")
     }
 
     func testTheContractStillNamesTheStreamsOwnKindsAndTheFiveSecondKeepalive() throws {

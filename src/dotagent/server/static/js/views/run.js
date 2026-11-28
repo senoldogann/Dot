@@ -45,6 +45,8 @@ import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
+import { chatTasks } from "../tasks.js";
+import { openTasks, routedWords } from "../taskwords.js";
 import { splitQuote } from "../quotebutton.js";
 import { createQueue } from "../queue.js";
 import { recapSection } from "../recap.js";
@@ -251,10 +253,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // The run is stopped from the composer's send while the box is empty, or from a delegated run's pill (item 120).
   function stopRun() {
     attempt(async () => {
+      // The Stop of a chat with several tasks stops every one of them (item 2013, the owner's word of 2026-11-27); each
+      // task's row has its own Stop.
+      const many = tasksNow !== null && tasksNow.tasks.length > 0;
+      const path = many ? `/threads/${tasksNow.chat_id}/stop` : `/runs/${runId}/cancel`;
       // With no link the Stop is kept and sent when the link is back, in order with what else was done (item 1523).
-      const stopped = await viaOutbox({ kind: "stop", chat: run.thread_id, method: "POST", path: `/runs/${runId}/cancel`, body: null }, () =>
-        api.post(`/runs/${runId}/cancel`, null),
-      );
+      const stopped = await viaOutbox({ kind: "stop", chat: run.thread_id, method: "POST", path, body: null }, () => api.post(path, null));
+      tasks.refresh();
       if (stopped !== null && typeof stopped === "object" && "kept" in stopped) {
         return;
       }
@@ -847,6 +852,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       queueNow = summary;
       paintCapsule();
     },
+    onRouted: (routed) => tellRouted(routed),
   });
   // ⌘⇧Enter sends what the box holds the other way than the send does (`steers`): to the run now, past the queue, or
   // into the queue where a message steers; with the box empty, it sends the queue's next message to the run. Escape
@@ -996,6 +1002,71 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       paintCapsule();
     },
   });
+  // The tasks of a chat with several (item 2013): their rows over the composer, a capsule's segment on a phone, and on a
+  // task's own page the line that says whose task it is.
+  /** @type {import("../taskwords.js").ChatTasks | null} */
+  let tasksNow = null;
+  const laneText = el("span", { class: "lane-line-text" });
+  const laneBack = el("button", { class: "btn ghost sm", type: "button", onclick: () => backToChat() }, t("tasks.back"));
+  const laneLine = el("div", { class: "lane-line", role: "note", hidden: true }, icon("layers"), laneText, laneBack);
+  const tasks = chatTasks({
+    threadId: run.thread_id,
+    onChange: (info) => {
+      tasksNow = info;
+      const lane = info !== null && info.chat_id !== run.thread_id;
+      laneLine.hidden = !lane;
+      if (lane) {
+        setText(laneText, t("tasks.taskOf", { chat: info.chat_title }));
+      }
+      paintCapsule();
+    },
+  });
+
+  /** Open the chat this task's page belongs to, at its newest run. */
+  function backToChat() {
+    const own = tasksNow?.tasks.find((task) => task.own);
+    if (own !== undefined) {
+      goOn(`/runs/${own.run_id}`);
+    }
+  }
+
+  /** Say where a message sent to a chat with several tasks went, with the way to it and Move (item 2013). */
+  async function tellRouted(routed) {
+    await tasks.refresh();
+    const chatId = tasksNow?.chat_id ?? run.thread_id;
+    const words = routedWords(routed, run.thread_id, chatId, tasks.titleOf(routed.thread_id));
+    if (words === null) {
+      return;
+    }
+    const open = () => {
+      const task = tasksNow?.tasks.find((each) => each.thread_id === routed.thread_id);
+      const target = routed.run_id ?? task?.run_id;
+      if (target !== undefined) {
+        goOn(`/runs/${target}`);
+      }
+    };
+    toast("ok", words.text, words.move ? { label: t("tasks.move"), run: () => moveRouted(routed) } : words.open ? { label: t("tasks.open"), run: open } : null);
+  }
+
+  /** Move a message the router sent to the wrong task: to another task of the chat, or to a new one. */
+  async function moveRouted(routed) {
+    const others = (tasksNow?.tasks ?? []).filter((task) => task.thread_id !== routed.thread_id);
+    const choices = others.map((task) => ({ value: task.thread_id, label: tasks.titleOf(task.thread_id), tone: "plain" }));
+    // A new task is no place for what started one already.
+    if (routed.kind !== "new") {
+      choices.push({ value: "", label: t("tasks.newTask"), tone: "primary" });
+    }
+    const chosen = await choiceDialog({ title: t("tasks.moveTo"), message: "", choices });
+    if (chosen === null) {
+      return;
+    }
+    const body = { to_thread_id: chosen === "" ? null : chosen };
+    await attempt(async () => {
+      const moved = routed.message_id !== null ? await api.post(`/queue/${routed.message_id}/move`, body) : await api.post(`/runs/${routed.run_id}/move`, body);
+      await tellRouted(moved);
+    });
+  }
+
   // The bar over the composer (items 297, 352, 360 and 401): the run's time, its helpers and the messages queued at its
   // left, and the way down at its right end, all in one pane of glass.
   const capsule = createCapsule({
@@ -1013,8 +1084,15 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // Dot asks stays its own card over the capsule. A computer's window keeps the panes.
   const sheets = createDockSheets();
   const dockBar = createDockBar({ onWork: () => inspector.openTab("run"), onStop: () => stopRun(), onEnd: () => goDown(), sheets });
-  const dock = el("div", { class: "dock" }, capsule.wait, statusBar, resumeLine, refusedLine.element, queue.element, loops.element, background.element, asks.element, dockBar.element, frame.element, foot);
+  const dock = el("div", { class: "dock" }, laneLine, capsule.wait, statusBar, resumeLine, refusedLine.element, tasks.element, queue.element, loops.element, background.element, asks.element, dockBar.element, frame.element, foot);
   sheets.add("queue", { anchor: dockBar.segment("queue"), title: () => t("dock.queueTitle"), adopt: queue.element, onOpen: () => queue.expand() });
+  sheets.add("tasks", {
+    anchor: dockBar.segment("tasks"),
+    title: () => t("tasks.title"),
+    adopt: tasks.element,
+    onOpen: () => tasks.present(true),
+    onClose: () => tasks.present(false),
+  });
   sheets.add("loops", {
     anchor: dockBar.segment("loops"),
     title: () => t("loops.region"),
@@ -1250,7 +1328,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // while it works (`steers`, `other` the way ⌘⇧Enter sends), otherwise as the chat's next run, whose id is returned
   // (null for the others).
   async function deliver(text, files, other) {
-    if (active && !steers(other)) {
+    // A chat that may hold several tasks (item 2013) sends every message through its queue, which sends it where it
+    // belongs, as the phone does: a message that starts the chat's next run then starts there, as it would have.
+    const routes = !active && tasksNow !== null && tasksNow.cap > 1 && run.agent_id === null && run.parent_run_id === null && run.campaign_id === null;
+    if ((active && !steers(other)) || routes) {
       // The level is checked against the model's own, so the models are known first.
       await choices.ready();
       const chosen = choices.value();
@@ -1503,6 +1584,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       loops: loopsNow,
       queue: queueNow,
       running: runningNow,
+      tasks: { open: tasksNow === null ? 0 : openTasks(tasksNow.tasks) },
     });
     sheets.repaint("helpers");
     sheets.repaint("plan");
@@ -2520,6 +2602,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     queue.dispose();
     background.dispose();
     loops.dispose();
+    tasks.dispose();
     panelWatch.disconnect();
     dockBar.dispose();
     sheets.dispose();
