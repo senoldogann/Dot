@@ -44,6 +44,28 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")
     }
 
+    func testSystemShowsHealthChecksAndConfirmsARestart() {
+        let app: XCUIApplication = launch("settings-system")
+        let checks: XCUIElement = app.buttons["Health checks"].firstMatch
+        XCTAssertTrue(checks.waitForExistence(timeout: 10))
+        checks.tap()
+        let chrome: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Google Chrome")).firstMatch
+        XCTAssertTrue(chrome.waitForExistence(timeout: 5))
+        chrome.tap()
+        XCTAssertTrue(app.staticTexts["Chrome is installed."].exists)
+        app.navigationBars.buttons.firstMatch.tap()
+
+        let restart: XCUIElement = app.buttons["Restart Dot"].firstMatch
+        XCTAssertTrue(restart.waitForExistence(timeout: 5))
+        restart.tap()
+        let cancel: XCUIElement = app.buttons["Cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        cancel.tap()
+        restart.tap()
+        app.buttons["system.confirmRestart"].tap()
+        XCTAssertTrue(app.staticTexts["Reconnecting…"].waitForExistence(timeout: 5))
+    }
+
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
     func testTheMacsEmergencyStopIsShownAndReleased() {
         let app: XCUIApplication = launch("settings-stopped")

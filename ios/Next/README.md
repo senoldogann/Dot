@@ -72,7 +72,7 @@ switch on each row; edit, run now, delete; + makes a new one, item 1911, and a s
 each opening its chat), Rules (the approval mode tasks start in and what asks in it; free mode,
 switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, a new note, every note to read, edit, pin or
 forget, and the Trash to restore from), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
-Mark achieved as the daemon takes them), Health and version, Usage,
+Mark achieved as the daemon takes them), Health and version (health checks and restart), Usage,
 Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on
 the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no Settings row opens
 the web app; the phone does not engage the emergency stop (the Mac's failsafe does), and while it holds Settings says

@@ -4357,6 +4357,17 @@
         }
       }
     },
+    "Dot has not confirmed the restart yet. Check your Mac if it stays unreachable.": {
+      "comment": "System: the restart could not be confirmed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot yeniden başladığını henüz doğrulamadı. Ulaşılamamaya devam ederse Mac'inizi kontrol edin."
+          }
+        }
+      }
+    },
     "Dot is asking you": {
       "comment": "Ask dock title: a question",
       "localizations": {
@@ -4364,6 +4375,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot sana soruyor"
+          }
+        }
+      }
+    },
+    "Dot is back": {
+      "comment": "System: Dot answered after restarting",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot yeniden bağlandı"
           }
         }
       }
@@ -5304,6 +5326,17 @@
         }
       }
     },
+    "Failing": {
+      "comment": "Health checks: a required check failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başarısız"
+          }
+        }
+      }
+    },
     "Fallbacks": {
       "comment": "Models section: the models a task moves to when its own cannot answer",
       "localizations": {
@@ -6099,6 +6132,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlık ve sürüm"
+          }
+        }
+      }
+    },
+    "Health checks": {
+      "comment": "System: the Mac's diagnostic checklist",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlık denetimleri"
           }
         }
       }
@@ -9187,6 +9231,17 @@
         }
       }
     },
+    "Optional": {
+      "comment": "Health checks: an optional check failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İsteğe bağlı"
+          }
+        }
+      }
+    },
     "Optional, separated by commas.": {
       "comment": "Memory: the tags' hint",
       "localizations": {
@@ -10570,6 +10625,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıt akışı"
+          }
+        }
+      }
+    },
+    "Restart Dot": {
+      "comment": "System: restart Dot on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'u yeniden başlat"
+          }
+        }
+      }
+    },
+    "Restart now?": {
+      "comment": "System: confirm restarting Dot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi yeniden başlatılsın mı?"
           }
         }
       }
@@ -14454,13 +14531,13 @@
         }
       }
     },
-    "Updating or restarting Dot is done on the Mac: Settings › System.": {
-      "comment": "System: update and restart are the Mac's",
+    "Updating Dot is done on the Mac: Settings › System.": {
+      "comment": "System: updating Dot is done on the Mac",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dot'u güncellemek ya da yeniden başlatmak Mac'te yapılır: Ayarlar › Sistem."
+            "value": "Dot'u Mac'te güncelleyin: Ayarlar › Sistem."
           }
         }
       }
