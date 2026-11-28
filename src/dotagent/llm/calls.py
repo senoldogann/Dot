@@ -58,6 +58,8 @@ type CallPurpose = Literal[
     "image",
     # Dot's first words in a chat (item 2018): one line of the fast model while the run starts.
     "first_words",
+    # The manager's review of the team (item 2068): one call with no tool but its answer's.
+    "team_review",
 ]
 
 CALL_EVENT: str = "model_call"

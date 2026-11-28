@@ -447,6 +447,47 @@ order stands, its title, its bot, tries, age, due time, the last note and a link
 or let go stand last, under "Finished objectives", each with its state (item 2009, so that the web and the phone's
 bot profile list the same). A bot's page has a **Work** section, as the phone's bot profile does (item 2035): its work orders (how many are open), its objectives (how many are active, those its orders serve) and today's hand-offs (how many), each a link to a page of the bot's own (`#/agents/{id}/orders`, `/objectives`, `/handoffs`): the orders open, then finished; the objectives active, then finished; the hand-offs received, then sent to others, each newest first. Dot's pages hold every order and objective, as it hands and keeps them all.
 
+### The manager review
+
+**A manager oversees the team** (item 2068, your ask of 2026-11-28, after Grok Bot's note: specialised bots like a
+company, a manager bot over them, and a bot overloaded drops balls). The review is off until you turn it on: on the
+phone in a bot's profile (**Manager review**, **How often**: Off, Daily or Weekly; choosing it there makes that bot the
+manager), on the web on the **Orders** part of the Agents page (**Manager**: Dot or one of your bots; **How often**).
+One bot is the manager at a time, Dot by default. **Review now** reviews at once, whatever the setting says.
+
+A review first finds, with no model: work orders that have not moved for two days or are past their due time, bots
+overloaded (item 2067, above), bots of yours whose runs this week failed half the time or more (three runs at least),
+objectives with no progress for a week, and bots older than a week that ran nothing in it, hold no order and have no
+routine on (Dot and a paused bot are never idle), twenty at most. A review that finds nothing asks no model and says
+so. Otherwise the manager's model (its own, or the review model for a bot without one, Dot's included) is asked once,
+with no tool but its answer's, and proposes a change for the findings a change helps, eight at most, each one of:
+
+- **move work orders** of one bot to another bot whose role fits (not Dot): accepted, each order goes on as the lead's
+  `reassign` sends it, an attempt of the run that handed it out; only orders still the first bot's and waiting for a
+  review move, or none does;
+- **split a bot** into two or three new bots, each with a name of its own, one narrower role and the routines of the
+  split bot that fit it: accepted, each new bot is made with the split bot's instructions, model, reasoning level,
+  approvals, tools and what it never does, and its routines move to it; the split bot stays with what is left (Dot is
+  never split);
+- **switch a routine off**: accepted, it is off, saying "switched off: the owner accepted the manager review's
+  proposal".
+
+A proposal that names an order, a bot or a routine the team does not have, or a split into a name taken, is asked again
+of the model, never shown. Each is a card with what it changes, the orders or new bots it names, and why, in the
+manager's words, with **Accept** and **Skip**. **Nothing changes until you accept a card**: the review itself asks
+nothing and changes nothing, in every mode, yolo and free mode included. Accepting checks the card again against the
+team as it is then, and one that no longer fits (an order that moved on, a name taken since, a routine gone or off) is
+refused and stays for you to skip. A title or name a run wrote after reading outside content is not shown to the model
+or on the card ("a work order", "a routine"), and the words of the team are data to the model, never instructions. A
+review that fails says why on its page and is tried again at its next time; the scheduler starts one only in the
+daemon, never under the emergency stop.
+
+The API: `GET /api/team-review` (`manager`, `every`: `off`, `daily` or `weekly`, `last_at`, `next_at`, `running`,
+`review` with its `findings` and `proposals`, and `error`), `PUT /api/team-review` (`manager`, `every`; 404 for a bot
+that is not there), `POST /api/team-review/run` (202; 409 while one is under way), and `POST
+/api/team-review/proposals/{id}/accept` or `/skip` (409 for a card decided already or that no longer fits, 404 for one
+that is not there).
+
 ## Campaigns
 
 ```bash
