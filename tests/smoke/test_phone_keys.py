@@ -196,11 +196,26 @@ async def test_a_check_that_began_before_a_change_records_nothing(
 
     monkeypatch.setattr(routes_keys, "check_provider_key", slow)
     async with _served(own_home) as client:
-        mac: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
-        checking: asyncio.Task[httpx.Response] = asyncio.create_task(client.post(f"/keys/{NAME}/check", headers=mac))
+        phone: dict[str, str] = await _phone_headers(client)
+        checking: asyncio.Task[httpx.Response] = asyncio.create_task(client.post(f"/keys/{NAME}/check", headers=phone))
         await started.wait()
-        assert (await client.post(f"/keys/{NAME}", json={"value": KEY}, headers=mac)).status_code == 200
+        assert (await client.post(f"/keys/{NAME}", json={"value": KEY}, headers=phone)).status_code == 200
         release.set()
         assert (await checking).status_code == 200
-        listed: httpx.Response = await client.get("/keys", headers=mac)
+        listed: httpx.Response = await client.get("/keys", headers=phone)
         assert next(key for key in listed.json()["keys"] if key["name"] == NAME)["check"] is None
+
+
+async def test_changes_a_phone_sends_at_once_are_held_to_its_limit(
+    own_home: Path, tells: list[tuple[str, str, str]]
+) -> None:
+    """Changes a phone sends at the same moment each passed the limit before any was counted (item 2054's review)."""
+    async with _served(own_home) as client:
+        phone: dict[str, str] = await _phone_headers(client)
+        sent: int = routes_keys.PHONE_CHANGES * 3
+        answers: list[httpx.Response] = await asyncio.gather(
+            *(client.post(f"/keys/{NAME}", json={"value": KEY}, headers=phone) for _ in range(sent))
+        )
+        codes: list[int] = sorted(answer.status_code for answer in answers)
+        assert codes == [200] * routes_keys.PHONE_CHANGES + [429] * (sent - routes_keys.PHONE_CHANGES), codes
+    assert len(tells) == routes_keys.PHONE_CHANGES

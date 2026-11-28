@@ -148,16 +148,19 @@ def keys_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
     async def save_key(name: str, request: KeyRequest, http: Request) -> KeyView:
         provider: str = provider_of(name)
         phone: str | None = _phone_of(http)
-        if phone is not None:
-            refuse_changes_past_limit(phone)
+        # The limit is asked and the change counted under the lock that runs one change at a time, so changes sent at
+        # once are counted one after the other, and only one that changed the file counts.
         async with writing:
+            if phone is not None:
+                refuse_changes_past_limit(phone)
             await asyncio.to_thread(write_env_value, env_file_path(), name, request.value)
             checks.pop(name, None)
             changed[name] = changed.get(name, 0) + 1
-        # Told before anything else can fail: the key is changed from here on.
+            if phone is not None:
+                count(changes, phone, PHONE_CHANGES_WINDOW_S)
+        # Told before anything after the change can fail: the key is changed from here on.
         log.info("key_saved", provider=provider, name=name, phone=phone)
         if phone is not None:
-            count(changes, phone, PHONE_CHANGES_WINDOW_S)
             await tell_phone_change(phone, provider, "saved")
         await retire(provider)
         return await asyncio.to_thread(_view, provider, name, None)
@@ -167,20 +170,21 @@ def keys_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         """Remove the key saved in Dot. A key from the environment or the Keychain is not Dot's to remove: 404."""
         provider: str = provider_of(name)
         phone: str | None = _phone_of(http)
-        if phone is not None:
-            refuse_changes_past_limit(phone)
         async with writing:
+            if phone is not None:
+                refuse_changes_past_limit(phone)
             removed: bool = await asyncio.to_thread(remove_env_value, env_file_path(), name)
             if removed:
                 checks.pop(name, None)
                 changed[name] = changed.get(name, 0) + 1
+                if phone is not None:
+                    count(changes, phone, PHONE_CHANGES_WINDOW_S)
         if not removed:
             raise NotFoundError(
                 "Dot's .env file has no entry for this key", {"name": name, "env_file": str(env_file_path())}
             )
         log.info("key_removed", provider=provider, name=name, phone=phone)
         if phone is not None:
-            count(changes, phone, PHONE_CHANGES_WINDOW_S)
             await tell_phone_change(phone, provider, "removed")
         await retire(provider)
         return await asyncio.to_thread(_view, provider, name, checks.get(name))
