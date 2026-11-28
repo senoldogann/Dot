@@ -793,9 +793,12 @@ a run, and neither asks you:
     as the screen does, and they read Chrome's values of a plain field, a code there, or a password a page shows as
     plain text ("show password").
   - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
-    going back can bring the filled page back whole. Once a script of the run ran in a tab of the chat, no tab of it
-    gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
-    page, in a tab it opened, or in a page Chrome brings back from its cache.
+    going back can bring the filled page back whole. A page opened there (`browser_open`) opens in a new tab in its
+    place and the filled tab closes, as a run would close it itself: the sign-in holds, and scripts run again once
+    no other tab a login was filled into is open. An address the rules refuse leaves the filled tab as it was. Once a
+    script of the run ran in a tab of the chat, no tab of it gets a login until all of them are closed: the script
+    could have left a listener that copies what is typed, in its page, in a tab it opened, or in a page Chrome brings
+    back from its cache.
   - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
     (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
@@ -1190,11 +1193,16 @@ a run, and neither asks you:
   the run that tells a schedule's command in the background ended keeps the sandbox in your own chat too (`/loop`). A
   run you started (a message in the app, on a phone, by iMessage, `dotx run`) runs as before, also in a chat a schedule
   opened; Resume on a schedule's run goes on as that run, in the sandbox, and so do the sessions of a campaign after its
-  first, which its schedule starts. What it does not cover: Dot's own file tools (`write_file`, `edit_file`)
-  run in the daemon's process, not in the sandbox, so in `yolo` they still change Dot's files unasked; Apple Events and a
-  hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from the daemon itself, in a checkout
-  of its own, not through a run's tools, and is not changed by it. `false` has those runs follow `[shell] sandbox` and
-  `yolo` as yours do.
+  first, which its schedule starts. Dot's own tools, which read and write in the daemon's process and not in
+  the sandbox, keep the same seal for such a run (item 2026): a step of `read_file`, `write_file`, `edit_file`, the
+  search tools, `generate_image`, `watch_video`, a page shown from a file, a pipeline record, a browser upload or a file
+  a web tool reads is refused, in every mode, when the file is one the sandbox seals for that run (read or written: Dot's
+  own files and `[policy] sealed_paths`; written: what Dot loads and runs, and Dot's home and logs but the workspace).
+  The gate refuses it before the policy weighs it, so nothing asks; its policy event says `seal`. What it does not cover:
+  a tool that changes Dot's files through its own interface and names no path (the memory tools, `skill_save`, a
+  schedule), Apple Events and a hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from
+  the daemon itself, in a checkout of its own, not through a run's tools, and is not changed by it. `false` has those
+  runs follow `[shell] sandbox` and `yolo` as yours do.
 - **Code mode** (items 1500 to 1507, [Code mode](code-mode.md)): the code of a `code_run` is text a model wrote, which a page
   may have shaped, so it does not run in the sandbox above, which allows everything but Dot's files. It runs under
   `sandbox-exec` with `(deny default)`: it reads its interpreter's installation and its `tools` folder, reads and writes its

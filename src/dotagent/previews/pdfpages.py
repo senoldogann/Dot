@@ -1,9 +1,12 @@
 """The pages of a PDF as pictures for the panel beside a chat, drawn by Core Graphics: a page shows as it is in every
 browser, a phone's too, where a PDF in a frame shows its first page alone or nothing. Core Graphics draws on any
 thread, so a page is drawn off the event loop. Core Graphics is imported by the functions that draw, so that the panel's
-routes load where it is not, as on the Linux that runs a cloud agent's unit tests (item 1270)."""
+routes load where it is not, as on the Linux that runs a cloud agent's unit tests (item 1270). PyObjC resolves a
+framework's names lazily and not safely across threads: two pages drawn at once raised ``KeyError`` for a name the other
+thread was resolving, so the names are imported under one lock (``_IMPORTING``)."""
 
 import io
+import threading
 from pathlib import Path
 
 from PIL import Image
@@ -13,6 +16,8 @@ from dotagent.core.types import FrozenModel
 
 # The widths a page is drawn at, in pixels: a few, so that the panel asks for the same pictures again.
 PAGE_WIDTHS: tuple[int, ...] = (600, 900, 1200, 1800)
+# Held while Foundation's and Quartz's names are imported (see the module's docstring).
+_IMPORTING: threading.Lock = threading.Lock()
 
 
 class PageSize(FrozenModel):
@@ -23,8 +28,9 @@ class PageSize(FrozenModel):
 
 
 def _document(path: Path) -> object:
-    from Foundation import NSURL
-    from Quartz import CGPDFDocumentCreateWithURL, CGPDFDocumentIsUnlocked
+    with _IMPORTING:
+        from Foundation import NSURL
+        from Quartz import CGPDFDocumentCreateWithURL, CGPDFDocumentIsUnlocked
 
     document: object | None = CGPDFDocumentCreateWithURL(NSURL.fileURLWithPath_(str(path)))
     if document is None:
@@ -35,7 +41,8 @@ def _document(path: Path) -> object:
 
 
 def _size(page: object) -> PageSize:
-    from Quartz import CGPDFPageGetBoxRect, CGPDFPageGetRotationAngle, kCGPDFCropBox
+    with _IMPORTING:
+        from Quartz import CGPDFPageGetBoxRect, CGPDFPageGetRotationAngle, kCGPDFCropBox
 
     box = CGPDFPageGetBoxRect(page, kCGPDFCropBox)
     turned: bool = CGPDFPageGetRotationAngle(page) % 180 != 0
@@ -45,7 +52,8 @@ def _size(page: object) -> PageSize:
 
 def page_sizes(path: Path) -> tuple[PageSize, ...]:
     """The size of each page of the PDF at ``path``. ``InvalidValueError`` when it cannot be read or is locked."""
-    from Quartz import CGPDFDocumentGetNumberOfPages, CGPDFDocumentGetPage
+    with _IMPORTING:
+        from Quartz import CGPDFDocumentGetNumberOfPages, CGPDFDocumentGetPage
 
     document: object = _document(path)
     return tuple(
@@ -62,8 +70,9 @@ def pdf_text(path: Path, most_chars: int) -> tuple[str, bool]:
     """The text of the first ``TEXT_PAGES`` pages of the PDF at ``path``, in order, at most ``most_chars`` characters
     in all, and whether it was cut at either bound (item 403): what the panel's copy takes. A PDF of pictures alone,
     or one PDFKit cannot read, gives ""."""
-    from Foundation import NSURL
-    from Quartz import PDFDocument
+    with _IMPORTING:
+        from Foundation import NSURL
+        from Quartz import PDFDocument
 
     # PDFKit's proxies carry no types: the document and its pages are read through PyObjC as they come.
     document = PDFDocument.alloc().initWithURL_(NSURL.fileURLWithPath_(str(path)))
@@ -92,23 +101,24 @@ MOST_PAGE_HEIGHT: int = 20_000
 
 def page_png(path: Path, number: int, width: int) -> bytes:
     """Page ``number`` (from 1) of the PDF at ``path`` as a PNG ``width`` pixels wide, on white."""
-    from Quartz import (
-        CGBitmapContextCreate,
-        CGBitmapContextGetBytesPerRow,
-        CGBitmapContextGetData,
-        CGColorSpaceCreateDeviceRGB,
-        CGContextConcatCTM,
-        CGContextDrawPDFPage,
-        CGContextFillRect,
-        CGContextScaleCTM,
-        CGContextSetRGBFillColor,
-        CGPDFDocumentGetNumberOfPages,
-        CGPDFDocumentGetPage,
-        CGPDFPageGetDrawingTransform,
-        CGRectMake,
-        kCGImageAlphaPremultipliedLast,
-        kCGPDFCropBox,
-    )
+    with _IMPORTING:
+        from Quartz import (
+            CGBitmapContextCreate,
+            CGBitmapContextGetBytesPerRow,
+            CGBitmapContextGetData,
+            CGColorSpaceCreateDeviceRGB,
+            CGContextConcatCTM,
+            CGContextDrawPDFPage,
+            CGContextFillRect,
+            CGContextScaleCTM,
+            CGContextSetRGBFillColor,
+            CGPDFDocumentGetNumberOfPages,
+            CGPDFDocumentGetPage,
+            CGPDFPageGetDrawingTransform,
+            CGRectMake,
+            kCGImageAlphaPremultipliedLast,
+            kCGPDFCropBox,
+        )
 
     if width not in PAGE_WIDTHS:
         raise InvalidValueError("a page is drawn at one of the widths of PAGE_WIDTHS", {"width": width})

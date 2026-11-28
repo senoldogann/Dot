@@ -100,6 +100,8 @@ def test_a_blocked_goal_fails_the_run_and_keeps_its_answer() -> None:
     assert outcome.result.startswith(ENDED.result)
     assert "cannot be reached" in outcome.result
     assert "it needs a sign-in" in outcome.result
+    assert outcome.goal_blocked
+    assert _after_limit_verdict(_verdict("blocked", "it needs a sign-in"), ENDED).goal_blocked
 
 
 def test_a_goal_that_is_not_reached_sends_the_run_back_to_work() -> None:

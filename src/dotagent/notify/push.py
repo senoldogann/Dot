@@ -85,8 +85,8 @@ _GROUP_OF: dict[str, PushGroup] = {
     # ``approval_requested``, or of ``question_left`` once the run went on without an answer).
     **{kind: "needs_you" for kind in _ASKED_KINDS},
     # Dot's own work broke, which the owner is to look at: a schedule that did not run or was switched off, learning
-    # that stopped, a restart after an unexpected stop. They are not "done": a phone that switches the ends of tasks off
-    # still hears them, the only way it learns Dot's own work failed.
+    # that stopped, a restart after an unexpected stop. They remain in their own group so they can be switched
+    # independently of task ends. DotNext's APNs topic takes only task alerts.
     SCHEDULE_MISSED_EVENT: "needs_you",
     SCHEDULE_STOPPED_EVENT: "needs_you",
     DAEMON_RESTARTED_EVENT: "needs_you",
@@ -140,6 +140,8 @@ class PushMessage(FrozenModel):
     body: str
     route: str
     state: PushState
+    title_tr: str | None = None
+    body_tr: str | None = None
 
 
 class PushTotals(FrozenModel):
@@ -180,13 +182,38 @@ def _cut_off(runs: int) -> str:
 
 
 def finished_message(status: str, result: str, run_id: str) -> PushMessage:
-    """The message of the end of a run: how it ended, and the first line of its answer. A schedule's run is told in
-    these words too, when its level tells it (``dotagent.scheduler.notices``)."""
+    """The end of a scheduled run: how it ended and the first line of its answer, at the schedule's own notice level."""
     return PushMessage(
         title=_FINISHED_TITLE.get(status, "A task has ended"),
         body=_shorten(_first_line(result)),
         route=f"#/runs/{run_id}",
         state=_FINISHED_STATE.get(status, "idle"),
+    )
+
+
+# These fixed task notices have the same words across APNs, Web Push and desktop notifications. The detailed
+# answer or approval stays in its chat. The English strings are also DotNext's APNs localization keys.
+_TASK_NOTICE_TR: dict[str, str] = {
+    "Dot has a question": "Dot'un bir sorusu var",
+    "Dot needs your help": "Dot'un yardımınıza ihtiyacı var",
+    "Dot asks for approval": "Dot onay istiyor",
+    "A task is done": "Bir görev bitti",
+    "A task failed": "Bir görev başarısız oldu",
+    "A task is blocked": "Bir görev ilerleyemedi",
+    WAITING_TITLE: "Dot sizi bekliyor",
+}
+_TASK_NOTICE_BODY: str = "Open Dot to see it."
+_TASK_NOTICE_BODY_TR: str = "Görmek için Dot'u açın."
+
+
+def task_notice(title: str, run_id: str, state: PushState) -> PushMessage:
+    return PushMessage(
+        title=title,
+        body=_TASK_NOTICE_BODY,
+        route=f"#/runs/{run_id}",
+        state=state,
+        title_tr=_TASK_NOTICE_TR[title],
+        body_tr=_TASK_NOTICE_BODY_TR,
     )
 
 
@@ -198,17 +225,12 @@ def _told_by_its_schedule(run: RunRecord) -> bool:
 
 def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
     """The message an event of a run is worth, or ``None``: an approval or a question asked or left; a draft written
-    for the owner to send (item 314); the end of a run of its own (the sub-runs of a run stay quiet, as in the web UI),
-    with the first line of its result, but for a schedule's run, which its schedule tells at its level (item 461); the
-    end of a campaign by itself."""
+    for the owner to send (item 314); a successful, failed or blocked end of a run with no parent, apart from a
+    scheduled run, which its schedule tells at its notice level; or the end of a campaign."""
     if event.kind in _ASKED_KINDS:
         severity: object = event.data.get("severity")
-        args: object = event.data.get("args")
-        question: object = args.get("question") if isinstance(args, dict) else None
-        summary: object = event.data.get("summary")
-        text: str = question if severity == "question" and isinstance(question, str) else str(summary or "")
         title: str = _ASKING_TITLE.get(str(severity), "Dot asks for approval")
-        return PushMessage(title=title, body=_shorten(text), route=f"#/runs/{run.id}", state="waiting")
+        return task_notice(title, run.id, "waiting")
     if event.kind == DRAFT_CREATED_EVENT:
         draft: DraftRecord = DraftRecord.model_validate(event.data)
         about: str = draft.subject if draft.channel == "mail" else draft.body
@@ -219,19 +241,20 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
             state="waiting",
         )
     if event.kind == "run_finished" and run.parent_run_id is None and not _told_by_its_schedule(run):
-        result: object = event.data.get("result")
-        said: str = result if isinstance(result, str) else ""
         needs: object = event.data.get("needs")
         needed: str = needs.strip() if isinstance(needs, str) else ""
-        status: str = str(event.data.get("status", ""))
+        status: object = event.data.get("status")
+        if event.data.get("goal_blocked") is True or status == "blocked":
+            return task_notice("A task is blocked", run.id, "waiting")
         if event.data.get("waiting") is True or (status == "failed" and needed != ""):
             # Done as far as it can go, waiting on the owner (item 2070), or failed having said what it needs from them
-            # (item 1061): what it needs, not "done" nor "failed", as the web and the phone show it.
-            asked: str = needed if needed != "" else said
-            return PushMessage(
-                title=WAITING_TITLE, body=_shorten(_first_line(asked)), route=f"#/runs/{run.id}", state="waiting"
-            )
-        return finished_message(status, said, run.id)
+            # (item 1061): "waiting for you", not "done" nor "failed", as the web and the phone show it.
+            return task_notice(WAITING_TITLE, run.id, "waiting")
+        if status == "done":
+            return task_notice(_FINISHED_TITLE["done"], run.id, "done")
+        if status == "failed":
+            return task_notice(_FINISHED_TITLE["failed"], run.id, "failed")
+        return None
     if event.kind == CAMPAIGN_ENDED_EVENT:
         ended: CampaignEnded = CampaignEnded.model_validate(event.data)
         achieved: bool = ended.status == "achieved"
@@ -312,7 +335,7 @@ def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) 
                 "endpoint": subscription.endpoint,
                 "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
             },
-            data=json.dumps(message.model_dump()),
+            data=json.dumps(message.model_dump(exclude_none=True)),
             vapid_private_key=_signer(keys),
             vapid_claims={"sub": SUBJECT},
             ttl=_TTL_S,

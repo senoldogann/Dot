@@ -10,7 +10,7 @@ import pytest
 
 from dotagent.config import load_default_config
 from dotagent.desktop.script import run_osascript
-from dotagent.policy.sandbox import UNSANDBOXED, SwitchedSandbox
+from dotagent.policy.sandbox import NO_SEAL, UNSANDBOXED, SwitchedSandbox
 from dotagent.tools.apple import build_apple_tool
 from dotagent.tools.context import ToolContext
 
@@ -49,7 +49,7 @@ async def test_the_apple_script_tool_gives_its_script_the_environment_of_a_runs_
                 shell_env=_commands_env(),
                 protected=(),
                 dot_paths=(),
-                sandbox=SwitchedSandbox(UNSANDBOXED, False, False),
+                sandbox=SwitchedSandbox(UNSANDBOXED, NO_SEAL, False, False),
             ),
             workspace=Path("/nonexistent-workspace"),
             approvals="yolo",

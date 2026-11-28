@@ -391,6 +391,13 @@ public actor Outbox {
                 // Already over: nothing left to stop.
             }
             return .done(item)
+        case .stopChat(let thread):
+            do {
+                try await api.stopChat(thread: thread)
+            } catch where error.statusCode == 404 {
+                // The chat is gone: nothing left to stop.
+            }
+            return .done(item)
         case .stopHelper(let path, _, _):
             do {
                 try await api.stop(path: path)

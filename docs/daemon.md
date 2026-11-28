@@ -40,7 +40,7 @@ step that needs your answer is not folded out of sight. Its fold is kept in that
 kept from before item 836 is not read as it. At the right of a chat at work the age gives way to **Working** and how long
 since the run was asked for ("12s", "4m", "1h 5m", read again every second). What a chat delegated (item 507), the runs at
 work and those that ended, is one quiet count in its last line (the users mark and how many), and its name for a screen reader
-says how many there are. A chat whose run waits on its helpers says **Waiting on 2 helpers…** in its last line, in place of its last words, shimmering as the work line does, and a chat at rest with something still working for it (a helper let go, a command in the background, its loop) says **Waiting · ** and the first of them, quiet (item 2010, as the iPhone app's rows do; read from `GET /api/threads/view` beside the list, so a phone with no link shows what the list alone tells). Nothing hangs under the row: a click on it opens the chat,
+says how many there are. A chat whose run waits on its helpers says **Waiting for 2 helpers…** in its last line, in place of its last words, shimmering as the work line does, and a chat at rest with something still working for it (a helper let go, a command in the background, its loop) says **Waiting · ** and the first of them, quiet (item 2010, as the iPhone app's rows do; read from `GET /api/threads/view` beside the list, so a phone with no link shows what the list alone tells). Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
 (which works in a thread of its own). A run another run delegated stands under the chat its work came from, never as a
 row of its own, also once the run that delegated it has ended (item 1074: a work order's try outlives the lead's turn
@@ -266,7 +266,7 @@ the providers; then the Options as rows that say their value and open in place: 
 browser per model, the choices for one message, and fast mode where the model has it), **Mode** and **Approvals**; and
 **How Dot works** with its switches (Keep going, goal mode, Plan first). A pick keeps the sheet open; Done, Close,
 Escape, a tap on the dim or a drag of a phone's sheet head down puts it away. The mode, the reasoning and the approvals
-have no pill in the bar; the open lock of **Ask only to pay or send** alone stays there, since the run then asks next
+have no pill in the bar; the open lock of **Ask only to pay** alone stays there, since the run then asks next
 to nothing (item 2069: a payment) and the box must say so. The agent's pill (its face and name,
 once an agent exists) stays at the left of the model, with its menu of the agents and their roles.
 
@@ -341,6 +341,9 @@ Until the tick the box keeps what it held. The dictation also ends:
 - after six seconds with no word (a recording: no sound at all), saying nothing was heard;
 - after a pause of fifteen seconds once a word was (a recording: a sound), the words going into the box;
 - when you type (it is dropped), when you send, and when the page goes out of sight.
+
+A pause shorter than that loses no word: the words heard before it stay in the box and the next ones follow them, also
+where a browser hands the words after a pause in a result list of its own (item 2048).
 
 It listens in the page's language, given its region ("en" listens as "en-US", item 593), or the one chosen in Settings ›
 General › Voice (English, Türkçe, Suomi, Svenska, Deutsch, Français or Español). The silence is counted from the moment
@@ -614,7 +617,7 @@ group: its head shows their faces, how many they are ("3 helpers"), how they sta
 works; "2 done · 1 stopped" after) and the time from the first one's start to the last one's end, counting on while
 one works, and a chevron that folds the rows away; while one works a quiet line in the card says how they work: side by
 side while the chat waits, their answers coming back to it. Over the composer, while the task waits for them, a line
-says **Waiting on 2 helpers** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
+says **Waiting for 2 helpers** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
 and the helpers with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 helpers keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
 and hairline in the dock, and the dock is not the conversation: it stands where it is while the chat is scrolled, a phone's
 included, and nothing of the history shows through it (item 1347). A phone does not draw the line (item 1383): its words
@@ -821,10 +824,10 @@ the commands at work in the chat, which stand right under it. An interrupted cha
 while Dot is reachable. During a daemon outage the shared line under the bar shows *Mac asleep or unreachable
 since HH:MM*. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
-work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
+work are one capsule of glass, a single row just above the box with a round way down beside it (item 1991: it comes whenever the end of the conversation is away from the window, as on the iPhone, also in a chat that is over and past the start of its long answer; it leads to the answer while a finished chat's answer start is below the window, else to the end, and follows again), whose segments are
 divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Waiting on 2 helpers** (only while the run has stopped for them), **Chat updates interrupted**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
-**Waiting on 2 helpers** while the run has stopped for them, **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
+**Waiting for 2 helpers** (only while the run has stopped for them), **Chat updates interrupted**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the chat's tasks (**2 tasks**, item 2013), the loop (**every 10 min**, or **2
+**Waiting for 2 helpers** while the run has stopped for them, **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the chat's tasks (**2 tasks**, item 2013), the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
 has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
 for the secondary segments, then the Stop without its word, then the time without "Working", and at the narrowest a
@@ -832,7 +835,8 @@ second line that keeps the status and the Stop in words, never a scroll or a cut
 closed by a tap outside it, by Escape, by its handle or by a swipe down: the queue with its up and down arrows (44 px,
 never a drag), pencil, **Steer** and ×; the loops with how often and when next, and **Stop repeating**; the commands
 with their words wrapped whole, how long they ran and **Stop**; the helpers with what the task waits on, what each does
-now, **Details** and **Stop**; the plan. The status opens the panel's Task tab. What Dot asks is its own card over the
+now, **Details** and **Stop**; the chat's tasks, each with how it stands, **Stop** and **Open**; the plan. The status
+opens the panel's Task tab. What Dot asks is its own card over the
 capsule, never in it, and the capsule goes on saying the run waits for you; the Continue of a task that was cut off is a
 card of its own over it too. A window wider than a phone's keeps the panes and draws no capsule. When the run ends
 done, the next message starts and the
@@ -847,7 +851,13 @@ session. The box holds the home's choices too, in its Chat settings (item 2015):
 for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a
 chat from before has the open run's until its next run starts; a Task kept before Auto, item 495, reads as Auto, which
 settles a task unless a message's words ask only to look). They are not kept in the browser as the home's are, and
-Keep going stays a new chat's choice. The run under way keeps its own: while it works, the model's pill steps back and says that the choices wait for the next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
+Keep going stays a new chat's choice. A message to a chat that leaves a choice out of its request takes the chat's
+(item 2071: the iPhone's follow-up names none, and a chat on Claude Haiku ran on the default model): `POST
+/threads/{id}/queue`, and `POST /runs` with a `thread_id`; a choice the request names, `"model": null` (the daemon's
+default) among them, stays its own, and a model it names brings its own level and speed. The chat's model then wins over
+the agent's own and over a model `[models] kinds` names for the message's kind of task; a resume starts on the chat's
+model too when the chat names another one than the run it resumes (with the chat's level and speed). A chat whose model
+cannot answer (no key for its provider) refuses the message by name and starts nothing. The run under way keeps its own: while it works, the model's pill steps back and says that the choices wait for the next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
 window up to 200 000, items 396 and 732); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows
 the figures, the point past which Dot summarizes the older part of the run, the model's window, and why the budget is
@@ -1345,9 +1355,10 @@ light on the way in; a screenshot tour (`tests/smoke/test_tour.py`) photographs 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) Chat · Dot`. Settings › General ›
 Notifications adds desktop notifications (off until you switch them on; the browser asks for its permission on that
 click): Dot says when it asks for an approval, a question or your help, and when it leaves you a question that a run
-could not wait for (a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or
-stopped, with the first line of its answer; the sub-runs of a run stay quiet, and a schedule's run is told as its
-notification level says, item 461, see [Memory and schedules](memory-and-schedules.md)); when a campaign ends by itself
+could not wait for (a `yolo`, scheduled or campaign run goes on without the answer). Task end notices say when the
+task succeeded, failed or the goal check found it blocked. A stopped task and sub-run ends stay quiet. Task notices
+use fixed copy and open the chat for details. A schedule's run is told at its own notification level, as described
+in [Memory and schedules](memory-and-schedules.md). Dot also tells when a campaign ends by itself
 (achieved, or stopped by the emergency stop, by `campaign_max_sessions` or by `campaign_failed_sessions`, item 724);
 when a schedule misses a firing that nobody saw (overdue, or its run could not start; told once while the reason stays
 the same, and not at its level "never"); when a repeating schedule is switched off because its runs failed so many times
@@ -1578,6 +1589,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
 | `GET\|PUT /policy/free` (`{"free": true}`) | the owner's free mode (item 922): on, no run asks anything (but a task's post in a meeting's chat, item 1138, and a join of a meeting that is not the owner's word, item 1150); kept in `config.toml` as `[policy] free`; a phone may switch it off, and gets 403 switching it on |
 | `PUT /initiative/look-model` (`{"model": "provider:model"}`, `""` for the default model) | make the model that looks for work on Dot's own initiative (item 916), kept in `config.toml` as `[initiative] look_model` (422 for one that cannot use actions, one of Zen's free models or of no known provider; the provider's error, 502, for one it does not know) |
+| `GET /providers/custom`, `PUT\|DELETE /providers/custom/{name}`, `POST /providers/custom/test`, `POST /providers/custom/docs` (`{"url": …}`) | the custom providers (item 1949, [Models](models.md#custom-providers)): list them with whether each key is set; add or change one (`base_url`, `protocol`, `needs_key`, `headers`, `models`, `list_models`), kept in `config.toml` and served from the next call, its key named `DOT_CUSTOM_<NAME>_API_KEY` and saved through `POST /keys/{name}`; remove one no setting names a model of, and the key Settings saved for it; one small real call with a key typed and kept nowhere; fields proposed from a documentation page, nothing saved. A phone's key may only list them (403) |
 | `PUT /models/standby` (`{"models": ["provider:model", …]}`)                    | the standby models in their order (item 478), kept in `config.toml` as `[models] standby`; `[]` for none (422 for one named twice, one that cannot call tools or one of Zen's free models) |
 | `GET /code-review`, `PUT /code-review` (`{"model", "fallback", "small_model", "small_max_lines", "max_minutes"}`, and `"effort"`, `"fallback_effort"`, kept when left out) | the models of the pre-push review of Dot's own code (item 1663), kept in `config.toml` as `[code_review]`, all written or none; a model newly named must run Dot's tools and use actions, and no fallback may be named twice or be the review model (422); a phone's key reads and changes it too (item 1770) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |

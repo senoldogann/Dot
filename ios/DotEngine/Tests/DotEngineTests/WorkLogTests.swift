@@ -319,7 +319,7 @@ final class WorkLogTests: XCTestCase {
         return event(id, "tool_call", ["call_id": .string(call), "tool": .string("delegate"), "args": .object(args)])
     }
 
-    /// The capsule says "Waiting on N helpers" only while the main run has stopped for them: every open call of its newest
+    /// The capsule says "Waiting for N helpers" only while the main run has stopped for them: every open call of its newest
     /// step waits on a helper. While another call of that step runs, while it thinks or writes, or once the waits were
     /// answered, the run works.
     func testTheRunWaitsOnHelpersOnlyWhileEveryOpenCallIsAWaitOnOne() {

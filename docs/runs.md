@@ -139,7 +139,7 @@ is the answer (a small model that is offered both writes the call out as text).
   a schedule, an approval, an objective; the newest 60, item 924), each of which `recall` reads back with the ids next
   to it (the chat of a run, the runs of a chat, the run of a thing to do), so that a run that comes back to old work
   recalls it step by step rather than from a summary that lost it (`recall` fences what a run that read outside content
-  wrote and marks the reader untrusted); and a check lists names, paths and links in the summary that the conversation
+  wrote and marks the reader untrusted; a run deleted with its chat is read back from the run ledger, which keeps where it came from, its model, how it ended and when it was deleted and none of its words, item 2077; a record that is gone without a trace is an error that says it was deleted or is no id of Dot's); and a check lists names, paths and links in the summary that the conversation
   never had (an address cut short, with the ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
   it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
   `compacted` event names the model,
@@ -425,7 +425,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the router of DeepSeek Harness's Super-agent design (2026-11-01): with one session that does the work itself, a new
   request waits; in its measure, a model left to decide whether to hand work out did so in none of five runs.
 - Several tasks in one chat (item 1984, slice 1 of [item 1982](../roadmap/1982.md)'s design): with `[agent]
-  chat_tasks` above 1 (1 by default, since the pages do not show lanes yet), a request of its own sent while the chat
+  chat_tasks` above 1 (1 by default: the owner switches it on, as their Dot's `config.toml` says), a request of its
+  own sent while the chat
   works starts in a **lane** of the chat rather than a chat of its own: a thread of its own (`threads.lane_of` names
   the chat) that the chat list does not show, whose first run is given what the chat said so far (the owner's words
   and Dot's reply of the chat's newest runs and its lanes', not their steps), in front of the owner's words, which
@@ -459,6 +460,18 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   (`to_thread_id: null`). It is checked as a queued message is before anything moves; a message with picks, for one
   level, for an agent, following a reaction, or answering a question card stays where it is. After a restart of the
   daemon a queue held for a free task waits for the owner's **Resume**.
+- The tasks on the pages and the phone (item 2013, slice 3): a chat with a lane lists its tasks over the composer,
+  **Tasks**, the chat's own first (*This chat*), each with how it stands (*Working*, *Waits for you*, *Done*,
+  *Stopped*, *Failed*), a **Stop** for one at work and **Open** for another than the page's; on a phone the capsule
+  says *2 tasks* and opens the same rows in a sheet. A task's own page says *A task of <chat>* with **Back to the
+  chat**. The composer's Stop of a chat with tasks stops every one of them; a row's Stop stops its task alone. A
+  message routed elsewhere is told in a toast (*Sent to <task>*, *Started a new task: <task>*, *Stopped every task*),
+  with **Move** for a message queued in a task, a task's run its words started, or a new task: it offers the chat's
+  other tasks and, but for a new task, **New task**. A message steered into a run already at work on its own task
+  offers no Move, which would stop that run. With `chat_tasks` above 1 the pages send every message of a chat of
+  Dot's own through its queue, which routes it, as the phone does. `GET /api/threads/{id}/tasks` and the chat's view
+  (`tasks`) say the tasks; a thread's revision is the newest of its family's (the chat's and every lane's of it),
+  since the chat's view and each lane's show the chat's tasks, so a change of any of them moves every one's view.
 - A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
@@ -1179,7 +1192,7 @@ restarts), or when a call that pays, sends or posts for you was cut while it ran
 chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the
 work again rather than taking it as a failed part. A helper the run still waited for when the daemon stopped ends with
 that run, whose own resume note names the cut `delegate` call. The bar over the
-composer says "Waiting on N helpers" in place of Working only while the run has stopped for them (every call of its
+composer says "Waiting for N helpers" in place of Working only while the run has stopped for them (every call of its
 step that has no answer yet waits on a helper; while a command of the same step still runs, or the model thinks, it
 says Working and the helpers keep their own part), with no spinner, and the line over it says what the first helper
 does now; "N helpers keep working in the background" once it was released, and nothing when none work; on a phone

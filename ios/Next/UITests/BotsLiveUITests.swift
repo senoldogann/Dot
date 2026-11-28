@@ -202,6 +202,20 @@ final class BotsLiveUITests: XCTestCase {
         app.navigationBars["Activity"].buttons.firstMatch.tap()
         XCTAssertTrue(edit.waitForExistence(timeout: 10), "back on the profile")
 
+        // Its Model page is the app's one model catalog (the owner's report of 2026-11-28): Main model on top and chosen,
+        // the providers as groups that fold, the search at the foot.
+        let modelRow: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Model")).firstMatch
+        for _ in 0..<4 where !modelRow.isHittable { app.swipeUp() }
+        modelRow.tap()
+        let main: XCUIElement = app.buttons["agentModel.main"]
+        XCTAssertTrue(main.waitForExistence(timeout: 15), "Main model on top")
+        XCTAssertTrue(main.isSelected, "a new bot follows the main model")
+        XCTAssertTrue(app.descendants(matching: .any)["modelCatalog.provider"].firstMatch.waitForExistence(timeout: 10), "the providers as groups")
+        XCTAssertTrue(app.textFields["modelCatalog.search"].exists, "the search at the foot")
+        shot(app, "bot-model")
+        app.navigationBars["Model"].buttons.firstMatch.tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 10), "back on the profile")
+
         edit.tap()
         let nameField: XCUIElement = app.textFields["botEdit.name"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 10), "the edit page")

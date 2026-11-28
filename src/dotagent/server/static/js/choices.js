@@ -128,7 +128,7 @@ function levelBars(level, levels) {
 export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
   // What the model's pill adds after the name on a phone (item 1121), where it alone stands for the choices: the mode
-  // when one is named and the reasoning level. The approval mode is not among them: the owner read "Pay or send" as a
+  // when one is named and the reasoning level. The approval mode is not among them: the owner read "Pay" as a
   // part of the model's name. Painted once the pills exist.
   let reasoningShort = "";
   let paintPhonePill = () => undefined;
@@ -165,7 +165,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     const badge = shown === null ? null : approvalBadge(shown);
     optionsPill.setValue(badge === null ? "" : badge.short, "");
     optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
-    // In the least-asking mode the run asks only to pay or send: the box says so even while its choices are away (item
+    // In the least-asking mode the run asks only to pay: the box says so even while its choices are away (item
     // 833).
     optionsPill.element.toggleAttribute("data-yolo", shown === "yolo");
     setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
@@ -444,7 +444,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
 
   function modelArgs() {
     const fallback = defaultRefOf(getSnapshot());
-    return { groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) };
+    return { groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback), blankHint: null };
   }
 
   // On a phone the model's pill opens the chat's settings instead (item 1202, the owner's ask after another
@@ -493,7 +493,16 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     );
     const plan = isChat
       ? null
-      : sheetSwitch({ label: t("options.planFirst"), hint: t("choices.planFirstNext"), on: frame.picks.planFirst(), onToggle: () => frame.picks.setPlanFirst(!frame.picks.planFirst()) });
+      : sheetSwitch({
+          label: t("options.planFirst"),
+          hint: t("choices.planFirstNext"),
+          on: frame.picks.planFirst(),
+          // The sheet is painted again so that its switch says the new state, as Fast mode's is (pickSpeed).
+          onToggle: () => {
+            frame.picks.setPlanFirst(!frame.picks.planFirst());
+            repaintSettings();
+          },
+        });
     const models = sections.build(modelArgs());
     return {
       body: [

@@ -29,6 +29,7 @@ _NONE: dict[str, object] = {
     "loops": {"count": 0, "rhythm": None, "problem": False},
     "queue": {"count": 0, "held": False, "problem": False, "sending": False},
     "running": {"count": 0, "problem": False},
+    "tasks": {"open": 0},
 }
 _ALL: dict[str, object] = {
     **_NONE,

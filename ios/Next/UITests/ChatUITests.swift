@@ -50,6 +50,29 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// The round "↓" beside the bottom capsule (item 1991): it is absent while the chat stands at its end, comes once the owner
+    /// scrolls up, and a tap on it scrolls to the end, follows again and hides it.
+    @MainActor
+    func testTheJumpButtonComesWhenTheOwnerScrollsUpAndLeavesWithATap() {
+        let app: XCUIApplication = launch("n2-failed", defaults: [])
+        let jump: XCUIElement = app.buttons["chat.scrollToBottom"]
+        let message: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 10))
+        XCTAssertFalse(jump.exists, "at the end there is no button")
+        let scroll: XCUIElement = app.scrollViews.firstMatch
+        for _ in 0..<3 { scroll.swipeDown(velocity: .fast) }
+        XCTAssertTrue(jump.waitForExistence(timeout: 5), "scrolled up, the button comes")
+        XCTAssertGreaterThanOrEqual(jump.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(jump.frame.height, 44)
+        let attachment: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "jump-button"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        jump.tap()
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: jump)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "at the end again, the button leaves")
+    }
+
     /// The swipe to quote beats the navigation's pull-back (item 2030): iOS 26 pulls a pushed chat back from a swipe to the
     /// right anywhere in it, which a swipe on a message is. On a message of the owner's and of Dot's, from the middle of the
     /// screen, the message is quoted and the chat stays open; a swipe from the screen's edge still goes back.
@@ -75,7 +98,8 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(answer.waitForExistence(timeout: 10))
         drag(answer, by: 200)
         XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on Dot's message quotes it")
-        XCTAssertTrue(chip.label.contains("merged"), chip.label)
+        // The whole message is quoted and the chip shows its first line, the answer's "## Fixed" heading.
+        XCTAssertTrue(chip.label.contains("Fixed"), chip.label)
         XCTAssertFalse(home.exists, "the chat is still open")
         app.buttons["composer.quote.remove"].tap()
 
@@ -129,12 +153,12 @@ final class ChatUITests: XCTestCase {
         XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
     }
 
-    /// The owner's report of 2026-11-27: the capsule says "Waiting on N helpers" only while the main run has stopped for
+    /// The owner's report of 2026-11-27: the capsule says "Waiting for N helpers" only while the main run has stopped for
     /// them (`n2-helpers`: its step's one open call is a delegate); while it works beside its helper (`n2-chat`) it says
     /// "Working". No spinner on either, and the status takes only its words' width, so that Stop, the plan and the helpers
     /// keep their room.
     func testTheCapsuleSaysWaitingOnlyWhileTheRunWaitsAndSpinsNothing() {
-        for (scene, words) in [("n2-helpers", "Waiting on 1 helper"), ("n2-chat", "Working, ")] {
+        for (scene, words) in [("n2-helpers", "Waiting for 1 helper"), ("n2-chat", "Working, ")] {
             let app: XCUIApplication = launch(scene)
             let status: XCUIElement = app.buttons["capsule.status"]
             XCTAssertTrue(status.waitForExistence(timeout: 10), scene)

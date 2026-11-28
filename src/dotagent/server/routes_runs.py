@@ -22,6 +22,7 @@ from dotagent.agent.attachments import (
 )
 from dotagent.agent.budget import loosens, run_budget
 from dotagent.agent.campaign import session_number
+from dotagent.agent.chat_choices import MessageChoices
 from dotagent.agent.held_secrets import SECRET_SEVERITY, HeldSecret, forget_secret, save_secret
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import disliked_of, run_lessons
@@ -108,6 +109,7 @@ from dotagent.server.views import (
     UndoRequest,
     UsageQuery,
     picks_of,
+    sent_choices,
 )
 from dotagent.store.db import Store
 from dotagent.store.endings import classify_ending
@@ -250,12 +252,19 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         return None if not records else CodingWork.model_validate(records[0].data)
 
     @router.post("/runs", status_code=201)
-    async def start_run(request: StartRunRequest) -> RunRecord:
+    async def start_run(sent: StartRunRequest) -> RunRecord:
         """Start a run, or with ``standing`` a campaign whose opening session the returned run is. The message sent
         again with its ``key`` gets the run its first sending started (:func:`send_once`). With ``loop`` the goal is a
         loop of the run's chat too (item 400, :func:`make_loop`); what the scheduler would refuse of the loop
         (:func:`plan_schedule`) starts nothing. The run's source is the request's: the pages', or ``dotx run``'s for a
-        run it hands to the daemon."""
+        run it hands to the daemon. A message to a chat (``thread_id``) takes each choice it leaves out from the chat
+        (item 2071)."""
+        request: StartRunRequest = sent
+        if sent.thread_id is not None:
+            chosen: MessageChoices = await ctx.manager.chat_message_choices(
+                sent.thread_id, sent_choices(sent), sent.model_fields_set
+            )
+            request = sent.model_copy(update=chosen.model_dump())
         if request.model is not None:
             parse_model_ref(request.model)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)

@@ -34,6 +34,7 @@ from dotagent.notify.push import (
     push_message,
     quiet_while_shown,
     read_or_create_keys,
+    task_notice,
 )
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, PushSubscription, RunRecord
@@ -91,7 +92,7 @@ def test_the_keys_are_made_once_private_and_reused(tmp_path: Path) -> None:
             "approval_requested",
             {"severity": "question", "summary": "Which colour? — asked", "args": {"question": "Which colour?"}},
             None,
-            PushMessage(title="Dot has a question", body="Which colour?", route="#/runs/run-1", state="waiting"),
+            task_notice("Dot has a question", "run-1", "waiting"),
         ),
         (
             "question_left",
@@ -103,44 +104,40 @@ def test_the_keys_are_made_once_private_and_reused(tmp_path: Path) -> None:
                 "args": {"question": "Which colour?", "options": []},
             },
             None,
-            PushMessage(title="Dot has a question", body="Which colour?", route="#/runs/run-1", state="waiting"),
+            task_notice("Dot has a question", "run-1", "waiting"),
         ),
         (
             "approval_requested",
             {"severity": "handoff", "summary": "Open https://example.com/ — rule", "args": {}},
             "run-0",
-            PushMessage(
-                title="Dot needs your help",
-                body="Open https://example.com/ — rule",
-                route="#/runs/run-1",
-                state="waiting",
-            ),
+            task_notice("Dot needs your help", "run-1", "waiting"),
         ),
         (
             "approval_requested",
             {"severity": "high", "summary": "rm -rf build — destructive", "args": {"kind": "shell"}},
             None,
-            PushMessage(
-                title="Dot asks for approval", body="rm -rf build — destructive", route="#/runs/run-1", state="waiting"
-            ),
+            task_notice("Dot asks for approval", "run-1", "waiting"),
         ),
         (
             "run_finished",
             {"status": "done", "result": "\n  \nTen leads are in leads.csv.\n\n| name | site |", "needs": ""},
             None,
-            PushMessage(title="A task is done", body="Ten leads are in leads.csv.", route="#/runs/run-1", state="done"),
+            task_notice("A task is done", "run-1", "done"),
         ),
         (
             "run_finished",
             {"status": "failed", "result": "The model provider failed: timed out", "needs": ""},
             None,
-            PushMessage(
-                title="A task failed",
-                body="The model provider failed: timed out",
-                route="#/runs/run-1",
-                state="failed",
-            ),
+            task_notice("A task failed", "run-1", "failed"),
         ),
+        (
+            "run_finished",
+            {"status": "failed", "goal_blocked": True, "result": "private obstacle"},
+            None,
+            task_notice("A task is blocked", "run-1", "waiting"),
+        ),
+        ("run_finished", {"status": "cancelled"}, None, None),
+        ("goal_check", {"decision": "achieved", "final": True}, None, None),
         ("run_finished", {"status": "done", "result": "Done.", "needs": ""}, "run-0", None),
         (
             "campaign_ended",
@@ -418,9 +415,7 @@ def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_ses
     scheduled: RunRecord = _run(None).model_copy(update={"source": "schedule"})
     assert push_message(ended, scheduled) is None
     session: RunRecord = scheduled.model_copy(update={"campaign_id": "cmp-1"})
-    assert push_message(ended, session) == PushMessage(
-        title="A task failed", body="The site moved.", route="#/runs/run-1", state="failed"
-    )
+    assert push_message(ended, session) == task_notice("A task failed", "run-1", "failed")
 
 
 def test_the_end_of_a_run_that_waits_on_the_owner_says_what_it_needs_not_done() -> None:

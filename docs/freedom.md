@@ -10,7 +10,7 @@ contract, and `tests/unit/test_freedom_contract.py` is what makes it executable.
 
 **A run in yolo, and every run while free mode is on, asks the owner nothing, and every tool action runs unasked.**
 
-- **Yolo** (`approvals = "yolo"` of the run; the chat's pill "Pay or send", item 443): the gate waives every question and
+- **Yolo** (`approvals = "yolo"` of the run; the chat's pill "Pay", item 443): the gate waives every question and
   every hand-off, each with the reason it would have asked for: the question that outside content raises, the one about
   Dot's own files (`_OWN_FILES_REASON`), money and credentials, a login filled from a vault (`_VAULT_REASON`), a message
   or a post in the owner's name, a release, a pre-approved spend, the preset's and the owner's `ask` rules', and the
@@ -73,8 +73,13 @@ or free run deny something it allowed is a regression too.
   nor what Dot loads and runs, nor hand work to launchd, Shortcuts or Launch Services, nor reach the clipboard
   ([Safety](safety.md)). macOS refuses such a step (`Operation not permitted`); the gate asks nothing new, waits for
   nothing and decides every call as before, and the rest of the task's reach (the network, the owner's files, their
-  programs) is unchanged. This is the one thing such a run no longer does. A run the owner started has no sandbox in
-  yolo, as before.
+  programs) is unchanged. Dot's own tools, which act in the daemon's process, keep the same seal for such a run (item
+  2026, `RunGate._keep_seal`, `sealed_step` in `policy/sandbox.py`): a step of `write_file`, `edit_file`,
+  `read_file` and the others that name a file is refused (policy event `seal`) when the file is one the sandbox seals,
+  before anything is weighed, so nothing asks; a read of Dot's own files and of `[policy] sealed_paths` is refused too,
+  and a write of what Dot runs. The test's table names the rows it refuses (`SEALED_ROWS`: a write and an edit of Dot's
+  own files; its world holds no file that is read-sealed) and fails on any other. This is the one thing such a run no
+  longer does. A run the owner started has no sandbox and no seal in yolo, as before.
 - **A hand-off past the hop limit refuses nothing in yolo and free mode** (item 1741). Every hand-off from one agent to
   another (a run another run delegated or messaged, a work order's attempt, the lead's run woken by its agent's answer,
   a thing on Dot's list a run put there) is one hop further than the run it came from (`runs.hops`, set by Dot and never

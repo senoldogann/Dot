@@ -69,6 +69,7 @@ from dotagent.policy.engine import (
     waived_in_yolo,
 )
 from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action, spacing_wait
+from dotagent.policy.sandbox import Seal, sealed_step
 from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
 from dotagent.secrets import known_secrets
@@ -249,6 +250,7 @@ class RunGate:
         owner_there: bool = True,
         chat_id: str | None = None,
         unattended: bool = False,
+        seal: Seal | None = None,
     ) -> None:
         self._store: Store = store
         # Whether the run is of a chat Dot opened on its own initiative (item 850), whose messages, posts and releases
@@ -263,6 +265,9 @@ class RunGate:
         # processes start in the sandbox in every mode, whatever the owner's switch says. The gate decides nothing by
         # it; the tools read it (``ToolContext.unattended``).
         self.unattended: bool = unattended
+        # What Dot's own tools keep from the run (item 2026): for a run nobody started, the paths its sandbox seals,
+        # refused to a step that reads or writes them in Dot's own process, in every mode; ``None`` for any other run.
+        self._seal: Seal | None = seal
         # The chat whose "don't ask again" yeses answer this run's questions (item 866): its own chat's, or for a
         # delegated run its parent's; ``None``: none answer them.
         self.chat_id: str | None = chat_id
@@ -430,6 +435,7 @@ class RunGate:
         values a login filled masked (the browser and web tools, item 621): the owner's rules are matched against it,
         so that what a rule decides never tells a run whether a word of its own is the password; everything the gate
         records, shows or asks is of ``info``."""
+        await self._keep_seal(info)
         await self._refuse_carried_secret(info, {} if arguments is None else arguments)
         # Before the locks of a site's pace and spend: the review model may take a while, and the other runs' steps
         # on the same site would wait for it (item 525).
@@ -465,6 +471,21 @@ class RunGate:
             await self._space(paced)
             await self._store.record_paced_action(paced.host, paced.pace, time.time(), self._run_id)
         return authorized
+
+    async def _keep_seal(self, info: ActionInfo) -> None:
+        """Refuse a step of a run nobody started that reads or writes, in Dot's own process, what its sandbox seals
+        (item 2026), in every mode, before the policy weighs it and before anything asks: its target when it is a
+        read or a write of a file, and the files it reads besides (``reads``)."""
+        if self._seal is None:
+            return
+        found: str | None = sealed_step(self._seal, info)
+        if found is None:
+            return
+        decision: Decision = Decision(verdict="deny", source="seal", reason=found, rule_id=None)
+        shown, said = await _shown(info, decision)
+        # A refusal before the policy weighs the step: the run's taint as it stands.
+        await self._emit_policy(shown, said, self.tainted)
+        raise PolicyDenied(found, {"action": _describe(shown), "source": decision.source})
 
     async def _keep_pace(self, info: ActionInfo, paced: PacedAction, lead: str) -> None:
         """Refuse the action when its site had as many of its class as the pace allows in the last hour or day; ``lead``

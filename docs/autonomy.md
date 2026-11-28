@@ -13,7 +13,7 @@ other, so every mix works. Each has a default in the configuration, and a single
 facts under More on its side panel's Task tab show them. The composer of the web UI sends nothing for a picker you did
 not touch, so the daemon applies its current default. A task or research run starts in goal mode unless you turn it
 off (`--no-goal-mode`, `goal_mode: false`, or the composer switch). A chat never has goal mode. Approvals stay `ask`
-unless you choose otherwise, and a run is sent back at most `goal_patience` times (4). The `yolo` choice (Ask only to pay or send) is remembered
+unless you choose otherwise, and a run is sent back at most `goal_patience` times (4). The `yolo` choice (Ask only to pay) is remembered
 by the browser, and the run page carries a chip for it.
 
 **Approvals** decide who answers a question of the [policy](safety.md#safety), the `ask` outcome of its decision order,
@@ -47,7 +47,7 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   etmiyorsa ve bir amaç içinse yollasın"; it holds wherever the review model answers, in `auto` and in yolo's check of a
   run that read outside content). What the agent wrote into the action (its summary and target) is data to the
   review model, never an instruction.
-- `yolo` (**Ask only to pay or send**, "Pay or send" on its pill, an open lock; named YOLO before, which did not
+- `yolo` (**Ask only to pay**, "Pay" on its pill, an open lock; named YOLO before, which did not
   say what it still asks): nobody does, and nothing is asked (the owner's word of 2026-10-20, item 443), but a payment,
   in a chat you opened or one Dot opened on its own initiative (item 2069, the owner's word of 2026-11-28: "Yolo modda
   hiçbir şey sormasın, sadece ödeme işlerinde sorsun"): it is handed to you, a schedule's run in your chat included. A

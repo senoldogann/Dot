@@ -9,7 +9,7 @@ function dayOf(seconds) {
 }
 
 /** The lines of what the rule would have done: how many steps it fits, the earlier rules that decide some first, what
- * no rule decides (the steps of a run in the mode that asks only to pay or send, and the checks that come before every rule), and how what it would decide
+ * no rule decides (the steps of a run in the mode that asks only to pay, and the checks that come before every rule), and how what it would decide
  * compares with what was decided then. */
 export function previewLines(view, days) {
   if (view.scanned === 0) {

@@ -1,9 +1,9 @@
 """A chat's row says what it waits on that is not the owner (item 2010, as DotNext's rows say it, item 1920), on a
 daemon in Chrome, wide and at a phone's width, in English and Turkish. A run hands two jobs to two helpers that each
-wait in a shell command, and waits on them: its row in the sidebar says "Waiting on 2 helpers…" ("2 yardımcıyı
+wait in a shell command, and waits on them: its row in the sidebar says "Waiting for 2 helpers…" ("2 yardımcı
 bekliyor…") in its last line, where its last words stood, shimmering as the work does, while its right still says
 Working and for how long, and no count of the helpers stands beside the words that say it. Once one helper is stopped,
-the open page's row says "Waiting on 1 helper…" without a reload.
+the open page's row says "Waiting for 1 helper…" without a reload.
 
 No network and no model service is used: the scripted model plays the run and its helpers.
 """
@@ -51,8 +51,8 @@ async def test_a_row_says_its_run_waits_on_its_helpers(login_env: dict[str, str]
             browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
             try:
                 for width, language, words in (
-                    (390, "tr", "2 yardımcıyı bekliyor…"),
-                    (1440, "en", "Waiting on 2 helpers…"),
+                    (390, "tr", "2 yardımcı bekleniyor…"),
+                    (1440, "en", "Waiting for 2 helpers…"),
                 ):
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 900}, reduced_motion="reduce"
@@ -73,7 +73,7 @@ async def test_a_row_says_its_run_waits_on_its_helpers(login_env: dict[str, str]
                         # the other.
                         manager.cancel(helpers[0].id)
                         await expect(row.locator(".side-chat-live")).to_have_text(
-                            "Waiting on 1 helper…", timeout=15_000
+                            "Waiting for 1 helper…", timeout=15_000
                         )
                     await page.close()
             finally:
