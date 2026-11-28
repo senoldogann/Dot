@@ -268,10 +268,10 @@ async def test_the_side_menu_shows_every_agent_of_a_run_on_the_chats_row(
                 # row says so in place of the count of every run it delegated (item 2010), and nothing hangs under it.
                 await expect(section.locator(".side-chat")).to_have_count(1)
                 row: Locator = section.locator(".side-chat > .side-run")
-                await expect(row.locator(".side-chat-live")).to_have_text("Waiting on 1 helper…")
+                await expect(row.locator(".side-chat-live")).to_have_text("Waiting for 1 helper…")
                 await expect(row.locator(".side-helpers")).to_have_count(0)
                 await expect(section.locator(".side-children")).to_have_count(0)
-                assert "Waiting on 1 helper…" in (await row.get_attribute("aria-label") or "")
+                assert "Waiting for 1 helper…" in (await row.get_attribute("aria-label") or "")
                 await page.screenshot(path=str(tmp_path / f"agents-{width}-{scheme}.png"))
                 await page.close()
         finally:

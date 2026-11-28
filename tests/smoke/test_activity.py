@@ -277,7 +277,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     working_row = sidebar.locator("[data-section=working] .side-chat > .side-run").filter(
                         has_not_text="Find leads"
                     )
-                    await expect(working_row.locator(".side-chat-live")).to_have_text("Waiting on 1 helper…")
+                    await expect(working_row.locator(".side-chat-live")).to_have_text("Waiting for 1 helper…")
                     await expect(working_row.locator(".side-helpers")).to_have_count(0)
                     await expect(sidebar.locator("[data-section=working] .side-children")).to_have_count(0)
                     assert "1 helper" in (await working_row.get_attribute("aria-label") or "")
