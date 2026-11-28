@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2079](2079.md) | done | 2026-11-28 | A stuck tab with a navigation under way is said after one timeout, within browser_snapshot's limit |
 | [2077](2077.md) | done | 2026-11-28 | Recall reads back a run whose chat was deleted, and says a record it cannot find may be deleted |
 | [2076](2076.md) | done | 2026-11-28 | A page opened from the tab a login was filled into opens in a new tab in its place |
 | [2073](2073.md) | done | 2026-11-28 | A run is told that the mail and calendar tools take no address but the accounts signed in |
