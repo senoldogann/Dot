@@ -348,11 +348,11 @@ async def _one_size(
         ["Item", "Amount", "Rent", "1200,50", "Food", "300"]
     )
     # The rows past the first page are drawn as the panel scrolls to its end.
-    await expect(view.locator(".file-grid tbody tr")).to_have_count(200)
+    await expect(view.locator(".file-grid tbody tr:not(.lazy-more)")).to_have_count(200)
     for _ in range(3):
         await view.locator(".file-body").evaluate("(body) => { body.scrollTop = body.scrollHeight; }")
         await page.wait_for_timeout(200)
-    await expect(view.locator(".file-grid tbody tr")).to_have_count(253)
+    await expect(view.locator(".file-grid tbody tr:not(.lazy-more)")).to_have_count(253)
     await expect(view.locator(".file-grid tbody tr").last.locator("td").first).to_have_text("Row 250")
     await expect(view.get_by_role("button", name="Copy the text")).to_be_hidden()
     await view.get_by_role("button", name="Open on the Mac").click()

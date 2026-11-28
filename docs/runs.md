@@ -558,9 +558,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   zooms with two fingers, a double tap, the trackpad's pinch or Ctrl and the wheel, and its −, + and Fit; zoomed, the
   picture is dragged; Close, Escape, a tap beside the picture or a swipe down close it); a Markdown file (`.md`, `.markdown`) formatted as an answer is, with its headings, lists, tables and
   code, and as it is written a click away (item 269), its HTML never drawn; a source file (Python, JavaScript,
-  TypeScript, shell, Rust, Go, Swift, SQL, YAML and the like, by its extension) as code, its lines numbered and its
+  TypeScript, shell, Rust, Go, Swift, YAML and the like, by its extension) as code, its lines numbered and its
   words coloured by their kind (keywords, strings, numbers, comments) by the change view's scanner, or by its nearest
-  grammar (C, C++, C#, Java, Kotlin, PHP and Dart by JavaScript's, Ruby by Python's; SQL is not coloured), its language
+  grammar (C, C++, C#, Java, Kotlin, PHP and Dart by JavaScript's, Ruby by Python's, INI by TOML's, Vue and Svelte by
+  HTML's; SQL is numbered but not coloured), its language
   and its path over it (item 624), in the change view's code view (item 2017; a JSON file laid out, a Markdown file's
   source numbered too); any
   other text as text, never as a page. Code, a Markdown file and a grid are drawn a page at a time as they scroll into
