@@ -367,13 +367,17 @@ never a layer over it. Its segments are the run's status with its Stop (**Workin
 drops), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**.
 A daemon outage appears in the shared line under the bar. The capsule appears only when it has something to say. A row too narrow says
 **Waiting for 2 helpers** while the run has stopped for them, **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
+**Waiting on 2 helpers** while the run has stopped for them, or **Chat updates interrupted** if only the chat stream
+drops), its plan, **2 helpers**, the chat's tasks (**2 tasks**, item 2013), the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**.
+A daemon outage appears in the shared line under the bar. The capsule appears only when it has something to say. A row too narrow says
+**Waiting on 2 helpers** while the run has stopped for them, **Can't reach Dot**), its plan, **2 helpers**, the chat's tasks (**2 tasks**, item 2013), the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
 "Working") and at 320 px, with everything to say, takes a second line that keeps the status and the Stop in words, never
 a scroll or a cut. A tap on a segment opens its detail as a sheet from the foot of the screen, one
 at a time, which closes by a tap outside, by Escape, by its handle or by a swipe down: the queue's rows with their
 arrows, the loops with when next and **Stop repeating**, the commands with their words wrapped and **Stop**, the helpers
-with **Details** and **Stop**, the plan. What Dot asks, and the Continue of a task that was cut off, are cards of their
+with **Details** and **Stop**, the chat's tasks with how each stands, **Stop** and **Open**, the plan. What Dot asks, and the Continue of a task that was cut off, are cards of their
 own directly over the capsule, never folded into it.
 It respects reduced motion and its segments have focus rings, names and `aria-expanded`. A window wider than 720 px
 keeps the bar of item 401 and the panes over the composer.
