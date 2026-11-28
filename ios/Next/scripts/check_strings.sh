@@ -1,6 +1,7 @@
 #!/bin/sh
 # Fails when DotNext shows a string the String Catalog does not hold, holds a key the code no longer uses (stale), or
-# holds a key with no Turkish translation or no translator comment (the owner reads Turkish only).
+# holds a key with no Turkish translation or no translator comment (the owner reads Turkish only), or holds an English
+# unit not marked translated (a key that is not its English: the build leaves such a unit out of en.lproj).
 #
 # Usage: ios/Next/scripts/check_strings.sh <derived data folder of a DotNext build>
 #   The build writes the keys the compiler found (.stringsdata, SWIFT_EMIT_LOC_STRINGS). A copy of the catalog is
@@ -38,6 +39,9 @@ for key, entry in sorted(committed.items()):
     unit = entry.get("localizations", {}).get("tr", {}).get("stringUnit", {})
     if unit.get("state") != "translated" or not unit.get("value"):
         problems.append(f"no Turkish translation: {key!r}")
+    english = entry.get("localizations", {}).get("en", {}).get("stringUnit")
+    if english is not None and english.get("state") != "translated":
+        problems.append(f"English not marked translated (left out of en.lproj; run apply_translations.py): {key!r}")
     if not entry.get("comment"):
         problems.append(f"no translator comment: {key!r}")
 if raw:

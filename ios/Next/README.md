@@ -135,6 +135,12 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 - `App/`: the shell (the home of bots, PLAN §27: `Home.swift`, a bot's chat `BotChat.swift`, its profile
   `BotProfile.swift` and its Work pages `BotWorkPages.swift`, faces `BotFace.swift`), the gallery, sample content. `scripts/e2e_bots.sh` runs `BotsLiveUITests`
   on a throwaway daemon.
+- `Data/`: the phone's own adapters: dictation, image sizing, the performance record, and `PhoneAsks`, which does Dot's
+  asks on the phone (item 2051, `docs/phone.md` "Dot's asks to the phone"): the calendars read and an event added
+  (EventKit), a reminder added, and where the phone is (Core Location, when in use). iOS asks for each permission the
+  first time an ask needs it (Info.plist's `NSCalendarsFullAccessUsageDescription`,
+  `NSRemindersFullAccessUsageDescription`, `NSLocationWhenInUseUsageDescription`, Turkish in `tr.lproj/InfoPlist.strings`);
+  the engine's `PhoneAskLoop` brings the asks while the app is in front.
 - `Resources/`: the asset catalog (app icon, accent = the ink) and `Localizable.xcstrings`.
 - `Tests/`: `DotNextTests`. `scripts/`: the icon, the strings check, the screenshot harness.
 
@@ -155,7 +161,8 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 Every user-visible string goes through `String(localized: "…", comment: "…")` and lives in
 `Resources/Localizable.xcstrings` with a Turkish translation (the owner reads Turkish). `StringCatalogTests` fails on a
 key without Turkish, without a comment, or stale; `scripts/check_strings.sh <derived data>` fails on a string of the code
-that the catalog lacks and on raw literals in SwiftUI calls. To add strings: build, run the check, copy the synced
+that the catalog lacks, on raw literals in SwiftUI calls, and on an English unit (a key that is not its English,
+`task.open`) not marked translated, which the build would leave out of `en.lproj`. To add strings: build, run the check, copy the synced
 catalog it names over `Resources/Localizable.xcstrings`, add the Turkish to `scripts/translations_tr.py`, run
 `python3 ios/Next/scripts/apply_translations.py`.
 

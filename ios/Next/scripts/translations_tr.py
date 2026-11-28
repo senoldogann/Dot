@@ -1,6 +1,8 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# The manager review of the team (item 2068).
+# A bot that carries too much (item 2067).
 # Rules on the phone (item 2055).
 # MS1: the last confirmed contact with the Mac.
 # Memory: a new note, the trash and Restore (G1b).
@@ -10,6 +12,11 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # The Dot Next app's own asks (item 2051), in the web's words.
+    "iPhone calendar": "iPhone takvimi",
+    "Add to iPhone calendar": "iPhone takvimine ekle",
+    "Add iPhone reminder": "iPhone anımsatıcısı ekle",
+    "iPhone location": "iPhone konumu",
     # Activity's skill and plugin proposals (item 2062).
     "Install a plugin the review rates risky?": "İncelemenin riskli bulduğu eklenti kurulsun mu?",
     "Use a skill written from outside content?": "Dış içerikten yazılmış beceri kullanılsın mı?",
@@ -1259,6 +1266,39 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "%@ is overloaded: %@": "%1$@ aşırı yüklü: %2$@",
+        "%@ ran nothing for %lld days and has no work order or routine": "%1$@ %2$lld gündür hiçbir şey yapmadı; iş emri ya da rutini yok",
+        "%@ reviewed the team %@": "%1$@ ekibi inceledi, %2$@",
+        "%@ reviews": "%@ inceliyor",
+        "%@ reviews the team now. Choosing how often here makes this bot the manager.": "Ekibi şu an %@ inceliyor. Sıklığı burada seçersen bu bot yönetici olur.",
+        "%@: %lld of its %lld runs this week failed": "%1$@: bu hafta %3$lld işinden %2$lld tanesi başarısız oldu",
+        "Accept": "Kabul et",
+        "Daily": "Her gün",
+        "How often": "Ne sıklıkla",
+        "Manager review": "Yönetici incelemesi",
+        "Move %lld work orders from %@ to %@": "%1$lld iş emrini %2$@ botundan %3$@ botuna taşı",
+        "Move 1 work order from %@ to %@": "1 iş emrini %1$@ botundan %2$@ botuna taşı",
+        "Nothing to change: no work order is stuck, no objective is behind, and no bot is idle, overloaded or failing.": "Değişecek bir şey yok: takılan iş emri yok, geride kalan hedef yok, boşta, aşırı yüklü ya da sık başarısız olan bot yok.",
+        "Objective %@ has had no progress for %lld days": "%1$@ hedefinde %2$lld gündür ilerleme yok",
+        "Off: the manager reviews the team only when you ask. It only proposes; nothing changes until you accept a card.": "Kapalı: yönetici ekibi yalnızca sen istediğinde inceler. Yalnızca önerir; sen bir kartı kabul edene kadar hiçbir şey değişmez.",
+        "Proposals": "Öneriler",
+        "Review now": "Şimdi incele",
+        "Reviewing…": "İnceleniyor…",
+        "Split %@ into %@": "%1$@ botunu böl: %2$@",
+        "Switch off the routine %@ of %@": "%2$@ botunun %1$@ rutinini kapat",
+        "The last review failed: %@": "Son inceleme başarısız oldu: %@",
+        "Weekly": "Her hafta",
+        "Work order %@ of %@ has not moved for %lld days": "%2$@ botunun %1$@ iş emri %3$lld gündür ilerlemedi",
+        "a routine": "bir rutin",
+        "a work order": "bir iş emri",
+        "an objective": "bir hedef",
+        "no routine": "rutin yok",
+        "takes %@": "devraldığı: %@",
+        "%lld open work orders (more than %lld)": "%lld açık iş emri (en çok %lld olmalı)",
+        "%lld routines on (more than %lld)": "%lld rutin açık (en çok %lld olmalı)",
+        "%lld%% of its runs ended done this week, %lld%% the week before": "Bu hafta işlerinin %%%lld kadarı bitti, geçen hafta %%%lld",
+        "Overloaded: %@": "Aşırı yüklü: %@",
+        "Overloaded": "Aşırı yüklü",
         "Goes ahead without asking": "Sormadan ilerler",
         "Goes ahead, whatever it has read": "Ne okumuş olursa olsun ilerler",
         "Ask me first": "Önce bana sor",

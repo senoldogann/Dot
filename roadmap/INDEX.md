@@ -6,6 +6,9 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2087](2087.md) | done | 2026-11-28 | main's smoke gate: the iMessage progress test no longer races the runner's speed, and a failed test leaves no run behind |
+| [2086](2086.md) | done | 2026-11-28 | main's iPhone tests green again: the English of a key that is not its English, and the keyboard's first-use tip |
+| [2085](2085.md) | done | 2026-11-28 | main's smoke gate: a bot file naming unknown actions says "bot", and the capsule test knows the chat's tasks |
 | [2084](2084.md) | done | 2026-11-28 | An agent file the web cannot read is called a bot file, as the test and the page say |
 | [2080](2080.md) | done | 2026-11-28 | The iPhone's question card keeps its arrows in place while paging; main's chat UI tests green again |
 | [2079](2079.md) | done | 2026-11-28 | A stuck tab with a navigation under way is said after one timeout, within browser_snapshot's limit |
@@ -14,10 +17,13 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2074](2074.md) | done | 2026-11-28 | A bot's Model page is the model picker: Main model on top, the providers as groups that fold, a search |
 | [2073](2073.md) | done | 2026-11-28 | A run is told that the mail and calendar tools take no address but the accounts signed in |
 | [2071](2071.md) | built | 2026-11-28 | A message that leaves its choices out starts on the chat's: the chosen model is the one that runs |
+| [2068](2068.md) | done | 2026-11-28 | A manager reviews the team: stuck orders, idle, overloaded and failing bots, objectives behind, and a card per change it proposes |
+| [2067](2067.md) | done | 2026-11-28 | A bot that carries too much says so: the team's load measured, a quiet "Overloaded" mark on its row and profile |
 | [2066](2066.md) | done | 2026-11-28 | A code_run that cannot open a file is told that its code opens only its scratch folder |
 | [2065](2065.md) | done | 2026-11-28 | A code review whose chat has a run under way starts in a new chat instead of failing |
 | [2062](2062.md) | done | 2026-11-28 | DotNext's Activity answers Dot's skill and plugin proposals |
 | [2055](2055.md) | done | 2026-11-28 | Read rules and add a rule that asks or hands a step back from Dot Next |
+| [2051](2051.md) | done | 2026-11-28 | The iPhone's calendars, reminders and location, from Dot Next |
 | [2050](2050.md) | done | 2026-11-28 | The old iPhone app's dictation loses no word on a pause either |
 | [2049](2049.md) | done | 2026-11-28 | The plan's sheet: a head with the count, where the run stands and a bar; the steps on a line; a failed run's step says so |
 | [2048](2048.md) | done | 2026-11-28 | A pause in a dictation loses no word, on the phone and the web |

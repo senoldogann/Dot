@@ -232,7 +232,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full` offers all of them at every step. `grouped`, the default
   since item 1280, starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
-  `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, `waits`, `recon`, `skills`, and `mcp__<server>` for
+  `terminal`, `memory_admin`, `drafts`, `accounts`, `phone_app`, `team`, `pages`, `waits`, `recon`, `skills`, and `mcp__<server>` for
   each MCP server) are
   listed in the system prompt with what they are for and
   their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. A
@@ -746,6 +746,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts` or a registered scope, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write`, and the pages of the owner's own Safari: `safari_open`, `safari_read`, `safari_act` (item 1959, [Browser and computer use](browser-and-computer-use.md#the-owners-own-safari)) |
 | Phone           | while `[phone] enabled` (item 1196): `phone_status`, whether the owner's iPhone answers over WebDriverAgent and is locked ([Dot and your iPhone](phone-control.md)) |
+| iPhone app      | while a phone is paired (item 2051, tool group `phone_app`): `phone_calendar_events`, `phone_calendar_add`, `phone_reminder_add`, `phone_location`, done by Dot Next on the iPhone while it is open there ([Dot's asks to the phone](phone.md#dots-asks-to-the-phone-item-2051)) |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools`, `recall` (a record a compaction named, read back, item 924) |

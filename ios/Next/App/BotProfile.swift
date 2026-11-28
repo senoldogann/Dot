@@ -22,6 +22,8 @@ struct BotProfile: View {
     @State private var objectives: Loadable<[ObjectiveRecord]> = .loading
     @State private var handoffs: Loadable<BotHandoffs> = .loading
     @State private var pausing: Bool = false
+    /// The manager review's settings (item 2068), for its row's detail; `nil` until read or when the read failed.
+    @State private var review: TeamReviewView?
     @State private var problem: SettingsFailure?
     @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
 
@@ -35,6 +37,14 @@ struct BotProfile: View {
                 if bot.record.pausedAt != nil {
                     Notice(tone: .warn, message: String(localized: "Paused: its routines start nothing by themselves.", comment: "Bot profile: a paused bot"), dismiss: nil)
                         .accessibilityIdentifier("profile.paused")
+                }
+                if bot.overloaded {
+                    Notice(
+                        tone: .info,
+                        message: String(localized: "Overloaded: \(overloadWords(bot.load))", comment: "Bot profile: a bot that carries too much; the argument is why"),
+                        dismiss: nil
+                    )
+                    .accessibilityIdentifier("profile.overloaded")
                 }
                 GroupedSection(header: nil, footer: nil) {
                     if let latest = bot.latest {
@@ -53,6 +63,11 @@ struct BotProfile: View {
                         detail: routinesWords(bot)
                     ) { SchedulesPage(editsFirst: false, scope: bot.isDot ? .dot : .agent(bot.id)) }
                     .accessibilityIdentifier("profile.routines")
+                    NavigationRow(
+                        systemImage: "person.3", title: String(localized: "Manager review", comment: "Bot profile: the manager's review of the team"), description: nil,
+                        detail: review.map { reviewRowWords($0, botId: bot.id, names: Dictionary(model.bots.map { ($0.id, $0.record.name) }, uniquingKeysWith: { first, _ in first })) }
+                    ) { TeamReviewPage(botId: bot.id) }
+                    .accessibilityIdentifier("profile.review")
                     modelRow(bot)
                     NavigationRow(
                         systemImage: "clock.arrow.circlepath", title: String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away"),
@@ -106,11 +121,14 @@ struct BotProfile: View {
         }
         .task { await loadSchedules() }
         .task { await loadWork() }
+        // Read again on each return from the review's page, whose choice its detail shows.
+        .onAppear { Task { await loadReview() } }
         .refreshable {
             problem = nil
             await model.loadAgents()
             await loadSchedules()
             await loadWork()
+            await loadReview()
         }
         .sheet(item: Binding(get: { library.map(LibraryChat.init) }, set: { library = $0?.id })) { chat in
             RunInspector(thread: chat.id, close: { library = nil })
@@ -248,6 +266,11 @@ struct BotProfile: View {
     }
 
     /// Pauses the bot or lets it go on (`POST /api/agents/{id}/pause|resume`), then reads the agents again; a refusal is said at the top.
+    /// The review's settings, for its row; a read that fails leaves the row without its detail, and its page says why.
+    private func loadReview() async {
+        if case .loaded(let view) = await model.read({ api throws(DaemonRequestError) in try await api.teamReview() }) { review = view }
+    }
+
     private func setPaused(_ bot: Bot, _ paused: Bool) {
         guard !pausing else { return }
         Task {

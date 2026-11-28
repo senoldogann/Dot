@@ -451,6 +451,7 @@ final class FakeDaemon: @unchecked Sendable {
             let status: String = lock.withLock { decided[approval] ?? "pending" }
             return Reply(status: 200, body: Self.json(approvalRecord(approval, status: status)), stream: false, lost: false)
         }
+        if let asks: Reply = phoneAsksReply(method: method, parts: parts, body: body) { return asks }
         if let voice: Reply = voiceReply(method: method, parts: parts, body: body) { return voice }
         if let models: Reply = modelsReply(method: method, parts: parts, body: body) { return models }
         if method == "DELETE", let found: [String] = Self.match(parts, ["api", "threads"]) {
@@ -494,6 +495,31 @@ final class FakeDaemon: @unchecked Sendable {
         }
         if method == "DELETE", let found: [String] = Self.match(parts, ["api", "voice", "streams", "*"]) {
             lock.withLock { voiceBytes[found[0]] = nil }
+            return Reply(status: 204, body: Data(), stream: false, lost: false)
+        }
+        return nil
+    }
+
+    // MARK: Dot's asks to the phone (item 2051)
+
+    private var heldAsks: [String] = []
+    private var takenAnswers: [String: Data] = [:]
+
+    /// An ask the next `GET /api/phone/asks/next` gives, as the daemon writes it.
+    func queueAsk(_ json: String) { lock.withLock { heldAsks.append(json) } }
+
+    /// The answers the phone sent, by ask id.
+    var phoneAnswers: [String: Data] { lock.withLock { takenAnswers } }
+
+    private func phoneAsksReply(method: String, parts: [String], body: Data?) -> Reply? {
+        if method == "GET", Self.match(parts, ["api", "phone", "asks", "next"]) != nil {
+            if old { return Self.refused(404, "Not Found") }
+            let next: String? = lock.withLock { heldAsks.isEmpty ? nil : heldAsks.removeFirst() }
+            guard let next else { return Reply(status: 204, body: Data(), stream: false, lost: false) }
+            return Reply(status: 200, body: Data(next.utf8), stream: false, lost: false)
+        }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "phone", "asks", "*"]) {
+            lock.withLock { takenAnswers[found[0]] = body ?? Data() }
             return Reply(status: 204, body: Data(), stream: false, lost: false)
         }
         return nil

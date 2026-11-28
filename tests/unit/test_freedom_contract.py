@@ -624,6 +624,11 @@ ROWS: tuple[Row, ...] = (
     _row("code: run Python", "code_run", {"code": "print(1 + 1)", "title": "Add two numbers"}),
     # --- the iPhone, a site's own face, and a security scan
     _row("phone: status", "phone_status", {}),
+    # The Dot Next app's calendars, reminders and location (item 2051): the gate decides before the ask goes.
+    _row("phone: calendar events", "phone_calendar_events", {"start": "2026-11-28", "end": "2026-11-29"}),
+    _row("phone: add an event", "phone_calendar_add", {"title": "Dentist", "start": "2026-11-28T14:00"}),
+    _row("phone: add a reminder", "phone_reminder_add", {"title": "Call Ada", "due": "2026-11-28"}),
+    _row("phone: location", "phone_location", {}),
     _row("recon: a site", "recon", {"target": "example.com"}),
     _row("recon: a security scan", "security_scan", {"target": "example.com"}),
     # --- the run's own tools

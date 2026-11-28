@@ -96,7 +96,7 @@ final class ChatListTests: XCTestCase {
             id: "agt_1", name: "Scout", role: "", instructions: "", model: "", effort: nil, approvals: nil, tools: [], createdAt: 0, updatedAt: 0, look: nil,
             pausedAt: nil, refuses: nil)
         let built: [Bot] = DotEngine.bots(
-            agents: [AgentSummary(record: dot, home: nil), AgentSummary(record: agent, home: nil)], rows: [dots, agents, campaign], pinned: [],
+            agents: [AgentSummary(record: dot, home: nil, load: nil), AgentSummary(record: agent, home: nil, load: nil)], rows: [dots, agents, campaign], pinned: [],
             fallbackDot: dot, gone: [])
         let dotsAsTheHomeCounts: ChatListScope = .botChats(bot: "dot", agent: nil)
         XCTAssertTrue(dotsAsTheHomeCounts.holds(campaign, bots: built), "a campaign's chat is Dot's, as on the home")
@@ -105,7 +105,7 @@ final class ChatListTests: XCTestCase {
         XCTAssertEqual(ChatListScope.botChats(bot: "agt_1", agent: "agt_1").agent, "agt_1", "the pencil starts a chat with the bot")
         let newer: ThreadRow = try row("d", status: "done", asks: 0, pinned: false, actor: nil)
         let later: [Bot] = DotEngine.bots(
-            agents: [AgentSummary(record: dot, home: nil)], rows: [dots, newer], pinned: [], fallbackDot: dot, gone: [])
+            agents: [AgentSummary(record: dot, home: nil, load: nil)], rows: [dots, newer], pinned: [], fallbackDot: dot, gone: [])
         XCTAssertTrue(dotsAsTheHomeCounts.holds(newer, bots: later), "item 1965: a chat made after the page opened is there")
     }
 }

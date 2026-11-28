@@ -327,3 +327,22 @@ private func kindPhrase(_ kind: String, _ count: Int, bundle: Bundle, locale: Lo
     default: String(localized: "used \(count) tools", bundle: bundle, locale: locale, comment: "Work log group: other tools; the argument is how many")
     }
 }
+
+/// Why a bot is overloaded (item 2067), one sentence per reason the phone knows, joined as the web joins them; "" when
+/// it is not. The web's words are `views.agents.overload*`.
+func overloadWords(_ load: BotLoad?) -> String {
+    (load?.reasons ?? []).compactMap { reason -> String? in
+        switch reason.kind {
+        case "orders":
+            String(localized: "\(reason.count) open work orders (more than \(reason.limit))", comment: "Bot profile: why a bot is overloaded; its open work orders and the most it should hold")
+        case "routines":
+            String(localized: "\(reason.count) routines on (more than \(reason.limit))", comment: "Bot profile: why a bot is overloaded; its routines switched on and the most it should hold")
+        case "done_share":
+            String(
+                localized: "\(reason.count)% of its runs ended done this week, \(reason.limit)% the week before",
+                comment: "Bot profile: why a bot is overloaded; the share of its runs that ended done this week and the week before")
+        default: nil
+        }
+    }
+    .joined(separator: " · ")
+}

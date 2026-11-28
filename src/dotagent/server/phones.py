@@ -74,6 +74,12 @@ def phone_name(user_agent: str | None) -> str:
     return "Phone"
 
 
+def any_paired(path: Path) -> bool:
+    """Whether ``path`` lists a phone (item 2051: a run has the Dot Next app's tools only then); a file that cannot be
+    read raises as :meth:`PairedPhones.load` does."""
+    return bool(PairedPhones.load(path).listed())
+
+
 class PairedPhones:
     """The phones that hold a key, read from ``path`` once and written whole on every change. One per daemon: the guard
     and the routes share it."""

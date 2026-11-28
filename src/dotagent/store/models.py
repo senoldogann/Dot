@@ -71,6 +71,8 @@ WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {
 }
 # An order in one of these is open: somebody still has to do or judge something about it.
 OPEN_WORK_ORDERS: tuple[WorkOrderStatus, ...] = ("assigned", "working", "in_review", "returned", "escalated")
+# The open orders a bot still holds: an escalated one waits for the owner, not for its bot (item 2067).
+BOT_HELD_WORK_ORDERS: tuple[WorkOrderStatus, ...] = ("assigned", "working", "in_review", "returned")
 # Where an objective of the owner's stands (item 908).
 ObjectiveStatus = Literal["active", "done", "dropped"]
 # The moves the store allows. A dropped objective stays dropped. Opening a done one again is the one way back, and the
@@ -370,6 +372,27 @@ class AgentRecord(FrozenModel):
     look: AgentLook | None
     paused_at: float | None
     refuses: str = ""
+
+
+class BotLoadRow(FrozenModel):
+    """What one bot carries, counted from the store with no model (item 2067): its open work orders, its routines
+    switched on (and all of them), the active objectives its open orders serve (Dot's: every active one), and its
+    runs (Dot's own, not the parts its runs handed out) of the window and of the window before it: how many, how many
+    ended done or failed, their steps in all, and when its newest run of any age (of those counted) began.
+    ``agent_id`` is Dot's id for Dot."""
+
+    agent_id: str
+    open_orders: int
+    active_routines: int
+    routines: int
+    objectives: int
+    runs: int
+    done: int
+    failed: int
+    steps: int
+    prior_runs: int
+    prior_done: int
+    last_run_at: float | None
 
 
 DOT_AGENT_ID: str = "dot"
