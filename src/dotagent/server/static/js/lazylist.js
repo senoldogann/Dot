@@ -15,7 +15,8 @@ import { el } from "./dom.js";
  */
 export function appendInPages(holder, count, size, make, root) {
   let drawn = 0;
-  const sentinel = el("div", { class: "lazy-more", "aria-hidden": "true" });
+  // In a table's body the mark is a row, so the table lays it out as one.
+  const sentinel = el(holder.tagName === "TBODY" ? "tr" : "div", { class: "lazy-more", "aria-hidden": "true" });
   const more = () => {
     const next = Math.min(count, drawn + size);
     const nodes = [];

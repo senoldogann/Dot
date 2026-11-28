@@ -383,22 +383,31 @@ function officeView(file, lookAddress, views, toolbar, body) {
 // lines numbered, its words coloured by diffview.js's scanner, a JSON file laid out.
 const CODE_FILE = /\.(?:py|pyi|js|mjs|cjs|jsx|ts|tsx|mts|cts|json|jsonl|webmanifest|css|scss|html|xml|sh|bash|zsh|rs|go|java|kt|kts|c|h|cc|cpp|hpp|cs|php|rb|sql|toml|yaml|yml|ini|swift|dart|vue|svelte|plist|svg)$/i;
 
+// The source files diffview.js has no grammar of its own for, coloured by the nearest one it has: the languages that
+// write their comments as C does by JavaScript's, Ruby by Python's, a settings file by TOML's, a component file by
+// HTML's. SQL has none near it, so its lines are numbered but not coloured.
+const NEAREST_GRAMMAR = {
+  java: "javascript", kt: "javascript", kts: "javascript", c: "javascript", h: "javascript", cc: "javascript",
+  cpp: "javascript", hpp: "javascript", cs: "javascript", php: "javascript", dart: "javascript",
+  rb: "python", ini: "toml", vue: "html", svelte: "html",
+};
+
 function codeFileView(file, toolbar, body, cut) {
   const format = changeFormat(file.name);
-  const language = format.kind === "code" ? format.language : format.kind;
   const extension = file.name.match(/\.([^.]+)$/)?.[1]?.toLowerCase() ?? "";
+  const language = (format.kind === "code" ? format.language : format.kind) ?? NEAREST_GRAMMAR[extension] ?? null;
   const path = file.path ?? file.name;
   const breadcrumb = path.split(/[\\/]/).filter(Boolean).join(" / ");
   fill(
     toolbar,
     el("div", { class: "file-code-path", title: path },
-      el("span", { class: "file-code-language" }, language ?? extension),
+      el("span", { class: "file-code-language" }, NEAREST_GRAMMAR[extension] === undefined ? (language ?? extension) : extension),
       el("span", { class: "file-code-breadcrumb" }, breadcrumb),
     ),
   );
   const text = format.kind === "json" ? (prettyJSON(file.preview.text) ?? file.preview.text) : file.preview.text;
   const view = codeView(fileLines(text.replace(/\r\n?/g, "\n")), language, false);
-  view.setAttribute("aria-label", t("filepanel.languageSourceCode", { language: language ?? extension }));
+  view.setAttribute("aria-label", t("filepanel.languageSourceCode", { language: NEAREST_GRAMMAR[extension] === undefined ? (language ?? extension) : extension }));
   fill(body, view, cut);
 }
 
@@ -479,7 +488,7 @@ function textView(file, views, toolbar, body) {
     fill(body, source(), cut);
     return;
   }
-  const show = (id) => fill(body, id === "formatted" ? markdownBody(file.preview.text, body) : codeView(fileLines(file.preview.text), "markdown", false), cut);
+  const show = (id) => fill(body, id === "formatted" ? markdownBody(file.preview.text, body) : codeView(fileLines(file.preview.text.replace(/\r\n?/g, "\n")), "markdown", false), cut);
   const tabs = segmented(
     [
       { id: "formatted", label: t("filepanel.formatted"), hint: t("filepanel.showTheMarkdownFormatted") },

@@ -168,7 +168,9 @@ def _user_home(root: Path) -> Path:
     home: Path = root / "user"
     (home / "Documents").mkdir(parents=True)
     (home / ".private").mkdir()
-    (home / "Documents" / "rows.csv").write_text("Item;Amount\nRent;1200,50\nFood;300\n", encoding="utf-8")
+    # More rows than a grid draws at first (200, item 2099), so the rest are drawn as the panel scrolls to them.
+    filler: str = "".join(f"Row {number};{number}\n" for number in range(1, 251))
+    (home / "Documents" / "rows.csv").write_text("Item;Amount\nRent;1200,50\nFood;300\n" + filler, encoding="utf-8")
     (home / "Documents" / "todo.md").write_text(TODO, encoding="utf-8")
     (home / "Documents" / "chart.png").write_bytes(_picture())
     (home / "Documents" / "total.py").write_text(SCRIPT, encoding="utf-8")
@@ -342,7 +344,16 @@ async def _one_size(
     rows: Locator = paths.filter(has_text="rows.csv")
     await rows.click()
     await expect(view).to_have_attribute("data-kind", "table")
-    await expect(view.locator(".file-grid td")).to_have_text(["Item", "Amount", "Rent", "1200,50", "Food", "300"])
+    await expect(view.locator(".file-grid tbody tr:nth-child(-n+3) td")).to_have_text(
+        ["Item", "Amount", "Rent", "1200,50", "Food", "300"]
+    )
+    # The rows past the first page are drawn as the panel scrolls to its end.
+    await expect(view.locator(".file-grid tbody tr")).to_have_count(200)
+    for _ in range(3):
+        await view.locator(".file-body").evaluate("(body) => { body.scrollTop = body.scrollHeight; }")
+        await page.wait_for_timeout(200)
+    await expect(view.locator(".file-grid tbody tr")).to_have_count(253)
+    await expect(view.locator(".file-grid tbody tr").last.locator("td").first).to_have_text("Row 250")
     await expect(view.get_by_role("button", name="Copy the text")).to_be_hidden()
     await view.get_by_role("button", name="Open on the Mac").click()
     await expect(page.locator(".toast.ok")).to_have_text("Opened rows.csv on the Mac")
