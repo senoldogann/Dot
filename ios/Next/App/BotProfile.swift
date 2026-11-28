@@ -331,13 +331,19 @@ struct AgentModelPage: View {
         InsetSection(header: nil) {
             Button { pick("") } label: {
                 HStack(spacing: Space.s) {
-                    Text(String(localized: "Main model", comment: "Bot profile: an agent on the configured main model")).textRole(.body).foregroundStyle(Tone.text)
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        Text(String(localized: "Main model", comment: "Bot profile: an agent on the configured main model")).textRole(.body).foregroundStyle(Tone.text)
+                        // A chat's own model wins: this is only what a chat with none takes.
+                        Text(String(localized: "For chats that have no model of their own", comment: "Bot profile's Model page: what the main model row is for"))
+                            .textRole(.footnote).foregroundStyle(Tone.secondary)
+                    }
                     Spacer(minLength: Space.s)
                     Image(systemName: "checkmark").font(.system(.body, weight: .semibold)).foregroundStyle(Tone.text)
                         .opacity(picked.isEmpty ? 1 : 0).accessibilityHidden(true)
                 }
                 .padding(.horizontal, Space.groupedGutter)
-                .frame(minHeight: Metric.row)
+                .padding(.vertical, Space.xs)
+                .frame(minHeight: Metric.rowWithDescription)
                 .contentShape(Rectangle())
             }
             .buttonStyle(RowPressStyle())
