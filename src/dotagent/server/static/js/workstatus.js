@@ -21,7 +21,7 @@
 
 import { clip, el, setText } from "./dom.js";
 import { t } from "./i18n.js";
-import { callKind, describeArguments, narrates, toolWords } from "./tools.js";
+import { callKind, describeArguments, narrates } from "./tools.js";
 
 // The words for each kind of work (tools.js callKind): one phrase each, which stays while the same work goes on.
 /** @type {Record<string, import("./i18n.js").WordKey>} */
@@ -66,20 +66,15 @@ export function callPhrase(tool, args) {
   if (Object.hasOwn(DETAILED, kind) && about !== "") {
     return DETAILED[kind](about);
   }
-  // A tool with no phrase of its own is named as the steps name it ("List folder"), with what it is about.
-  if (kind === "other") {
-    return about === "" ? toolWords(tool) : `${toolWords(tool)}: ${clip(about, DETAIL_CHARS)}`;
-  }
+  // A tool with no phrase of its own is "Working": a tool's name is no plain word (owner 2026-11-27).
   return t(PHRASES[kind] ?? PHRASES.other);
 }
 
-/**
- * A call the run told as a line of the conversation (a `narration` event, item 1976), in the line's words: a page or a
- * site by its name ("Looking at gistsmith.com"), any other call as the live line says it.
- */
-export function narrationPhrase(tool, args) {
-  const address = typeof args?.url === "string" ? args.url : "";
-  return address === "" ? callPhrase(tool, args) : t("work.lookingAt", { what: clip(hostOf(address).replace(/^www\./, ""), DETAIL_CHARS) });
+/** Dot's first words in a chat (a `first_words` event, item 2018): the fast model's line, or the words said at once
+ * when it has none ("Looking into it…"). */
+export function firstWordsPhrase(text) {
+  const line = text.trim();
+  return line === "" ? t("work.firstWords") : line;
 }
 
 /** How long a run has worked, as the line says it beside its words ("12 s", "3 min"). */

@@ -601,11 +601,11 @@ judged as after a page until you write in its chat. A note starts nothing; a run
 a run marked untrusted, which a note marks too, so that no chain of notes carries a page's words, or a note's, on past
 the rules each run keeps (item 963); none goes to a run whose approval mode asks you less than its sender's; and a run
 of Dot's own initiative, which asks before a message, a post or a release in every mode, sends none to a run that does
-not ask them, but for a run of a chat you opened (an agent's chat among them, item 963), which asks a payment, a
+not ask them, but for a run of a chat you opened (a bot's chat among them, item 963), which asks a payment, a
 message, a mail and a post itself or has the review model judge them (item 860), a release there being checked by the
 review model (item 962) as after a page; in yolo with `[policy] yolo_taint_check = false` nothing would check it, so it
 sends none there then. A `preapproved` rule of yours lets a step through in a run a note marked as it does after a page
-(see [Agents](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
+(see [Bots and campaigns](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
 some. A message you send to the run clears the mark; your answer to a question of a run you watch does not, whether the
 run waited for it or went on (item 508), as it answers what the run asked rather than sending it on its way: the run it
 reaches stays marked, and the run it starts once that run has ended starts as untrusted as that run ended; so does
@@ -614,7 +614,7 @@ as your instruction, not the question the run wrote, which a page it read may ha
 run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off, a run that goes on
 in a chat of recurring work (an agent's one chat, a run of Dot's own initiative in the chat of the same name, a look
 for work's among them, a campaign's sessions', item 952) as that chat's last run ended, whoever sent it, since it reads that run's words: once such a chat read outside content, its runs stay
-marked until you write in it yourself, and an agent's chat keeps that mark when the chat that sent it the work is
+marked until you write in it yourself, and a bot's chat keeps that mark when the chat that sent it the work is
 deleted, whose runs go with it, and the run that
 tells a chat that its command in the background ended as the chat's last run ended: that message is Dot's, not yours,
 and so is the note that tells a run at work of such an end, which clears nothing. The report of a helper the run
@@ -803,9 +803,12 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
     as the screen does, and they read Chrome's values of a plain field, a code there, or a password a page shows as
     plain text ("show password").
   - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
-    going back can bring the filled page back whole. Once a script of the run ran in a tab of the chat, no tab of it
-    gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
-    page, in a tab it opened, or in a page Chrome brings back from its cache.
+    going back can bring the filled page back whole. A page opened there (`browser_open`) opens in a new tab in its
+    place and the filled tab closes, as a run would close it itself: the sign-in holds, and scripts run again once
+    no other tab a login was filled into is open. An address the rules refuse leaves the filled tab as it was. Once a
+    script of the run ran in a tab of the chat, no tab of it gets a login until all of them are closed: the script
+    could have left a listener that copies what is typed, in its page, in a tab it opened, or in a page Chrome brings
+    back from its cache.
   - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
     (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
@@ -1349,9 +1352,11 @@ own initiative, a message, a post or a release waits for your own yes in every m
 but free mode (below).
 A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer (not in free mode, which asks no run's owner anything: item 1563); one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
-what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
-ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are cards, each with
+what it leads to, and the one Dot recommends is marked: a tap picks an option (one, or several when several may be
+chosen; a second tap lets it go), and what you pick is sent with what you write, as one answer. Several questions page
+in one panel ("1 / 3", on the phone and on the web alike), and its one "Submit answers" sends them all once each has an
+answer or was skipped (item 2001). In the terminal you type an option's number (several, separated by
 commas) or your own words. The run reads which option you chose, and whether it was the one it recommended. A line
 typed in the terminal before a prompt for a decision appears (the next message of a chat, typed while the run worked)
 is set aside and answers nothing, and the prompt says so; at a hand-off only Enter or a yes says that you did the step,

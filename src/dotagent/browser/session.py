@@ -362,6 +362,11 @@ _FRESH_FOR_LOGIN_NOTE: str = (
     "a script of this run ran in this chat's tabs and could copy what is typed there: before the login, Dot closed "
     "them and opened this page again in a new tab"
 )
+# What a page opened from a tab a login was filled into says (item 2076).
+_REPLACED_HELD_NOTE: str = (
+    "a login was filled into this tab: Dot closed it and opened this page in a new tab in its place, where the filled "
+    "page cannot come back; the sign-in holds"
+)
 # The title a tab list gives a tab on a URL the rules forbid, which is not read (item 554).
 _UNREAD_TITLE: str = "(not read: a URL that may not be opened; switching to the tab resets it)"
 # The longest address a note on a tab carries whole.
@@ -2890,8 +2895,12 @@ class BrowserSession:
         :func:`dotagent.tools.web._renderer_for`) every request the tab sends meanwhile, redirect hops and the page's
         own resources included, is refused before it is sent when its address is not a public one or cannot be read
         (item 1319); in Dot's own Chrome only, where the requests are Dot's to answer. The browser tools never ask."""
+        # The rules on the address first: a refused one leaves the chat's tabs as they were, the filled one too.
+        self._require_allowed(url)
         async with self._locked(thread_id, opens=True) as thread:
             tab: Tab = await self._current_tab(thread)
+            if tab.vault_held:
+                tab = await self._replace_held(thread, tab)
             held: bool = public_only and self._config.mode == "own"
             if held:
                 self._public_only_pages.add(tab.page)
@@ -2900,6 +2909,21 @@ class BrowserSession:
             finally:
                 if held:
                     self._public_only_pages.discard(tab.page)
+
+    async def _replace_held(self, thread: ThreadTabs, held: Tab) -> Tab:
+        """A new tab in the place of ``held``, a tab a login was filled into, which closes (item 2076): a page opened
+        there leaves the filled one, which only the tab's history could bring back, and with the tab closed no script
+        is kept off the chat's tabs for it (another tab a login was filled into still keeps them off). The sign-in
+        holds in the new tab, as it does in any tab of the browser; the values filled stay the chat's to mask. It is
+        what a run did itself, one call later, once a script was refused while the tab was open."""
+        position: int = thread.tabs.index(held)
+        await self._close_tab_object(thread, held)
+        fresh: Tab = await self._create_tab(thread)
+        thread.tabs.remove(fresh)
+        thread.tabs.insert(position, fresh)
+        thread.active = position
+        add_note(fresh, _REPLACED_HELD_NOTE)
+        return fresh
 
     async def new_tab(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
         """Open ``url`` in a new tab that becomes the current one."""

@@ -32,7 +32,6 @@ from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, EventBus, Subscription
 from dotagent.llm.price_list import keep_prices
 from dotagent.loop_watch import LoopWatch
-from dotagent.meetings.desk import MeetingDesk
 from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
 from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
 from dotagent.notify.health import NotifyHealth
@@ -43,7 +42,7 @@ from dotagent.notify.push import PUSH_KINDS, watch_pushes
 from dotagent.notify.tell_ledger import TELL_SOURCE_KINDS, watch_tells
 from dotagent.oauth.accounts import keep_revoking
 from dotagent.phone.keeper import keep_phone
-from dotagent.proactive.watching import watch_loop
+from dotagent.proactive.watching import emergency_stop_engaged, watch_loop, watcher_due_by
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server.activity import live_runs
@@ -65,6 +64,7 @@ log = get_logger(__name__)
 _GRACE_S: int = 3
 # How often the daemon looks whether Dot works, to hold the Mac awake for it (item 1671).
 _AWAKE_LOOK_S: float = 2.0
+_AWAKE_LOOKAHEAD_S: float = 3 * 60
 _PRIVATE_FILE_MODE: int = 0o600
 _PID_BYTES: int = 32
 _STOP_SIGNALS: tuple[signal.Signals, ...] = (signal.SIGINT, signal.SIGTERM)
@@ -259,9 +259,16 @@ def _log_backups_end(backups: asyncio.Task[None]) -> None:
     log.error("backups_ended", error=repr(backups.exception()))
 
 
-def _dot_works(manager: RunManager, meetings: MeetingDesk) -> bool:
-    """Whether Dot works now (item 1671): a run of its own, one of a ``dotx`` command it relays, or a meeting."""
-    return bool(manager.active_run_ids()) or bool(manager.elsewhere_run_ids()) or meetings.busy() is not None
+async def _dot_needs_awake(manager: RunManager, runtime: Runtime, scheduler: Scheduler) -> bool:
+    """Whether a task is active or a routine or watcher is close enough to need the idle-sleep hold."""
+    if manager.active_run_ids() or manager.elsewhere_run_ids() or runtime.meetings.busy() is not None:
+        return True
+    if await emergency_stop_engaged():
+        return False
+    now: float = time.time()
+    return await scheduler.routine_due_near(now, _AWAKE_LOOKAHEAD_S) or await watcher_due_by(
+        runtime, now + _AWAKE_LOOKAHEAD_S
+    )
 
 
 def _log_awake_end(awake_task: asyncio.Task[None]) -> None:
@@ -496,13 +503,12 @@ async def run_daemon(config: AppConfig) -> int:
             await channels.start()
             cleanup.push_async_callback(channels.stop)
             scheduler_loop: asyncio.Task[None] = await scheduler.start()
-            # The Mac does not idle-sleep while Dot works (item 1671): a run of its own or of a dotx command, a
-            # schedule's run, a meeting.
+            # Keep the Mac from idle sleep during work and before the next routine or watcher is due.
             if config.daemon.keep_awake:
                 awake_task: asyncio.Task[None] = asyncio.create_task(
                     keep_awake_while_working(
                         runtime.work_awake,
-                        functools.partial(_dot_works, manager, runtime.meetings),
+                        functools.partial(_dot_needs_awake, manager, runtime, scheduler),
                         config.daemon.keep_awake_after_s,
                         _AWAKE_LOOK_S,
                         stopping,

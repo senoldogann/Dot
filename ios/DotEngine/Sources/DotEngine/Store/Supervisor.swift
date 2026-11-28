@@ -184,7 +184,6 @@ public actor Supervisor {
                 await waker.wait(seconds: 30, clock: clock, seen: seen)
                 continue
             }
-            if key == .list { await store.set(transport: attempt == 0 ? .connecting : .reconnecting(attempt: attempt)) }
             let seen: Int = await waker.current
             let ending: Ending = await connect(key)
             switch ending {
@@ -214,6 +213,7 @@ public actor Supervisor {
         case .list:
             do {
                 let status: DaemonStatus = try await api.status()
+                await store.reached(at: clock.now())
                 if await store.change(to: status.identity) == .reset {
                     // The unsent messages are kept for the owner first, then the outbox lets go of its doings for the old
                     // daemon's chats, then the new daemon is taken as the copies' (and the outbox may send): a kill at any
@@ -281,6 +281,7 @@ public actor Supervisor {
         watchdog.cancel()
         if readers[key] == reader { readers[key] = nil }
         if beats[key] === beat { beats[key] = nil }
+        if key == .list { await store.reached(at: beat.last) }
         if !Task.isCancelled, immediate.contains(key) == false { Traffic.shared.streamBroke() }
         await broke(key, connection: connection)
         if case .chat(let thread) = key, await store.chat(thread)?.freshness == .deleted { return .gone }

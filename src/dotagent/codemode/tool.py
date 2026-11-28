@@ -62,13 +62,21 @@ _SIGNALS: dict[int, str] = {
     24: "SIGXCPU, the CPU time limit of the process",
     25: "SIGXFSZ, the file size limit of the process",
 }
+# The last line of a traceback whose code could not open a file: the sandbox refused it (EPERM), or a relative path was
+# read from the scratch folder, where the file is not.
+_FILE_ERRORS: tuple[str, ...] = ("PermissionError: [Errno 1]", "FileNotFoundError: [Errno 2]")
+FILE_HINT: str = (
+    "The code opens no file outside its scratch folder, its own working folder (os.getcwd()), which is not your "
+    "working directory: copy the files it needs there first (with shell, from dot_tools.servers.dot import shell, or "
+    "before the code_run), or read one with read_file."
+)
 _EXTENSIONS: dict[str, str] = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 
 DESCRIPTION: str = (
-    "Run Python 3 in a sandbox: no network, no programs, no files but its scratch folder (its working folder, kept "
-    "between code_runs). Use it for many tool calls, a lot of data, a loop or a poll: call the tools from the code, "
-    "filter and count in Python, and print only what you need (a count and at most 5 rows, never the raw dump): only "
-    "what the code prints reaches you, with the number of tool calls and the time.\n"
+    "Run Python 3 in a sandbox: no network, no programs, no files but its scratch folder (its cwd, kept between "
+    "code_runs; not your working dir). Use it for many tool calls, a lot of data, a loop or a poll: call the tools "
+    "from the code, filter and count in Python, and print only what you need (a count and at most 5 rows, never the "
+    "raw dump): only what the code prints reaches you, with the number of tool calls and the time.\n"
     "Tools are functions, parameters as keywords: `from dot_tools.servers.dot import read_file` (Dot's own), `from "
     "dot_tools.servers.<server> import <tool>` (an MCP server's). A result is the JSON the tool said, as Python "
     'objects, else its text. `import dot_tools`: dot_tools.search_tools("words", detail="name"|"description"|"schema") '
@@ -237,6 +245,14 @@ def _tidy(text: str, layout: Layout, interpreter: Interpreter) -> str:
     return f"{printed}{marker}{trace}"
 
 
+def _could_not_open_a_file(ended: Ended) -> bool:
+    """Whether the code failed on a file it could not open: the last line of its traceback is a refused or a missing
+    file."""
+    _, marker, trace = ended.output.rpartition(_TRACEBACK)
+    last: str = next((line.strip() for line in reversed(trace.splitlines()) if line.strip()), "")
+    return bool(marker) and last.startswith(_FILE_ERRORS)
+
+
 def _footer(ended: Ended) -> str:
     return f"[{ended.calls} tool call{'' if ended.calls == 1 else 's'}, {ended.seconds:.1f} s]"
 
@@ -307,6 +323,8 @@ def result_of(
         parts: list[str] = [_headline(ended, config, limits)]
         if printed and ended.ending != "unstartable":
             parts.append(printed)
+        if ended.ending == "failed" and ended.signal is None and _could_not_open_a_file(ended):
+            parts.append(FILE_HINT)
         result = fail("\n".join([*parts, footer]))
     return mark_untrusted(result) if untrusted else result
 

@@ -26,6 +26,8 @@ struct ModelCatalog<Options: View>: View {
     /// The groups the owner opened or folded by hand.
     @State private var opened: Set<String> = []
     @State private var closed: Set<String> = []
+    /// The provider's mark beside a model grows with the text, as an SF Symbol would.
+    @ScaledMetric(relativeTo: .body) private var markSize: CGFloat = 20
     private let recent: [String] = RecentModels.read(.standard)
 
     var body: some View {
@@ -130,7 +132,7 @@ struct ModelCatalog<Options: View>: View {
             } label: {
                 HStack(spacing: Space.s) {
                     Image(providerMarkAsset(providerOfModel(row.option.ref, in: providers))).resizable().renderingMode(.template).scaledToFit()
-                        .frame(width: 20, height: 20).foregroundStyle(row.isHidden ? Tone.tertiary : Tone.text)
+                        .frame(width: markSize, height: markSize).foregroundStyle(row.isHidden ? Tone.tertiary : Tone.text)
                         .frame(minWidth: Metric.iconSlot)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: Space.xxs) {

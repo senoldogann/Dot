@@ -415,7 +415,7 @@ struct RunInspector: View {
         }
     }
 
-    private var showsSteps: Bool { model.stepsOverrides[thread] ?? showStepsEverywhere }
+    private var showsSteps: Bool { model.showsSteps(of: thread, everywhere: showStepsEverywhere) }
     private var onWord: String { String(localized: "On", comment: "This chat sheet: a folded section's switch is on") }
     private var offWord: String { String(localized: "Off", comment: "This chat sheet: a folded section's switch is off") }
 

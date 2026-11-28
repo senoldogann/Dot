@@ -136,7 +136,7 @@ class ServerConfig(FrozenModel):
 
 class DaemonConfig(FrozenModel):
     """What the daemon does for Dot's work (``[daemon]``, item 1671): ``keep_awake`` keeps the Mac from idle sleep while
-    a run, a schedule's run or a meeting works, and ``keep_awake_after_s`` seconds after the last one ended."""
+    work is active or a routine or watcher is due soon, with ``keep_awake_after_s`` seconds of grace."""
 
     keep_awake: bool
     keep_awake_after_s: float = Field(ge=0)
@@ -429,6 +429,9 @@ class AgentConfig(FrozenModel):
     checkpoint_steps: int = Field(ge=0)
     # A message the owner sends a chat at work, a request of its own, starts at once in a chat of its own (item 915).
     busy_parallel: bool
+    # A run the owner starts in a chat says its first words at once, then the fast model's line of what it looks at
+    # first while its own first step has said nothing yet (item 2018, ``agent/first_words.py``).
+    first_words: bool
     # How many tasks work at once in one chat, the chat itself included (item 1984): above 1, a request of its own sent
     # while the chat works starts in a lane of the chat (a thread the sidebar does not list) instead of a chat of its
     # own; 1 is one run at a time, and a request of its own goes to a chat of its own (item 915).

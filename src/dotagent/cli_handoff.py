@@ -119,6 +119,17 @@ def in_a_new_chat(command: RunCommand) -> RunCommand:
     return command.model_copy(update={"thread": None})
 
 
+def beside_a_busy_chat(command: RunCommand, refusal: RunConflict) -> RunCommand:
+    """``command``, a code review (``--review``) whose ``--thread`` chat the daemon refused to start it in, started in
+    a new chat (item 2065). The chat is the branch's review chat, and what keeps it is a run still under way in it: an
+    earlier push's review of the same branch, from a hook whose push was stopped or that runs beside this one. The
+    review reads the change from its files, so that run is no reason to refuse it; refused, the hook would hand the
+    change to its next model as if the first had given no verdict."""
+    log.warning("review_chat_busy", thread_id=command.thread, reason=refusal.message, context=refusal.context)
+    sys.stderr.write(f"the chat {command.thread} has a run under way; the review starts in a new chat\n")
+    return command.model_copy(update={"thread": None})
+
+
 class DaemonApi:
     """The calls ``dotx run`` makes of the daemon's API for a run it handed to it."""
 
@@ -286,6 +297,17 @@ async def _ask_stop(api: DaemonApi, run_id: str) -> None:
         log.info("handed_run_stop_refused", run_id=run_id, reason=exc.message, context=exc.context)
 
 
+async def _start(api: DaemonApi, command: RunCommand, goal: str) -> RunRecord:
+    """Start the run of ``command`` on the daemon; a review the daemon refuses in its chat starts in a new one
+    (:func:`beside_a_busy_chat`), any other refusal is raised."""
+    try:
+        return await api.start(handed_request(command, goal))
+    except RunConflict as exc:
+        if not command.review or command.thread is None:
+            raise
+        return await api.start(handed_request(beside_a_busy_chat(command, exc), goal))
+
+
 async def hand_run(link: DaemonLink, server: ServerConfig, command: RunCommand, goal: str, options: UiOptions) -> int:
     """Start the run of ``command`` on the daemon of ``link``, show its events as they come, then print its answer,
     what it needs of the user, the questions it left and its campaign, as ``dotx run`` does for a run of its own; 0 when
@@ -300,7 +322,7 @@ async def hand_run(link: DaemonLink, server: ServerConfig, command: RunCommand, 
         api: DaemonApi = DaemonApi(client)
         if command.review and command.thread is not None and not await api.has_thread(command.thread):
             command = in_a_new_chat(command)
-        run: RunRecord = await api.start(handed_request(command, goal))
+        run: RunRecord = await _start(api, command, goal)
         log.info("run_handed_to_daemon", run_id=run.id, thread_id=run.thread_id, port=link.port)
         desk: DaemonDesk = DaemonDesk(api)
         ui: TerminalUi = TerminalUi(desk, server, options)
