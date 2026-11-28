@@ -61,7 +61,10 @@ settings are on your Mac"), and no row of it opens the web app (item 1791). The 
 on the Mac, and a connected app, 1Password's token or an official sign-in is taken back with Disconnect; adding a
 connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows Dot's version and
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
-which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Its **Campaigns** (item 1895, under Agents) lists each
+which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). **Maintenance › Diagnostics** shows Dot's processes, disk use,
+pauses and the last 300 lines of a selected log with secrets masked on the Mac. Filter or copy the shown lines.
+**Maintenance › Browser** chooses the Chrome and profile Dot uses, the window and page settings, and whether tasks can
+use the browser. Sign in opens Chrome on the Mac. Clear and Delete ask before removing a profile's sign-ins and site data. Its **Campaigns** (item 1895, under Agents) lists each
 campaign with its state, goal and last progress, and a campaign's page stops it (it asks first), resumes it or marks it
 achieved, as the web's page does; deleting one is done on the Mac. Dot Next's composer records your voice (item 1802): the
 microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written

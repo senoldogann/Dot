@@ -241,6 +241,12 @@
             case ("DELETE", let route) where route.hasPrefix("/api/mcp/servers/"): return (200, connectServers)
             case ("GET", "/api/reactions/settings"):
                 return (200, #"{"follow_ups":true,"follow_ups_per_hour":20,"hold_minutes":30,"good":"feedback","love":"feedback","wrong":"follow_up","again":"follow_up","explain":"follow_up","hold":"follow_up"}"#)
+            case ("GET", "/api/diagnostics/logs"):
+                return (200, #"{"folder":"/tmp/logs","files":[{"name":"dotx.log","bytes":48,"modified_at":1}]}"#)
+            case ("GET", "/api/diagnostics/logs/dotx.log"):
+                return (200, #"{"name":"dotx.log","lines":["Dot is ready","A routine finished"]}"#)
+            case ("GET", "/api/browser"):
+                return (200, #"{"mode":"own","enabled":true,"connected":true,"signing_in":false,"raise_window":false,"remote_input":false,"debug_port":0,"profile":"default","profiles":[{"name":"default","kind":"default"},{"name":"work","kind":"added"}],"look":{"fit_window":true,"viewport_width":1280,"viewport_height":720,"appearance":"system","zoom":100}}"#)
             case ("GET", "/api/diagnostics/programs"):
                 return (
                     200,

@@ -1467,6 +1467,28 @@
         }
       }
     },
+    "Add a profile": {
+      "comment": "Browser: create a profile",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil ekle"
+          }
+        }
+      }
+    },
+    "Add profile": {
+      "comment": "Browser: adds a profile",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil ekle"
+          }
+        }
+      }
+    },
     "Add schedule": {
       "comment": "Tool row of Dot's own tool: a schedule added",
       "localizations": {
@@ -1797,6 +1819,17 @@
         }
       }
     },
+    "Any program on this Mac can use the port while Dot's Chrome runs. 0 turns it off.": {
+      "comment": "Browser: the optional port is local and does not ask for a key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un Chrome'u çalışırken bu Mac'teki her program bağlantı noktasını kullanabilir. Kapatmak için 0 girin."
+          }
+        }
+      }
+    },
     "Appearance": {
       "comment": "Bot edit page: the section of how the bot looks\nComponent gallery (debug builds): a heading or sample text\nSettings row",
       "localizations": {
@@ -1804,6 +1837,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Görünüm"
+          }
+        }
+      }
+    },
+    "Appearance of pages": {
+      "comment": "Browser: opens page appearance",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfaların görünümü"
           }
         }
       }
@@ -2376,6 +2420,17 @@
         }
       }
     },
+    "Bring Chrome to the front while working": {
+      "comment": "Browser: bring the window forward",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışırken Chrome'u öne getir"
+          }
+        }
+      }
+    },
     "Brown": {
       "comment": "Bot colour",
       "localizations": {
@@ -2383,6 +2438,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kahverengi"
+          }
+        }
+      }
+    },
+    "Browse with": {
+      "comment": "Browser: choose which Chrome Dot uses",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şununla gezin"
           }
         }
       }
@@ -2405,6 +2471,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "dentist.example/booking sayfasına bakıldı"
+          }
+        }
+      }
+    },
+    "Browser": {
+      "comment": "Settings: Dot's browser",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarayıcı"
           }
         }
       }
@@ -2629,6 +2706,17 @@
         }
       }
     },
+    "Change this profile?": {
+      "comment": "Browser: confirmation of a destructive profile action",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu profil değiştirilsin mi?"
+          }
+        }
+      }
+    },
     "Changed": {
       "comment": "File preview row: when the file last changed",
       "localizations": {
@@ -2728,6 +2816,17 @@
         }
       }
     },
+    "Check": {
+      "comment": "Browser: checks that Chrome can read sign-ins",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrol et"
+          }
+        }
+      }
+    },
     "Check again": {
       "comment": "This Mac: runs the diagnosis again",
       "localizations": {
@@ -2812,6 +2911,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir ya da daha fazlasını seç, sonra gönder."
+          }
+        }
+      }
+    },
+    "Chrome read %lld saved cookies.": {
+      "comment": "Browser: number of readable cookies in a profile check",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chrome %lld kayıtlı çerezi okudu."
           }
         }
       }
@@ -3946,6 +4056,17 @@
         }
       }
     },
+    "DevTools port": {
+      "comment": "Browser: Chrome's developer port",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DevTools bağlantı noktası"
+          }
+        }
+      }
+    },
     "Diagnose": {
       "comment": "Settings: opens the connection's diagnosis",
       "localizations": {
@@ -3953,6 +4074,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tanıla"
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "comment": "Maintenance: diagnose Dot on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanılama"
           }
         }
       }
@@ -4129,6 +4261,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ bağlantısı kesilsin mi?"
+          }
+        }
+      }
+    },
+    "Disk": {
+      "comment": "Diagnostics: Dot's use of disk space",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disk"
           }
         }
       }
@@ -4437,6 +4580,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot işi sohbetlerinde verir ve değerlendirir; emirler burada okunur."
+          }
+        }
+      }
+    },
+    "Dot has not stopped answering for more than %@ seconds since it started.": {
+      "comment": "Diagnostics: no pause longer than the given number of seconds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot başladığından beri %@ saniyeden uzun süre yanıtsız kalmadı."
           }
         }
       }
@@ -5520,6 +5674,17 @@
         }
       }
     },
+    "Filter the lines": {
+      "comment": "Diagnostics: search the loaded log lines",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satırları süz"
+          }
+        }
+      }
+    },
     "Filter the models": {
       "comment": "VoiceOver: the filter button beside the model search",
       "localizations": {
@@ -5637,6 +5802,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bitenler"
+          }
+        }
+      }
+    },
+    "Fit the window": {
+      "comment": "Browser: make the page fill the window",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pencereye sığdır"
           }
         }
       }
@@ -6198,6 +6374,17 @@
         }
       }
     },
+    "Height": {
+      "comment": "Browser: viewport height in pixels",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükseklik"
+          }
+        }
+      }
+    },
     "Held": {
       "comment": "System: the scheduler is held (emergency stop)",
       "localizations": {
@@ -6440,6 +6627,17 @@
         }
       }
     },
+    "In use": {
+      "comment": "Browser: the profile in use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanımda"
+          }
+        }
+      }
+    },
     "In use: the tasks that start from now on follow it.": {
       "comment": "Self-improvement: a version was put in use",
       "localizations": {
@@ -6447,6 +6645,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kullanımda: bundan sonra başlayan işler bunu izler."
+          }
+        }
+      }
+    },
+    "Incognito": {
+      "comment": "Browser: the profile that keeps no data",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gizli"
           }
         }
       }
@@ -6722,6 +6931,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalıştıkça çalışmaları burada görünür."
+          }
+        }
+      }
+    },
+    "Its sign-ins and site data will be removed.": {
+      "comment": "Browser: consequence of clearing or deleting a profile",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oturumları ve site verileri kaldırılacak."
           }
         }
       }
@@ -7107,6 +7327,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dosya yükleniyor"
+          }
+        }
+      }
+    },
+    "Logs": {
+      "comment": "Diagnostics: Dot's log files",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günlükler"
           }
         }
       }
@@ -7724,6 +7955,17 @@
         }
       }
     },
+    "My Chrome": {
+      "comment": "Browser: the owner's Chrome",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Benim Chrome'um"
+          }
+        }
+      }
+    },
     "Name": {
       "comment": "Rename alert: the field of the chat's new name\nSchedule edit: the name\nThis Mac: the Mac's name",
       "localizations": {
@@ -7731,6 +7973,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ad"
+          }
+        }
+      }
+    },
+    "Name of the new profile": {
+      "comment": "Browser: profile name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni profilin adı"
           }
         }
       }
@@ -8145,6 +8398,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardımcı yok"
+          }
+        }
+      }
+    },
+    "No line holds these words.": {
+      "comment": "Diagnostics: the search found nothing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiçbir satır bu sözleri içermiyor."
+          }
+        }
+      }
+    },
+    "No logs yet": {
+      "comment": "Diagnostics: the Mac has no logs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz günlük yok"
           }
         }
       }
@@ -9403,6 +9678,17 @@
         }
       }
     },
+    "Own Chrome": {
+      "comment": "Browser: Dot's own Chrome",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un Chrome'u"
+          }
+        }
+      }
+    },
     "Own work model": {
       "comment": "Models: the model that looks for Dot's own work",
       "localizations": {
@@ -9410,6 +9696,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kendi iş modeli"
+          }
+        }
+      }
+    },
+    "PID %lld · %@ CPU · %@": {
+      "comment": "Diagnostics: process identifier, CPU use and time running",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PID %1$lld · %2$@ CPU · %3$@"
           }
         }
       }
@@ -9576,6 +9873,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Duraklatıldı: zamanlamaları kendiliğinden hiçbir şey başlatmaz."
+          }
+        }
+      }
+    },
+    "Pauses": {
+      "comment": "Diagnostics: times Dot stopped responding",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duraklamalar"
           }
         }
       }
@@ -9866,6 +10174,17 @@
         }
       }
     },
+    "Processes": {
+      "comment": "Diagnostics: processes on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İşlemler"
+          }
+        }
+      }
+    },
     "Processor": {
       "comment": "Maintenance › Performance: CPU time row",
       "localizations": {
@@ -9884,6 +10203,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Üretkenlik"
+          }
+        }
+      }
+    },
+    "Profiles": {
+      "comment": "Browser: profiles of Dot's Chrome",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profiller"
           }
         }
       }
@@ -11824,6 +12154,17 @@
         }
       }
     },
+    "Settings › Browser": {
+      "comment": "Where on the Mac: browser settings",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Tarayıcı"
+          }
+        }
+      }
+    },
     "Settings › Campaigns": {
       "comment": "Where on the Mac: the Campaigns page",
       "localizations": {
@@ -11842,6 +12183,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ayarlar › Bağlayıcılar"
+          }
+        }
+      }
+    },
+    "Settings › Diagnostics": {
+      "comment": "Where on the Mac: diagnostics",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Tanılama"
           }
         }
       }
@@ -12260,6 +12612,17 @@
         }
       }
     },
+    "Sign in…": {
+      "comment": "Browser: opens Chrome on the Mac to sign in",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oturum aç…"
+          }
+        }
+      }
+    },
     "Sign-in code": {
       "comment": "Pairing screen section: the 8-character code",
       "localizations": {
@@ -12278,6 +12641,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Boyut"
+          }
+        }
+      }
+    },
+    "Size of a page": {
+      "comment": "Browser: page dimensions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfanın boyutu"
           }
         }
       }
@@ -12553,6 +12927,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adımlar"
+          }
+        }
+      }
+    },
+    "Still paused": {
+      "comment": "Diagnostics: a pause is ongoing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duraklama sürüyor"
           }
         }
       }
@@ -13016,6 +13401,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan görevler"
+          }
+        }
+      }
+    },
+    "Tasks may use the browser": {
+      "comment": "Browser: makes the browser available to tasks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görevler tarayıcıyı kullanabilir"
           }
         }
       }
@@ -13522,6 +13918,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Canlı ekran sonraki bir sürümde gelecek."
+          }
+        }
+      }
+    },
+    "The log is empty.": {
+      "comment": "Diagnostics: the log has no lines",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günlük boş."
           }
         }
       }
@@ -14769,6 +15176,17 @@
         }
       }
     },
+    "Use the page from the screen while I hold the task": {
+      "comment": "Browser: enables input in a page while a task is held",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görevi devraldığımda sayfayı ekrandan kullan"
+          }
+        }
+      }
+    },
     "User input needed": {
       "comment": "Ask dock header: Dot waits for the owner's answer",
       "localizations": {
@@ -14908,6 +15326,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bekle"
+          }
+        }
+      }
+    },
+    "Wait for the current change to finish.": {
+      "comment": "Browser: a change is already saving",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişikliğin tamamlanmasını bekleyin."
           }
         }
       }
@@ -15509,6 +15938,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Geniş"
+          }
+        }
+      }
+    },
+    "Width": {
+      "comment": "Browser: viewport width in pixels",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genişlik"
           }
         }
       }
@@ -16246,6 +16686,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zen"
+          }
+        }
+      }
+    },
+    "Zoom of pages": {
+      "comment": "Browser: page zoom percentage",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfa yakınlaştırması"
           }
         }
       }
