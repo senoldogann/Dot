@@ -60,12 +60,17 @@ _PLAIN: dict[str, object] = {
 
 
 async def _with_two_models(route: Route) -> None:
-    response = await route.fetch()
-    providers: list[dict[str, list[dict[str, object]]]] = await response.json()
+    # The daemon's list is read here rather than with `route.fetch`: on GitHub's runners the WebKit sheet found no
+    # Thinker to pick, as if the list never came, and `route.fetch` cut another test's request there (ECONNRESET).
+    headers: dict[str, str] = await route.request.all_headers()
+    async with httpx.AsyncClient(headers={"Authorization": headers["authorization"]}, timeout=30) as client:
+        response: httpx.Response = await client.get(route.request.url)
+    response.raise_for_status()
+    providers: list[dict[str, list[dict[str, object]]]] = response.json()
     for provider in providers:
         if provider["provider"] == "ollama":
             provider["models"].extend([_THINKER, _PLAIN])
-    await route.fulfill(response=response, json=providers)
+    await route.fulfill(json=providers)
 
 
 def _shots(tmp_path: Path) -> Path:
