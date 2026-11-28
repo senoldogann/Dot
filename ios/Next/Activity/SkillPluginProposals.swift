@@ -102,6 +102,7 @@ private struct SkillProposalSheet: View {
     let done: (String) -> Void
     @Environment(AppModel.self) private var model: AppModel
     @Environment(\.dismiss) private var dismiss: DismissAction
+    @State private var askingUse: Bool = false
     @State private var working: Bool = false
     @State private var problem: SettingsFailure?
 
@@ -120,9 +121,18 @@ private struct SkillProposalSheet: View {
                         message: String(localized: "A step may come from content others can write. Read it before you use it.", comment: "Skill proposal: the draft may carry outside content"),
                         dismiss: nil)
                 }
-                GroupedSection(header: shown.proposal.draft.kind, footer: nil) {
+                GroupedSection(
+                    header: shown.proposal.draft.kind,
+                    footer: shown.proposal.kind == "merge" && shown.proposal.names.count > 1
+                        ? String(
+                            localized: "Use writes this as \(shown.proposal.names[0]) and puts the others to rest.",
+                            comment: "Skill proposal: what Use does to the merged skills; the argument is the one that stays")
+                        : nil
+                ) {
                     VStack(alignment: .leading, spacing: Space.xs) {
                         Text(shown.proposal.draft.description).textRole(.body).foregroundStyle(Tone.text).fixedSize(horizontal: false, vertical: true)
+                        Text(String(localized: "When: \(shown.proposal.draft.when)", comment: "Skill proposal: when the skill fits; the argument is that"))
+                            .textRole(.footnote).foregroundStyle(Tone.secondary).fixedSize(horizontal: false, vertical: true)
                         ForEach(Array(shown.proposal.draft.steps.enumerated()), id: \.offset) { index, step in
                             HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
                                 Text(verbatim: "\(index + 1).").textRole(.body).foregroundStyle(Tone.secondary).tabularNumbers()
@@ -135,7 +145,9 @@ private struct SkillProposalSheet: View {
                 }
                 VStack(spacing: Space.s) {
                     if shown.stale == nil {
-                        Button { Task { await answer(yes: true) } } label: {
+                        Button {
+                            if shown.proposal.tainted { askingUse = true } else { Task { await answer(yes: true) } }
+                        } label: {
                             Text(String(localized: "Use", comment: "Skill proposal: writes the new version")).frame(maxWidth: .infinity)
                         }
                         .buttonStyle(PrimaryButtonStyle())
@@ -154,6 +166,12 @@ private struct SkillProposalSheet: View {
             .padding(.vertical, Space.groupedGutter)
         }
         .fullSheet(title: String(localized: "Skill proposal", comment: "Activity: the sheet of a skill proposal")) { dismiss() }
+        .confirmationDialog(
+            String(localized: "Use a skill written from outside content?", comment: "Skill proposal: asks before using a tainted draft"),
+            isPresented: $askingUse, titleVisibility: .visible
+        ) {
+            Button(String(localized: "Use it", comment: "Self-improvement: confirms using a version")) { Task { await answer(yes: true) } }
+        }
     }
 
     private func answer(yes: Bool) async {
@@ -181,6 +199,7 @@ private struct PluginProposalSheet: View {
     let done: (String) -> Void
     @Environment(AppModel.self) private var model: AppModel
     @Environment(\.dismiss) private var dismiss: DismissAction
+    @State private var askingInstall: Bool = false
     @State private var working: Bool = false
     @State private var problem: SettingsFailure?
 
@@ -191,7 +210,7 @@ private struct PluginProposalSheet: View {
                 Text(pluginTitle(shown)).textRole(.headline).foregroundStyle(Tone.text).fixedSize(horizontal: false, vertical: true)
                 Text(String(localized: "By \(shown.publisher) · \(tierWords(shown.tier))", comment: "Plugin proposal: its publisher and how far it is trusted"))
                     .textRole(.footnote).foregroundStyle(Tone.secondary)
-                if shown.risk == "medium" || shown.risk == "high" {
+                if risky {
                     Notice(
                         tone: .warn,
                         message: shown.risk == "high"
@@ -210,7 +229,9 @@ private struct PluginProposalSheet: View {
                     .padding(Space.groupedGutter)
                 }
                 VStack(spacing: Space.s) {
-                    Button { Task { await answer(install: true) } } label: {
+                    Button {
+                        if risky { askingInstall = true } else { Task { await answer(install: true) } }
+                    } label: {
                         Text(String(localized: "Install", comment: "Plugin proposal: installs it")).frame(maxWidth: .infinity)
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -228,7 +249,15 @@ private struct PluginProposalSheet: View {
             .padding(.vertical, Space.groupedGutter)
         }
         .fullSheet(title: String(localized: "Plugin proposal", comment: "Activity: the sheet of a plugin proposal")) { dismiss() }
+        .confirmationDialog(
+            String(localized: "Install a plugin the review rates risky?", comment: "Plugin proposal: asks before installing one of medium or high risk"),
+            isPresented: $askingInstall, titleVisibility: .visible
+        ) {
+            Button(String(localized: "Install", comment: "Plugin proposal: installs it")) { Task { await answer(install: true) } }
+        }
     }
+
+    private var risky: Bool { shown.risk == "medium" || shown.risk == "high" }
 
     private func fact(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: Space.xxs) {
