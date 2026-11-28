@@ -378,8 +378,8 @@ class BotLoadRow(FrozenModel):
     """What one bot carries, counted from the store with no model (item 2067): its open work orders, its routines
     switched on (and all of them), the active objectives its open orders serve (Dot's: every active one), and its
     runs (Dot's own, not the parts its runs handed out) of the window and of the window before it: how many, how many
-    ended done or failed, their steps in all, and when its newest run of any age began. ``agent_id`` is Dot's id for
-    Dot."""
+    ended done or failed, their steps in all, and when its newest run of any age (of those counted) began.
+    ``agent_id`` is Dot's id for Dot."""
 
     agent_id: str
     open_orders: int

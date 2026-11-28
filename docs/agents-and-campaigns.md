@@ -477,8 +477,9 @@ of the model, never shown. Each is a card with what it changes, the orders or ne
 manager's words, with **Accept** and **Skip**. **Nothing changes until you accept a card**: the review itself asks
 nothing and changes nothing, in every mode, yolo and free mode included. Accepting checks the card again against the
 team as it is then, and one that no longer fits (an order that moved on, a name taken since, a routine gone or off) is
-refused and stays for you to skip. A title or name a run wrote after reading outside content is not shown to the model
-or on the card ("a work order", "a routine"), and the words of the team are data to the model, never instructions. A
+refused and stays for you to skip. The title of a work order or an objective and the name of a routine a run wrote after
+reading outside content are not shown to the model or on the card ("a work order", "a routine"); a bot's name and role
+are (a bot keeps no such mark), and every word of the team is data to the model, never instructions. A
 review that fails says why on its page and is tried again at its next time; the scheduler starts one only in the
 daemon, never under the emergency stop.
 
