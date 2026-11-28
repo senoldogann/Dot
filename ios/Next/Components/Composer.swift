@@ -632,7 +632,7 @@ struct WorkingSummary: Equatable, Sendable {
     /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
     /// transcript's live line says).
     let status: ChatStatus?
-    /// "Waiting on 2 helpers" in the status's place while the main run only waits for its helpers; `nil` while it takes
+    /// "Waiting for 2 helpers" in the status's place while the main run only waits for its helpers; `nil` while it takes
     /// a step of its own ("Working" and the turn's clock).
     let activity: String?
     /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not; `nil`
@@ -657,7 +657,7 @@ struct WorkingSummary: Equatable, Sendable {
 
 /// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
 /// The capsule is one pill for everything about the chat's work, thin dividers between its segments (item 1880, the
-/// owner's reference app): "Working 1m 50s" or "Waiting on 2 helpers" | Stop | Plan 1/5 | queued | helpers done/total.
+/// owner's reference app): "Working 1m 50s" or "Waiting for 2 helpers" | Stop | Plan 1/5 | queued | helpers done/total.
 /// Each segment is its own button, at least 44 pt each way. It stays one line at the default text size: in words where
 /// they fit, else Stop, the plan and the queue as their glyphs with the numbers and "Working" as its clock alone (the
 /// smallest iPhone with every segment shown). No segment spins: the ticking clock says the run works. At the accessibility sizes the segments stack, as glyphs.
@@ -822,7 +822,7 @@ struct FloatingWorkingControl: View {
     }
 }
 
-/// What a run does now, as the capsule's status word ("Waiting on 2 helpers"): its own width and no more, so that Stop,
+/// What a run does now, as the capsule's status word ("Waiting for 2 helpers"): its own width and no more, so that Stop,
 /// the plan and the helpers keep their room, and no spinner (the owner's report of 2026-11-27).
 struct ActivityWord: View {
     let text: String
