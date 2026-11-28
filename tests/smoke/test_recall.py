@@ -122,3 +122,23 @@ async def test_a_schedule_a_run_made_after_it_read_a_page_is_read_back_fenced_an
         assert not clean.untrusted
     finally:
         await store.close()
+
+
+async def test_a_run_whose_chat_was_deleted_is_read_back_from_the_ledger(tmp_path: Path) -> None:
+    """Item 2077: a run recalled the ids of runs whose chats the owner had deleted, read in an earlier run's words, and
+    was told no record of Dot's had them, as of an id it made up. The ledger of item 1323 keeps the numbers of every
+    deleted run: recall says the run was deleted with its chat and what the ledger keeps, and none of its words."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        thread = await store.create_thread("A code review", "review")
+        run: RunRecord = await _run(store, thread.id, "SECRET-GOAL review the diff.")
+        await store.finish_run(run.id, "done", "SECRET-ANSWER no findings.")
+        await store.delete_threads([thread.id])
+        read: ToolResult = await _recall(store, run.id)
+        assert not read.is_error and not read.untrusted
+        assert f"Run {run.id} was deleted with its chat" in read.text and "done" in read.text
+        assert "SECRET" not in read.text
+        with pytest.raises(ToolInputError, match="deleted, or the id is not one of Dot's"):
+            await _recall(store, thread.id)
+    finally:
+        await store.close()

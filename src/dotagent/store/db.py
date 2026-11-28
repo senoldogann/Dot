@@ -80,6 +80,7 @@ from dotagent.store.models import (
     ChatMessage,
     ChatTeam,
     Correspondent,
+    DeletedRunRecord,
     DraftChannel,
     DraftRecord,
     DraftStatus,
@@ -4078,6 +4079,28 @@ class Store:
         if row is None:
             raise NotFoundError("run not found", {"run_id": run_id})
         return _run(row)
+
+    async def get_deleted_run(self, run_id: str) -> DeletedRunRecord:
+        """What the run ledger keeps of ``run_id``, a run deleted with its chat (item 2077); ``NotFoundError`` when the
+        ledger has no row of it (a run still kept, one deleted before the ledger was, or no run of Dot's)."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT id, source, model, status, created_at, finished_at, deleted_at, parent_run_id, schedule_id"
+            " FROM run_ledger WHERE id = ?",
+            (run_id,),
+        )
+        if row is None:
+            raise NotFoundError("deleted run not found", {"run_id": run_id})
+        return DeletedRunRecord(
+            id=row["id"],
+            source=row["source"],
+            model=row["model"],
+            status=_STATUS.validate_python(row["status"]),
+            created_at=row["created_at"],
+            finished_at=row["finished_at"],
+            deleted_at=row["deleted_at"],
+            parent_run_id=row["parent_run_id"],
+            schedule_id=row["schedule_id"],
+        )
 
     async def goals_of(self, run_ids: Sequence[str]) -> dict[str, str]:
         """The goal of each of ``run_ids``, a run no longer kept left out (item 1118)."""

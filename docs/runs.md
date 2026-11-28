@@ -139,7 +139,7 @@ is the answer (a small model that is offered both writes the call out as text).
   a schedule, an approval, an objective; the newest 60, item 924), each of which `recall` reads back with the ids next
   to it (the chat of a run, the runs of a chat, the run of a thing to do), so that a run that comes back to old work
   recalls it step by step rather than from a summary that lost it (`recall` fences what a run that read outside content
-  wrote and marks the reader untrusted); and a check lists names, paths and links in the summary that the conversation
+  wrote and marks the reader untrusted; a run deleted with its chat is read back from the run ledger, which keeps where it came from, its model, how it ended and when it was deleted and none of its words, item 2077; a record that is gone without a trace is an error that says it was deleted or is no id of Dot's); and a check lists names, paths and links in the summary that the conversation
   never had (an address cut short, with the ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
   it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
   `compacted` event names the model,
