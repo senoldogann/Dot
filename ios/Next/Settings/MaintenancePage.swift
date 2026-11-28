@@ -101,6 +101,11 @@ struct MaintenancePage: View {
                         systemImage: "arrow.uturn.forward", title: String(localized: "Continue after restart", comment: "Maintenance: resume interrupted tasks after a restart"),
                         description: String(localized: "Resume interrupted tasks after an update or restart.", comment: "Maintenance: what continue after restart does"), isOn: resumeBinding(picture))
                 }
+                GroupedSection(header: nil, footer: nil) {
+                    NavigationRow(systemImage: "wrench.and.screwdriver",
+                                  title: String(localized: "Self-repair", comment: "Settings: Dot's own repairs"),
+                                  description: nil, detail: nil) { RepairPage() }
+                }
                 if let performance = picture.performance { performanceSection(performance) }
             }
         }

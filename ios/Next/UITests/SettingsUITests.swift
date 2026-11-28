@@ -44,6 +44,20 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")
     }
 
+    func testSelfRepairShowsProblemsAndConfirmsStopping() {
+        let app: XCUIApplication = launch("settings-maintenance")
+        let repair: XCUIElement = app.buttons["Self-repair"].firstMatch
+        XCTAssertTrue(repair.waitForExistence(timeout: 10))
+        repair.tap()
+        let problem: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "A browser stopped responding")).firstMatch
+        XCTAssertTrue(problem.waitForExistence(timeout: 10))
+        app.buttons["Run now"].tap()
+        let stop: XCUIElement = app.buttons["Stop"].firstMatch
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.tap()
+        XCTAssertTrue(app.buttons["Cancel"].firstMatch.waitForExistence(timeout: 5))
+    }
+
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
     func testTheMacsEmergencyStopIsShownAndReleased() {
         let app: XCUIApplication = launch("settings-stopped")
