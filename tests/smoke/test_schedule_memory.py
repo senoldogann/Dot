@@ -326,8 +326,13 @@ async def test_settings_show_the_two_choices_and_the_chat_shows_the_goal_alone(
                 await page.screenshot(path=str(tmp_path / f"settings-{width}-{scheme}.png"))
                 await page.goto(f"{served}/#/runs/{second.id}")
                 await expect(page.locator(".timeline")).to_contain_text("Found 2 new listings.")
-                # The chat shows the owner's goal alone, never the digest the model was told.
-                await expect(page.locator(".user-message .bubble.user")).to_have_text(GOAL)
+                # The routine's message is one compact row (item 2021), whose words, unfolded, are the owner's goal
+                # alone, never the digest the model was told.
+                routine: Locator = page.locator(".routine")
+                await expect(routine).to_have_count(1)
+                await expect(page.locator(".bubble.user")).to_have_count(0)
+                await routine.locator(".routine-head").click()
+                await expect(routine.locator(".routine-prompt")).to_have_text(GOAL)
                 await expect(page.locator(".run-layout")).not_to_contain_text(HISTORY_OPEN)
                 await expect(page.locator(".run-layout")).not_to_contain_text("Found 1 new listings.")
                 await page.screenshot(path=str(tmp_path / f"chat-{width}-{scheme}.png"))
