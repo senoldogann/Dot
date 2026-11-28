@@ -112,7 +112,7 @@ async def test_the_line_says_how_the_link_stands_and_covers_nothing(login_env: d
                     tag: str = f"{width}x{height}-{scheme}"
                     context: BrowserContext = await phone(chromium, playwright, width, height, scheme)
                     page: Page = await open_chat(context, working.address, working.token, working.run.id)
-                    await expect(page.locator(".capsule")).to_contain_text("Waiting on 2 helpers", timeout=20_000)
+                    await expect(page.locator(".capsule")).to_contain_text("Waiting for 2 helpers", timeout=20_000)
                     await until_kept(page, chats=1, lists=2)
                     # With the link well the line is not there.
                     assert await page.locator(".link-line:not([hidden])").count() == 0

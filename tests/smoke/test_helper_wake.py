@@ -615,7 +615,7 @@ async def _served(login_env: dict[str, str], model: _Roles) -> AsyncIterator[tup
 async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_blocked_on_its_helpers(
     login_env: dict[str, str],
 ) -> None:
-    """While the run waits, the line says "Waiting on 1 helper"; once a message released it, the same line says the
+    """While the run waits, the line says "Waiting for 1 helper"; once a message released it, the same line says the
     subagent keeps working in the background, and a page loaded again says the same."""
     roles: _Roles = _Roles(
         main=[ScriptedTurn(text="", calls=(_delegate("slow"),)), _turn("shell", {"command": "sleep 60"})],
@@ -636,7 +636,7 @@ async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_bl
                 if width == 1280:
                     # The bar's own part says the wait; the line over it holds the helper's words (capsule.js).
                     await expect(page.locator(".capsule-time")).to_have_text(
-                        "Waiting on 1 helper", timeout=WAIT_S * 1000
+                        "Waiting for 1 helper", timeout=WAIT_S * 1000
                     )
                     manager.steer(parent.id, "Stop waiting.", ())
                 await expect(line).to_have_text("1 helper keeps working in the background", timeout=WAIT_S * 1000)
@@ -652,7 +652,7 @@ async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_bl
 
 @pytest.mark.browser
 async def test_a_rows_wait_on_its_helper_goes_when_a_message_lets_the_helper_go(login_env: dict[str, str]) -> None:
-    """Item 2010: the sidebar's row of a chat whose run waits on its helper says "Waiting on 1 helper…"; once a message
+    """Item 2010: the sidebar's row of a chat whose run waits on its helper says "Waiting for 1 helper…"; once a message
     released the run from its wait (``helper_released``, with the run still at work and no run's end to reload on), the
     open page's row says it no more."""
     roles: _Roles = _Roles(
@@ -666,7 +666,7 @@ async def test_a_rows_wait_on_its_helper_goes_when_a_message_lets_the_helper_go(
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             row = page.locator(f'.side-run[href="#/runs/{parent.id}"]').first
-            await expect(row.locator(".side-chat-live")).to_have_text("Waiting on 1 helper…", timeout=WAIT_S * 1000)
+            await expect(row.locator(".side-chat-live")).to_have_text("Waiting for 1 helper…", timeout=WAIT_S * 1000)
             manager.steer(parent.id, "Stop waiting.", ())
             await expect(row.locator(".side-chat-live")).to_have_count(0, timeout=WAIT_S * 1000)
             assert (await runtime.store.get_run(parent.id)).status == "running"
