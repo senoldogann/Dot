@@ -50,6 +50,41 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// The swipe to quote beats the navigation's pull-back (item 2030): iOS 26 pulls a pushed chat back from a swipe to the
+    /// right anywhere in it, which a swipe on a message is. On a message of the owner's and of Dot's, from the middle of the
+    /// screen, the message is quoted and the chat stays open; a swipe from the screen's edge still goes back.
+    @MainActor
+    func testASwipeOnAMessageQuotesWhileTheEdgeSwipeStillGoesBack() {
+        let app: XCUIApplication = launch("n2-failed", defaults: ["-DotNextPushed", "YES"])
+        let home: XCUIElement = app.staticTexts["Fixture home"]
+        let chip: XCUIElement = app.descendants(matching: .any)["composer.quote"]
+        let owner: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+        XCTAssertTrue(owner.waitForExistence(timeout: 10))
+        let origin: XCUICoordinate = app.coordinate(withNormalizedOffset: .zero)
+        func drag(_ element: XCUIElement, by dx: CGFloat) {
+            let start: CGVector = CGVector(dx: element.frame.midX - 40, dy: element.frame.midY)
+            origin.withOffset(start).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: start.dx + dx, dy: start.dy)))
+        }
+        drag(owner, by: 200)
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on the owner's message quotes it")
+        XCTAssertTrue(chip.label.contains("Book me the dentist"), chip.label)
+        XCTAssertFalse(home.exists, "the chat is still open")
+        app.buttons["composer.quote.remove"].tap()
+
+        let answer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "merged, see")).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 10))
+        drag(answer, by: 200)
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on Dot's message quotes it")
+        XCTAssertTrue(chip.label.contains("merged"), chip.label)
+        XCTAssertFalse(home.exists, "the chat is still open")
+        app.buttons["composer.quote.remove"].tap()
+
+        // From the screen's own edge it is still the way back.
+        origin.withOffset(CGVector(dx: 2, dy: 400)).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: 260, dy: 400)))
+        XCTAssertTrue(home.waitForExistence(timeout: 10), "the edge swipe goes back")
+        XCTAssertFalse(chip.exists)
+    }
+
     @MainActor
     func testThePlusMenuAttachesAVideoWithItsDurationAndCanRemoveIt() throws {
         let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))
@@ -587,6 +622,20 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// Item 2018: Dot's first words stand under the owner's message as one of its short messages, with the steps shown and
+    /// with Show steps off.
+    func testTheFirstWordsStandUnderTheOwnersMessageWithAndWithoutTheSteps() {
+        for defaults in [["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", "{}"], ["-showSteps", "NO", "-stepsOverrides", "{}"]] {
+            let app: XCUIApplication = launch("n2-chat", defaults: defaults)
+            let words: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Looking at next week's calendar first.")).firstMatch
+            // The chat opens at its newest words; the first words stand near the run's start, above them.
+            for _ in 0..<6 where !words.waitForExistence(timeout: 2) { app.swipeDown() }
+            for _ in 0..<6 where !words.exists { app.swipeUp() }
+            XCTAssertTrue(words.waitForExistence(timeout: 15), "\(defaults): the first words")
+            app.terminate()
+        }
+    }
+
     /// Item 1932: the asks scene settles: once it stood still for a few seconds, the screen is not drawn again (its
     /// scroll followed the lazy stack's own height estimates in a loop, at 100 % CPU).
     func testTheAsksSceneSettles() {
@@ -601,14 +650,13 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
-    /// Item 1931 and the owner's report of 2026-11-27: with no link, the capsule says Offline in the status's place once
-    /// it lasted a few seconds, and offers no Stop; the header keeps the bot's face and name, no link words.
-    func testThePillSaysOfflineWithoutALink() {
+    /// A lasting outage shows the last contact in the capsule without adding link text to the header.
+    func testThePillShowsTheLastContactWithoutALink() {
         let app: XCUIApplication = launch("n2-offline-saved")
         let link: XCUIElement = app.buttons["capsule.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
-        XCTAssertEqual(link.label, "Offline")
-        for words in ["Syncing", "Reconnecting", "Offline ·"] {
+        XCTAssertEqual(link.label, "Mac asleep or unreachable since 14:05")
+        for words in ["Syncing", "Reconnecting", "Mac asleep or unreachable"] {
             XCTAssertFalse(
                 app.navigationBars.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", words)).firstMatch.exists, "no link words in the header: \(words)")
         }
@@ -617,6 +665,12 @@ final class ChatUITests: XCTestCase {
         shot.name = "pill-offline"
         shot.lifetime = .keepAlways
         add(shot)
+
+        app.terminate()
+        let list: XCUIApplication = launch("n2-offline-list")
+        let listLink: XCUIElement = list.staticTexts["chats.link"]
+        XCTAssertTrue(listLink.waitForExistence(timeout: 15))
+        XCTAssertEqual(listLink.label, "Mac asleep or unreachable since 14:05")
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {

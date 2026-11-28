@@ -468,6 +468,17 @@ async def emergency_stop_engaged() -> bool:
     return await asyncio.to_thread(failsafe_path().exists)
 
 
+async def watcher_due_by(runtime: Runtime, until: float) -> bool:
+    """Whether a watcher is looking now or is switched on and due to look by ``until``."""
+    if not runtime.config.watchers.enabled:
+        return False
+    if any(lock.locked() for lock in _LOCKS.values()):
+        return True
+    return any(
+        watcher.enabled and watcher.state.next_look_at <= until for watcher in await list_watchers(runtime.store)
+    )
+
+
 async def look_due(runtime: Runtime, manager: RunManager, now: float) -> int:
     """Look for every watcher that is switched on and due at ``now``, one after another, each on its own: one that fails
     keeps no other from looking. Nothing looks while the emergency stop is engaged. Returns how many looked."""

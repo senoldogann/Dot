@@ -12911,3 +12911,34 @@ dialog.teach {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* An agent's work on its page (item 2035), as the phone's bot profile has it: a row each for its work orders, its
+   objectives and today's hand-offs, an icon, the name, how many and a chevron, the row a link to its page. */
+.agent-work-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.agent-work-row > .row-meta {
+  color: var(--muted);
+}
+
+.agent-work-row > .icon:last-child {
+  width: 12px;
+  height: 12px;
+  color: var(--muted);
+}
+
+.agent-work-group + .agent-work-group {
+  margin-top: var(--space-4);
+}
+
+.agent-work-foot {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}

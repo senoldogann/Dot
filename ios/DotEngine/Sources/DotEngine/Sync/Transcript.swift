@@ -204,6 +204,10 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     /// The message a routine sent into the chat (a schedule's, a watcher's or a hook's run, owner 2026-11-27): one compact
     /// row, "Routine · <its title>", whose chevron shows the whole `prompt`; never an owner's bubble.
     case automation(id: String, title: String, prompt: String)
+    /// Dot's first words as a run the owner started begins (a `first_words` event, item 2018): the fast model's line of what
+    /// it looks at first, or empty for the words said at once ("Looking into it…"), which the app says in its language.
+    /// Drawn in every way of showing the work and in the conversation: they are Dot's words, not a step.
+    case firstWords(id: String, text: String)
     /// The helpers a run started, each with its current step (plan §18).
     case helpers(id: String, runId: String, helpers: [HelperView])
     /// The run's plan as a checklist, as it stands now.
@@ -218,7 +222,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .owner(let id, _, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
-            .limit(let id, _), .automation(let id, _, _):
+            .limit(let id, _), .automation(let id, _, _), .firstWords(let id, _):
             id
         case .tool(let entry): entry.id
         case .decision(let anchor): anchor.id
@@ -346,6 +350,7 @@ enum Category: Equatable {
     case thought
     case decision
     case runEnd
+    case firstWords
 }
 
 /// A row with what the filter and the fold need: its category and when it began and ended.
@@ -407,6 +412,15 @@ private func runItems(
     let events: [EventRecord] = timeline?.events ?? []
     for event in events {
         switch event.kind {
+        case "first_words":
+            // The fast model's line takes the place of the words said at once: one row a run.
+            let text: String = event.data["text"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let row: Built = Built(item: .firstWords(id: "fw:\(run.id)", text: text), category: .firstWords, start: event.ts, end: event.ts)
+            if let at: Int = items.firstIndex(where: { $0.category == .firstWords }) {
+                items[at] = Built(item: row.item, category: .firstWords, start: items[at].start, end: items[at].end)
+            } else {
+                items.append(row)
+            }
         case "assistant":
             let thought: String = event.data["thinking"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !thought.isEmpty {
@@ -608,6 +622,8 @@ private func firstLine(_ text: String) -> String {
 /// Whether a row of `category` shows in `mode` (the table on `ToolCallMode`).
 func shows(_ category: Category, mode: ToolCallMode) -> Bool {
     switch (mode, category) {
+    // Dot's first words are its words, in every mode.
+    case (_, .firstWords): true
     case (.showAll, _): true
     case (_, .owner), (_, .note), (_, .answer(final: true)), (_, .writing), (_, .decision), (_, .runEnd): true
     case (.zen, .thought), (.hideAll, .thought): false

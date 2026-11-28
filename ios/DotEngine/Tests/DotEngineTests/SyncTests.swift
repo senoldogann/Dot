@@ -326,6 +326,42 @@ final class SyncTests: XCTestCase {
 
     // MARK: The outbox in the picture
 
+    func testAnUnreachableMacKeepsItsLastContactAndReceivesTheWaitingMessageOnce() async throws {
+        let live: EngineSnapshot = try await openLive()
+        rig.clock.advance(10)
+        let lastContact: Double = rig.clock.now()
+        daemon.pushRaw(
+            ": keepalive\n\ndata: " + #"{"id":1,"run_id":"run_1","ts":1,"kind":"run_started","data":{}}"# + "\n\n",
+            thread: nil
+        )
+        _ = try await snapshot(of: rig.store, "the stream delivered its frame") { $0.heard > live.heard }
+        rig.clock.advance(10)
+        daemon.offline = true
+        daemon.dropStreams()
+        let down: EngineSnapshot = try await snapshot(of: rig.store, "the Mac cannot be reached") {
+            $0.transport == .reconnecting(attempt: 1)
+        }
+        XCTAssertTrue(down.online, "the phone's network is still up")
+        XCTAssertEqual(down.lastContact, lastContact, "the last heartbeat, not the break or a retry")
+        let restored: SyncStore = SyncStore(cache: SyncCache(folder: folder.appending(path: "cache")), clock: rig.clock)
+        let restoredContact: Double? = await restored.snapshot.lastContact
+        XCTAssertEqual(restoredContact, lastContact)
+
+        let sleeps: Int = rig.clock.askedCount
+        let key: String = try await rig.engine.send("Send when the Mac is back", thread: "thr_1", photos: [], picks: .none)
+        _ = try await snapshot(of: rig.store, "the message is kept") { $0.outbox.contains { $0.id == key } }
+        try await rig.clock.waitForSleep(of: 0.5, count: 1, since: sleeps)
+        XCTAssertEqual(daemon.acceptedTexts, [])
+
+        daemon.offline = false
+        rig.clock.advance(0.6)
+        let back: EngineSnapshot = try await snapshot(of: rig.store, "the Mac is back and took the message") {
+            $0.transport == .up && $0.outbox.isEmpty
+        }
+        XCTAssertEqual(daemon.acceptedTexts, ["Send when the Mac is back"])
+        XCTAssertGreaterThan(try XCTUnwrap(back.lastContact), lastContact)
+    }
+
     func testAMessageSentOfflineWaitsShowsOfflineAndGoesOnceTheLinkIsBack() async throws {
         _ = try await openLive()
         rig.link.report(.down)

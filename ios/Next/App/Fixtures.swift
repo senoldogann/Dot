@@ -26,8 +26,9 @@
         case failed = "n2-failed"
         /// The phone offline with nothing saved of the chat.
         case offline = "n2-offline"
-        /// No link, with the chat's copy saved on the phone (item 1931: the pill says Offline over it).
+        /// No link, with a cached chat and a known last contact.
         case offlineSaved = "n2-offline-saved"
+        case offlineList = "n2-offline-list"
         /// A chat deleted on the Mac while open.
         case deleted = "n2-deleted"
         /// The agents sheet (§19's one-line titles).
@@ -64,10 +65,15 @@
         /// The snapshot the scene draws.
         func snapshot(now: Double) -> EngineSnapshot {
             var snapshot: EngineSnapshot = .empty
-            let linked: Bool = self != .offline && self != .offlineSaved
+            let linked: Bool = self != .offline && self != .offlineSaved && self != .offlineList
             snapshot.transport = linked ? .up : .offline
             snapshot.online = linked
-            if self == .offlineSaved { snapshot.savedAt[Self.thread] = now - 240 }
+            if self == .offlineSaved || self == .offlineList {
+                snapshot.savedAt[Self.thread] = now - 240
+                snapshot.lastContact = Calendar.current.date(
+                    bySettingHour: 14, minute: 5, second: 0, of: Date(timeIntervalSince1970: now)
+                )?.timeIntervalSince1970
+            }
             let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : self == .offlineSaved ? .cached : .live
             if self != .offline {
                 let view: ThreadView = decode(viewJSON(now: now))
@@ -191,6 +197,7 @@
                 #"{"id":7,"run_id":"run_a","ts":\#(a + 63),"kind":"tool_call","data":{"call_id":"a4","tool":"shell","args":{"command":"npm test"}}}"#,
                 #"{"id":8,"run_id":"run_a","ts":\#(a + 134),"kind":"tool_result","data":{"call_id":"a4","ok":true,"text":"42 passed"}}"#,
                 ###"{"id":9,"run_id":"run_a","ts":\###(a + 134),"kind":"run_finished","data":{"status":"done","result":"## Fixed\nThe build failed because **Node 18** was pinned on CI while the lock file needs Node 22.\n\n| Agent | Job |\n|---|---|\n| Invention Scout | Checks a lost invention against two independent sources and lists the Commons images with their licences → `research/<date>-<slug>.md` |\n| Story Scripter | Writes 9 scenes of 130–145 words in English to `script.json` (the hook in the first 3 s, an ironic close) |\n| Channel Analyst | Measures the weekly views |\n\n```yaml\n- uses: actions/setup-node@v4\n  with:\n    node-version: 22\n```\n\nhttps://github.com/example/site/pull/1012 merged, see [Node's release notes](https://nodejs.org/en/blog) for 22. The notes are in `~/Desktop/ci-notes.md`."}}"###,
+                #"{"id":19,"run_id":"run_b","ts":\#(b + 1),"kind":"first_words","data":{"text":"Looking at next week's calendar first.","model":"fast"}}"#,
                 #"{"id":20,"run_id":"run_b","ts":\#(b + 2),"kind":"plan","data":{"steps":[{"text":"Read next week's calendar","status":"done"},{"text":"Find free afternoon slots at the dentist","status":"in_progress"},{"text":"Book the slot you choose","status":"pending"}]}}"#,
                 #"{"id":21,"run_id":"run_b","ts":\#(b + 3),"kind":"tool_call","data":{"call_id":"b1","tool":"delegate","args":{"goal":"Check the dentist's free slots"}}}"#,
                 #"{"id":22,"run_id":"run_b","ts":\#(b + 4),"kind":"tool_result","data":{"call_id":"b1","ok":true,"text":"started"}}"#,

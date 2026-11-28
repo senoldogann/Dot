@@ -29,6 +29,9 @@ final class AppModel {
     private(set) var outbox: [OutboxItem] = []
     private(set) var accepted: [String: AcceptedMessage] = [:]
     private(set) var transport: Transport = .connecting
+    private(set) var visibleLink: LinkLine?
+    @ObservationIgnored private var linkDelay: Task<Void, Never>?
+    @ObservationIgnored private var currentLink: LinkLine?
     private(set) var online: Bool = true
     private(set) var savedAt: [String: Double] = [:]
     private(set) var workingAt: [String: Double] = [:]
@@ -98,6 +101,7 @@ final class AppModel {
         if next.outbox != outbox { outbox = next.outbox }
         if next.accepted != accepted { accepted = next.accepted }
         if next.transport != transport { transport = next.transport }
+        showLink(linkLine(transport: next.transport, lastContact: next.lastContact))
         if next.online != online { online = next.online }
         if next.savedAt != savedAt { savedAt = next.savedAt }
         if next.workingAt != workingAt { workingAt = next.workingAt }
@@ -106,6 +110,24 @@ final class AppModel {
         if next.reset != reset { reset = next.reset }
         if next.heard != heard { heard = next.heard }
         if let fresh: DaemonReset = next.reset, !fresh.taken, UserDefaults.standard.double(forKey: Self.rescuedKey) != fresh.at { rescue(fresh) }
+    }
+
+    private func showLink(_ line: LinkLine?) {
+        guard currentLink != line else { return }
+        currentLink = line
+        if line == nil {
+            linkDelay?.cancel()
+            linkDelay = nil
+            visibleLink = nil
+        } else if visibleLink != nil {
+            visibleLink = line
+        } else if linkDelay == nil {
+            linkDelay = Task { [weak self] in
+                do { try await Task.sleep(for: linkLineDelay) } catch { return }
+                self?.visibleLink = self?.currentLink
+                self?.linkDelay = nil
+            }
+        }
     }
 
     /// The draft of the new chat's composer, kept like a chat's (a chat's id is the daemon's `thr_…`, never this).
