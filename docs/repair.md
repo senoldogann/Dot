@@ -152,7 +152,9 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
   push): a session that pushed to it itself, which would have the hook review only what comes after, pushes nothing; and
   a push that goes through without the hook's mark of that commit (a hooks path set elsewhere) opens no pull request.
   Either is yours (*Needs you*, item 943). When the hook stops the push, its review goes back to the same session
-  (`--resume`), fenced as a finding, and Dot pushes the session's next commit. A push is given half an hour.
+  (`--resume`), fenced as a finding, and Dot pushes the session's next commit; so do the hook's own checks before the
+  review (item 2100: a commit made without the repository's hooks, a test weakened with no `Test-change:` line). A push
+  is given half an hour.
 - **The pull request.** Its title is the commit's subject (`Item <n>: ...`). Its body holds the commits and says it
   came from the self-repair, with the problem and the session.
 - **Checks.** Dot waits for the checks for `checks_minutes` at most (45), looking every minute. The failed ones go back

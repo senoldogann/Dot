@@ -108,7 +108,13 @@ A change that takes days is many pushes, each waiting on the review and the gate
   for it before the next merge, and never cancel it: it is what shows a break only macOS sees (a pull request runs no
   macOS job, item 1886) and two pull requests that pass alone and break `main` together. A run of `main` shown as
   cancelled before it began was replaced by a newer waiting one (item 1011),
-  whose run checks that merge too. A red `main` is fixed before anything else is merged.
+  whose run checks that merge too. A red `main` is fixed before anything else is merged: `scripts/merge_pr.py`
+  refuses to merge over it (item 2100), but the pull request whose body says `Fixes-main-red: <run id>` for a run
+  that is red now.
+- **A test a change weakens says why (item 2100).** A removed or changed assertion, a removed test, a new skip,
+  xfail, rerun or raised timeout is named, file by file, in a `Test-change:` line of a commit's body, with what the old
+  assertion caught; the gate and the pre-push hook fail without it. A test the code broke is fixed in the code. Commits
+  are made with the repository's hooks: one without the commit hook's stamp is refused ([Development](docs/development.md)).
 - **Merging main** into a branch whose own change is unchanged costs no review (the hook sees it); do it when the
   branch is ready, never while a test run of the same worktree is going.
 - **A failure that is not the change's** (a known flaky test, `main` red): rerun the job (`gh run rerun <id> --failed`)

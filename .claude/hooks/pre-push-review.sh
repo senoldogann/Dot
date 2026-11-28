@@ -26,7 +26,19 @@
 # the hook says so before the next one (REVIEW.md: reconsider the approach). A model that is not on the Claude plan is
 # also told its budget (a number of calls and the time to write its verdict by), as DeepSeek stopped at the time limit
 # in 21 of 61 reviews without a verdict.
+#
+# Before the review, two checks no model is asked for (item 2100), run from the scripts beside this hook (the checkout
+# the hook is linked from, not the branch pushed, so that a branch cannot loosen what checks it) on that checkout's
+# Python: every commit pushed carries the commit hook's stamp (scripts/hook_stamps.py: one made with the hooks off is
+# refused), and a test the branch weakens is named, with why, in a `Test-change:` line of its commits
+# (scripts/weakened_tests.py). The review is then given a section on the tests the change edits, which REVIEW.md's "Test
+# changes" says how to answer.
 set -euo pipefail
+
+# The checkout this hook belongs to, through its link, and the Python and the scripts of its checks.
+guard_root=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../.." && pwd)
+guard_python="$guard_root/.venv/bin/python"
+guards="$guard_root/scripts"
 
 # The change a tip makes against main as a patch id: line numbers do not count, so lines of main moving under the change
 # do not alter it, but whitespace does (--verbatim: a dedent changes what Python means), and so does a merge that
@@ -79,6 +91,32 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     base=$remote_sha
   fi
   [[ "$base" == "$local_sha" ]] && continue
+
+  # The checks no model is asked for (item 2100): they read git alone and take a second.
+  if [[ ! -x "$guard_python" ]]; then
+    echo "claude-review: push stopped; $guard_python is missing: run \`uv sync\` in $guard_root" >&2
+    exit 1
+  fi
+  status=0
+  found=$("$guard_python" "$guards/hook_stamps.py" --base "$base" --head "$local_sha" 2>&1) || status=$?
+  if ((status == 0)); then
+    found=$("$guard_python" "$guards/weakened_tests.py" check --base origin/main --head "$local_sha" 2>&1) ||
+      status=$?
+  fi
+  if ((status == 1)); then
+    # What the checks found is written where a review's findings are, and named as a review's BLOCK names its file, so
+    # that Dot's repair night hands it to the session to answer as it does a review (src/dotagent/repair/github.py,
+    # push_branch). It carries no verdict: it is no review of the change, and no round of the three.
+    checks_file="$review_dir/$local_sha.checks.md"
+    printf '%s\n' "$found" >"$checks_file"
+    printf 'claude-review: %s\n' "$found" >&2
+    echo "claude-review: push stopped before the review; the review is in $checks_file. Fix what it found and push" \
+      "again" >&2
+    exit 1
+  elif ((status != 0)); then
+    echo "claude-review: push stopped; the checks before the review could not run (exit $status): $found" >&2
+    exit 1
+  fi
 
   if [[ -f "$review_dir/$local_sha.pass" ]]; then
     echo "claude-review: $local_ref at ${local_sha:0:7} already passed review"
@@ -202,12 +240,25 @@ then review this diff; do not repeat a finding that was fixed."
   # other`, `git push --all` and the repair flow push a branch that is not HEAD.
   branch=${local_ref#refs/heads/}
   thread_file="$review_dir/thread-${branch//\//-}"
+  # The tests the change edits, for the reviewer to answer for (REVIEW.md, "Test changes"; item 2100): in every
+  # round's goal, the diff aside.
+  status=0
+  tests_brief=$("$guard_python" "$guards/weakened_tests.py" brief --base origin/main --since "$base" \
+    --head "$local_sha" 2>&1) ||
+    status=$?
+  if ((status != 0)); then
+    echo "claude-review: could not be reviewed: the tests the change edits could not be read: $tests_brief" >&2
+    exit 1
+  fi
   # The change itself goes in the goal of a branch's first review while it fits the daemon's 50,000 characters, so that
   # the review starts from it rather than spending steps to read it; a larger one, and a later round's in the same
   # chat, are read from the file (the chat's earlier goals reach its judges as instructions: a diff in each would be
   # carried by every one of them).
   {
     printf '%s\n' "$prompt"
+    if [[ -n "$tests_brief" ]]; then
+      printf '\n%s\n' "$tests_brief"
+    fi
     if [[ ! -s "$thread_file" ]] && (($(wc -c <"$diff_file") <= 40000)); then
       printf '\nThe change (the same as %s):\n\n' "$diff_file"
       cat "$diff_file"

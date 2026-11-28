@@ -61,7 +61,19 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     assert gate_jobs["gate"]["runs-on"] == "macos-latest"
     assert gate_jobs["ci"]["runs-on"] == "ubuntu-latest"
     assert gate_jobs["ci"]["if"] == "always()"
-    assert set(gate_jobs["ci"]["needs"]) == {"prose", "checks", "gate", "smoke", "browser", "desktop", "zizmor"}
+    assert set(gate_jobs["ci"]["needs"]) == {
+        "prose",
+        "guards",
+        "checks",
+        "gate",
+        "smoke",
+        "browser",
+        "desktop",
+        "zizmor",
+    }
+    # The checks no model is asked for (item 2100) run on every pull request, prose alone included.
+    assert gate_jobs["guards"]["if"] == "github.event_name == 'pull_request'"
+    assert "needs" not in gate_jobs["guards"]
     assert not any("ruff " in str(step.get("run", "")) for step in gate_jobs["gate"]["steps"])
     assert any("ruff format" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
     assert any("npm run check" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
