@@ -6,7 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
-| [2053](2053.md) | no status |  | Preview long prose in browser snapshots |
+| [2053](2053.md) | done | 2026-11-28 | Preview long prose in browser snapshots |
 | [2046](2046.md) | done | 2026-11-27 | A coding helper hands its pull request checks to the chat's background watcher |
 | [2045](2045.md) | done | 2026-11-27 | Measure the character line against the injection evals |
 | [2044](2044.md) | done | 2026-11-27 | Keep the Mac awake for an upcoming routine or watcher |
