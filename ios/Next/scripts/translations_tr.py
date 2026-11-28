@@ -1,6 +1,7 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# A bot that carries too much (item 2067).
 # Rules on the phone (item 2055).
 # MS1: the last confirmed contact with the Mac.
 # Memory: a new note, the trash and Restore (G1b).
@@ -1260,6 +1261,11 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "%lld open work orders (more than %lld)": "%lld açık iş emri (en çok %lld olmalı)",
+        "%lld routines on (more than %lld)": "%lld rutin açık (en çok %lld olmalı)",
+        "%lld%% of its runs ended done this week, %lld%% the week before": "Bu hafta işlerinin %%%lld kadarı bitti, geçen hafta %%%lld",
+        "Overloaded: %@": "Aşırı yüklü: %@",
+        "Overloaded": "Aşırı yüklü",
         "Goes ahead without asking": "Sormadan ilerler",
         "Goes ahead, whatever it has read": "Ne okumuş olursa olsun ilerler",
         "Ask me first": "Önce bana sor",

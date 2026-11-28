@@ -36,6 +36,14 @@ struct BotProfile: View {
                     Notice(tone: .warn, message: String(localized: "Paused: its routines start nothing by themselves.", comment: "Bot profile: a paused bot"), dismiss: nil)
                         .accessibilityIdentifier("profile.paused")
                 }
+                if bot.overloaded {
+                    Notice(
+                        tone: .info,
+                        message: String(localized: "Overloaded: \(overloadWords(bot.load))", comment: "Bot profile: a bot that carries too much; the argument is why"),
+                        dismiss: nil
+                    )
+                    .accessibilityIdentifier("profile.overloaded")
+                }
                 GroupedSection(header: nil, footer: nil) {
                     if let latest = bot.latest {
                         Button { library = latest.summary.id } label: {

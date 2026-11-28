@@ -11,6 +11,8 @@ public struct Bot: Sendable, Hashable, Identifiable {
     public let unread: Int
     /// How many asks wait on the owner across its chats.
     public let asks: Int
+    /// What it carries and why it is overloaded (item 2067); `nil` before the agents were read.
+    public let load: BotLoad?
 
     public var id: String { record.id }
     public var isDot: Bool { record.id == dotAgentId }
@@ -19,11 +21,15 @@ public struct Bot: Sendable, Hashable, Identifiable {
     /// When it last moved, for the home's order (its record's birth when it has no chat yet).
     public var movedAt: Double { chats.first?.summary.updatedAt ?? record.createdAt }
 
-    public init(record: AgentRecord, chats: [ThreadRow], unread: Int, asks: Int) {
+    /// Whether it carries too much (item 2067): its reasons are on its profile.
+    public var overloaded: Bool { !(load?.reasons.isEmpty ?? true) }
+
+    public init(record: AgentRecord, chats: [ThreadRow], unread: Int, asks: Int, load: BotLoad?) {
         self.record = record
         self.chats = chats
         self.unread = unread
         self.asks = asks
+        self.load = load
     }
 }
 
@@ -52,6 +58,8 @@ public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fa
     }
     let homes: [String: ThreadSummary] = Dictionary(
         agents.compactMap { summary in summary.home.map { (summary.record.id, $0) } }, uniquingKeysWith: { first, _ in first })
+    let loads: [String: BotLoad] = Dictionary(
+        agents.compactMap { summary in summary.load.map { (summary.record.id, $0) } }, uniquingKeysWith: { first, _ in first })
     func bot(_ record: AgentRecord) -> Bot {
         var held: [ThreadRow] = byBot[record.id] ?? []
         // A home read with the agents is dropped once it went (deleted here, on the Mac or on another phone) or is going
@@ -61,7 +69,8 @@ public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fa
             held.append(ThreadRow(summary: home, revision: 0, asks: home.latestStatus == "blocked" ? 1 : 0, helpers: nil, background: nil))
         }
         let chats: [ThreadRow] = held.sorted { $0.summary.updatedAt > $1.summary.updatedAt }
-        return Bot(record: record, chats: chats, unread: chats.filter { $0.summary.unread && isConversation($0.summary) }.count, asks: chats.reduce(0) { $0 + $1.asks })
+        return Bot(record: record, chats: chats, unread: chats.filter { $0.summary.unread && isConversation($0.summary) }.count, asks: chats.reduce(0) { $0 + $1.asks },
+            load: loads[record.id])
     }
     let rank: [String: Int] = Dictionary(pinned.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
     let agentBots: [Bot] = others.map(bot).sorted { left, right in

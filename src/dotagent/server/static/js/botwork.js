@@ -56,3 +56,25 @@ export function agentHandoffs(agentId, messages) {
   const newest = [...messages].sort((a, b) => b.ts - a.ts);
   return { received: newest.filter((message) => message.to_id === agentId), sent: newest.filter((message) => message.from_id === agentId) };
 }
+
+/** @typedef {{ kind: string, count: number, limit: number }} OverloadReason */
+/** @typedef {{ reasons: OverloadReason[] }} LoadLike */
+
+/** The catalogue key of each reason a bot is overloaded (item 2067, the daemon's `OverloadReason`). */
+const OVERLOAD_KEYS = /** @type {Record<string, import("./i18n.js").WordKey>} */ ({
+  orders: "views.agents.overloadOrders",
+  routines: "views.agents.overloadRoutines",
+  done_share: "views.agents.overloadDoneShare",
+});
+
+/**
+ * Why a bot is overloaded, as catalogue keys with their values, in the daemon's order; empty when it is not, when the
+ * daemon sent no load (one from before item 2067), and for a reason this page does not know yet.
+ * @param {LoadLike | null | undefined} load
+ * @returns {{ key: import("./i18n.js").WordKey, values: { count: number, limit: number } }[]}
+ */
+export function overloadLines(load) {
+  return (load?.reasons ?? [])
+    .filter((reason) => reason.kind in OVERLOAD_KEYS)
+    .map((reason) => ({ key: OVERLOAD_KEYS[reason.kind], values: { count: reason.count, limit: reason.limit } }));
+}

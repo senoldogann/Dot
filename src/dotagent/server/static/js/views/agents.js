@@ -9,7 +9,7 @@
 // agent under the list's "…". A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
-import { agentHandoffs, agentObjectives, agentOrders, orderOpen } from "../botwork.js";
+import { agentHandoffs, agentObjectives, agentOrders, orderOpen, overloadLines } from "../botwork.js";
 import { emptyBoxWords } from "../composershape.js";
 import { sendToWork } from "../sendwork.js";
 import { AGENTS_CHANGED_EVENT, api } from "../api.js";
@@ -56,6 +56,19 @@ function faceOf(record, latest) {
   return record.id === DOT_ID ? dotFace(state) : actorFace(record.id, state, record.look);
 }
 
+/** Why the bot is overloaded (item 2067), one sentence per reason; "" when it is not. */
+function overloadWords(load) {
+  return overloadLines(load)
+    .map(({ key, values }) => t(key, values))
+    .join(" · ");
+}
+
+/** The quiet mark of an overloaded bot on its card, its reasons in the title; null when it is not. */
+function overloadBadge(load) {
+  const words = overloadWords(load);
+  return words === "" ? null : el("span", { class: "badge b-muted agent-overloaded", title: words }, t("views.agents.overloaded"));
+}
+
 function hrefOf(record) {
   return record.id === DOT_ID ? "#/runs" : `#/agents/${record.id}`;
 }
@@ -65,7 +78,7 @@ function hrefOf(record) {
  * them the title of its newest chat with when it began, or that it has none. Dot's names its newest chat of its own
  * (item 633) and opens the chats.
  */
-function agentCard({ record, latest, latest_title: latestTitle }, picking = null) {
+function agentCard({ record, latest, latest_title: latestTitle, load }, picking = null) {
   // The chat's own title, which the owner may have named; a daemon from before it was sent says the run's goal.
   const chat = latest === null ? t("views.agents.noChatsYet") : clip(latestTitle ?? latest.goal, GOAL_CHARS);
   // While the owner picks agents for a team (item 867), a card of theirs is a box to tick, not a way to its page.
@@ -90,6 +103,7 @@ function agentCard({ record, latest, latest_title: latestTitle }, picking = null
         record.made_by === null ? null : el("span", { class: "agent-made" }, t("views.agents.madeByDot")),
         // A paused agent (item 465) says so in the list, as on its page.
         record.paused_at === null ? null : el("span", { class: "badge b-warn", title: t("views.agents.itsSchedulesStartNothingBy") }, t("views.agents.paused")),
+        overloadBadge(load),
       ),
       el("div", { class: "agent-card-role", title: record.role }, record.role === "" ? t("views.agents.noRoleYet") : record.role),
     ),
@@ -1299,7 +1313,7 @@ const FACE_PX = 96;
 // Which sections of an agent's page are folded, kept per browser as the home keeps its own.
 const FOLDS_KEY = "dot.agentFolds";
 
-function who(record, face) {
+function who(record, face, overload) {
   return el(
     "div",
     { class: "home-who agent-who" },
@@ -1315,6 +1329,7 @@ function who(record, face) {
           el("span", { class: "badge b-warn" }, t("views.agents.paused")),
           t("views.agents.itsSchedulesStartNothingBy2"),
         ),
+    overload,
   );
 }
 
@@ -1566,6 +1581,15 @@ function mountPage(root, ctx, agentId) {
     await reload();
   }
 
+  // Why the bot is overloaded (item 2067), under its name: quiet, and hidden while it is not.
+  const overloadLine = el("p", { class: "home-greeting agent-overloaded-line", hidden: true });
+
+  function paintOverload(load) {
+    const words = overloadWords(load);
+    overloadLine.hidden = words === "";
+    overloadLine.replaceChildren(...(words === "" ? [] : [el("span", { class: "badge b-muted" }, t("views.agents.overloaded")), words]));
+  }
+
   function closeForm() {
     delete page.dataset.editing;
     if (form !== null) {
@@ -1583,7 +1607,7 @@ function mountPage(root, ctx, agentId) {
     face?.dispose();
     face = liveFace(record.id, "idle", record.look, FACE_PX);
     paintConversation(record);
-    top.replaceChildren(who(record, face.element), composer.element, conversation);
+    top.replaceChildren(who(record, face.element, overloadLine), composer.element, conversation);
     stageOf(record);
   }
 
@@ -1699,6 +1723,7 @@ function mountPage(root, ctx, agentId) {
 
   function paintLists(detail) {
     shownDetail = detail;
+    paintOverload(detail.load);
     const learned = learnedRows(detail.record, detail.learned, {
       forget: (record) => attempt(() => forget(record)),
       skillsChanged: (list) => {
