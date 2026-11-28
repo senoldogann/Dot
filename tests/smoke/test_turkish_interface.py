@@ -38,7 +38,7 @@ _TABS: dict[str, str] = {
     "memory": "Bellek",
     "vault": "Kasa",
     "snapshots": "Anlık görüntüler",
-    "agents": "Ajanlar",
+    "agents": "Botlar",
     "models": "Modeller",
     "browser": "Tarayıcı",
     "websearch": "Web araması",
