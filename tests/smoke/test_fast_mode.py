@@ -1,7 +1,7 @@
-"""Fast mode (item 223): the Claude models that have it offer it in the composer's reasoning menu, off at first; a chat
-keeps it with its choices, and the run it starts asks the model for it at every step, with the beta Anthropic names.
-A model without it refuses it. A stand-in of Anthropic's API for the request, and a real server over a stand-in of the
-provider in a browser, wide and on a phone, light and dark."""
+"""Fast mode (item 223): the Claude models that have it offer it as a switch in the chat's settings, off at first; a
+chat keeps it with its choices, and the run it starts asks the model for it at every step, with the beta Anthropic
+names. A model without it refuses it. A stand-in of Anthropic's API for the request, and a real server over a stand-in
+of the provider in a browser, wide and on a phone, light and dark."""
 
 import asyncio
 import json
@@ -240,7 +240,7 @@ async def _ended(manager: RunManager, run_id: str) -> RunRecord:
 
 
 @pytest.mark.browser
-async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_for_it(
+async def test_the_chat_settings_offer_fast_mode_and_the_chats_next_run_asks_for_it(
     runtime: Runtime, served: tuple[RunManager, str], claude: Claude, tmp_path: Path
 ) -> None:
     manager, address = served
@@ -260,26 +260,24 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{first.id}")
-                # The model's pill opens the chat's settings on every width (items 1202 and 2015), whose Reasoning row
-                # holds the speed.
+                # The model's pill opens the chat's settings on every width (items 1202 and 2015), whose Options hold
+                # Fast mode as a switch, as the phone's (item 2023).
                 pill: Locator = page.locator(".dock .composer-pill[data-pill='model']")
                 await expect(pill).to_be_visible()
                 await pill.click()
                 menu: Locator = page.get_by_role("dialog", name="Chat settings")
-                await menu.locator("summary", has_text="Reasoning").click()
-                speed: Locator = menu.get_by_role("listbox", name="Speed")
-                await expect(speed.get_by_role("option")).to_have_count(2)
-                fast: Locator = speed.get_by_role("option", name="Fast")
-                await expect(fast).to_contain_text("twice the price")
+                fast: Locator = menu.get_by_role("switch", name="Fast mode")
+                await expect(fast).to_have_count(1)
+                await expect(
+                    menu.locator(".sheet-switch").filter(has=page.get_by_role("switch", name="Fast mode"))
+                ).to_contain_text("twice the price")
                 if index == 0:
-                    await expect(speed.get_by_role("option", name="Standard")).to_have_attribute(
-                        "aria-selected", "true"
-                    )
+                    await expect(fast).to_have_attribute("aria-checked", "false")
                     await fast.click()
                     await expect(pill).to_contain_text("Fast")
                     # The page tells the daemon, which keeps it with the chat's choices.
                     await _kept_fast(runtime, first.thread_id)
-                await expect(fast).to_have_attribute("aria-selected", "true")
+                await expect(fast).to_have_attribute("aria-checked", "true")
                 await page.screenshot(path=str(tmp_path / f"fast-{width}-{scheme}.png"), animations="disabled")
                 await page.keyboard.press("Escape")
                 await page.close()

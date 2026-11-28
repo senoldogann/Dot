@@ -164,7 +164,8 @@ async def test_a_turn_that_goes_on_after_a_restart_says_so_with_a_bolt(own_home:
 
                 # The chat that waits for the owner: the line over its composer, and its Continue.
                 await page.goto(f"{address}/#/runs/{by_hand.id}")
-                line: Locator = page.locator(".resume-line")
+                # The line of a model's no (item 1889) wears the same classes, hidden: not this one.
+                line: Locator = page.locator(".resume-line:not(.refused-line)")
                 await expect(line).to_contain_text("Dot was shut down while this task worked.")
                 await expect(line).to_have_class(re.compile(r"\brestart-note\b"))
                 await page.screenshot(path=str(tmp_path / "cut-off.png"))
