@@ -170,7 +170,7 @@ private struct SkillProposalSheet: View {
             String(localized: "Use a skill written from outside content?", comment: "Skill proposal: asks before using a tainted draft"),
             isPresented: $askingUse, titleVisibility: .visible
         ) {
-            Button(String(localized: "Use it", comment: "Self-improvement: confirms using a version")) { Task { await answer(yes: true) } }
+            Button(String(localized: "Use it", comment: "Self-improvement and skill proposals: confirms using a version or a skill")) { Task { await answer(yes: true) } }
         }
     }
 
