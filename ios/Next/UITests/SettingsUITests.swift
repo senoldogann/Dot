@@ -62,6 +62,24 @@ final class SettingsUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Dot is ready"].exists)
     }
 
+    func testClearingABrowserProfileAsksBeforeRemovingItsSiteData() {
+        let app: XCUIApplication = launch("settings-maintenance")
+        let browser: XCUIElement = app.buttons["Browser"]
+        XCTAssertTrue(browser.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !browser.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        browser.tap()
+        let work: XCUIElement = app.buttons["work"].firstMatch
+        XCTAssertTrue(work.waitForExistence(timeout: 5))
+        for _ in 0..<4 where !work.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        work.tap()
+        let clear: XCUIElement = app.buttons["Clear"].firstMatch
+        for _ in 0..<4 where !clear.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        clear.tap()
+        XCTAssertTrue(app.staticTexts["Its sign-ins and site data will be removed."].waitForExistence(timeout: 5))
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Browser"].exists)
+    }
+
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
     func testTheMacsEmergencyStopIsShownAndReleased() {
         let app: XCUIApplication = launch("settings-stopped")

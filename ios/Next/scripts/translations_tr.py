@@ -1802,3 +1802,10 @@ TR.update(
         "Any program on this Mac can use the port while Dot's Chrome runs. 0 turns it off.": "Dot'un Chrome'u çalışırken bu Mac'teki her program bağlantı noktasını kullanabilir. Kapatmak için 0 girin.",
     }
 )
+
+TR.update(
+    {
+        "Own Chrome is a profile of Dot's, apart from yours. My Chrome opens tabs in your Chrome, signed in as you.": "Dot'un Chrome'u, sizinkinden ayrı bir profildir. Benim Chrome'um seçeneği, sizin oturumunuzla Chrome'unuzda sekmeler açar.",
+        "On, a task you took over can be used from the screen that shows its page: your taps, scrolls and keys go to the page while the task waits. Nothing you type is kept.": "Açıkken devraldığınız görevin sayfasını ekrandan kullanabilirsiniz. Görev beklerken dokunmalarınız, kaydırmalarınız ve tuşlarınız sayfaya iletilir. Yazdıklarınız saklanmaz.",
+    }
+)

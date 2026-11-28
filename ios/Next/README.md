@@ -73,9 +73,10 @@ each opening its chat), Rules (the approval mode tasks start in and what asks in
 switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, a new note, every note to read, edit, pin or
 forget, and the Trash to restore from), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
 Mark achieved as the daemon takes them), Health and version, Usage,
-Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on
-the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no Settings row opens
-the web app; the phone does not engage the emergency stop (the Mac's failsafe does), and while it holds Settings says
+Maintenance (Dot's and the provider programs' versions, Continue after restart, Diagnostics and Browser). Diagnostics
+reads masked logs and the Mac's process, storage and pause information. Browser manages Dot's window, browser and
+profiles. Signing in to sites in those profiles and installing Dot updates are done on the Mac. Settings uses native
+pages; Connect apps is described below. The Mac engages the emergency stop, and while it holds Settings says
 so at the top with Release the stop. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code

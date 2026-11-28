@@ -9315,6 +9315,17 @@
         }
       }
     },
+    "On, a task you took over can be used from the screen that shows its page: your taps, scrolls and keys go to the page while the task waits. Nothing you type is kept.": {
+      "comment": "Browser: explains input on a held page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açıkken devraldığınız görevin sayfasını ekrandan kullanabilirsiniz. Görev beklerken dokunmalarınız, kaydırmalarınız ve tuşlarınız sayfaya iletilir. Yazdıklarınız saklanmaz."
+          }
+        }
+      }
+    },
     "On, at times set on your Mac": {
       "comment": "Morning brief: its schedule runs at times the phone cannot show",
       "localizations": {
@@ -9685,6 +9696,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un Chrome'u"
+          }
+        }
+      }
+    },
+    "Own Chrome is a profile of Dot's, apart from yours. My Chrome opens tabs in your Chrome, signed in as you.": {
+      "comment": "Browser: explains which Chrome profile Dot can use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un Chrome'u, sizinkinden ayrı bir profildir. Benim Chrome'um seçeneği, sizin oturumunuzla Chrome'unuzda sekmeler açar."
           }
         }
       }

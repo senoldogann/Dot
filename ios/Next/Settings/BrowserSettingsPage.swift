@@ -55,13 +55,17 @@ struct BrowserSettingsPage: View {
                     Task { _ = await change { api throws(DaemonRequestError) in try await api.deleteBrowserProfile(profile.name) } }
                 }
             }
+            Button(String(localized: "Cancel", comment: "Browser: cancels clearing or deleting a profile"), role: .cancel) {}
         } message: { _ in
             Text(String(localized: "Its sign-ins and site data will be removed.", comment: "Browser: consequence of clearing or deleting a profile"))
         }
     }
 
     private func general(_ settings: BrowserSettingsView) -> some View {
-        GroupedSection(header: String(localized: "Browse with", comment: "Browser: choose which Chrome Dot uses"), footer: nil) {
+        GroupedSection(
+            header: String(localized: "Browse with", comment: "Browser: choose which Chrome Dot uses"),
+            footer: String(localized: "Own Chrome is a profile of Dot's, apart from yours. My Chrome opens tabs in your Chrome, signed in as you.", comment: "Browser: explains which Chrome profile Dot can use")
+        ) {
             ForEach(BrowserChoice.allCases, id: \.self) { mode in
                 RadioRow(title: modeWords(mode), description: nil, isSelected: settings.mode == mode) {
                     Task { _ = await change { api throws(DaemonRequestError) in try await api.setBrowserChoice(mode) } }
@@ -76,7 +80,8 @@ struct BrowserSettingsPage: View {
                 Task { _ = await change { api throws(DaemonRequestError) in try await api.setBrowserRaise(value) } }
             }))
             ToggleRow(systemImage: nil, title: String(localized: "Use the page from the screen while I hold the task", comment: "Browser: enables input in a page while a task is held"),
-                      description: nil, isOn: Binding(get: { state.value?.remoteInput == true }, set: { value in
+                      description: String(localized: "On, a task you took over can be used from the screen that shows its page: your taps, scrolls and keys go to the page while the task waits. Nothing you type is kept.", comment: "Browser: explains input on a held page"),
+                      isOn: Binding(get: { state.value?.remoteInput == true }, set: { value in
                 Task { _ = await change { api throws(DaemonRequestError) in try await api.setBrowserRemoteInput(value) } }
             }))
         }
@@ -161,7 +166,11 @@ struct BrowserSettingsPage: View {
     }
 
     private func change(_ call: (DaemonAPI) async throws(DaemonRequestError) -> BrowserSettingsView) async -> SettingsFailure? {
-        guard !busy else { return .other(String(localized: "Wait for the current change to finish.", comment: "Browser: a change is already saving")) }
+        guard !busy else {
+            let failure: SettingsFailure = .other(String(localized: "Wait for the current change to finish.", comment: "Browser: a change is already saving"))
+            problem = failure
+            return failure
+        }
         busy = true
         defer { busy = false }
         notice = nil
