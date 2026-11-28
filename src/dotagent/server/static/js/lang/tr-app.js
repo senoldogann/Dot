@@ -434,7 +434,7 @@ export const TR_APP = {
   "cost.whatTheModelWrote": "Modelin yazdıkları",
   "cost.howOftenTheOlderPart": "Yer açmak için sohbetin eski bölümünün kaç kez özetlendiği",
   "cost.theWebSearchesThatCame": "Geri dönen web aramaları, yanıtlayan arama hizmetine göre (Anthropic'inki arama başına bir sente mal olur)",
-  "cost.theTasksThisTaskHanded": "Bu görevin yardımcılara devrettiği görevler ve onları ne kadar beklediği",
+  "cost.theTasksThisTaskHanded": "Bu görevin yardımcılara verdiği görevler ve onları ne kadar beklediği",
   "cost.counting": "Sayılıyor…",
   "cost.cost": "Maliyet",
   "cost.costOfThisTask": "Bu görevin maliyeti",

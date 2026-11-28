@@ -417,7 +417,7 @@ async def _chat_page(context: BrowserContext, proxy: Proxy, run: RunRecord) -> P
     await page.clock.install()
     await page.goto(ui_url("127.0.0.1", proxy.port, TOKEN))
     await page.goto(f"http://127.0.0.1:{proxy.port}/#/runs/{run.id}")
-    await expect(page.locator(".capsule")).to_contain_text("Waiting on 2 helpers", timeout=15_000)
+    await expect(page.locator(".capsule")).to_contain_text("Waiting for 2 helpers", timeout=15_000)
     await expect(page.locator(".helpers-body")).to_contain_text("Running sleep", timeout=15_000)
     await page.wait_for_timeout(1_500)
     return page
