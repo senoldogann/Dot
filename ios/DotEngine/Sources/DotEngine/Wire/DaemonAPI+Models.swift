@@ -1,8 +1,8 @@
 import Foundation
 
-// Settings › Models on the phone, as the web's page has them (item 1907): the task models, the other-family check, the fallbacks, the
-// night's learning, Dot's own work and self-repair; the routes are the daemon's own (`routes_system.py`,
-// `routes_proactive.py`, `routes_repair.py`).
+// Settings › Models on the phone, as the web's page has them (item 1907): the task models, the other-family check, the
+// fallbacks, the night's learning, Dot's own work and self-repair; the routes are the daemon's own
+// (`routes_system.py`, `routes_proactive.py`, `routes_repair.py`).
 
 private struct KindBody: Encodable {
     let kind: String

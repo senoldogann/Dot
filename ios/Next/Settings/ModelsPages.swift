@@ -39,10 +39,10 @@ func modelLabel(_ ref: String, in options: [ProviderModels]) -> String {
 }
 
 /// Settings › Agents › Models, every model setting of the Mac's Settings › Models a phone may change (item 1907): the
-/// main, fast, vision and review models, the other-family check model (item 1929), the task models (items 1889 and 1928), the fallbacks in their order, Dot's own
-/// work, the night's learning, self-repair (its model, effort and fast mode) and the code review; the default level of
-/// reasoning as the Mac's config holds it, read only, as the web shows it. Each model is picked on the app's one model
-/// catalog. The chat size and the providers are set on the Mac.
+/// main, fast, vision and review models, the other-family check model (item 1929), the task models (items 1889 and
+/// 1928), the fallbacks in their order, Dot's own work, the night's learning, self-repair (its model, effort and fast
+/// mode) and the code review; the default level of reasoning as the Mac's config holds it, read only, as the web shows
+/// it. Each model is picked on the app's one model catalog. The chat size and the providers are set on the Mac.
 struct ModelsPage: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var state: Loadable<ModelsPicture> = .loading
