@@ -471,7 +471,7 @@ switch off a rule that asks, delete or switch off an allow rule that a pre-appro
 (an allow rule asks of a run that read outside content where a pre-approved one does not; item 981), or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
 shown or connected on the Mac alone (the eye of the vault, 1Password, a sign-in of Google or Microsoft, the microphone's
 pane of System Settings) answers the installation's token alone, never a phone's key, whatever address a phone's request
-names. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is
+names. `yolo`, which asks nothing but a payment, in a chat you opened or one Dot opened on its own initiative (item 2069), is
 yours to use from the phone as from the Mac: a phone's key can start a run, a chat
 or a campaign in `yolo`, make a schedule, a loop of a chat (`/loop`) or an agent kept in `yolo`, switch one on or let
 one go on, and what such a run does is not held by these limits (it may do whatever your account may). Removing a phone

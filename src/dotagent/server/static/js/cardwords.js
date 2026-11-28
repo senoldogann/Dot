@@ -8,13 +8,13 @@ import { capital } from "./flagwords.js";
 
 const REASON_MARK = " — ";
 
-// The policy's reasons that the line under a card says in its own words (`_INITIATIVE_REASON` and `OWNERS_REASON` of
+// The policy's reasons that the line under a card says in its own words (`_INITIATIVE_REASON` and `PAYMENT_REASON` of
 // policy/engine.py; tests/unit/test_static_ui.py holds them equal). Only these are left out of the card's words: any
 // other reason is the step's own (a payment's amount and caps, a guard's why), and what the review model passed on with
 // it is its warning; both stay (the pre-push review of item 872).
 export const FIXED_REASONS = {
-  initiative: "On its own initiative, Dot asks before it sends a message for you, posts in your name or puts a project's change live, in every mode",
-  owners: "In yolo too, Dot asks you before it pays, sends a message or mail for you or posts in your name",
+  initiative: "On its own initiative, Dot asks before it sends a message for you, posts in your name or puts a project's change live, in every mode but yolo",
+  owners: "In yolo too, Dot asks you before it pays",
 };
 
 /**

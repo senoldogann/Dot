@@ -815,7 +815,7 @@ const CORE = {
   "approvals.autoHint": "A second AI answers for you; you are asked only what it is unsure about, and about Dot's own files",
   "approvals.yolo": "Ask only to pay or send",
   "approvals.yoloShort": "Pay or send",
-  "approvals.yoloHint": "Dot asks only before a payment, a message or mail sent for you or a public post, in a chat you opened; in a chat it opened itself, only before a message, a post or a release. Every other step runs and is recorded, with why it would have asked",
+  "approvals.yoloHint": "Dot asks only before a payment, in a chat you opened or one it opened itself. Every other step runs and is recorded, with why it would have asked",
   // What a failure says to a person (errors.js).
   "errors.unreachable": "Could not reach Dot. Is it running? Open Dot again, or restart your Mac.",
   "errors.notRecognised": "Dot does not recognise this browser. Sign in again.",

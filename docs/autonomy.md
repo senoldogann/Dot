@@ -44,13 +44,15 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   reason of the review model in it. A message, a mail or a post must also be lawful and harmless to its readers and to
   you (no deceit, threat, harassment, spam or secret of yours in it): it denies one that is not, whatever your
   instructions say (item 860, the owner's word for the review of a schedule's messages: "legal ise, tehlike arz
-  etmiyorsa ve bir amaç içinse yollasın"). What the agent wrote into the action (its summary and target) is data to the
+  etmiyorsa ve bir amaç içinse yollasın"; it holds wherever the review model answers, in `auto` and in yolo's check of a
+  run that read outside content). What the agent wrote into the action (its summary and target) is data to the
   review model, never an instruction.
 - `yolo` (**Ask only to pay or send**, "Pay or send" on its pill, an open lock; named YOLO before, which did not
-  say what it still asks): nobody does, and nothing is asked (the owner's word of 2026-10-20, item 443), but a
-  payment, a message or mail sent for you and a public post in a chat you opened (item 860: you answer them, and in a
-  schedule's run there the review model judges a message or a post) and, in a chat Dot opened on its own initiative, a
-  message, a post or a release (item 850). Any other action is allowed and recorded: the question that untrusted content
+  say what it still asks): nobody does, and nothing is asked (the owner's word of 2026-10-20, item 443), but a payment,
+  in a chat you opened or one Dot opened on its own initiative (item 2069, the owner's word of 2026-11-28: "Yolo modda
+  hiçbir şey sormasın, sadece ödeme işlerinde sorsun"): it is handed to you, a schedule's run in your chat included. A
+  message or mail sent for you, a public post and a release go unasked, in those chats too (items 860 and 850 asked
+  them before). Any other action is allowed and recorded: the question that untrusted content
   raises (see [Safety](safety.md#safety)), the one about Dot's own files, the guard of money and credentials and of a
   message or a post in your name, a pre-approved spend, and the refusal of a read of your secrets (the keychain,
   `~/.ssh`, the files of a password manager) or of data sent out. Each step the policy stopped at is written into the
@@ -241,9 +243,8 @@ schedule leaves open, so what a schedule does while nobody is there depends on t
 policy waits `approval_timeout_s` and then counts as a refusal, or, for a step handed to you with `[policy] unanswered =
 "park"`, is kept for you (Steps kept for you, below), and a message, a post or a release is kept as a card with its
 draft (Sends kept for you, below, item 922). A no you gave a run holds for the rest of it: the same action is
-refused at once until you write to it again (item 456, [Safety](safety.md#safety)); a `yolo` run asks only the steps
-of item 860 (a payment, a message or mail, a public post, in a chat you opened), and a no you gave one of them holds
-there the same way.
+refused at once until you write to it again (item 456, [Safety](safety.md#safety)); a `yolo` run asks only a payment
+(item 2069), and a no you gave one holds there the same way.
 
 **Questions nobody answers during the run.** In a `yolo`, scheduled or eval run, and in every run while free mode is on (item 1563: free mode asks no run's owner
 anything, whatever the run's own mode), nobody answers the agent's own questions
@@ -318,7 +319,7 @@ with no card, until you write there again (a message of yours, or a run you star
 question open now has **Don't ask again in this chat** too, whose yes holds for the step's kind for the rest of the
 chat (item 866, [Safety](safety.md#safety) says which kinds and what never). Any other question still counts as a
 refusal when nobody answers, and nothing of the kind is kept in `yolo` or in an eval: the payment a `yolo` run of your
-chat asks (item 860) is refused when nobody answers. A message, a post or a release nobody answered is kept as a card
+chat asks (item 2069) is refused when nobody answers. A message, a post or a release nobody answered is kept as a card
 with its draft in every chat but an eval's (Sends kept for you, above, item 922), and in a chat Dot opened on its own
 initiative a run nobody watches keeps it at once. A delegated run keeps its
 steps where the run that delegated it does (item 485): the card is on the delegated run's page and in the Activity list,

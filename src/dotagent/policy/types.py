@@ -58,9 +58,15 @@ Flag = Literal[
     "vault_fill",
     # The action puts a project's change live (item 850): a deploy to production, a merge of a pull request, a push
     # that names the main branch, as the shell guard reads their names. It asks the owner in a chat Dot opened on its
-    # own initiative, in every mode (``policy.engine.initiative_guard``), and nowhere else.
+    # own initiative, in every mode but yolo (``policy.engine.initiative_guard``), and nowhere else.
     "release",
 ]
+
+# The flags of an action that pays, sends a message or mail for the owner or posts in their name: what reaches other
+# people in their name (item 860's class; since item 2069 yolo asks only the payment of it,
+# ``policy.engine.payment_guard``). A call of one that was cut while it ran may have been done, and a run that goes on
+# could do it a second time (``agent.resume``, ``claude_code.cut``).
+OUTWARD_FLAGS: frozenset[Flag] = frozenset({"financial", "message_send", "public_post"})
 
 Preset = Literal["aggressive", "balanced", "cautious"]
 # What the pace of a site counts an action as (:mod:`dotagent.policy.pace`).
@@ -81,7 +87,7 @@ DecisionSource = Literal[
     "spend",
     # The owner's question for a message, a post or a release in a chat of Dot's own initiative (item 850).
     "initiative",
-    # The owner's question in yolo for a payment, a message or mail, a post in a chat they opened (item 860).
+    # The owner's question in yolo for a payment, in a chat they opened or one of Dot's own initiative (item 2069).
     "owner_asks",
 ]
 

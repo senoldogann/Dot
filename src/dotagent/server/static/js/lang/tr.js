@@ -800,7 +800,7 @@ const CORE = {
   "approvals.autoHint": "İkinci bir yapay zekâ sizin yerinize yanıtlar; yalnızca emin olmadığı şeyler ve Dot'un kendi dosyaları size sorulur",
   "approvals.yolo": "Yalnızca ödeme ve gönderimde sor",
   "approvals.yoloShort": "Ödeme, gönderim",
-  "approvals.yoloHint": "Sizin açtığınız sohbette Dot yalnızca ödemeden, sizin adınıza gönderilecek mesaj ya da e-postadan ve herkese açık paylaşımdan önce sorar; kendi açtığı sohbette yalnızca mesaj, paylaşım ya da yayından önce sorar. Diğer her adım yapılır ve neden sorulacağıyla birlikte kaydedilir",
+  "approvals.yoloHint": "Dot yalnızca ödemeden önce sorar; sizin açtığınız sohbette de, kendi açtığı sohbette de. Diğer her adım yapılır ve neden sorulacağıyla birlikte kaydedilir",
   "errors.unreachable": "Dot'a ulaşılamadı. Çalışıyor mu? Dot'u yeniden açın ya da Mac'inizi yeniden başlatın.",
   "errors.notRecognised": "Dot bu tarayıcıyı tanımıyor. Yeniden giriş yapın.",
   "errors.dotFailed": "Dot bir sorunla karşılaştı ve bitiremedi. Birazdan yeniden deneyin.",

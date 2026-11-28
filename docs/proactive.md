@@ -249,12 +249,14 @@ own initiative: …": the review model takes none of it as your instruction, in 
 resume too (`auto` asks you what reaches others), and a thing that a run put on the list after reading content third
 parties can author (a mail, a page) is done by a run that starts untrusted, so that in `yolo` too the review model
 refuses a message, a post, a payment or an upload that no word of yours calls for (item 525). A run that read nothing of
-the kind (a thing from your own chats) is checked by nobody in `yolo`, and a payment it decides on goes out as it
-decides, which is what `yolo` means (item 443); `[initiative] approvals` set to `auto` or `ask` has such a run ask you
-first.
+the kind (a thing from your own chats) is checked by nobody in `yolo`, and a message, a post or a release it decides on
+goes out as it decides, which is what `yolo` means (item 443); a payment waits for you (item 2069, your word of
+2026-11-28: "Yolo modda hiçbir şey sormasın, sadece ödeme işlerinde sorsun"): it is handed to you, unless free mode is
+on. `[initiative] approvals` set to `auto` or `ask` has such a run ask you first.
 
-But in a chat Dot opened on its own initiative, three steps wait for you in every mode, `yolo` and `auto` too (item
-850, your word of 2026-10-30), unless free mode is on (item 922, [Safety](safety.md#safety)):
+In a chat Dot opened on its own initiative, three steps wait for you in every mode but `yolo`, `auto` too (item 850,
+your word of 2026-10-30), unless free mode is on (item 922, [Safety](safety.md#safety)). In `yolo` they go unasked since
+item 2069, and a run of Dot's own initiative, `yolo` by default, sends, posts and puts a change live by itself:
 - a message sent for you: an email, a chat or text message, a reply;
 - a post in your name;
 - a project's change put live: a deploy to production, a pull request merged, a push that names the main branch
@@ -278,9 +280,8 @@ This holds for every run of that chat, as the owner's answers in it start runs t
   so. A run of yours in that chat (your answer to it) asks you, and a send of it you do not answer in time is kept as a
   card too.
 
-In `yolo` your own chats ask you before a payment, a message or mail sent for you and a public post (item 860); in a
-schedule's run in one of your chats the review model judges a message or a post, and a payment is handed to you; a
-schedule's own chat asks nothing of the kind.
+In `yolo` your own chats ask you before a payment alone, which is handed to you, a schedule's run in them included
+(item 2069); a schedule's own chat asks nothing of the kind.
 
 A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or let go.
 Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push, the

@@ -1,10 +1,12 @@
-"""In a chat Dot opened on its own initiative, a message, a post or a release waits for the owner, yolo too (item 850):
-the owner's word of 2026-10-30 after Dot's initiative put a local build live and posted on their LinkedIn, both in
-yolo. The gate on a real store and bus with no model: such a step asks the owner in every mode, never the review model,
-an owner's rule that allows it does not answer for them, a refusal stands, and the same step outside such a chat is
-waived in yolo as before. Then real runs on a scripted model: the initiative's run and the run of the owner's answer in
-its chat both wait before a release, and a chat of the owner's own does it at once. The command is a push to main of a
-folder that is no repository, which fails at once: nothing reaches a network."""
+"""In a chat Dot opened on its own initiative, a message, a post or a release waits for the owner in every mode that
+asks (item 850: the owner's word of 2026-10-30 after Dot's initiative put a local build live and posted on their
+LinkedIn), and in yolo only a payment does (item 2069, the owner's word of 2026-11-28: "Yolo modda hiçbir şey
+sormasın, sadece ödeme işlerinde sorsun"). The gate on a real store and bus with no model: such a step asks the owner in
+`ask`, `auto` and `supervised`, never the review model, an owner's rule that allows it does not answer for them, a
+refusal stands, and in yolo it goes through unasked and is recorded, while a payment is handed to the owner. Then real
+runs on a scripted model: the initiative's run in yolo releases at once, the run of the owner's answer in its chat asks
+before a release in `ask` and not in yolo. The command is a push to main of a folder that is no repository, which fails
+at once: nothing reaches a network."""
 
 import asyncio
 import time
@@ -65,6 +67,14 @@ RELEASE: ActionInfo = ActionInfo(
     summary="Run: npx wrangler pages deploy dist",
     target="",
     flags=("release",),
+)
+PAYMENT: ActionInfo = ActionInfo(
+    tool="browser_act",
+    kind="browser_click",
+    risk="high",
+    summary="click a1b2c3 'Pay now'",
+    target="https://shop.example.invalid/checkout",
+    flags=("financial",),
 )
 # A push to main in a folder that is no repository: git refuses it at once, before any network.
 PUSH: str = "git -C /nonexistent/dot-item-850 push origin main"
@@ -145,9 +155,9 @@ async def _pending(store: Store) -> ApprovalRecord:
             await asyncio.sleep(0.02)
 
 
-@pytest.mark.parametrize("approvals", ["yolo", "auto", "ask", "supervised"])
+@pytest.mark.parametrize("approvals", ["auto", "ask", "supervised"])
 @pytest.mark.parametrize("step", [POST, MAIL, RELEASE], ids=["post", "mail", "release"])
-async def test_in_a_chat_of_the_initiative_the_step_asks_the_owner_in_every_mode(
+async def test_in_a_chat_of_the_initiative_the_step_asks_the_owner_in_every_mode_that_asks(
     room: Room, approvals: ApprovalMode, step: ActionInfo
 ) -> None:
     gate: RunGate = _gate(room, approvals, owners_word=True)
@@ -160,9 +170,26 @@ async def test_in_a_chat_of_the_initiative_the_step_asks_the_owner_in_every_mode
     assert done.decision.answered_by == "user"
 
 
+async def test_in_yolo_the_step_goes_unasked_and_is_recorded_and_a_payment_is_the_owners(room: Room) -> None:
+    """Item 2069: yolo asks nothing in a chat of Dot's own initiative but a payment, which is handed to the owner as in
+    every mode that asks; a message, a post and a release go through, each recorded with why it would have asked."""
+    gate: RunGate = _gate(room, "yolo", owners_word=True)
+    for step in (POST, MAIL, RELEASE):
+        done: Authorization = await gate.authorize_recorded(step)
+        assert done.decision.answered_by in ("yolo", "policy"), step.summary
+    assert await room.store.list_approvals("pending", 10) == []
+    paid: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(PAYMENT))
+    handed: ApprovalRecord = await _pending(room.store)
+    assert (handed.tool, handed.severity) == (PAYMENT.tool, "handoff")
+    await room.broker.resolve(handed.id, False, "test", "")
+    with pytest.raises(ApprovalRejected):
+        async with asyncio.timeout(WAIT_S):
+            await paid
+
+
 async def test_the_owners_no_refuses_it_and_a_rule_that_allows_it_does_not_answer(room: Room) -> None:
     await room.store.add_rule("allow", "browser_act", ".*", "Let every click through")
-    gate: RunGate = _gate(room, "yolo", owners_word=True)
+    gate: RunGate = _gate(room, "ask", owners_word=True)
     asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(POST))
     question: ApprovalRecord = await _pending(room.store)
     await room.broker.resolve(question.id, False, "test", "not this text")
@@ -171,14 +198,12 @@ async def test_the_owners_no_refuses_it_and_a_rule_that_allows_it_does_not_answe
             await asked
 
 
-@pytest.mark.parametrize("approvals", ["yolo", "auto"])
+@pytest.mark.parametrize("approvals", ["auto", "ask"])
 @pytest.mark.parametrize("case", ["handoff rule", "credential"])
-async def test_a_hand_off_stays_the_owners_and_yolo_does_not_waive_it(
-    room: Room, approvals: ApprovalMode, case: str
-) -> None:
-    """The independent review of item 850: a hand-off, stricter than the question, was left as it was, and yolo then
-    waived it: an owner's rule that hands posts off, or a post that also carried a credential, went through unasked.
-    It reaches the owner as a hand-off, in yolo too."""
+async def test_a_hand_off_stays_the_owners(room: Room, approvals: ApprovalMode, case: str) -> None:
+    """The independent review of item 850: a hand-off, stricter than the question, was left as it was, and the mode then
+    answered it: an owner's rule that hands posts off, or a post that also carried a credential, went through. It
+    reaches the owner as a hand-off (yolo waives both since item 2069, as in any chat of yolo)."""
     step: ActionInfo = POST
     if case == "handoff rule":
         await room.store.add_rule("handoff", "browser_act", ".*", "I post on LinkedIn myself")
@@ -218,7 +243,7 @@ async def test_a_run_nobody_is_there_for_keeps_the_step_and_the_owners_yes_lets_
     step is kept as a card for 30 days, the run told to keep its draft, and the same step again is that card. The run
     their yes reaches does that step exactly as the card showed it, once; a step of a page, whose references are new
     in that run, asks them once more; the next one asks too."""
-    alone: RunGate = _gate(room, "yolo", owners_word=True, owner_there=False)
+    alone: RunGate = _gate(room, "ask", owners_word=True, owner_there=False)
     alone.keep_sends_for(send_parking(room.run.thread_id, None, None))
     with pytest.raises(ApprovalParked, match="Keep what you wrote as a draft"):
         await alone.authorize_recorded(step)
@@ -231,7 +256,7 @@ async def test_a_run_nobody_is_there_for_keeps_the_step_and_the_owners_yes_lets_
     with pytest.raises(ApprovalParked, match="waits for the user's yes already"):
         await alone.authorize_recorded(step)
     assert len(await room.store.list_approvals("left", 10)) == 1
-    carried: RunGate = _gate(room, "yolo", owners_word=True)
+    carried: RunGate = _gate(room, "ask", owners_word=True)
     if exact:
         carried.allow_send_once(kept.digest)
         done: Authorization = await carried.authorize_recorded(step)
@@ -256,15 +281,15 @@ async def test_the_yes_lets_through_no_other_send_and_no_other_run(room: Room, o
     """The independent and the pre-push review of item 922: a yes was a permit any run of the chat could spend on any
     send of the kind. It is the card's step exactly, in the run it reached: another mail, or the same with a flag more,
     asks; a run it did not reach asks for the card's step itself."""
-    alone: RunGate = _gate(room, "yolo", owners_word=True, owner_there=False)
+    alone: RunGate = _gate(room, "ask", owners_word=True, owner_there=False)
     alone.keep_sends_for(send_parking(room.run.thread_id, None, None))
     with pytest.raises(ApprovalParked):
         await alone.authorize_recorded(MAIL)
     [kept] = await room.store.list_approvals("left", 10)
     assert kept.digest is not None
-    reached: RunGate = _gate(room, "yolo", owners_word=True)
+    reached: RunGate = _gate(room, "ask", owners_word=True)
     reached.allow_send_once(kept.digest)
-    elsewhere: RunGate = _gate(room, "yolo", owners_word=True)
+    elsewhere: RunGate = _gate(room, "ask", owners_word=True)
     for gate, step in ((reached, other), (elsewhere, MAIL)):
         asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(step))
         question: ApprovalRecord = await _pending(room.store)
@@ -280,7 +305,7 @@ async def test_a_yes_that_reached_the_run_at_work_has_it_ask_the_owner_rather_th
 ) -> None:
     """The pre-push review of item 922: the owner's yes reached the run that kept a post while it still worked; the post
     on a page it opens anew is not the card's step, and it kept a new card on every yes. Now it asks them, and waits."""
-    alone: RunGate = _gate(room, "yolo", owners_word=True, owner_there=False)
+    alone: RunGate = _gate(room, "ask", owners_word=True, owner_there=False)
     alone.keep_sends_for(send_parking(room.run.thread_id, None, None))
     with pytest.raises(ApprovalParked):
         await alone.authorize_recorded(POST)
@@ -304,7 +329,7 @@ async def test_a_terminals_line_is_never_done_on_a_yes_given_to_its_card(room: R
         target="npx wrangler pages deploy dist",
         flags=("release",),
     )
-    alone: RunGate = _gate(room, "yolo", owners_word=True, owner_there=False)
+    alone: RunGate = _gate(room, "ask", owners_word=True, owner_there=False)
     alone.keep_sends_for(send_parking(room.run.thread_id, None, None))
     with pytest.raises(ApprovalParked):
         await alone.authorize_recorded(typed)
@@ -420,7 +445,7 @@ async def _refused_pending(runtime: Runtime) -> ApprovalRecord:
     return question
 
 
-async def test_the_initiatives_run_and_the_run_of_the_owners_answer_wait_and_the_owners_own_chat_does_not(
+async def test_the_initiatives_run_in_yolo_releases_and_the_run_of_the_owners_answer_asks_only_outside_yolo(
     runtime: Runtime,
 ) -> None:
     manager: RunManager = RunManager(runtime)
@@ -428,32 +453,27 @@ async def test_the_initiatives_run_and_the_run_of_the_owners_answer_wait_and_the
         chat: ThreadRecord = await runtime.store.create_thread("On my own initiative: launch", "initiative")
         own: RunRecord = await manager.start_own("On my own initiative: release", "Release it.", "task", chat.id, False)
         assert own.approvals == "yolo"
-        # Nobody is there for it: the release is kept as a card, not waited for (item 922), and the run ends.
+        # Yolo asks nothing but a payment (item 2069): the release goes at once, no card kept and no question.
         async with asyncio.timeout(RUN_WAIT_S):
             await manager.wait(own.id)
-        [first] = await runtime.store.list_approvals("left", 10)
-        assert (first.run_id, first.tool) == (own.id, "shell")
+        assert await runtime.store.list_approvals("left", 10) == []
         assert await runtime.store.list_approvals("pending", 10) == []
-        # The owner's yes carries it on in the chat: the run it starts does the release once, asking nothing.
-        await manager.decide(first.id, True, "ui", "")
-        carried: RunRecord = (await runtime.store.list_runs(1, chat.id))[0]
-        assert carried.id != own.id
-        async with asyncio.timeout(RUN_WAIT_S):
-            await manager.wait(carried.id)
-        assert await runtime.store.list_approvals("pending", 10) == []
-        used: list[ApprovalRecord] = [
-            record for record in await runtime.store.list_approvals(None, 20) if record.run_id == carried.id
-        ]
-        assert [(record.status, record.decided_by) for record in used] == [("approved", "permit")], used
-        # The owner answers its question in the same chat: the run that answer starts is the owner's, in yolo, and
-        # still asks before the release (the run that posted on 2026-10-30 was such a one).
+        # The owner answers in the same chat in `ask`: the run that answer starts asks before the release (item 850,
+        # unchanged outside yolo; the run that posted on 2026-10-30 was such a one).
         answer: RunRecord = await manager.start(
-            "Ben yayınlayayım", "task", SCRIPTED_MODEL, chat.id, "ui", None, None, "standard", None, "yolo", False, ()
+            "Ben yayınlayayım", "task", SCRIPTED_MODEL, chat.id, "ui", None, None, "standard", None, "ask", False, ()
         )
         second: ApprovalRecord = await _refused_pending(runtime)
         assert second.run_id == answer.id
         async with asyncio.timeout(RUN_WAIT_S):
             await manager.wait(answer.id)
+        # The same answer in yolo releases unasked.
+        again: RunRecord = await manager.start(
+            "Ben yayınlayayım", "task", SCRIPTED_MODEL, chat.id, "ui", None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(RUN_WAIT_S):
+            await manager.wait(again.id)
+        assert await runtime.store.list_approvals("pending", 10) == []
         # A chat of the owner's own, in yolo, does it at once: no question.
         started: float = time.time()
         mine: RunRecord = await manager.start(

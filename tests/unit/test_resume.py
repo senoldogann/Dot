@@ -34,7 +34,7 @@ from dotagent.agent.resume import (
 )
 from dotagent.config import load_default_config
 from dotagent.llm.types import Message, ToolCall, assistant_message, tool_message, user_message
-from dotagent.policy import engine
+from dotagent.policy import engine, types
 from dotagent.policy.types import ActionKind
 from dotagent.process_groups import GroupRecord
 from dotagent.runtime import _tool_groups
@@ -321,8 +321,10 @@ def test_a_helper_the_daemons_end_cut_is_resumed_unless_a_rule_says_why_not() ->
 
 
 def test_the_outward_flags_are_the_policys_own() -> None:
-    """The class a resumed helper refuses is what even yolo keeps for the owner (``owners_guard``)."""
-    assert OUTWARD_FLAGS == engine._OWNERS_FLAGS
+    """The class a resumed helper refuses is the policy's class of what reaches other people in the owner's name, which
+    the Claude Code program's cut reads too, and it holds what yolo still asks (item 2069)."""
+    assert OUTWARD_FLAGS == types.OUTWARD_FLAGS == frozenset({"financial", "message_send", "public_post"})
+    assert engine._PAYMENT_FLAGS <= OUTWARD_FLAGS
 
 
 def test_the_note_names_the_work_in_the_background_the_start_stopped() -> None:
