@@ -1,9 +1,9 @@
 """The chat's settings as the phone draws them (the owner's report of 2026-11-27), in the web: on a phone's width the
 model's pill opens "Chat settings", whose Options are one card in the phone's order and words: Reasoning (the chosen
 model's own levels in full words), Fast mode only for a model that has it, Approvals and Plan first; on a desk the
-Reasoning pill's menu holds the same levels in full words and Fast mode as a switch, only for a model that has it. At
-1440x900 and 390x844, light and dark; the shots go to ``DOT_SHOTS`` when it is set (for the pull request), else to the
-test's own folder. No network and no model service is used.
+model's pill opens the same sheet, whose Reasoning row holds the same levels in full words and Fast mode is a switch,
+only for a model that has it. At 1440x900 and 390x844, light and dark; the shots go to ``DOT_SHOTS`` when it is set
+(for the pull request), else to the test's own folder. No network and no model service is used.
 """
 
 import asyncio
