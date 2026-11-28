@@ -418,9 +418,9 @@ def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_ses
     assert push_message(ended, session) == task_notice("A task failed", "run-1", "failed")
 
 
-def test_the_end_of_a_run_that_waits_on_the_owner_says_what_it_needs_not_done() -> None:
-    """Item 2070: a run done as far as it can go, waiting on the owner, is told as a wait with what it needs from them
-    (or its answer when it said nothing of it), not as "done"."""
+def test_the_end_of_a_run_that_waits_on_the_owner_says_it_waits_not_done() -> None:
+    """Item 2070: a run done as far as it can go, waiting on the owner, is told as a wait, not as "done"; like every
+    task notice it carries fixed words, and what it needs stays in its chat."""
     waiting: EventRecord = _event(
         "run_finished",
         {
@@ -430,9 +430,7 @@ def test_the_end_of_a_run_that_waits_on_the_owner_says_what_it_needs_not_done() 
             "waiting": True,
         },
     )
-    assert push_message(waiting, _run(None)) == PushMessage(
-        title=WAITING_TITLE, body="Press Submit in the four tabs.", route="#/runs/run-1", state="waiting"
-    )
+    assert push_message(waiting, _run(None)) == task_notice(WAITING_TITLE, "run-1", "waiting")
     # Told with what waits on the owner, so that a phone's switch of that kind decides it, not the one of what ended.
     told: PushMessage | None = push_message(waiting, _run(None))
     assert told is not None and message_group("run_finished", told) == "needs_you"
@@ -440,13 +438,9 @@ def test_the_end_of_a_run_that_waits_on_the_owner_says_what_it_needs_not_done() 
     assert done is not None and message_group("run_finished", done) == "done"
     # A failed run that said what it needs waits on the owner too (item 1061), as the web and the phone show it.
     said: EventRecord = _event("run_finished", {"status": "failed", "result": "No code.", "needs": "The bank's code."})
-    assert push_message(said, _run(None)) == PushMessage(
-        title=WAITING_TITLE, body="The bank's code.", route="#/runs/run-1", state="waiting"
-    )
+    assert push_message(said, _run(None)) == task_notice(WAITING_TITLE, "run-1", "waiting")
     silent: EventRecord = waiting.model_copy(update={"data": {**waiting.data, "needs": ""}})
-    assert push_message(silent, _run(None)) == PushMessage(
-        title=WAITING_TITLE, body="Four forms are filled.", route="#/runs/run-1", state="waiting"
-    )
+    assert push_message(silent, _run(None)) == task_notice(WAITING_TITLE, "run-1", "waiting")
 
 
 @pytest.mark.asyncio
