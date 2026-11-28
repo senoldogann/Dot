@@ -90,19 +90,28 @@ public func unreadBots(_ bots: [Bot], except current: String?, muted: Set<String
     bots.filter { $0.id != current && !muted.contains($0.id) && ($0.unread > 0 || $0.asks > 0) }.count
 }
 
-/// What the home's search finds (PLAN §27: bots, chats, messages): the bots whose name or role holds every word, the
-/// chats whose title or last line does, and the daemon's finds in what the chats say, a chat named once.
+/// What the home's search finds (PLAN §27: bots, chats, messages, files): the bots whose name or role holds every word,
+/// the chats whose title or last line does, the daemon's finds in what the chats say (a chat named once), and the
+/// files of the chats whose name holds the words.
 public struct HomeFinds: Sendable, Equatable {
     public let bots: [Bot]
     public let chats: [ThreadRow]
     public let messages: [ChatHit]
+    public let files: [FileHit]
 
-    public var isEmpty: Bool { bots.isEmpty && chats.isEmpty && messages.isEmpty }
+    public init(bots: [Bot], chats: [ThreadRow], messages: [ChatHit], files: [FileHit]) {
+        self.bots = bots
+        self.chats = chats
+        self.messages = messages
+        self.files = files
+    }
+
+    public var isEmpty: Bool { bots.isEmpty && chats.isEmpty && messages.isEmpty && files.isEmpty }
 }
 
-public func homeFinds(_ query: String, bots: [Bot], hits: [ChatHit]) -> HomeFinds {
+public func homeFinds(_ query: String, bots: [Bot], hits: [ChatHit], files: [FileHit]) -> HomeFinds {
     let words: [String] = query.split(whereSeparator: \.isWhitespace).map(String.init)
-    guard !words.isEmpty else { return HomeFinds(bots: [], chats: [], messages: []) }
+    guard !words.isEmpty else { return HomeFinds(bots: [], chats: [], messages: [], files: []) }
     func holds(_ texts: [String]) -> Bool {
         words.allSatisfy { word in texts.contains { $0.range(of: word, options: [.caseInsensitive, .diacriticInsensitive]) != nil } }
     }
@@ -111,5 +120,44 @@ public func homeFinds(_ query: String, bots: [Bot], hits: [ChatHit]) -> HomeFind
     let named: Set<String> = Set(foundChats.map(\.summary.id))
     var seen: Set<String> = named
     let messages: [ChatHit] = hits.filter { seen.insert($0.threadId).inserted }
-    return HomeFinds(bots: foundBots, chats: foundChats, messages: messages)
+    return HomeFinds(bots: foundBots, chats: foundChats, messages: messages, files: files)
+}
+
+/// The chips over the search's finds (the owner's ask of 2026-11-27): everything, what the chats say (their titles and
+/// their messages), the bots, or the files. Dot has no group chats to show apart: a chat with a team is a chat.
+public enum SearchScope: String, CaseIterable, Sendable {
+    case all, messages, bots, files
+}
+
+/// How many finds of each kind All shows before its "See all" (the kind's chip).
+public let searchAllShown: Int = 3
+
+/// The finds a chip shows (pure): All a few of each kind, the others every find of their kind and nothing else.
+public func scopedFinds(_ finds: HomeFinds, scope: SearchScope) -> HomeFinds {
+    switch scope {
+    case .all:
+        HomeFinds(
+            bots: Array(finds.bots.prefix(searchAllShown)), chats: Array(finds.chats.prefix(searchAllShown)),
+            messages: Array(finds.messages.prefix(searchAllShown)), files: Array(finds.files.prefix(searchAllShown)))
+    case .messages: HomeFinds(bots: [], chats: finds.chats, messages: finds.messages, files: [])
+    case .bots: HomeFinds(bots: finds.bots, chats: [], messages: [], files: [])
+    case .files: HomeFinds(bots: [], chats: [], messages: [], files: finds.files)
+    }
+}
+
+/// The scope whose chip shows every find of a kind All cut short ("See all"), for each of the kinds All shows (pure).
+public func cutShort(_ finds: HomeFinds) -> Set<SearchScope> {
+    var scopes: Set<SearchScope> = []
+    if finds.bots.count > searchAllShown { scopes.insert(.bots) }
+    if finds.chats.count > searchAllShown || finds.messages.count > searchAllShown { scopes.insert(.messages) }
+    if finds.files.count > searchAllShown { scopes.insert(.files) }
+    return scopes
+}
+
+/// The word of a search snippet to find in its chat when the find opens it (the first the daemon marked `[...]`), so
+/// that the chat opens at that message; `nil` for a snippet with no mark (pure).
+public func markedWord(_ snippet: String) -> String? {
+    guard let open = snippet.firstIndex(of: "["), let close = snippet[open...].firstIndex(of: "]") else { return nil }
+    let word: String = String(snippet[snippet.index(after: open)..<close]).trimmingCharacters(in: .whitespaces)
+    return word.isEmpty ? nil : word
 }

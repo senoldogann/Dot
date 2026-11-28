@@ -1812,7 +1812,7 @@
       }
     },
     "All": {
-      "comment": "Component gallery (debug builds): a heading or sample text\nConnect apps: the chip of every section",
+      "comment": "Component gallery (debug builds): a heading or sample text\nConnect apps: the chip of every section\nSearch chip: every kind of find",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2324,6 +2324,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekle"
+          }
+        }
+      }
+    },
+    "Attached": {
+      "comment": "Search: a file the owner attached to a message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekli"
           }
         }
       }
@@ -5781,12 +5792,23 @@
       }
     },
     "Files": {
-      "comment": "Composer + menu: picks documents or other files",
+      "comment": "Composer + menu: picks documents or other files\nSearch chip and section: the files attached to the chats or made by their runs",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Dosyalar"
+          }
+        }
+      }
+    },
+    "Files could not be searched: %@": {
+      "comment": "Home search: the Mac's search of files failed; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyalarda aranamadı: %@"
           }
         }
       }
@@ -9180,7 +9202,7 @@
       }
     },
     "Nothing found": {
-      "comment": "Home search: no bot, chat or message holds the words",
+      "comment": "Home search: no bot, chat, message or file under the chosen chip holds the words",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -12048,6 +12070,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Güvenlik araştırması modeli"
+          }
+        }
+      }
+    },
+    "See all": {
+      "comment": "Search: shows every find of a kind, under its chip",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tümünü gör"
           }
         }
       }

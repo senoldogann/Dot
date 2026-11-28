@@ -33,9 +33,12 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2043](2043.md) | done | 2026-11-27 | Show when the Mac was last reachable |
 | [2042](2042.md) | implemented | 2026-11-27 | Show task notifications and Live Activities in DotNext |
 | [2041](2041.md) | implemented | 2026-11-27 | Task notifications use the goal check's outcome and the same words across surfaces |
+| [2039](2039.md) | done | 2026-11-27 | The files search reads only the newest calls and attachments: 24 s to 0.1 s on a big store |
 | [2035](2035.md) | done | 2026-11-27 | An agent's work lists as the phone's bot profile lists it: a Work section, pages of its own, hand-offs newest first |
 | [2034](2034.md) | done | 2026-11-27 | The web says "routine", as the phone does |
 | [2033](2033.md) | done | 2026-11-27 | The web says "bot", as the phone does |
+| [2032](2032.md) | done | 2026-11-27 | The search's chips: All, Messages, Bots, Files, on the phone and the web |
+| [2031](2031.md) | done | 2026-11-27 | A living face while a chat works, on the phone and the web |
 | [2030](2030.md) | done | 2026-11-27 | A swipe on a message quotes it and does not pull the chat back |
 | [2027](2027.md) | built | 2026-11-27 | What Dot resumes on its own is marked by the run its chain began with: the asks of items 850 and 860 hold |
 | [2026](2026.md) | built | 2026-11-27 | Dot's own tools keep the seal of a run nobody started: no daemon-side read or write of what its sandbox seals |

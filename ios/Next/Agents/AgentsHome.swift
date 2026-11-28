@@ -107,7 +107,7 @@ struct AgentProfilePage: View {
             }
         }
         .sheet(item: $picking) { pick in ModelPickerSheet(pick: pick, defaultRef: "") }
-        .navigationDestination(item: $chat) { thread in ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false) }
+        .navigationDestination(item: $chat) { thread in ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false, find: nil) }
         .task { await load() }
         .refreshable { await load() }
     }

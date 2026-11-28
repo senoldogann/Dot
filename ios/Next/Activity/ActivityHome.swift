@@ -33,7 +33,7 @@ struct ActivityScreen: View {
 
     var body: some View {
         ActivityHome(agent: agent, actions: actions)
-            .navigationDestination(item: $openedChat) { thread in ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false) }
+            .navigationDestination(item: $openedChat) { thread in ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false, find: nil) }
             // A failure's Diagnose opens This Mac here too (`FailureBanner`).
             .navigationDestination(for: SettingsPage.self) { page in
                 if case .mac = page { MacPage() }

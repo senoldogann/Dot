@@ -128,7 +128,13 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    stands, strongest first: Needs you in the accent while an approval, a question or a secret waits, Working… shimmering
    and a small live mark for its time while a run works, Waiting for N helpers while the run waits on them, Waiting ·
    what works in the background (a helper let go, a background command, its loop), else its last line, with the unread
-   dot; Dot's face wears a ring while one of its chats works or waits on the owner; all from the list's rows, which carry
+   dot; Dot's face wears a ring while one of its chats works or waits on the owner, and a bot's face lives while a chat
+   of it works, in its row, its profile, its chat's header and the live line (a short bob, a glance to one side and back
+   every few seconds, a blink, a flip about every 16 s, each face at its own moment; still at rest, waiting on the owner
+   or failed; a slow glow instead under Reduce Motion; drawn only on screen and while the app is in front, at most 30
+   frames a second); the home's search opens with chips over it (All, Messages, Bots, Files: the bots, the chats by their
+   titles and what they say, and the files attached to them or written by their runs, three of each under All with See
+   all), a message opening its chat at that message with Find in chat on its word; all from the list's rows, which carry
    `helpers` and `background` and are read again when a chat's revision moves, item 1920; chats selected together are deleted
    in one request and leave every screen at once, coming back if the Mac refuses, and the list refills with older chats
    after a deletion, item 1964-1965; Settings › General › Language chooses English or Türkçe whatever the iPhone's,
@@ -728,6 +734,7 @@ paired`) and nothing is kept for it.
 | `POST /api/runs/{id}/input` | any token | 470, 1840 | 200, what the page took |
 | `POST /api/runs/{id}/handback` | any token | 1840 | 202, the run goes on |
 | `GET /api/threads/search?q=&limit=` | any token | 1882 | 200, finds in what the chats say |
+| `GET /api/threads/search/files?q=&limit=` | any token | 2032 | 200, the files of the chats, by their names |
 | `POST /api/phone/metrics` | the phone's key | 1926 | 204, the phone's performance record kept |
 | `GET /api/phone/metrics` | the phone's key | 1926 | 200, its summary of the last seven days |
 
@@ -1278,12 +1285,26 @@ web uses:
 ### GET /api/threads/search
 
 The home's search of the iPhone app (item 1882) looks in what the chats say: `q` (1 to 200 characters) and `limit` (1 to
-50, 20 when left out). The answer is a list, best first, of `{"thread_id", "seq", "kind", "ref", "snippet"}`: `kind`
+50, 20 when left out). The answer is a list, best first, of `{"thread_id", "seq", "kind", "ref", "snippet", "run_id"}`
+(`run_id` the run whose work the message is of, which the web opens the chat on; `null` for a chat with no run, a
+find the web leaves out): `kind`
 `m` is a message of the chat's history (`ref` the role that said it, `seq` its place), `r` the answer of a run (`ref`
 the run's id, `seq` -1); `snippet` holds the words around the match with the matched words in `[...]`, and a secret
 Dot holds is masked in it where the snippet holds it whole (a match inside a value, or a snippet cut through one, can
 leave a part unmasked, as the chat's own view shows the words unmasked to the same key). Words are folded as the index folds them (case, accents, the Turkish dotted and dotless i);
 words that fold to nothing find nothing, and an empty `q` is a 422. A tool's output is not in the index.
+
+### GET /api/threads/search/files
+
+The Files chip of the search on the phone and the web finds the files of the chats by their names: `q` and `limit` as
+above. The answer is a list, newest first, of `{"thread_id", "run_id", "kind", "name", "path", "attachment_id", "at"}`,
+each file once per chat: `kind` `attachment` is a file the owner attached to a message (`attachment_id` its upload,
+`path` its name), `made` one a run wrote or edited with `write_file` or `edit_file` in a call that did its job (`path`
+as the call named it, `~/` for the home folder; a path the call gave relative to its folder stays relative). A helper's
+file stands under the chat and the run that started its line, the chat the owner sees (`run_id`, the page the web
+opens). Every word of `q`, folded, must be in the file's name (an attachment) or its path (a file made). The search
+reads the newest 50,000 calls and the newest 5,000 messages of each kind that carry attachments, no further back, so it
+answers in about a tenth of a second whatever the store's size (item 2039); a file older than that is not found.
 
 **Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
 `store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and

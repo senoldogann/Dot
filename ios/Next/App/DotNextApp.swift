@@ -112,7 +112,7 @@ struct RootView: View {
                         if fixture == .offlineList {
                             ChatListView(scope: .all, selection: .constant(nil))
                         } else {
-                            ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing)
+                            ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing, find: nil)
                         }
                     }
                     .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }

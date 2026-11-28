@@ -926,6 +926,18 @@ const CORE = {
   "side.select": "Select",
   "side.agents": "Bots",
   "side.showOlder": "Show older chats",
+  // The chips and the finds of the search (searchfinds.js).
+  "search.kinds": "What to search",
+  "search.all": "All",
+  "search.messages": "Messages",
+  "search.bots": "Bots",
+  "search.files": "Files",
+  "search.seeAll": "See all",
+  "search.attached": "Attached",
+  "search.searching": "Searching…",
+  "search.nothing": "Nothing found",
+  "search.messagesFailed": "Messages could not be searched: {why}",
+  "search.filesFailed": "Files could not be searched: {why}",
   // The Task tab of the side panel (contextpanelview.js).
   "panel.results": "Results",
   "panel.openFile": "Open {path}",

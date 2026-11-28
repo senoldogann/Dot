@@ -204,7 +204,7 @@ struct RunInspector: View {
             ) {
                 ForEach(helpers, id: \.runId) { helper in
                     NavigationLink {
-                        ChatScreen(thread: helper.threadId, initialPanel: nil, editsFirstQueued: false)
+                        ChatScreen(thread: helper.threadId, initialPanel: nil, editsFirstQueued: false, find: nil)
                     } label: {
                         HStack(spacing: Space.s) {
                             Text(helper.shortTitle).textRole(.body).foregroundStyle(Tone.text).lineLimit(1)

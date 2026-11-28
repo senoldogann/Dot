@@ -150,7 +150,7 @@ struct BotProfile: View {
 
     private func header(_ bot: Bot) -> some View {
         VStack(spacing: Space.s) {
-            BotFace(id: bot.id, look: bot.record.look, size: 96)
+            LivingBotFace(id: bot.id, look: bot.record.look, size: 96, alive: botState(bot).isLive)
             Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
             if !bot.record.role.isEmpty {
                 Text(shownRole(bot.record)).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)

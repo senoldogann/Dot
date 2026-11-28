@@ -138,7 +138,7 @@ struct WorkLineView: View {
                 HStack(spacing: Space.xs) {
                     Group {
                         if let speaker {
-                            BotFace(id: speaker.id, look: speaker.look, size: Metric.iconSlot)
+                            LivingBotFace(id: speaker.id, look: speaker.look, size: Metric.iconSlot, alive: workLineMoves(now))
                         } else if let symbol = workLineSymbol(now) {
                             Symbol(name: symbol, context: .tool).foregroundStyle(Tone.tertiary)
                         } else {

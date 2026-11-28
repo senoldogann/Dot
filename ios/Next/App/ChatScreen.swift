@@ -56,6 +56,8 @@ struct ChatScreen: View {
     let initialPanel: ChatPanel?
     /// Begins the edit of the first queued message at once (the debug fixtures); `false` in the app.
     let editsFirstQueued: Bool
+    /// The search's find of a message in this chat: the chat opens with Find in chat on its word, at that message.
+    let find: ChatFind?
     @Environment(AppModel.self) private var model: AppModel
     @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.hideAll.rawValue
     @AppStorage(PrefKey.showSteps) private var showStepsEverywhere: Bool = true
@@ -112,6 +114,8 @@ struct ChatScreen: View {
     /// Find in chat (the bot menu's): the words looked for and which find is shown; `nil` while the bar is closed.
     @State private var finding: String?
     @State private var findIndex: Int = 0
+    /// The snippet of the search's find this chat opened at, until its message is scrolled to.
+    @State private var findSnippet: String?
 
     private var chat: ChatProjection? { model.chats[thread] }
     private var view: ThreadView? { chat?.view }
@@ -181,7 +185,7 @@ struct ChatScreen: View {
             .navigationBarTitleDisplayMode(.inline)
             .modifier(HelperChats(thread: thread, helpers: helpers.map(\.threadId), opened: $openedHelper))
             .navigationDestination(item: $openedTask) { taskThread in
-                ChatScreen(thread: taskThread, initialPanel: nil, editsFirstQueued: false).environment(\.pushedFrom, thread)
+                ChatScreen(thread: taskThread, initialPanel: nil, editsFirstQueued: false, find: nil).environment(\.pushedFrom, thread)
             }
             .overlay(alignment: .topLeading) {
                 if RenderMeter.shown {
@@ -395,14 +399,29 @@ struct ChatScreen: View {
                         },
                         close: { self.finding = nil }
                     )
-                    .onChange(of: found.first) { _, first in
-                        if let first {
-                            pinned = false
+                    // `initial`: a chat the search opened may hold its finds already when the bar appears.
+                    .onChange(of: found.first, initial: true) { _, first in
+                        guard let first else { return }
+                        pinned = false
+                        if let snippet = findSnippet {
+                            // The search's message, once: later finds of the words go as Find in chat's own.
+                            findSnippet = nil
+                            findIndex = findStart(items, found: found, snippet: snippet)
+                            position.scrollTo(id: found[findIndex], anchor: .center)
+                        } else {
                             position.scrollTo(id: first, anchor: .center)
                         }
                     }
                 }
             }
+        }
+        .task(id: thread) {
+            // Opened from a find of the search: Find in chat on its word, at its message (once the chat has drawn).
+            guard let find else { return }
+            do { try await Task.sleep(for: .milliseconds(120)) } catch { return }
+            findSnippet = find.snippet
+            findIndex = 0
+            finding = find.word
         }
     }
 
@@ -770,6 +789,7 @@ struct ChatScreen: View {
         if let botChat {
             BotHeader(
                 chat: botChat,
+                alive: capsuleStatus == .working || capsuleStatus == .starting,
                 find: {
                     findIndex = 0
                     finding = ""

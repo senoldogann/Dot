@@ -125,6 +125,12 @@ extension AppModel {
     func searchChats(_ query: String) async -> Loadable<[ChatHit]> {
         await read { api throws(DaemonRequestError) in try await api.searchChats(query, limit: 20) }
     }
+
+    /// The files of the chats whose name holds the words (what the owner attached, what the runs wrote), or why it
+    /// could not be asked.
+    func searchFiles(_ query: String) async -> Loadable<[FileHit]> {
+        await read { api throws(DaemonRequestError) in try await api.searchFiles(query, limit: 30) }
+    }
 }
 
 /// The composer's placeholder in a bot's chat: "Ask <name>".

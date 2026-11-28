@@ -180,6 +180,36 @@ public struct AgentRequest: Codable, Sendable, Hashable {
     }
 }
 
+/// One find of the search's Files (`GET /api/threads/search/files`): a file the owner attached (`kind` "attachment") or
+/// one a run of the chat wrote (`kind` "made"), in the chat the owner sees; `path` is where it is (`~/…`), an
+/// attachment's own name for one attached.
+public struct FileHit: Codable, Sendable, Hashable {
+    public let threadId: String
+    public let runId: String
+    public let kind: String
+    public let name: String
+    public let path: String
+    public let attachmentId: String?
+    public let at: Double
+
+    enum CodingKeys: String, CodingKey {
+        case kind, name, path, at
+        case threadId = "thread_id"
+        case runId = "run_id"
+        case attachmentId = "attachment_id"
+    }
+
+    public init(threadId: String, runId: String, kind: String, name: String, path: String, attachmentId: String?, at: Double) {
+        self.threadId = threadId
+        self.runId = runId
+        self.kind = kind
+        self.name = name
+        self.path = path
+        self.attachmentId = attachmentId
+        self.at = at
+    }
+}
+
 /// One find of the home search in what the chats say (`GET /api/threads/search`, item 1882): the chat it is in, and
 /// the words around the match with the matched words in `[...]`.
 public struct ChatHit: Codable, Sendable, Hashable {

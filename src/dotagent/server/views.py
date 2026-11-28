@@ -362,6 +362,18 @@ class ChatSearchQuery(FrozenModel):
     limit: int = Field(default=20, ge=1, le=50)
 
 
+class ChatSearchHit(FrozenModel):
+    """A find of the chat search as the phone and the web show it (``ChatHit``, item 1882), with the run whose work the
+    message belongs to (``run_id``: the web opens the chat on it, at the message), ``None`` for a chat with no run."""
+
+    thread_id: str
+    seq: int
+    kind: Literal["m", "r"]
+    ref: str
+    snippet: str
+    run_id: str | None
+
+
 class HelpersQuery(FrozenModel):
     limit: int = Field(default=50, ge=1, le=200)
 
