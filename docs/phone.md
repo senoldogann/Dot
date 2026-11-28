@@ -1103,6 +1103,12 @@ again every 30 seconds while it is on screen and when it is pulled down.
   each with its habits and tips; Use puts one in use (asking first when a line may come from content others can write;
   one the checks refuse offers no Use) and Set aside keeps it for the record (`POST /api/harness/{id}/adopt` and
   `/retire`).
+- **Skills and plugins** (item 2062): the merges and rewrites of learned skills that wait (`GET /api/skills/proposals`),
+  each with why, the skill it would write and its steps; Use writes it (none offered for one that cannot be applied now)
+  and Drop drops it (`POST /api/skills/proposals/{id}/accept`, `DELETE /api/skills/proposals/{id}`); and the plugins the
+  nightly scout proposes (`GET /api/plugin-scout`), each with what it does, why it fits, what it needs, its publisher and
+  its review's risk; Install and Skip (`POST /api/plugin-scout/{id}/install|skip?kind=`). The Skills and Plugins pages
+  (learned skills, versions, installed plugins, Revert and Remove) stay on the Mac (PLAN §26).
 - **Needs you, Working, Later today, Earlier today, Learned today**: the sections of `GET /api/activity`; a row of a run
   opens its chat (a delegated run the chat at the top of its chain), where an ask is answered with its whole card.
 - **Dot comes to you**: the morning brief and the evening check-in with their switches (`PUT /api/brief`, `PUT
