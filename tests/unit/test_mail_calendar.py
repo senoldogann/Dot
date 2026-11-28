@@ -235,8 +235,14 @@ def test_the_prompt_names_the_accounts_signed_in_and_nothing_without_one() -> No
         Account(provider="microsoft", address="ada@outlook.com", connected_at=2.0),
     ]
     (line,) = account_lines(accounts)
-    assert line.endswith(
+    assert (
         "take as account: ada@gmail.com (Gmail and Google Calendar); ada@outlook.com (Outlook and Outlook Calendar)."
+        in line
+    )
+    # Item 2073: runs took an address of the owner's that their notes name for an account, and each call was refused.
+    assert line.endswith(
+        "They take no other address: another address of the user, such as one your notes name, is not signed in "
+        "and is refused."
     )
     assert account_lines([]) == ()
 
