@@ -21,11 +21,13 @@ from dotagent.notify.keys import keys_problem
 from dotagent.notify.push import (
     PUSH_GROUPS,
     PUSH_KINDS,
+    WAITING_TITLE,
     PushError,
     PushKeys,
     PushMessage,
     PushTotals,
     gone,
+    message_group,
     notice_message,
     push_event,
     push_group,
@@ -418,6 +420,37 @@ def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_ses
     session: RunRecord = scheduled.model_copy(update={"campaign_id": "cmp-1"})
     assert push_message(ended, session) == PushMessage(
         title="A task failed", body="The site moved.", route="#/runs/run-1", state="failed"
+    )
+
+
+def test_the_end_of_a_run_that_waits_on_the_owner_says_what_it_needs_not_done() -> None:
+    """Item 2070: a run done as far as it can go, waiting on the owner, is told as a wait with what it needs from them
+    (or its answer when it said nothing of it), not as "done"."""
+    waiting: EventRecord = _event(
+        "run_finished",
+        {
+            "status": "done",
+            "result": "Four forms are filled.",
+            "needs": "Press Submit in the four tabs.",
+            "waiting": True,
+        },
+    )
+    assert push_message(waiting, _run(None)) == PushMessage(
+        title=WAITING_TITLE, body="Press Submit in the four tabs.", route="#/runs/run-1", state="waiting"
+    )
+    # Told with what waits on the owner, so that a phone's switch of that kind decides it, not the one of what ended.
+    told: PushMessage | None = push_message(waiting, _run(None))
+    assert told is not None and message_group("run_finished", told) == "needs_you"
+    done: PushMessage | None = push_message(_event("run_finished", {"status": "done", "result": "Done."}), _run(None))
+    assert done is not None and message_group("run_finished", done) == "done"
+    # A failed run that said what it needs waits on the owner too (item 1061), as the web and the phone show it.
+    said: EventRecord = _event("run_finished", {"status": "failed", "result": "No code.", "needs": "The bank's code."})
+    assert push_message(said, _run(None)) == PushMessage(
+        title=WAITING_TITLE, body="The bank's code.", route="#/runs/run-1", state="waiting"
+    )
+    silent: EventRecord = waiting.model_copy(update={"data": {**waiting.data, "needs": ""}})
+    assert push_message(silent, _run(None)) == PushMessage(
+        title=WAITING_TITLE, body="Four forms are filled.", route="#/runs/run-1", state="waiting"
     )
 
 

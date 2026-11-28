@@ -155,6 +155,39 @@ final class WorkLogTests: XCTestCase {
         XCTAssertEqual(done.filter { if case .answer(_, _, _, .some) = $0 { true } else { false } }.count, 1)
     }
 
+    /// Item 2070: a run done as far as it can go and waiting on the owner (`waiting`), and a failed run that said what it
+    /// needs (item 1061), end "Waiting for you" with what it needs, their answer above; never "The run failed".
+    func testARunThatWaitsOnTheOwnerEndsWaitingWithWhatItNeeds() {
+        let waiting: ChatProjection = chat(
+            [run("run_a", status: "done")],
+            [event(10, "run_finished", ["status": .string("done"), "result": .string("Four forms are filled."),
+                "needs": .string("Press Submit in the four tabs.\nAnswer the Tampere question."), "waiting": .bool(true)])])
+        let ended: [TranscriptItem] = transcript(of: waiting, pending: [], mode: .showAll, streaming: true, context: .none)
+        XCTAssertEqual(ended.last, .ended(id: "e:run_a", status: waitingEnd, detail: "Press Submit in the four tabs."))
+        XCTAssertTrue(ended.contains { if case .answer(_, "Four forms are filled.", _, _) = $0 { true } else { false } })
+        let said: ChatProjection = chat(
+            [run("run_a", status: "failed")],
+            [event(10, "run_finished", ["status": .string("failed"), "result": .string("The bank asks for a code."),
+                "needs": .string("The six-digit code.")])])
+        let failedWaiting: [TranscriptItem] = transcript(of: said, pending: [], mode: .showAll, streaming: true, context: .none)
+        XCTAssertEqual(failedWaiting.last, .ended(id: "e:run_a", status: waitingEnd, detail: "The six-digit code."))
+        XCTAssertTrue(failedWaiting.contains { if case .answer(_, "The bank asks for a code.", _, _) = $0 { true } else { false } })
+        let helper: RunRecord = RunRecord(
+            id: "run_a", threadId: "thr_1", goal: "goal of run_a", mode: "task", model: "m", status: "failed", createdAt: 1, finishedAt: nil,
+            result: "", parentRunId: "run_p", source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
+        let helped: ChatProjection = chat(
+            [helper],
+            [event(10, "run_finished", ["status": .string("failed"), "result": .string("No code."), "needs": .string("The code.")])])
+        XCTAssertEqual(
+            transcript(of: helped, pending: [], mode: .showAll, streaming: true, context: .none).last,
+            .ended(id: "e:run_a", status: "failed", detail: "No code."), "a helper's needs are the run's that asked it")
+        let done: ChatProjection = chat(
+            [run("run_a", status: "done")],
+            [event(10, "run_finished", ["status": .string("done"), "result": .string("Done."), "needs": .string("")])])
+        XCTAssertFalse(
+            transcript(of: done, pending: [], mode: .showAll, streaming: true, context: .none).contains { if case .ended = $0 { true } else { false } })
+    }
+
     func testAUsageLimitIsItsOwnCardAndAFailureSaysItsCauseInOneLine() {
         let limited: ChatProjection = chat(
             [run("run_a", status: "failed")],

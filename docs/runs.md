@@ -320,7 +320,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer. A run that failed so is stored `failed`, but
   its page says "Waiting on you", not "The task failed", and the line that offers Continue says that a message below
-  answers it (item 1061).
+  answers it (item 1061); the phone ends it "Waiting for you" too. A run the goal check found waits on you ends done
+  and waiting ([Autonomy](autonomy.md), item 2070), and reads the same.
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`
   did in most trial runs). Dot does not reinterpret such text: it is nudged first when tools were used, otherwise it
   becomes the result as written. Use a larger model as `main` for task and research runs.

@@ -159,7 +159,13 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
   ends done too. The note stands until you write in the chat of that run (a run of yours, not the schedule's, after it,
   however many firings came since), or for seven days from when that run began, after which the part is tried again, as you may have cleared it without saying so; a firing you
   start by hand has none. It is read from the schedule's runs, nothing is stored for it, it makes no question to you, and
-  a run of any other kind, or a firing that asked nothing of you, fails as before.
+  a firing that asked nothing of you fails as before.
+  Any other run at the top of a chat (not a helper, whose need is the run's that asked it, nor a campaign's session)
+  whose own finish said what it needs from you, or that left you a card still open (an approval, a question, a step kept
+  for you), ends **done** the same way (item 2070), its end stored as "waiting for the owner" (`owner_wait`): the web and
+  the phone say **Waiting for you** with what it needs, not "The run failed", the notice of its end says Dot is waiting
+  for you, and the card stays on the chat; your answer to it carries the work on in that chat, as for any card left for
+  you, and so does a message of yours. A run that asked nothing of you fails as before.
 - `scheduled` (item 675): all the run can do now is done, and what is left waits on something only time brings (a reply
   to what it sent, a payment, a site's review, a moment the goal names), which a run scheduled in the same chat picks
   up. The run ends as done, with the check's words under its answer. The checker is shown the chat's schedules that are

@@ -40,9 +40,10 @@ RESULT_EMERGENCY_STOPPED: str = f"{PREFIX_EMERGENCY_STOP}every active run was st
 PREFIX_INTERNAL_ERROR: str = "Internal error: "
 # Between the answer of a run and what the goal check made of it, when the check does not accept the end.
 GOAL_CHECK_MARK: str = "\n\n---\nGoal check: "
-# What the goal check's note starts with when a schedule's run is done because the goal waits on the owner (item 1952):
-# the run's own finish said what it needs from them, the check found the goal cannot be reached without it, and the run
-# ends done with that need shown, not failed. The next firings read it, and skip that part until the owner answers.
+# What the goal check's note starts with when a run is done because the goal waits on the owner (items 1952 and 2070):
+# the run's own finish said what it needs from them, or it left them a card, the check found the goal cannot be reached
+# without them, and the run ends done with that need shown, not failed (the ending ``owner_wait``). A schedule's next
+# firings read it, and skip that part until the owner answers.
 OWNER_WAIT_NOTE: str = "the goal waits on the owner, who is asked above, not on the run. "
 # What the goal check's note starts with when no model could answer it (item 1402): the run's work stands, not checked.
 # Any other note under the mark is the check's own word on the end.
@@ -51,6 +52,7 @@ GOAL_CHECK_UNAVAILABLE: str = "the check could not run"
 type Ending = Literal[
     "active",
     "finished",
+    "owner_wait",
     "failed",
     "goal_check_refused",
     "goal_check_unavailable",
@@ -72,6 +74,7 @@ type Ending = Literal[
 ENDING_LABELS: dict[Ending, str] = {
     "active": "still active",
     "finished": "finished",
+    "owner_wait": "waiting for the owner (done as far as it can go without them)",
     "failed": "failed (the agent's own report, or an error of the model service)",
     "goal_check_refused": "refused by the goal check",
     "goal_check_unavailable": "goal check could not run (answer not verified)",
@@ -119,6 +122,14 @@ def _goal_check_ending(result: str) -> Ending:
     return "goal_check_unavailable" if note.startswith(GOAL_CHECK_UNAVAILABLE) else "goal_check_refused"
 
 
+def _done_ending(result: str) -> Ending:
+    """How a run that ended done ended: waiting for the owner when the goal check's last note says the goal waits on
+    them (:data:`OWNER_WAIT_NOTE`, items 1952 and 2070), else finished."""
+    if GOAL_CHECK_MARK in result and result.rpartition(GOAL_CHECK_MARK)[2].startswith(OWNER_WAIT_NOTE):
+        return "owner_wait"
+    return "finished"
+
+
 def _cancelled_ending(result: str) -> Ending:
     if result == RESULT_SHUTDOWN:
         return "daemon_shutdown"
@@ -152,7 +163,7 @@ def classify_ending(status: RunStatus, result: str, stored: str | None = None) -
         return known
     match status:
         case "done":
-            return "finished"
+            return _done_ending(result)
         case "failed":
             return _failed_ending(result)
         case "cancelled":

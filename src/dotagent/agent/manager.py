@@ -5480,6 +5480,9 @@ class RunManager:
         clean: str = truncate_tail(redact_known(result, held), _RESULT_CHARS)
         needed: str = redact_known(needs, held)
         data: JsonObject = {"status": status, "result": clean, "needs": needed}
+        if classify_ending(status, clean) == "owner_wait":
+            # Done as far as it can go, waiting on the owner (item 2070): the pages say "Waiting for you", not done.
+            data["waiting"] = True
         if error is not None:
             data["error"] = redact_json(error, held)
         if restated:

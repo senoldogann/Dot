@@ -52,8 +52,8 @@ from dotagent.notify.push import (
     PUSH_KINDS,
     PushGroup,
     PushMessage,
+    message_group,
     notice_message,
-    push_group,
     push_message,
     quiet_while_shown,
 )
@@ -206,7 +206,7 @@ class ApnsWatch:
             log.info("apns_device_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
 
     async def alert(self, message: PushMessage, now: float, kind: str) -> None:
-        await self._alert(alert_payload(message.title, message.route), now, kind)
+        await self._alert(alert_payload(message.title, message.route), now, kind, message_group(kind, message))
 
     def _shown(self, phone_id: str, now: float) -> bool:
         """Whether the app of ``phone_id`` said it is in the foreground and its lease still holds at ``now``."""
@@ -227,11 +227,11 @@ class ApnsWatch:
             log.warning("apns_badge_not_counted", error=str(error))
             return payload
 
-    async def _alert(self, payload: JsonObject, now: float, kind: str) -> None:
-        """Send ``payload``, the alert of an event of ``kind``, to every phone that is told pushes of its kind (item
-        1421: each phone switches the three kinds of :data:`dotagent.notify.push.PUSH_GROUPS` for itself) and, for the
-        end of a run, which the app shows itself, is not showing Dot now (item 1420)."""
-        group: PushGroup | None = push_group(kind)
+    async def _alert(self, payload: JsonObject, now: float, kind: str, group: PushGroup | None) -> None:
+        """Send ``payload``, the alert of an event of ``kind`` told as the kind of push ``group``
+        (:func:`dotagent.notify.push.message_group`), to every phone that is told pushes of that kind (item 1421: each
+        phone switches the three kinds of :data:`dotagent.notify.push.PUSH_GROUPS` for itself) and, for the end of a
+        run, which the app shows itself, is not showing Dot now (item 1420)."""
         quiet: bool = quiet_while_shown(kind)
         payload = await self._badged(payload)
         for device in await self._store.list_apns_devices():
@@ -370,7 +370,12 @@ class ApnsWatch:
         message: PushMessage | None = push_message(event, run) if event.kind in PUSH_KINDS else None
         answerable: str | None = approval_answerable(event)
         if message is not None and answerable is not None:
-            await self._alert(approval_payload(message.title, message.route, answerable), now, event.kind)
+            await self._alert(
+                approval_payload(message.title, message.route, answerable),
+                now,
+                event.kind,
+                message_group(event.kind, message),
+            )
         elif message is not None:
             await self.alert(message, now, event.kind)
         if not follows_live(run):

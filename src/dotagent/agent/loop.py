@@ -1591,9 +1591,10 @@ def scheduled_goal_end(reason: str, ended: RunOutcome) -> RunOutcome:
 
 
 def owner_wait_end(reason: str, ended: RunOutcome) -> RunOutcome:
-    """The end of a schedule's firing whose goal check found that the goal cannot be reached without the owner (item
-    1952): done, not failed, with the check's words under the answer and what the run needs from them kept, so that the
-    owner is asked once, by the end's notice, and the schedule's row does not count a failure the owner has to clear."""
+    """The end of a run whose goal check found that the goal cannot be reached without the owner (items 1952 and 2070):
+    done, not failed, with the check's words under the answer and what the run needs from them kept, so that the owner
+    is asked once, by the end's notice, the run's end reads "waiting for the owner" (``owner_wait``) and a schedule's
+    row does not count a failure the owner has to clear."""
     marked: str = _with_check_note(ended.result, f"{OWNER_WAIT_NOTE}{reason}")
     return ended.model_copy(update={"status": "done", "result": marked})
 
@@ -1601,16 +1602,30 @@ def owner_wait_end(reason: str, ended: RunOutcome) -> RunOutcome:
 async def _owner_blocked_end(
     agent: AgentRun, verdict: GoalVerdict, goal: Message, settled: RunOutcome, ended: RunOutcome
 ) -> RunOutcome:
-    """``settled``, or the end of a firing blocked on the owner (:func:`owner_wait_end`): the goal check said the goal
-    cannot be reached, and the run's own finish says what it needs from the owner, or the firing began under the note
-    that the owner was asked already (:data:`OWNER_WAIT_OPEN`, which the scheduler writes into the run's first message,
-    where only Dot's words are). Only a schedule's firing is judged so; any other run that cannot reach its goal
-    failed."""
-    if verdict.decision != "blocked" or not await _is_firing(agent.runtime, agent.run):
+    """``settled``, or the end of a run blocked on the owner (:func:`owner_wait_end`): the goal check said the goal
+    cannot be reached, and the owner is what it waits on. A schedule's firing waits on them when its own finish says
+    what it needs from them, or it began under the note that they were asked already (:data:`OWNER_WAIT_OPEN`, which
+    the scheduler writes into the run's first message, where only Dot's words are; item 1952). Any other run at the top
+    of a chat waits on them when its finish says what it needs from them, or it left them a card still open: an
+    approval, a question or a step kept for them (item 2070), whose answer carries the work on. A helper (its need is
+    the run's that asked it) and a session of a campaign (its campaign follows its needs and questions) fail, and so
+    does a run that cannot reach its goal and asked nothing of the owner."""
+    if verdict.decision != "blocked":
         return settled
-    if ended.needs.strip() == "" and OWNER_WAIT_OPEN not in goal.content:
-        return settled
-    return owner_wait_end(shorten_reason(verdict.reason), ended)
+    asked: bool = ended.needs.strip() != ""
+    if await _is_firing(agent.runtime, agent.run):
+        waits: bool = asked or OWNER_WAIT_OPEN in goal.content
+    elif agent.run.parent_run_id is not None or agent.run.campaign_id is not None:
+        waits = False
+    else:
+        waits = asked or await _left_for_the_owner(agent.runtime, agent.run.id)
+    return owner_wait_end(shorten_reason(verdict.reason), ended) if waits else settled
+
+
+async def _left_for_the_owner(runtime: Runtime, run_id: str) -> bool:
+    """Whether the run ``run_id`` left the owner a card that is still open: a question or an approval it left, or a step
+    it kept for them (``left``), which their answer carries on in the chat (item 2070)."""
+    return any(record.status == "left" for record in await runtime.store.run_approvals(run_id))
 
 
 def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, patience: int) -> RunOutcome | SendBack:

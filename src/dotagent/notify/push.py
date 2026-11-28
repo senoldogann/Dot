@@ -64,6 +64,8 @@ _ASKED_AGAIN: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 _AGAIN_AFTER_S: float = 1.0
 _ASKED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
 _ASKING_TITLE: dict[str, str] = {"question": "Dot has a question", "handoff": "Dot needs your help"}
+# The title of the end of a run that is done as far as it can go and waits on the owner (item 2070).
+WAITING_TITLE: str = "Dot is waiting for you"
 _FINISHED_TITLE: dict[str, str] = {
     "done": "A task is done",
     "failed": "A task failed",
@@ -218,7 +220,18 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
         )
     if event.kind == "run_finished" and run.parent_run_id is None and not _told_by_its_schedule(run):
         result: object = event.data.get("result")
-        return finished_message(str(event.data.get("status", "")), result if isinstance(result, str) else "", run.id)
+        said: str = result if isinstance(result, str) else ""
+        needs: object = event.data.get("needs")
+        needed: str = needs.strip() if isinstance(needs, str) else ""
+        status: str = str(event.data.get("status", ""))
+        if event.data.get("waiting") is True or (status == "failed" and needed != ""):
+            # Done as far as it can go, waiting on the owner (item 2070), or failed having said what it needs from them
+            # (item 1061): what it needs, not "done" nor "failed", as the web and the phone show it.
+            asked: str = needed if needed != "" else said
+            return PushMessage(
+                title=WAITING_TITLE, body=_shorten(_first_line(asked)), route=f"#/runs/{run.id}", state="waiting"
+            )
+        return finished_message(status, said, run.id)
     if event.kind == CAMPAIGN_ENDED_EVENT:
         ended: CampaignEnded = CampaignEnded.model_validate(event.data)
         achieved: bool = ended.status == "achieved"
@@ -229,6 +242,15 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
             state="done" if achieved else "idle",
         )
     return None
+
+
+def message_group(kind: str, message: PushMessage) -> PushGroup | None:
+    """The kind of push ``message``, made of an event of ``kind``, is told as: the end of a run that waits on the owner
+    (item 2070, its state ``waiting``) with what waits on them, so that the switch of that kind decides it; any other
+    as :func:`push_group` says."""
+    if kind == "run_finished" and message.state == "waiting":
+        return "needs_you"
+    return push_group(kind)
 
 
 def notice_message(event: EventRecord) -> PushMessage | None:
