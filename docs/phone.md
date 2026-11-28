@@ -55,13 +55,15 @@ code** takes its place. Beside a shown code stands a QR code for the iPhone app 
 `dotnext://pair?host=https://<Dot's name>&code=<the code>` (`GET /api/phone/pair-qr`: only the code that is good now,
 never words of the caller's, and only for the Mac's own key, as a phone makes no code): the iPhone's camera opens Dot
 Next with the address and the code filled, and one tap pairs it. Dot Next's Settings hold what you need away from the
-Mac to direct, watch, answer or stop Dot; setting up the Mac stays on the Mac, which the list's last line says ("More
-settings are on your Mac"), and no row of it opens the web app (item 1791). The one exception is **Connect apps** (items
-1861 and 1862): the Mac's Connectors catalogue, where a Mac application's step is started from the phone and answered
+Mac to direct, watch, answer or stop Dot. The Settings list ends with "More settings are on your Mac" and its pages are
+native (item 1791). **Connect apps** (items 1861 and 1862) shows the Mac's Connectors catalogue. There a Mac application's step is started from the phone and answered
 on the Mac, and a connected app, 1Password's token or an official sign-in is taken back with Disconnect; adding a
 connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows Dot's version and
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
-which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Its **Campaigns** (item 1895, under Agents) lists each
+which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). **Maintenance › Diagnostics** shows Dot's processes, disk use,
+pauses and the last 300 lines of a selected log with secrets masked on the Mac. Filter or copy the shown lines.
+**Maintenance › Browser** chooses the Chrome and profile Dot uses, the window and page settings, and whether tasks can
+use the browser. Sign in opens Chrome on the Mac. Clear and Delete ask before removing a profile's sign-ins and site data. **Campaigns** (item 1895, under Agents) lists each
 campaign with its state, goal and last progress, and a campaign's page stops it (it asks first), resumes it or marks it
 achieved, as the web's page does; deleting one is done on the Mac. Dot Next's composer records your voice (item 1802): the
 microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written

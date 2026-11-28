@@ -44,6 +44,42 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")
     }
 
+    func testMaintenanceOpensAndFiltersAMaskedMacLog() {
+        let app: XCUIApplication = launch("settings-maintenance")
+        let diagnostics: XCUIElement = app.buttons["Diagnostics"]
+        XCTAssertTrue(diagnostics.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !diagnostics.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        diagnostics.tap()
+        app.buttons["Logs"].tap()
+        let log: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "dotx.log")).firstMatch
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        log.tap()
+        let filter: XCUIElement = app.textFields["Filter the lines"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 5))
+        filter.tap()
+        filter.typeText("routine")
+        XCTAssertTrue(app.staticTexts["A routine finished"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Dot is ready"].exists)
+    }
+
+    func testClearingABrowserProfileAsksBeforeRemovingItsSiteData() {
+        let app: XCUIApplication = launch("settings-maintenance")
+        let browser: XCUIElement = app.buttons["Browser"]
+        XCTAssertTrue(browser.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !browser.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        browser.tap()
+        let work: XCUIElement = app.buttons["work"].firstMatch
+        XCTAssertTrue(work.waitForExistence(timeout: 5))
+        for _ in 0..<4 where !work.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        work.tap()
+        let clear: XCUIElement = app.buttons["Clear"].firstMatch
+        for _ in 0..<4 where !clear.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        clear.tap()
+        XCTAssertTrue(app.staticTexts["Its sign-ins and site data will be removed."].waitForExistence(timeout: 5))
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Browser"].exists)
+    }
+
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
     func testTheMacsEmergencyStopIsShownAndReleased() {
         let app: XCUIApplication = launch("settings-stopped")

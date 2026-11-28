@@ -1756,3 +1756,56 @@ TR.update(
 
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+
+TR.update(
+    {
+        "Diagnostics": "Tanılama",
+        "Settings › Diagnostics": "Ayarlar › Tanılama",
+        "Processes": "İşlemler",
+        "Disk": "Disk",
+        "Pauses": "Duraklamalar",
+        "Logs": "Günlükler",
+        "PID %lld · %@ CPU · %@": "PID %1$lld · %2$@ CPU · %3$@",
+        "Dot has not stopped answering for more than %@ seconds since it started.": "Dot başladığından beri %@ saniyeden uzun süre yanıtsız kalmadı.",
+        "Still paused": "Duraklama sürüyor",
+        "No logs yet": "Henüz günlük yok",
+        "Filter the lines": "Satırları süz",
+        "The log is empty.": "Günlük boş.",
+        "No line holds these words.": "Hiçbir satır bu sözleri içermiyor.",
+        "Settings › Browser": "Ayarlar › Tarayıcı",
+        "Browser": "Tarayıcı",
+        "Add a profile": "Profil ekle",
+        "Name of the new profile": "Yeni profilin adı",
+        "Change this profile?": "Bu profil değiştirilsin mi?",
+        "Its sign-ins and site data will be removed.": "Oturumları ve site verileri kaldırılacak.",
+        "Browse with": "Şununla gezin",
+        "Tasks may use the browser": "Görevler tarayıcıyı kullanabilir",
+        "Bring Chrome to the front while working": "Çalışırken Chrome'u öne getir",
+        "Use the page from the screen while I hold the task": "Görevi devraldığımda sayfayı ekrandan kullan",
+        "Profiles": "Profiller",
+        "In use": "Kullanımda",
+        "Add profile": "Profil ekle",
+        "Sign in…": "Oturum aç…",
+        "Check": "Kontrol et",
+        "Appearance of pages": "Sayfaların görünümü",
+        "DevTools port": "DevTools bağlantı noktası",
+        "Wait for the current change to finish.": "Değişikliğin tamamlanmasını bekleyin.",
+        "Chrome read %lld saved cookies.": "Chrome %lld kayıtlı çerezi okudu.",
+        "Own Chrome": "Dot'un Chrome'u",
+        "My Chrome": "Benim Chrome'um",
+        "Incognito": "Gizli",
+        "Size of a page": "Sayfanın boyutu",
+        "Fit the window": "Pencereye sığdır",
+        "Width": "Genişlik",
+        "Height": "Yükseklik",
+        "Zoom of pages": "Sayfa yakınlaştırması",
+        "Any program on this Mac can use the port while Dot's Chrome runs. 0 turns it off.": "Dot'un Chrome'u çalışırken bu Mac'teki her program bağlantı noktasını kullanabilir. Kapatmak için 0 girin.",
+    }
+)
+
+TR.update(
+    {
+        "Own Chrome is a profile of Dot's, apart from yours. My Chrome opens tabs in your Chrome, signed in as you.": "Dot'un Chrome'u, sizinkinden ayrı bir profildir. Benim Chrome'um seçeneği, sizin oturumunuzla Chrome'unuzda sekmeler açar.",
+        "On, a task you took over can be used from the screen that shows its page: your taps, scrolls and keys go to the page while the task waits. Nothing you type is kept.": "Açıkken devraldığınız görevin sayfasını ekrandan kullanabilirsiniz. Görev beklerken dokunmalarınız, kaydırmalarınız ve tuşlarınız sayfaya iletilir. Yazdıklarınız saklanmaz.",
+    }
+)

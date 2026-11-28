@@ -101,6 +101,12 @@ struct MaintenancePage: View {
                         systemImage: "arrow.uturn.forward", title: String(localized: "Continue after restart", comment: "Maintenance: resume interrupted tasks after a restart"),
                         description: String(localized: "Resume interrupted tasks after an update or restart.", comment: "Maintenance: what continue after restart does"), isOn: resumeBinding(picture))
                 }
+                GroupedSection(header: nil, footer: nil) {
+                    NavigationRow(systemImage: "stethoscope", title: String(localized: "Diagnostics", comment: "Maintenance: diagnose Dot on the Mac"),
+                                  description: nil, detail: nil) { DiagnosticsPage() }
+                    NavigationRow(systemImage: "globe", title: String(localized: "Browser", comment: "Settings: Dot's browser"),
+                                  description: nil, detail: nil) { BrowserSettingsPage() }
+                }
                 if let performance = picture.performance { performanceSection(performance) }
             }
         }
