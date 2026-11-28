@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2087](2087.md) | done | 2026-11-28 | main's smoke gate: the iMessage progress test no longer races the runner's speed, and a failed test leaves no run behind |
 | [2086](2086.md) | done | 2026-11-28 | main's iPhone tests green again: the English of a key that is not its English, and the keyboard's first-use tip |
 | [2085](2085.md) | done | 2026-11-28 | main's smoke gate: a bot file naming unknown actions says "bot", and the capsule test knows the chat's tasks |
 | [2084](2084.md) | done | 2026-11-28 | An agent file the web cannot read is called a bot file, as the test and the page say |
