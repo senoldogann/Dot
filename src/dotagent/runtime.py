@@ -91,13 +91,14 @@ from dotagent.notify.money import MoneyTeller
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.oauth.accounts import Accounts
 from dotagent.oauth.keychain import Keychain, keychain_file
+from dotagent.phone.asks import PhoneLink
 from dotagent.phone.desk import PhoneDesk
 from dotagent.phone.devicectl import XcrunDevicectl, run_command
 from dotagent.phone.wda import WdaClient
 from dotagent.plugins.catalog import PluginShelf, load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
-from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox, hard_linked
+from dotagent.policy.sandbox import Sandbox, Seal, SwitchedSandbox, build_sandbox, check_sandbox, hard_linked
 from dotagent.safari.desk import SafariDesk
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import env_lock_path, optional_secret
@@ -130,6 +131,7 @@ from dotagent.tools.objectives import build_objective_tools
 from dotagent.tools.office import build_office_tools
 from dotagent.tools.pages import build_page_tools
 from dotagent.tools.phone import build_phone_tools
+from dotagent.tools.phone_app import build_phone_app_tools
 from dotagent.tools.pipeline import build_pipeline_tools
 from dotagent.tools.posts import build_post_tools
 from dotagent.tools.proof import build_proof_tool
@@ -276,6 +278,8 @@ class Runtime:
     meetings: MeetingDesk
     # The owner's iPhone over WebDriverAgent (docs/phone-control.md); ``None`` while [phone] is off.
     phone: PhoneDesk | None
+    # The asks of the runs to the Dot Next app on the owner's iPhone, while it is open (item 2051, docs/phone.md).
+    phone_link: PhoneLink
     # The Mac's dictation model (item 626): what the owner says into a page, and what is said in a video (item 1212).
     transcriber: Transcriber
     # The models' prices from the public price list (item 1856), which the estimates in dollars read.
@@ -338,6 +342,8 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
         # The phone tool exists only while the owner has [phone] on (docs/phone-control.md).
         *((build_phone_tools(),) if config.phone.enabled else ()),
+        # The Dot Next app's calendars, reminders and location (item 2051): a run has them while a phone is paired.
+        build_phone_app_tools(),
     )
     if not config.desktop.enabled:
         return core
@@ -492,7 +498,8 @@ async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths
         log.warning("sealed_file_has_other_names", path=str(linked), names=names)
     if config.shell.sandbox or config.shell.sandbox_unattended:
         await check_sandbox(built)
-    return SwitchedSandbox(built, config.shell.sandbox, config.shell.sandbox_unattended)
+    seal: Seal = Seal(sealed=sealed, unwritable=dot_paths, closed=closed, open_folders=workspace)
+    return SwitchedSandbox(built, seal, config.shell.sandbox, config.shell.sandbox_unattended)
 
 
 @dataclass(frozen=True)
@@ -706,6 +713,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             notify=show_notification,
             peers=peers,
             phone=_phone(config),
+            phone_link=PhoneLink(time.monotonic),
             transcriber=Transcriber(voice_dir()),
             prices=prices,
             meetings=MeetingDesk(

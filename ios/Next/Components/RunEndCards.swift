@@ -6,6 +6,7 @@ import SwiftUI
 /// - failed: the cause, Continue where the daemon says it can go on, and Retry (rewind to before the message and send
 ///   it again, item 1185), which asks first whether the files the run changed go back too;
 /// - stopped by the Claude plan's usage limit: when the plan resets, and Resume now (the same `/resume`);
+/// - waiting on the owner (item 2070): "Waiting for you" and what it needs, no red; its card above stays answerable;
 /// - stopped by the owner: the line alone.
 /// Nothing is offered while a run of the chat works, and a card of an older run offers no Continue.
 struct RunEndCard: View {
@@ -103,7 +104,9 @@ struct RunEndCard: View {
         if offer.cutOff != nil { return "arrow.uturn.backward" }
         switch ending {
         case .limit: return "info.circle"
-        case .ended(let status, _): return status == "failed" ? "exclamationmark.triangle" : "info.circle"
+        case .ended(let status, _):
+            if status == waitingEnd { return "hand.raised" }
+            return status == "failed" ? "exclamationmark.triangle" : "info.circle"
         }
     }
 
@@ -115,6 +118,7 @@ struct RunEndCard: View {
         case .ended(let status, _):
             switch status {
             case "failed": return String(localized: "The run failed", comment: "Notice at the end of a failed run")
+            case waitingEnd: return String(localized: "Waiting for you", comment: "Notice at the end of a run that waits on the owner")
             case "cancelled": return String(localized: "The run was stopped", comment: "Notice at the end of a stopped run")
             default: return String(localized: "The run ended", comment: "Notice at the end of a run that ended another way")
             }

@@ -252,7 +252,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import agent_folder
+from dotagent.core.paths import agent_folder, phones_path
 from dotagent.core.text import CHARS_PER_TOKEN, redact_known, truncate_middle
 from dotagent.core.together import await_together
 from dotagent.core.types import FrozenModel, JsonObject
@@ -314,6 +314,7 @@ from dotagent.scheduler.timing import format_local
 from dotagent.scopes import authorising_if_readable
 from dotagent.secrets import known_secrets
 from dotagent.server import REVIEW_SOURCE
+from dotagent.server.phones import any_paired
 from dotagent.skills.catalog import load_skills, playbook_root, unreported
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.endings import (
@@ -383,13 +384,14 @@ from dotagent.tools.office import (
     READ_CHAT_TOOL,
     SEND_TO_CHAT_TOOL,
 )
+from dotagent.tools.phone_app import PHONE_APP_TOOLS
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.recall import RECALL_TOOL
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.search_chats import SEARCH_CHATS_TOOL
 from dotagent.tools.skill import skill_instructions
 from dotagent.tools.team import CREATE_AGENT_TOOL, CREATE_TEAM_TOOL, MESSAGE_AGENT_TOOL
-from dotagent.tools.terminal import chatless_specs, tells_no_chat
+from dotagent.tools.terminal import terminal_specs_for_run
 from dotagent.tools.work_orders import ASSIGN_WORK_TOOL, WORK_ORDER_TOOLS
 from dotagent.vault.onepassword import kept_token
 
@@ -627,6 +629,7 @@ class RunOutcome(FrozenModel):
     # The steps of the text replies the answer restates (item 620), which the run's page leaves out; the manager writes
     # them into the run's ``run_finished`` event once the run's inbox is shut.
     restated: tuple[int, ...] = ()
+    goal_blocked: bool = False
 
 
 class RunEnd(FrozenModel):
@@ -1591,26 +1594,41 @@ def scheduled_goal_end(reason: str, ended: RunOutcome) -> RunOutcome:
 
 
 def owner_wait_end(reason: str, ended: RunOutcome) -> RunOutcome:
-    """The end of a schedule's firing whose goal check found that the goal cannot be reached without the owner (item
-    1952): done, not failed, with the check's words under the answer and what the run needs from them kept, so that the
-    owner is asked once, by the end's notice, and the schedule's row does not count a failure the owner has to clear."""
+    """The end of a run whose goal check found that the goal cannot be reached without the owner (items 1952 and 2070):
+    done, not failed, with the check's words under the answer and what the run needs from them kept, so that the owner
+    is asked once, by the end's notice, the run's end reads "waiting for the owner" (``owner_wait``) and a schedule's
+    row does not count a failure the owner has to clear."""
     marked: str = _with_check_note(ended.result, f"{OWNER_WAIT_NOTE}{reason}")
-    return ended.model_copy(update={"status": "done", "result": marked})
+    return ended.model_copy(update={"status": "done", "result": marked, "goal_blocked": True})
 
 
 async def _owner_blocked_end(
     agent: AgentRun, verdict: GoalVerdict, goal: Message, settled: RunOutcome, ended: RunOutcome
 ) -> RunOutcome:
-    """``settled``, or the end of a firing blocked on the owner (:func:`owner_wait_end`): the goal check said the goal
-    cannot be reached, and the run's own finish says what it needs from the owner, or the firing began under the note
-    that the owner was asked already (:data:`OWNER_WAIT_OPEN`, which the scheduler writes into the run's first message,
-    where only Dot's words are). Only a schedule's firing is judged so; any other run that cannot reach its goal
-    failed."""
-    if verdict.decision != "blocked" or not await _is_firing(agent.runtime, agent.run):
+    """``settled``, or the end of a run blocked on the owner (:func:`owner_wait_end`): the goal check said the goal
+    cannot be reached, and the owner is what it waits on. A schedule's firing waits on them when its own finish says
+    what it needs from them, or it began under the note that they were asked already (:data:`OWNER_WAIT_OPEN`, which
+    the scheduler writes into the run's first message, where only Dot's words are; item 1952). Any other run at the top
+    of a chat waits on them when its finish says what it needs from them, or it left them a card still open: an
+    approval, a question or a step kept for them (item 2070), whose answer carries the work on. A helper (its need is
+    the run's that asked it) and a session of a campaign (its campaign follows its needs and questions) fail, and so
+    does a run that cannot reach its goal and asked nothing of the owner."""
+    if verdict.decision != "blocked":
         return settled
-    if ended.needs.strip() == "" and OWNER_WAIT_OPEN not in goal.content:
-        return settled
-    return owner_wait_end(shorten_reason(verdict.reason), ended)
+    asked: bool = ended.needs.strip() != ""
+    if await _is_firing(agent.runtime, agent.run):
+        waits: bool = asked or OWNER_WAIT_OPEN in goal.content
+    elif agent.run.parent_run_id is not None or agent.run.campaign_id is not None:
+        waits = False
+    else:
+        waits = asked or await _left_for_the_owner(agent.runtime, agent.run.id)
+    return owner_wait_end(shorten_reason(verdict.reason), ended) if waits else settled
+
+
+async def _left_for_the_owner(runtime: Runtime, run_id: str) -> bool:
+    """Whether the run ``run_id`` left the owner a card that is still open: a question or an approval it left, or a step
+    it kept for them (``left``), which their answer carries on in the chat (item 2070)."""
+    return any(record.status == "left" for record in await runtime.store.run_approvals(run_id))
 
 
 def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, patience: int) -> RunOutcome | SendBack:
@@ -1625,6 +1643,7 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
             status="failed",
             result=_with_check_note(ended.result, f"the goal cannot be reached from here. {reason}"),
             needs=ended.needs,
+            goal_blocked=True,
         )
     if verdict.decision == "improve":
         # The goal is reached: a run whose rounds ran out on making it better is done (K3-04 of the code review of
@@ -1656,6 +1675,7 @@ def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
             status="failed",
             result=_with_check_note(ended.result, f"the goal cannot be reached from here. {reason}"),
             needs=ended.needs,
+            goal_blocked=True,
         )
     return RunOutcome(
         status="failed",
@@ -2977,7 +2997,8 @@ async def withheld_tools(
 ) -> frozenset[str]:
     """The tools of ``offered`` that ``run`` is not given now, by what Dot holds as it starts, the same for a run of
     Dot's own loop and one on the owner's Claude plan (items 1063 and 1068): the browser's while Settings › Browser
-    keeps every run off it (item 354); the mail and calendars (item 424) without an account ``signed_in``; the logins
+    keeps every run off it (item 354); the mail and calendars (item 424) without an account ``signed_in``; the Dot Next
+    app's calendars, reminders and location (item 2051) with no phone paired; the logins
     of 1Password (item 493) while it is not connected, and those of Dot's own vault (item 621) while it holds none;
     messaging and work orders with no teammate, unless the run may make one (item 99: then they stay, so a teammate
     made mid-run can be messaged at once); the objectives in an agent's run (item 908: they are Dot's own); the skill
@@ -2994,6 +3015,8 @@ async def withheld_tools(
         names.add(CONSULT_TOOL)
     if not signed_in:
         names |= {name for name in offered if group_of(name) == ACCOUNTS_GROUP}
+    if not await asyncio.to_thread(any_paired, phones_path()):
+        names |= PHONE_APP_TOOLS
     if not team and CREATE_AGENT_TOOL not in offered:
         names |= {MESSAGE_AGENT_TOOL, *WORK_ORDER_TOOLS}
     if run.agent_id is not None:
@@ -3043,9 +3066,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name not in NOT_FOR_DELEGATED_RUNS)
     if run.campaign_id is None:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
-    # No chat is told of the end of a command in the background of a delegated run or a campaign's session (item 1760).
-    if tells_no_chat(run):
-        specs = chatless_specs(specs)
+    specs = terminal_specs_for_run(specs, run)
     # The agent the run belongs to (item 86) bounds its tools: the ones it names, the core tools in any case, and the
     # MCP servers the owner opened to it (item 415): the ones picked for its message or an earlier one of its chat.
     agent_record: AgentRecord | None = reads.agent_record

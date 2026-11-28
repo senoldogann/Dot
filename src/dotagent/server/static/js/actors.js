@@ -6,7 +6,7 @@
 import { sharedGet } from "./api.js";
 import { mountCharacter } from "./character/character.js";
 import { el } from "./dom.js";
-import { hueLook, hueOf } from "./hues.js";
+import { hashId, hueLook, hueOf } from "./hues.js";
 import { readPref, writePref } from "./prefs.js";
 
 export const DOT_ID = "dot";
@@ -201,6 +201,115 @@ export function liveFace(id, state, look, size) {
       handle.destroy();
     },
   };
+}
+
+// The living face of a chat at work (the owner's ask of 2026-11-27, after Grok's list): the face bobs and now and then
+// flips (CSS, `.avatar[data-living]`, on the compositor), and its eyes glance to one side and back every few seconds
+// (the character's engine, `setLook`), the side changing from one glance to the next. The engine moves only while the
+// face is on screen and the page in front (the ticker stops while it is away); a face the page took out stops at its
+// next glance. Under `prefers-reduced-motion` the engine draws a still frame and the style sheet gives a slow pulse.
+const GLANCE_EVERY_MS = [3600, 4800];
+const GLANCE_MS = 1200;
+const GLANCE = { yaw: 30, pitch: 0, mix: 1, spin: 0, wander: 0.2 };
+const living = new WeakMap();
+const onScreen = new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    const life = living.get(entry.target);
+    if (life !== undefined) {
+      life.visible = entry.isIntersecting;
+      entry.target.toggleAttribute("data-offscreen", !entry.isIntersecting);
+      life.move();
+    }
+  }
+});
+
+/**
+ * Set a living face's turn (its bobs and its flip) where the page's clock has it, moved by its id (`data-seed`, tenths of a
+ * second) so that two faces at work do not flip as one: a face the page moved to a new row (which starts its animations
+ * again) goes on from where it was.
+ * @param {HTMLElement | SVGElement} face
+ */
+export function keepPhase(face) {
+  const now = performance.now() / 1000;
+  // The turn's length is the style sheet's token (`--motion-face`, "16s", on the root, so a face not yet on the page
+  // reads it too): one fact, in one place.
+  const turn = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--motion-face"));
+  const seed = Number(face.dataset.seed ?? "0") / 10;
+  face.style.setProperty("--live-delay", `${(-((now + seed) % turn)).toFixed(3)}s`);
+}
+
+/**
+ * Make a face live while `alive` (its chat has a run at work), or rest. `seed` is its actor's id: the rhythm is its own.
+ * A face of `actorFace` or `dotFace`; a team's faces live together.
+ */
+export function liven(face, alive, seed) {
+  const entry = handles.get(face);
+  if (entry === undefined) {
+    return;
+  }
+  if (entry.faces !== undefined) {
+    for (const each of entry.faces) {
+      liven(each, alive, seed);
+    }
+    return;
+  }
+  let life = living.get(face);
+  if (!alive) {
+    if (life !== undefined) {
+      life.stop();
+    }
+    return;
+  }
+  if (life !== undefined) {
+    return;
+  }
+  face.setAttribute("data-living", "");
+  // Its place in the turn, in tenths of a second of the 16 s turn.
+  face.dataset.seed = String(hashId(seed) % 160);
+  keepPhase(face);
+  let timer = 0;
+  let side = hashId(seed) % 2 === 0 ? -1 : 1;
+  life = {
+    visible: true,
+    move() {
+      if (this.visible) {
+        entry.handle.resume();
+      } else {
+        entry.handle.freeze();
+      }
+    },
+    stop() {
+      clearTimeout(timer);
+      onScreen.unobserve(face);
+      living.delete(face);
+      face.removeAttribute("data-living");
+      face.removeAttribute("data-offscreen");
+      entry.handle.setLook(null);
+      entry.handle.freeze();
+    },
+  };
+  living.set(face, life);
+  const glance = () => {
+    const [low, high] = GLANCE_EVERY_MS;
+    timer = setTimeout(
+      () => {
+        if (!face.isConnected) {
+          life.stop();
+          return;
+        }
+        side = -side;
+        entry.handle.setLook({ ...GLANCE, yaw: GLANCE.yaw * side });
+        timer = setTimeout(() => {
+          entry.handle.setLook(null);
+          glance();
+        }, GLANCE_MS);
+      },
+      low + Math.random() * (high - low),
+    );
+  };
+  glance();
+  onScreen.observe(face);
+  life.move();
 }
 
 /** Change the state a face shows: the expression and the animation follow. The faces of a team change together. */

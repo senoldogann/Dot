@@ -24,7 +24,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
-from dotagent.policy.engine import _INITIATIVE_REASON, OWNERS_REASON
+from dotagent.policy.engine import _INITIATIVE_REASON, PAYMENT_REASON
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -205,7 +205,7 @@ async def test_the_owners_questions_in_yolo_say_so_and_offer_no_rule(
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             (initiative, initiative_rule, initiative_box), (owners, owners_rule, owners_box) = await page.evaluate(
-                _CARD_LINES, [_INITIATIVE_REASON, OWNERS_REASON]
+                _CARD_LINES, [_INITIATIVE_REASON, PAYMENT_REASON]
             )
             # "Don't ask again in this chat" (item 866): on the owner's question, never on one of Dot's initiative.
             assert owners_box and not initiative_box
@@ -300,7 +300,7 @@ async def test_a_settled_step_is_one_line_with_its_command_once_and_the_rest_und
             assert path not in drawn["details"], drawn
             # Nor the fixed sentence of why Dot asks, nor the action again under Details (a payment in yolo).
             buy: str = "Pay 10 USD to a shop with your card (real money)"
-            drawn = await page.evaluate(_SETTLED, [f"{buy} — {OWNERS_REASON}", "payment:shop:10", ""])
+            drawn = await page.evaluate(_SETTLED, [f"{buy} — {PAYMENT_REASON}", "payment:shop:10", ""])
             assert drawn["what"] == buy and "In yolo too" not in drawn["line"], drawn
             assert buy not in drawn["details"] and "In yolo too" not in drawn["details"], drawn
             # A step's label beside its command stays one short word on the line.

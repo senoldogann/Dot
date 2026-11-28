@@ -105,7 +105,7 @@ final class ChatSettingsUITests: XCTestCase {
     /// Dark and light, and the largest accessibility size: the chip stays a 44 pt target (the mark alone at AX3) and the
     /// capsule keeps its parts on one line each. The shots go to the result bundle for the report.
     func testTheCapsuleHoldsInDarkAndAtTheLargestAccessibilitySize() {
-        for (name, extra) in [("dark", ["-AppleInterfaceStyle", "Dark"]), ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"])] {
+        for (name, extra) in [("dark", ["-colorScheme", "dark"]), ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"])] {
             let app: XCUIApplication = XCUIApplication()
             app.launchArguments = ["-DotNextScene", "n2-chat", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + extra
             app.launch()
@@ -121,6 +121,53 @@ final class ChatSettingsUITests: XCTestCase {
             add(shot)
             app.terminate()
         }
+    }
+
+    /// The one-line capsule's chip is the mark and a chevron; once the composer expands (more than a line) the chip names the
+    /// model, its level in grey after it, on the same centre line as + the microphone and send (item 1991). At the largest
+    /// accessibility size the mark stays, the name may truncate and nothing is pushed off the edge.
+    func testTheExpandedComposerNamesTheModelAndTheOneLineCapsuleKeepsTheMark() {
+        let app: XCUIApplication = launch("n2-chat")
+        let chip: XCUIElement = app.buttons["composer.model"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 10))
+        let oneLine: CGFloat = chip.frame.width
+        XCTAssertLessThan(oneLine, 70, "one line: the mark and a chevron alone, \(oneLine) pt")
+        let field: XCUIElement = any(app, "composer.field").firstMatch
+        // The screen may still be settling: tap, and again if the keyboard did not come.
+        field.tap()
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 5) { field.tap() }
+        field.typeText("one two three four five six seven eight nine ten eleven")
+        // The layout follows the typing a moment later: wait for the chip to widen.
+        for _ in 0..<50 where chip.frame.width <= oneLine + 60 { Thread.sleep(forTimeInterval: 0.1) }
+        XCTAssertGreaterThan(chip.frame.width, oneLine + 60, "the expanded chip names the model: \(chip.frame)")
+        XCTAssertTrue(chip.label.hasPrefix("Model: Opus 5.5"), chip.label)
+        XCTAssertFalse(chip.label.contains("Claude Code"), "the provider's name is not in front of the model's: \(chip.label)")
+        let mic: XCUIElement = app.buttons["composer.mic"]
+        let send: XCUIElement = app.buttons["composer.send"]
+        let plus: XCUIElement = app.buttons["Attach"]
+        for part in [chip, mic, plus] {
+            XCTAssertLessThanOrEqual(abs(part.frame.midY - send.frame.midY), 1, "one centre line: \(part.frame) \(send.frame)")
+            XCTAssertGreaterThanOrEqual(part.frame.height, 44)
+        }
+        XCTAssertLessThanOrEqual(chip.frame.maxX, mic.frame.minX + 1)
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "composer-expanded-chip"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.terminate()
+
+        let large: XCUIApplication = XCUIApplication()
+        large.launchArguments = ["-DotNextScene", "n2-chat", "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge"]
+        large.launch()
+        let bigChip: XCUIElement = large.buttons["composer.model"]
+        XCTAssertTrue(bigChip.waitForExistence(timeout: 10))
+        XCTAssertGreaterThanOrEqual(bigChip.frame.height, 44)
+        XCTAssertLessThanOrEqual(bigChip.frame.maxX, large.windows.firstMatch.frame.maxX, "nothing pushed off the edge")
+        XCTAssertLessThanOrEqual(large.buttons["composer.send"].frame.maxX, large.windows.firstMatch.frame.maxX)
+        let bigShot: XCTAttachment = XCTAttachment(screenshot: large.screenshot())
+        bigShot.name = "composer-expanded-chip-ax3"
+        bigShot.lifetime = .keepAlways
+        add(bigShot)
     }
 
     /// The owner's report of 2026-11-27: fast mode shows only for a model that has it (no greyed switch), the level is a
@@ -154,16 +201,17 @@ final class ChatSettingsUITests: XCTestCase {
         any(app, "chatSettings.approval.yolo").firstMatch.tap()
         app.navigationBars["Approvals"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(approvals.waitForExistence(timeout: 3))
-        XCTAssertTrue(approvals.label.contains("Ask only to pay or send"), approvals.label)
+        XCTAssertTrue(approvals.label.contains("Ask only to pay"), approvals.label)
         XCTAssertTrue(app.buttons["chatSettings.done"].isEnabled)
     }
 
-    /// No word of the level is cut, at the default size and at the largest accessibility size: the row and every choice of
-    /// its menu lie whole inside the window, one menu item per level with the full word. Shots of each, light and dark,
+    /// No word of the level is cut, at the default size and at the largest accessibility size: the row lies whole inside
+    /// the window and every choice of its menu whole across it (the menu scrolls at AX3), one item per level with the full
+    /// word. Shots of each, light and dark,
     /// go to the result bundle for the report.
     func testNoLevelIsCutAtTheDefaultSizeOrAtAX3() {
         for (name, extra) in [
-            ("default", [String]()), ("dark", ["-AppleInterfaceStyle", "Dark"]),
+            ("default", [String]()), ("dark", ["-colorScheme", "dark"]),
             ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]),
         ] {
             let app: XCUIApplication = XCUIApplication()
@@ -186,7 +234,9 @@ final class ChatSettingsUITests: XCTestCase {
                 let item: XCUIElement = app.buttons[level].firstMatch
                 XCTAssertTrue(item.waitForExistence(timeout: 3), "\(name): \(level) in the menu")
                 XCTAssertEqual(item.label, level, "\(name): the full word")
-                XCTAssertTrue(window.contains(item.frame), "\(name): \(level) lies whole inside the window: \(item.frame)")
+                // Whole across the window; at AX3 the system's menu scrolls, so a level may stand below its foot.
+                XCTAssertTrue(
+                    item.frame.minX >= window.minX && item.frame.maxX <= window.maxX, "\(name): \(level) lies whole across the window: \(item.frame)")
             }
             let menu: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
             menu.name = "chat-settings-levels-\(name)"

@@ -28,7 +28,7 @@ use sha2::Sha256;
 use tauri::image::Image;
 use tauri::ipc::CapabilityBuilder;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::{NewWindowResponse, PermissionKind, PermissionResponse};
 use tauri::{
     AppHandle, LogicalPosition, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow,
@@ -421,14 +421,69 @@ fn poll(home: &Path) -> (Seen, Option<Daemon>) {
     }
 }
 
-fn tray_icon(state: &str) -> Image<'static> {
-    let bytes = match state {
-        "waiting" => ICON_WAITING,
-        "working" => ICON_WORKING,
-        _ => ICON_IDLE,
+/// The face of the menu bar item: Dot at rest, at work, or with something that waits for you.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Face {
+    Idle,
+    Working,
+    Waiting,
+}
+
+impl Face {
+    /// The face of the state `GET /api/activity/count` names; one the shell does not know is the face at rest.
+    fn of(state: &str) -> Face {
+        match state {
+            "waiting" => Face::Waiting,
+            "working" => Face::Working,
+            _ => Face::Idle,
+        }
+    }
+}
+
+fn tray_icon(face: Face) -> Image<'static> {
+    let bytes = match face {
+        Face::Waiting => ICON_WAITING,
+        Face::Working => ICON_WORKING,
+        Face::Idle => ICON_IDLE,
     };
     Image::from_bytes(bytes)
         .expect("the tray icons are PNG files rendered by desktop/icons/render.py")
+}
+
+/// What the menu bar item shows: its face, the count of what waits for you beside it, and its tip.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TrayLook {
+    face: Face,
+    title: Option<String>,
+    tip: String,
+}
+
+/// What the menu bar item shows after a poll that saw `seen`, while the installer's window is up or not.
+fn tray_look(seen: &Seen, setting_up: bool) -> TrayLook {
+    let (face, waiting, working) = match seen {
+        Seen::Counted(count) => (Face::of(&count.state), count.waiting, count.working),
+        Seen::Silent | Seen::Unproven(_) | Seen::Unread(_) => (Face::Idle, 0, 0),
+    };
+    let tip = match seen {
+        _ if setting_up => "Dot · being set up".to_string(),
+        Seen::Counted(_) => format!("Dot · {waiting} waiting for you · {working} working"),
+        Seen::Silent => "Dot · the daemon is not running".to_string(),
+        Seen::Unproven(_) => "Dot · something else answers at the daemon's address".to_string(),
+        Seen::Unread(unread) => format!("Dot · {}", unread.tip()),
+    };
+    TrayLook {
+        face,
+        title: (waiting > 0).then(|| waiting.to_string()),
+        tip,
+    }
+}
+
+/// Show `look` on the menu bar item; whether every part of it was set.
+fn show_look(tray: &TrayIcon, look: &TrayLook) -> bool {
+    let icon = tray.set_icon_with_as_template(Some(tray_icon(look.face)), false);
+    let title = tray.set_title(look.title.as_deref());
+    let tip = tray.set_tooltip(Some(look.tip.as_str()));
+    icon.is_ok() && title.is_ok() && tip.is_ok()
 }
 
 /// The one window, made on first use, at the size the web UI's screenshot tour reviews (item 88). The title bar is
@@ -622,33 +677,18 @@ fn watch(app: AppHandle, shown: Shown) {
     thread::spawn(move || {
         let mut shown = shown;
         let mut misses: u32 = 0;
+        let mut shown_look: Option<TrayLook> = None;
         loop {
             let (seen, daemon) = poll(&dot_home());
             let counted = matches!(seen, Seen::Counted(_));
             misses = if counted { 0 } else { misses.saturating_add(1) };
-            if let Some(tray) = app.tray_by_id(TRAY) {
-                let (state, waiting, working) = match &seen {
-                    Seen::Counted(count) => (count.state.as_str(), count.waiting, count.working),
-                    Seen::Silent | Seen::Unproven(_) | Seen::Unread(_) => ("idle", 0, 0),
-                };
-                let _ = tray.set_icon_with_as_template(Some(tray_icon(state)), false);
-                let _ = tray.set_title(if waiting > 0 {
-                    Some(waiting.to_string())
-                } else {
-                    None
-                });
-                let tip = match &seen {
-                    _ if matches!(shown, Shown::Installer) => "Dot · being set up".to_string(),
-                    Seen::Counted(_) => {
-                        format!("Dot · {waiting} waiting for you · {working} working")
-                    }
-                    Seen::Silent => "Dot · the daemon is not running".to_string(),
-                    Seen::Unproven(_) => {
-                        "Dot · something else answers at the daemon's address".to_string()
-                    }
-                    Seen::Unread(unread) => format!("Dot · {}", unread.tip()),
-                };
-                let _ = tray.set_tooltip(Some(tip));
+            // The item is set only when what it shows changes (item 2089), not at every poll: each set decodes the
+            // icon's PNG and hands the app's main thread three calls to AppKit.
+            let look = tray_look(&seen, matches!(shown, Shown::Installer));
+            if shown_look.as_ref() != Some(&look) {
+                if let Some(tray) = app.tray_by_id(TRAY) {
+                    shown_look = show_look(&tray, &look).then_some(look);
+                }
             }
             shown = match (shown, daemon) {
                 // The installer's window gives way once the daemon answers and the install is not at work: the
@@ -848,7 +888,7 @@ fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
         )?
     };
     TrayIconBuilder::with_id(TRAY)
-        .icon(tray_icon("idle"))
+        .icon(tray_icon(Face::Idle))
         .tooltip("Dot")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -1252,6 +1292,41 @@ mod tests {
         let restart_polls: u32 = 6;
         assert!((0..=restart_polls).all(|misses| !leaves_ui(misses)));
         assert!(leaves_ui(MISSES_BEFORE_DOWN));
+    }
+
+    #[test]
+    fn the_menu_bar_item_shows_the_count_and_changes_only_with_what_it_shows() {
+        let counted = |waiting: u64, working: u64, state: &str| {
+            Seen::Counted(Count {
+                waiting,
+                working,
+                state: state.to_string(),
+            })
+        };
+        let waiting = tray_look(&counted(2, 1, "waiting"), false);
+        assert_eq!(
+            waiting,
+            TrayLook {
+                face: Face::Waiting,
+                title: Some("2".to_string()),
+                tip: "Dot · 2 waiting for you · 1 working".to_string(),
+            }
+        );
+        // The same count a second later is the same look, so the item is not set again.
+        assert_eq!(tray_look(&counted(2, 1, "waiting"), false), waiting);
+        let idle = tray_look(&counted(0, 0, "idle"), false);
+        assert_eq!((idle.face, idle.title), (Face::Idle, None));
+        assert_eq!(
+            tray_look(&counted(0, 1, "working"), false).face,
+            Face::Working
+        );
+        assert_eq!(tray_look(&counted(0, 0, "new"), false).face, Face::Idle);
+        let down = tray_look(&Seen::Silent, false);
+        assert_eq!(
+            (down.face, down.title, down.tip.as_str()),
+            (Face::Idle, None, "Dot · the daemon is not running")
+        );
+        assert_eq!(tray_look(&Seen::Silent, true).tip, "Dot · being set up");
     }
 
     #[test]

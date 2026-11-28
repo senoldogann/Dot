@@ -30,11 +30,14 @@ const OUTCOMES = {
  * How a run ended as the conversation shows it (item 1061): a run stored failed that said what it needs from the owner
  * (`finish` with `success: false` and `needs_from_user`: an approval to send, a sign-in) waits on them, which is not a
  * failure of its work; on the owner's Dot five such answers of six "failed" ones in five days said "The task failed".
+ * A run the daemon ended done as far as it can go, waiting on the owner (`waiting` of its `run_finished`, item 2070),
+ * waits on them too.
  * @param {string} status the run's stored status
  * @param {string} needs what the run said it needs from the owner, "" for nothing
+ * @param {boolean} waiting whether the daemon ended it waiting on the owner
  */
-export function outcomeOf(status, needs) {
-  return status === "failed" && needs.trim() !== "" ? "waiting" : status;
+export function outcomeOf(status, needs, waiting) {
+  return waiting || (status === "failed" && needs.trim() !== "") ? "waiting" : status;
 }
 
 /** What a run said, as it ended, it needs from the owner, under its answer. */

@@ -18,11 +18,7 @@ const ICONS = { offline: "cloud", reconnecting: "refresh", refused: "alert" };
  * @param {{ onPair?: () => void }} [options]
  */
 export function createConnectionLine(options = {}) {
-  if (!phoneScreen()) {
-    // A Mac's page talks to a Dot on the same Mac, which a network that is down does not take away: a line that said
-    // "Offline" there would be wrong, and the bar's pill and the chat's note say what they always said.
-    return { element: el("div", { class: "link-line", hidden: true }), dispose() {} };
-  }
+  const phone = phoneScreen();
   const words = el("span", { class: "link-line-text" });
   const mark = el("span", { class: "link-line-mark", "aria-hidden": "true" });
   const action = el("button", { class: "btn sm link-line-action", type: "button", hidden: true });
@@ -44,17 +40,18 @@ export function createConnectionLine(options = {}) {
     const facts = linkFacts();
     const now = Date.now();
     const line = lineOf({
-      online: navigator.onLine,
+      online: !phone || navigator.onLine,
       copyFrom: facts.copyFrom,
       waiting: facts.waiting,
-      reconnecting: navigator.onLine && reconnecting(now),
+      reconnecting: reconnecting(now),
+      lastContact: getSnapshot().lastContact,
       refused: facts.refused,
       now,
     });
     element.hidden = line === null;
     if (line === null) {
       // A break not told yet is told when its quiet time is over.
-      if (navigator.onLine && downSince !== null) {
+      if (downSince !== null) {
         timer = setTimeout(paint, Math.max(breakToldAt(downSince) - now, 0) + 50);
       }
       return;
@@ -71,7 +68,7 @@ export function createConnectionLine(options = {}) {
 
   const stopFacts = onLinkFacts(paint);
   const stopState = onChange((snapshot) => {
-    const down = snapshot.stream !== "live";
+    const down = snapshot.stream === "reconnecting";
     if (down && downSince === null) {
       downSince = Date.now();
     } else if (!down) {
@@ -82,7 +79,7 @@ export function createConnectionLine(options = {}) {
   window.addEventListener("online", paint);
   window.addEventListener("offline", paint);
   const snapshot = getSnapshot();
-  downSince = snapshot.stream === "live" ? null : Date.now();
+  downSince = snapshot.stream === "reconnecting" ? Date.now() : null;
   paint();
 
   return {

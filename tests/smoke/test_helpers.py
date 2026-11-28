@@ -339,7 +339,7 @@ async def test_a_delegated_run_starts_on_the_helper_the_call_names(login_env: di
     [asked] = helper.requests
     assert CONSULT_TOOL not in _offered(asked) and "# Helpers" not in asked.messages[0].content
     [result] = played.results(DELEGATE_TOOL)
-    assert result["ok"] is True and result["summary"] == f"Delegate to {HELPER}: Say which format."
+    assert result["ok"] is True and result["summary"] == f"Hand to a helper on {HELPER}: Say which format."
     assert str(result["text"]).startswith(f"Delegated run {child.id} on {HELPER} ended as done after 1 steps.")
 
 

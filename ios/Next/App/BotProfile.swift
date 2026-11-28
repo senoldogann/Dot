@@ -22,6 +22,8 @@ struct BotProfile: View {
     @State private var objectives: Loadable<[ObjectiveRecord]> = .loading
     @State private var handoffs: Loadable<BotHandoffs> = .loading
     @State private var pausing: Bool = false
+    /// The manager review's settings (item 2068), for its row's detail; `nil` until read or when the read failed.
+    @State private var review: TeamReviewView?
     @State private var problem: SettingsFailure?
     @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
 
@@ -35,6 +37,14 @@ struct BotProfile: View {
                 if bot.record.pausedAt != nil {
                     Notice(tone: .warn, message: String(localized: "Paused: its routines start nothing by themselves.", comment: "Bot profile: a paused bot"), dismiss: nil)
                         .accessibilityIdentifier("profile.paused")
+                }
+                if bot.overloaded {
+                    Notice(
+                        tone: .info,
+                        message: String(localized: "Overloaded: \(overloadWords(bot.load))", comment: "Bot profile: a bot that carries too much; the argument is why"),
+                        dismiss: nil
+                    )
+                    .accessibilityIdentifier("profile.overloaded")
                 }
                 GroupedSection(header: nil, footer: nil) {
                     if let latest = bot.latest {
@@ -53,6 +63,11 @@ struct BotProfile: View {
                         detail: routinesWords(bot)
                     ) { SchedulesPage(editsFirst: false, scope: bot.isDot ? .dot : .agent(bot.id)) }
                     .accessibilityIdentifier("profile.routines")
+                    NavigationRow(
+                        systemImage: "person.3", title: String(localized: "Manager review", comment: "Bot profile: the manager's review of the team"), description: nil,
+                        detail: review.map { reviewRowWords($0, botId: bot.id, names: Dictionary(model.bots.map { ($0.id, $0.record.name) }, uniquingKeysWith: { first, _ in first })) }
+                    ) { TeamReviewPage(botId: bot.id) }
+                    .accessibilityIdentifier("profile.review")
                     modelRow(bot)
                     NavigationRow(
                         systemImage: "clock.arrow.circlepath", title: String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away"),
@@ -106,11 +121,14 @@ struct BotProfile: View {
         }
         .task { await loadSchedules() }
         .task { await loadWork() }
+        // Read again on each return from the review's page, whose choice its detail shows.
+        .onAppear { Task { await loadReview() } }
         .refreshable {
             problem = nil
             await model.loadAgents()
             await loadSchedules()
             await loadWork()
+            await loadReview()
         }
         .sheet(item: Binding(get: { library.map(LibraryChat.init) }, set: { library = $0?.id })) { chat in
             RunInspector(thread: chat.id, close: { library = nil })
@@ -132,7 +150,7 @@ struct BotProfile: View {
 
     private func header(_ bot: Bot) -> some View {
         VStack(spacing: Space.s) {
-            BotFace(id: bot.id, look: bot.record.look, size: 96)
+            LivingBotFace(id: bot.id, look: bot.record.look, size: 96, alive: botState(bot).isLive)
             Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
             if !bot.record.role.isEmpty {
                 Text(shownRole(bot.record)).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
@@ -248,6 +266,11 @@ struct BotProfile: View {
     }
 
     /// Pauses the bot or lets it go on (`POST /api/agents/{id}/pause|resume`), then reads the agents again; a refusal is said at the top.
+    /// The review's settings, for its row; a read that fails leaves the row without its detail, and its page says why.
+    private func loadReview() async {
+        if case .loaded(let view) = await model.read({ api throws(DaemonRequestError) in try await api.teamReview() }) { review = view }
+    }
+
     private func setPaused(_ bot: Bot, _ paused: Bool) {
         guard !pausing else { return }
         Task {
@@ -279,8 +302,12 @@ struct BotProfile: View {
     }
 }
 
-/// An agent's model: the configured main model or one of the daemon's, read as Settings › Models reads them (the
-/// failure and its Retry when the Mac cannot be asked). `choose` takes `""` for the main model.
+/// An agent's model: the configured main model or one of the daemon's, on the app's one model catalog
+/// (`ModelCatalog`, as the chat's settings and Settings › Models draw it; the owner's report of 2026-11-28): "Main
+/// model" on top, then the recent models and the providers as groups that fold, the chosen model's open, each model
+/// with its mark and ✓, and the search with its filter at the foot. Read as Settings › Models reads them (the failure
+/// and its Retry when the Mac cannot be asked). `choose` takes `""` for the main model; which model a run uses is not
+/// this page's (`choose` writes the agent's own choice only).
 struct AgentModelPage: View {
     let current: String
     let choose: (String) async -> SettingsFailure?
@@ -289,28 +316,63 @@ struct AgentModelPage: View {
     @State private var chosen: String?
     @State private var problem: SettingsFailure?
     @State private var saving: Bool = false
+    @State private var marks: ModelMarks = ModelMarks.read(.standard)
+    @State private var query: String = ""
+    @State private var filter: ModelFilter = .all
+
+    private var picked: String { chosen ?? current }
 
     var body: some View {
-        SettingsScroll(title: String(localized: "Model", comment: "Bot profile: the bot's model")) {
-            if let problem { FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: nil) }
-            LoadedPage(state: options, macPlace: agentsOnTheMac, retry: { Task { await load() } }) { providers in
-                GroupedSection(header: nil, footer: nil) {
-                    RadioRow(
-                        title: String(localized: "Main model", comment: "Bot profile: an agent on the configured main model"),
-                        description: nil, isSelected: (chosen ?? current).isEmpty
-                    ) { pick("") }
-                }
-                ForEach(providers, id: \.provider) { provider in
-                    GroupedSection(header: provider.provider, footer: provider.error) {
-                        ForEach(provider.models, id: \.ref) { option in
-                            RadioRow(title: option.label, description: option.ref, isSelected: (chosen ?? current) == option.ref) { pick(option.ref) }
-                        }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: Space.xl) {
+                if let problem { FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: nil) }
+                LoadedPage(state: options, macPlace: agentsOnTheMac, retry: { Task { await load() } }) { providers in
+                    ModelCatalog(
+                        providers: providers, defaultRef: model.chatDefaults?.model, chosenRef: picked.isEmpty ? nil : picked, query: query,
+                        filter: filter, managesHidden: false, marks: $marks, pick: { option in pick(option.ref) }, problem: nil, retry: {}
+                    ) {
+                        if query.isEmpty { mainRow }
                     }
                 }
             }
+            .padding(.horizontal, Space.gutter)
+            .padding(.top, Space.xs)
+            .padding(.bottom, 96)
+            .readableColumn()
         }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Tone.ground)
+        .safeAreaInset(edge: .bottom) { ModelSearchBar(query: $query, filter: $filter) }
+        .navigationTitle(String(localized: "Model", comment: "Bot profile: the bot's model"))
+        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    /// The configured main model, ✓ while the agent follows it.
+    private var mainRow: some View {
+        InsetSection(header: nil) {
+            Button { pick("") } label: {
+                HStack(spacing: Space.s) {
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        Text(String(localized: "Main model", comment: "Bot profile: an agent on the configured main model")).textRole(.body).foregroundStyle(Tone.text)
+                        // A chat's own model wins: this is only what a chat with none takes.
+                        Text(String(localized: "For chats that have no model of their own", comment: "Bot profile's Model page: what the main model row is for"))
+                            .textRole(.footnote).foregroundStyle(Tone.secondary)
+                    }
+                    Spacer(minLength: Space.s)
+                    Image(systemName: "checkmark").font(.system(.body, weight: .semibold)).foregroundStyle(Tone.text)
+                        .opacity(picked.isEmpty ? 1 : 0).accessibilityHidden(true)
+                }
+                .padding(.horizontal, Space.groupedGutter)
+                .padding(.vertical, Space.xs)
+                .frame(minHeight: Metric.rowWithDescription)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(RowPressStyle())
+            .accessibilityAddTraits(picked.isEmpty ? [.isSelected] : [])
+            .accessibilityIdentifier("agentModel.main")
+        }
     }
 
     private func load() async {

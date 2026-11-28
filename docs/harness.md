@@ -140,6 +140,19 @@ approval gate and your rules, the credentials, `config.toml`, Dot's code, and sc
 habits stand in the prompt before the rules of trust and safety and the tool guidance after them, and each says that the
 rules of the prompt, trust and safety among them, win over it.
 
+### The lint of a skill
+
+A learned skill is linted as it is written (`skills/lint.py`), and its `playbook_written` event lists what it lacks
+under `lint`; the lint never refuses or changes a skill. A skill a later run can follow and check itself against has
+numbered steps, each step one objective (a step that chains a second one with "then", "and then", "ardından" or
+"sonra" counts as two) with a check of its own (a word that says how the step is seen done: check, confirm, verify,
+done when, expect, until, should show, should read, must show, showing, or kontrol, doğrula, teyit, emin ol,
+beklenen), and a table of failures and their fixes, a
+Markdown table whose header names a failure (or a symptom, a problem, an error) and a fix. A fix that only says to try
+again counts as missing. `dotx skills lint [NAME]...` lints the skills named, or every skill a run can read (your home's,
+`[skills] dirs`, the plugins', the ones that come with Dot and the learned ones), changes nothing, and exits 1 when one
+lacks something.
+
 ## Versions and adoption
 
 A version is one of:

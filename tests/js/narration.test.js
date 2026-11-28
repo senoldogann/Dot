@@ -1,17 +1,26 @@
-// The run told as a conversation (item 1976): the words of a line a call told (workstatus.js narrationPhrase), and the
-// time the live line says beside its words (workedFor).
+// The run told as a conversation (item 1976): the words the live line says for a call (workstatus.js callPhrase), and the
+// time it says beside them (workedFor).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { narrationPhrase, workedFor } from "../../src/dotagent/server/static/js/workstatus.js";
+import { callPhrase, workedFor } from "../../src/dotagent/server/static/js/workstatus.js";
 
-test("a page or a site is named by its site, any other call as the live line says it", () => {
-  assert.equal(narrationPhrase("browser_open", { url: "https://www.gistsmith.com" }), "Looking at gistsmith.com");
-  assert.equal(narrationPhrase("web_fetch", { url: "https://example.com" }), "Looking at example.com");
-  assert.equal(narrationPhrase("web_search", { query: "gistsmith contact" }), "Searching the web for “gistsmith contact”");
-  assert.equal(narrationPhrase("read_file", { path: "README.md" }), "Reading README.md");
-  assert.equal(narrationPhrase("shell", {}), "Running a command");
+test("a call is said in plain words, never by a tool's name (owner 2026-11-27)", () => {
+  assert.equal(callPhrase("web_search", { query: "gistsmith contact" }), "Searching the web for “gistsmith contact”");
+  assert.equal(callPhrase("read_file", { path: "/Users/x/README.md" }), "Reading README.md");
+  assert.equal(callPhrase("shell", {}), "Running a command");
+  assert.equal(callPhrase("code_run", { code: "print(1)" }), "Working");
+  assert.equal(callPhrase("list_dir", { path: "." }), "Working");
+});
+
+test("work handed to a helper is said in plain words with its short title, never delegate or subagent (item 2002)", () => {
+  const goal = { goal: "Check the dentist's free slots. Then say which suit." };
+  assert.equal(callPhrase("delegate", goal), "Handed to a helper: Check the dentist's free slots");
+  assert.equal(callPhrase("delegate", {}), "Handed to a helper");
+  for (const args of [goal, {}]) {
+    assert.doesNotMatch(callPhrase("delegate", args), /delegat|subagent|child/i);
+  }
 });
 
 test("the time is in seconds under a minute and in whole minutes after", () => {

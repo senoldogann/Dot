@@ -62,12 +62,14 @@ const dock = document.getElementById("dock");
 dock.append(el("div", { class: "status-bar" }, capsule.element), el("div", { class: "composer" }, "Queue a message"));
 bubble = planBubble({ anchor: capsule.plan, frame: dock, onOpenTab: () => { window.opened = "plan"; } });
 const statusAt = (index, done) => (index < done ? "done" : index === done ? "in_progress" : "pending");
-window.paint = (done, working) => {
+window.paint = (done, working, status = "running") => {
   const now = steps.map((step, index) => ({ ...step, status: statusAt(index, done) }));
   const plan = { done, total: now.length };
   const at = 1800000000;
-  capsule.paint({ status: working ? "running" : null, since: at - 97, now: at, plan, helpers: [], queued: 0 });
-  bubble.paint(now, targets);
+  capsule.paint({
+    status: working ? "running" : null, since: at - 97, now: at, plan, helpers: [], waits: false, queued: 0,
+  });
+  bubble.paint(now, targets, status);
 };
 window.paint(1, true);
 window.ready = true;
@@ -121,14 +123,14 @@ async def _box(locator: Locator) -> dict[str, float]:
     return box
 
 
-@pytest.mark.parametrize("width", [1280])
+@pytest.mark.parametrize("width", [1440])
 async def test_the_plans_part_opens_the_plan_as_a_bubble_that_follows_it_and_fits_the_window(
     static_page: str, width: int, tmp_path: Path
 ) -> None:
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
-            page: Page = await browser.new_page(viewport={"width": width, "height": 844}, reduced_motion="reduce")
+            page: Page = await browser.new_page(viewport={"width": width, "height": 900}, reduced_motion="reduce")
             await page.goto(static_page)
             await page.wait_for_function("window.ready === true")
             part: Locator = page.get_by_role("button", name="Plan, 1 of 3 steps done")
@@ -137,7 +139,15 @@ async def test_the_plans_part_opens_the_plan_as_a_bubble_that_follows_it_and_fit
             bubble: Locator = page.get_by_role("dialog", name="Plan")
             await expect(bubble).to_be_visible()
             await expect(part).to_have_attribute("aria-expanded", "true")
-            await expect(bubble.locator(".plan-popover-count")).to_have_text("1 / 3")
+            # The head (the owner's report of 2026-11-28): the count, where the run stands, a bar; the steps on a line.
+            await expect(bubble.locator(".plan-head-count")).to_have_text("1 of 3 done")
+            await expect(bubble.locator(".plan-head-state")).to_have_text("Working on step 2")
+            await expect(bubble.locator('.plan-bar[aria-valuenow="1"]')).to_have_count(1)
+            await expect(bubble.locator(".plan-timeline")).to_have_count(1)
+            mark: Locator = bubble.locator(".plan-step.in_progress .mark")
+            assert await mark.evaluate("(e) => getComputedStyle(e).animationName") == "none", (
+                "the step at work does not throb"
+            )
             await expect(bubble.locator(".plan-targets")).to_have_text(_TARGETS)
             await expect(bubble.locator(".plan-step")).to_have_count(3)
             await expect(bubble.locator(".plan-step.done")).to_have_text(_STEPS[0]["text"])
@@ -154,7 +164,14 @@ async def test_the_plans_part_opens_the_plan_as_a_bubble_that_follows_it_and_fit
             await page.screenshot(path=str(tmp_path / f"plan-bubble-{width}.png"))
             # It follows the plan while it is open.
             await page.evaluate("paint(2, true)")
-            await expect(bubble.locator(".plan-popover-count")).to_have_text("2 / 3")
+            await expect(bubble.locator(".plan-head-count")).to_have_text("2 of 3 done")
+            # A run that failed: its step at work shows failed, and the head says where.
+            await page.evaluate('paint(1, true, "failed")')
+            await expect(bubble.locator(".plan-head-state")).to_have_text("Failed at step 2")
+            await expect(bubble.locator(".plan-step.failed")).to_have_text(_STEPS[1]["text"])
+            await expect(bubble.locator(".plan-step.in_progress")).to_have_count(0)
+            await page.screenshot(path=str(tmp_path / f"plan-bubble-failed-{width}.png"))
+            await page.evaluate("paint(2, true)")
             await expect(page.get_by_role("button", name="Plan, 2 of 3 steps done")).to_have_text("Plan 2/3")
             # Escape closes it; the way to the Plan tab closes it too. (The part's name now says 2 of 3.)
             part = page.locator(".capsule-plan")
@@ -194,17 +211,18 @@ const bar = createDockBar({ onWork() {}, onStop() {}, onEnd() {}, sheets });
 document.getElementById("dock").prepend(bar.element);
 sheets.add("plan", {
   anchor: bar.segment("plan"),
-  title: () => t("capsule.plan", { done: now.filter((step) => step.status === "done").length, total: now.length }),
+  title: () => t("planbubble.plan"),
   build: () => planContent({
-    steps: now, targets, head: false, openTab: () => { sheets.close("plan"); window.opened = "plan"; },
+    steps: now, targets, status: window.runStatus, openTab: () => { sheets.close("plan"); window.opened = "plan"; },
   }),
 });
 const statusAt = (index, done) => (index < done ? "done" : index === done ? "in_progress" : "pending");
+window.runStatus = "running";
 window.paint = (done, working) => {
   now = steps.map((step, index) => ({ ...step, status: statusAt(index, done) }));
   bar.paint({
     status: working ? "running" : null, took: 97, stopping: false, reconnecting: false,
-    plan: { done, total: now.length }, helpers: { live: 0, waitedFor: 0, letGo: 0 },
+    plan: { done, total: now.length }, helpers: { live: 0, waitedFor: 0, letGo: 0 }, tasks: { open: 0 }, waits: false,
     loops: { count: 0, rhythm: null, problem: false }, queue: { count: 0, held: false, problem: false, sending: false },
     running: { count: 0, problem: false },
   });
@@ -258,7 +276,9 @@ async def test_on_a_phone_the_plans_segment_opens_the_plan_in_a_sheet_that_follo
             await expect(segment).to_contain_text("1/3")
             await segment.tap()
             sheet: Locator = page.locator(".dock-sheet-panel")
-            await expect(page.get_by_role("dialog", name="Plan 1/3")).to_be_visible()
+            await expect(page.get_by_role("dialog", name="Plan")).to_be_visible()
+            await expect(sheet.locator(".plan-head-count")).to_have_text("1 of 3 done")
+            await expect(sheet.locator(".plan-head-state")).to_have_text("Working on step 2")
             await expect(segment).to_have_attribute("aria-expanded", "true")
             await expect(sheet.locator(".plan-targets")).to_have_text(_TARGETS)
             await expect(sheet.locator(".plan-step")).to_have_count(3)
@@ -271,9 +291,9 @@ async def test_on_a_phone_the_plans_segment_opens_the_plan_in_a_sheet_that_follo
             way: dict[str, float] = await _box(sheet.get_by_role("button", name="Open in the side panel"))
             assert way["height"] >= 43.99, way
             await page.screenshot(path=str(tmp_path / "plan-sheet.png"), animations="disabled")
-            # It follows the plan while it is open, its title with it.
+            # It follows the plan while it is open, its head with it.
             await page.evaluate("paint(2, true)")
-            await expect(page.get_by_role("dialog", name="Plan 2/3")).to_be_visible()
+            await expect(sheet.locator(".plan-head-count")).to_have_text("2 of 3 done")
             await expect(sheet.locator(".plan-step.done")).to_have_count(2)
             # A step marked done that no tool result shows says so beside its text (item 1745), inside the window.
             await page.evaluate('window.steps[0].proof = "none"; paint(2, true)')
@@ -283,6 +303,19 @@ async def test_on_a_phone_the_plans_segment_opens_the_plan_in_a_sheet_that_follo
             tag: dict[str, float] = await _box(unshown)
             assert tag["x"] >= 0 and tag["x"] + tag["width"] <= 390, tag
             await page.screenshot(path=str(tmp_path / "plan-sheet-unshown.png"), animations="disabled")
+            # A run that was stopped: its step at work shows stopped, and the head says where (the owner's report of
+            # 2026-11-28), light and dark.
+            await page.evaluate('window.runStatus = "cancelled"; paint(1, true)')
+            await expect(sheet.locator(".plan-head-state")).to_have_text("Stopped at step 2")
+            await expect(sheet.locator(".plan-step.stopped")).to_have_text(_STEPS[1]["text"])
+            await page.evaluate('window.runStatus = "failed"; paint(1, true)')
+            await expect(sheet.locator(".plan-head-state")).to_have_text("Failed at step 2")
+            await expect(sheet.locator(".plan-step.in_progress")).to_have_count(0)
+            await page.screenshot(path=str(tmp_path / "plan-sheet-failed.png"), animations="disabled")
+            await page.emulate_media(color_scheme="dark")
+            await page.screenshot(path=str(tmp_path / "plan-sheet-failed-dark.png"), animations="disabled")
+            await page.emulate_media(color_scheme="light")
+            await page.evaluate('window.runStatus = "running"; paint(2, true)')
             # Escape closes it, the way to the Plan tab closes it too.
             await page.keyboard.press("Escape")
             await expect(sheet).to_be_hidden()

@@ -7,7 +7,7 @@ import test from "node:test";
 import { cardWords, FIXED_REASONS, unsaid } from "../../src/dotagent/server/static/js/cardwords.js";
 
 const COMMAND = 'cd "/Users/dogan/Library/Application Support/Dot/workspace/mywebsiterepo" && vercel build --prod 2>&1 | tail -25';
-const WHY = "On its own initiative, Dot asks before it sends a message for you, posts in your name or puts a project's change live, in every mode";
+const WHY = "On its own initiative, Dot asks before it sends a message for you, posts in your name or puts a project's change live, in every mode but yolo";
 
 test("the command its box shows and the reason its line says are not said again", () => {
   const summary = `Run: ${COMMAND} (runs vercel; vercel puts a project's change live) — ${WHY}`;

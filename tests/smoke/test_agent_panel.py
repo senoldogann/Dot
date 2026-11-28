@@ -101,7 +101,7 @@ async def _finished(manager: RunManager, client: httpx.AsyncClient, body: dict[s
 
 
 async def _agents_tab(browser: Browser, client: httpx.AsyncClient, run_id: str) -> tuple[Page, Locator]:
-    """The run's page with the side panel on its Agents tab: the page and the tab's panel."""
+    """The run's page with the side panel on its Bots tab: the page and the tab's panel."""
     port: int | None = client.base_url.port
     assert port is not None
     page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
@@ -110,7 +110,7 @@ async def _agents_tab(browser: Browser, client: httpx.AsyncClient, run_id: str) 
     await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
     await page.goto(f"http://127.0.0.1:{port}/#/runs/{run_id}")
     panel: Locator = page.locator(".inspector")
-    await panel.get_by_role("tab", name="Agents").click()
+    await panel.get_by_role("tab", name="Bots").click()
     return page, panel.locator(".inspector-panel:not([hidden])")
 
 
@@ -126,21 +126,21 @@ async def test_the_agents_tab_opens_with_the_chats_agent_and_edits_it_in_the_pan
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
             page, shown = await _agents_tab(browser, client, run_id)
-            await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Agent"])
+            await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Bot"])
             card: Locator = shown.locator(".agent-panel")
             await expect(card.locator(".agent-panel-name")).to_have_text("Scout")
             await expect(card.locator(".agent-panel-role")).to_have_text("Finds and checks sources")
             await expect(card.locator(".avatar")).to_have_count(1)
             facts: Locator = card.locator(".agent-panel-facts")
             await expect(facts.locator("dt")).to_have_text(["Model", "Approvals", "Actions"])
-            await expect(facts.locator("dd")).to_have_text(["Default (scripted)", "Ask only to pay or send", "All"])
+            await expect(facts.locator("dd")).to_have_text(["Default (scripted)", "Ask only to pay", "All"])
             await expect(card.get_by_role("region", name="Instructions")).to_contain_text("Prefer primary sources.")
             await expect(card.get_by_role("link", name="Open its page")).to_have_attribute(
                 "href", f"#/agents/{agent_id}"
             )
             # Edit opens the agent's editor in the panel; saved, the panel shows the agent as it is now.
             await card.get_by_role("button", name="Edit").click()
-            editor: Locator = card.get_by_role("region", name="Edit agent")
+            editor: Locator = card.get_by_role("region", name="Edit bot")
             await expect(editor).to_be_visible()
             role: Locator = editor.get_by_role("textbox", name="Role")
             await expect(role).to_have_value("Finds and checks sources")

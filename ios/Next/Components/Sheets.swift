@@ -1,3 +1,4 @@
+import DotEngine
 import SwiftUI
 
 /// Dot's own face: a light disc with two dark eyes on the ground (the app icon's mark, D12). Agents other than Dot get
@@ -6,13 +7,23 @@ struct DotFace: View {
     let size: CGFloat
 
     var body: some View {
+        DotFaceDrawing(size: size, pose: .rest)
+    }
+}
+
+/// Dot's face in a pose (`LivingFace`): the eyes where it looks, as open as it says.
+struct DotFaceDrawing: View {
+    let size: CGFloat
+    let pose: FacePose
+
+    var body: some View {
         ZStack {
             Circle().fill(Tone.action)
             HStack(spacing: size * 0.15) {
-                Capsule().fill(Tone.onAction).frame(width: size * 0.11, height: size * 0.22)
-                Capsule().fill(Tone.onAction).frame(width: size * 0.11, height: size * 0.22)
+                Capsule().fill(Tone.onAction).frame(width: size * 0.11, height: size * 0.22 * pose.open)
+                Capsule().fill(Tone.onAction).frame(width: size * 0.11, height: size * 0.22 * pose.open)
             }
-            .offset(y: -size * 0.02)
+            .offset(x: size * pose.glance, y: -size * 0.02)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)

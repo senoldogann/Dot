@@ -119,6 +119,22 @@
   color: var(--text);
 }
 
+/* While the run works the badge shows the face it keeps, living (actors.js `liven`), in the badge's square, as a row of
+   the sidebar does; once the run rests the letters come back. */
+.stage-badge:has(> .avatar[data-living]) {
+  background: none;
+}
+
+.stage-badge:has(> .avatar[data-living])::before {
+  content: none;
+}
+
+.stage-badge > .avatar[data-living] {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
 .stage-badge[data-state="waiting"] {
   background: var(--warn-weak);
   color: var(--warn);
@@ -999,6 +1015,152 @@ a.stage-name-link {
 
 .side-badge::before {
   content: attr(data-code);
+}
+
+/* The search's chips (searchfinds.js): All, Messages, Bots, Files under the search box while it has words, in a row that
+   scrolls sideways when the words are large; the chosen one in ink. */
+.side-chips {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+  padding: 0 var(--space-2) var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.side-chips[hidden] {
+  display: none;
+}
+
+.side-chip {
+  flex: none;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .side-chip:hover {
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+  }
+}
+
+.side-chip[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.side-chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* A phone's chips are a finger tall. */
+@media (pointer: coarse) {
+  .side-chip {
+    min-height: 36px;
+  }
+}
+
+/* What the search finds beyond the chats' titles: each kind under its heading, its rows two quiet lines. */
+.side-finds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-2) var(--space-3);
+}
+
+.side-finds[hidden] {
+  display: none;
+}
+
+.side-finds-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-inline: var(--space-2);
+}
+
+.side-find {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--text);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .side-find:hover {
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+  }
+}
+
+.side-find:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.side-find-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--weight-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-find-title .icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+
+.side-find-line {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.side-find-line strong {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+/* Bots and Files show their finds alone: the chats' list and what works and waits step aside. */
+.sidebar:is([data-scope="bots"], [data-scope="files"]) :is(.side-recent, .side-dock) {
+  display: none;
+}
+
+/* While its run works, a row wears its agent's face in the badge's place, living (actors.js `liven`): the square the
+   badge takes, so the row does not move. */
+.side-badge-face {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+.side-badge-face .avatar {
+  width: 20px;
+  height: 20px;
 }
 
 .side-agent {

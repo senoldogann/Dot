@@ -34,12 +34,15 @@ public struct ThreadRecord: Codable, Sendable, Hashable {
     public let createdAt: Double
     public let updatedAt: Double
     public let agentId: String?
+    /// The chat this thread is a task of (item 2013: a lane); `nil` for a chat, and from a daemon before lanes.
+    public var laneOf: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, title, source
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case agentId = "agent_id"
+        case laneOf = "lane_of"
     }
 }
 
@@ -243,6 +246,9 @@ public struct QueueView: Codable, Sendable, Hashable {
     public let messages: [QueuedMessageView]
     public let besideRunId: String?
     public let besideThreadId: String?
+    /// Where a message just sent to a chat with several tasks went (item 2012); `nil` for any other message, and from a
+    /// daemon before tasks.
+    public var routed: RoutedMessage? = nil
 
     public init(held: Bool, messages: [QueuedMessageView], besideRunId: String?, besideThreadId: String?) {
         self.held = held
@@ -252,9 +258,84 @@ public struct QueueView: Codable, Sendable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case held, messages
+        case held, messages, routed
         case besideRunId = "beside_run_id"
         case besideThreadId = "beside_thread_id"
+    }
+}
+
+/// Where a message sent to a chat with several tasks went (item 2012, `RoutedMessage`): `kind` is `stopped`, `new`,
+/// `queued`, `steered` or `continued`; `threadId` the task's thread (the chat's own for a stop of every task), `runId`
+/// the run it started, steered or stopped, `messageId` the queued message it became.
+public struct RoutedMessage: Codable, Sendable, Hashable {
+    public let kind: String
+    public let threadId: String
+    public let runId: String?
+    public let messageId: String?
+
+    public init(kind: String, threadId: String, runId: String?, messageId: String?) {
+        self.kind = kind
+        self.threadId = threadId
+        self.runId = runId
+        self.messageId = messageId
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case threadId = "thread_id"
+        case runId = "run_id"
+        case messageId = "message_id"
+    }
+}
+
+/// A task of a chat with several (item 2013, `ChatTaskView`): its thread (the chat's own, or a lane), its title, its
+/// newest run and that run's status, `state` (`working`, `waits` for the owner, or `ended`), and whether it is the chat's
+/// own.
+public struct ChatTaskView: Codable, Sendable, Hashable, Identifiable {
+    public let threadId: String
+    public let title: String
+    public let runId: String
+    public let status: String
+    public let state: String
+    public let own: Bool
+
+    public init(threadId: String, title: String, runId: String, status: String, state: String, own: Bool) {
+        self.threadId = threadId
+        self.title = title
+        self.runId = runId
+        self.status = status
+        self.state = state
+        self.own = own
+    }
+
+    public var id: String { threadId }
+
+    enum CodingKeys: String, CodingKey {
+        case title, status, state, own
+        case threadId = "thread_id"
+        case runId = "run_id"
+    }
+}
+
+/// The tasks of a chat (item 2013, `TasksView`): the chat, its title, how many tasks may work at once, and its tasks,
+/// none while it has no lane.
+public struct TasksView: Codable, Sendable, Hashable {
+    public let chatId: String
+    public let chatTitle: String
+    public let cap: Int
+    public let tasks: [ChatTaskView]
+
+    public init(chatId: String, chatTitle: String, cap: Int, tasks: [ChatTaskView]) {
+        self.chatId = chatId
+        self.chatTitle = chatTitle
+        self.cap = cap
+        self.tasks = tasks
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case cap, tasks
+        case chatId = "chat_id"
+        case chatTitle = "chat_title"
     }
 }
 
@@ -438,9 +519,12 @@ public struct ThreadView: Codable, Sendable, Hashable {
     /// The schedules that belong to the chat (`schedules`, item 1333): a routine's message is named by its schedule.
     /// `nil` from a daemon that sends none.
     public var schedules: [ChatSchedule]? = nil
+    /// The tasks of the chat this thread is, or is a lane of (item 2013); `nil` from a daemon before tasks.
+    public var tasks: TasksView? = nil
 
     enum CodingKeys: String, CodingKey {
-        case revision, thread, summary, runs, older, newest, queue, asks, helpers, background, reactions, drafts, schedules
+        case revision, thread, summary, runs, older, newest, queue, asks, helpers, background, reactions, drafts
+        case schedules, tasks
         case newestEvents = "newest_events"
         case newestEventsCut = "newest_events_cut"
     }
@@ -452,6 +536,7 @@ public struct ThreadView: Codable, Sendable, Hashable {
             newestEvents: newestEvents, newestEventsCut: newestEventsCut, queue: queue, asks: asks, helpers: next,
             background: background, reactions: reactions, drafts: drafts)
         view.schedules = schedules
+        view.tasks = tasks
         return view
     }
 
@@ -534,9 +619,12 @@ public struct ModelOption: Codable, Sendable, Hashable {
     public let free: Bool?
     /// It can see images: the vision model must (item 232).
     public let vision: Bool?
+    /// The model's lineage (`llm/families.py`), which an other-family check needs; `nil` when unknown or from an older
+    /// daemon.
+    public let family: String?
 
     enum CodingKeys: String, CodingKey {
-        case ref, label, efforts, tools, free, vision
+        case ref, label, efforts, tools, free, vision, family
         case defaultEffort = "default_effort"
         case contextLength = "context_length"
         case fastMode = "fast_mode"

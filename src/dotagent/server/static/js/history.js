@@ -16,7 +16,7 @@ import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { sourcesRow } from "./sources.js";
 import { countKinds, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, toolRow } from "./tools.js";
-import { narrationPhrase } from "./workstatus.js";
+import { firstWordsPhrase } from "./workstatus.js";
 
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read before the page is drawn (items 374 and 708), side by side: they stand right
@@ -220,8 +220,6 @@ function drawFlow(past, flow, asked, events, reactions) {
   // Dot's reaction (item 664) stands on the latest message of yours when it came: the turn's own, or a steer since.
   let reaction = null;
   let reactedTo = null;
-  // Whether the newest step wrote words, which tell its calls (item 1976).
-  let stepSaid = false;
   for (const event of events) {
     // A compaction is not a turn of the conversation: one short line, and its record under the details toggle.
     if (!visibleInConversation(event)) {
@@ -229,19 +227,25 @@ function drawFlow(past, flow, asked, events, reactions) {
       blocks.push({ internal: event });
       continue;
     }
-    if (event.kind === "narration") {
-      // A line of the run told as a conversation (item 1976), drawn with "Messages only" alone and none beside the step's
-      // own words; it ends no batch of steps, which stay as they were with the steps shown.
-      if (!stepSaid) {
-        blocks.push({ told: narrationPhrase(event.data.tool, event.data.args ?? {}) });
+    if (event.kind === "first_words") {
+      // Dot's first words (item 2018), in every way of showing the work; the fast model's line takes the place of the words
+      // said at once.
+      const first = blocks.find((block) => block.first !== undefined);
+      if (first === undefined) {
+        blocks.push({ first: firstWordsPhrase(event.data.text ?? "") });
+      } else {
+        first.first = firstWordsPhrase(event.data.text ?? "");
       }
+      continue;
+    }
+    if (event.kind === "narration") {
+      // A call's line is the live line's alone (owner 2026-11-27): never one of the conversation's messages.
       continue;
     }
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
       // Only words drawn tell the step's calls: those the answer restates are not drawn here.
-      stepSaid = said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer);
-      if (stepSaid) {
+      if (said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer)) {
         batch = null;
         blocks.push({ say: said, step: event.data.step, progress: narrates(event.data.tool_calls ?? []) });
       }
@@ -328,8 +332,8 @@ function drawFlow(past, flow, asked, events, reactions) {
     }
   }
   const nodes = blocks.map((block) =>
-    block.told !== undefined
-      ? el("div", { class: "turn-told say-narration", role: "article", "aria-label": t("outcome.update") }, prose(block.told))
+    block.first !== undefined
+      ? el("div", { class: "turn-told say-first", role: "article", "aria-label": t("outcome.update") }, prose(block.first))
       : block.internal !== undefined
       ? internalRecord(block.internal)
       : block.cards !== undefined
@@ -479,16 +483,21 @@ function turn(past, editFromHereOf, known, signal, reactions) {
     }
     const finished = events.find((event) => event.kind === "run_finished");
     const needs = typeof finished?.data.needs === "string" ? finished.data.needs.trim() : "";
-    const waits = outcomeOf(past.status, needs) !== past.status;
+    const waiting = finished?.data.waiting === true;
+    const waits = outcomeOf(past.status, needs, waiting) !== past.status;
     const sources = sourcesRow(events);
     if (!waits && sources === null) {
       return;
     }
     keepPlace(answer, () => {
       if (waits) {
-        const waiting = answerAs(outcomeOf(past.status, needs));
-        answer.replaceWith(waiting, needsAside(needs));
-        answer = waiting;
+        const waitingAnswer = answerAs(outcomeOf(past.status, needs, waiting));
+        if (needs === "") {
+          answer.replaceWith(waitingAnswer);
+        } else {
+          answer.replaceWith(waitingAnswer, needsAside(needs));
+        }
+        answer = waitingAnswer;
       }
       if (sources !== null) {
         answer.querySelector(":scope > .answer-foot")?.before(sources);

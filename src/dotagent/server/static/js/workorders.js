@@ -24,7 +24,7 @@ const OUTSIDE = t("workorders.writtenAfterDotReadContent");
  */
 
 /** @param {Objective} objective */
-function objectiveRow(objective) {
+export function objectiveRow(objective) {
   const newest = objective.notes.at(-1);
   const state = objectiveState(objective.status);
   // An active objective with no line of progress yet says the step that comes next, as the phone's row does.
@@ -54,7 +54,7 @@ function objectiveRow(objective) {
 }
 
 /** @param {OrderView} view */
-function orderRow(view) {
+export function orderRow(view) {
   const { order } = view;
   const state = stateOf(order.status);
   const due = dueWords(order, Date.now() / 1000);

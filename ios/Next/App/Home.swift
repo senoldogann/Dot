@@ -50,17 +50,33 @@ struct HomeShell: View {
             NewBotSheet(
                 made: { record in
                     showsNewBot = false
-                    selection = BotRoute(bot: record.id, thread: nil)
+                    selection = BotRoute(bot: record.id, thread: nil, find: nil)
                 }, close: { showsNewBot = false })
         }
         .sheet(isPresented: $showsApps) { ConnectAppsSheet(opensDetail: nil) }
         .task { await model.loadAgents() }
+        .task(id: model.requestedRun) {
+            guard let run = model.requestedRun, let api = model.engine?.api else { return }
+            do {
+                let head: RunHead = try await api.runHead(run)
+                guard !Task.isCancelled, model.requestedRun == run else { return }
+                showsSettings = false
+                showsNewBot = false
+                showsApps = false
+                selection = BotRoute(bot: head.run.agentId ?? dotAgentId, thread: head.run.threadId, find: nil)
+            } catch {
+                if !Task.isCancelled {
+                    PhonePush.log.warning("Could not open the notified run run=\(run, privacy: .public) error=\(String(describing: error), privacy: .private)")
+                }
+            }
+            if !Task.isCancelled, model.requestedRun == run { model.requestedRun = nil }
+        }
         // Back on the home: the agents' home chats (outside the list's window) are read again, so a chat read stops
         // counting as unread.
         .onChange(of: selection == nil) { _, home in if home { Task { await model.loadAgents() } } }
         // `initial`: the rows may be read before the home is first drawn, and the first chat opens then too.
         .onChange(of: model.list.rows.count, initial: true) { _, count in
-            if opensFirstChat, selection == nil, count > 0 { selection = BotRoute(bot: dotAgentId, thread: model.list.ordered.first?.summary.id) }
+            if opensFirstChat, selection == nil, count > 0 { selection = BotRoute(bot: dotAgentId, thread: model.list.ordered.first?.summary.id, find: nil) }
         }
     }
 }
@@ -75,6 +91,9 @@ struct HomeList: View {
     @State private var query: String = ""
     @State private var searching: Bool = false
     @State private var hits: Loadable<[ChatHit]> = .loaded([])
+    @State private var files: Loadable<[FileHit]> = .loaded([])
+    /// The chip the search shows (All, Messages, Bots, Files); All again each time the search opens.
+    @State private var scope: SearchScope = .all
     @State private var deleting: Bot?
     @State private var problem: SettingsFailure?
     @State private var nextUnread: Int = 0
@@ -95,7 +114,10 @@ struct HomeList: View {
                             .padding(.horizontal, Space.gutter)
                     }
                     if searching, !query.trimmingCharacters(in: .whitespaces).isEmpty {
-                        HomeResults(finds: homeFinds(query, bots: bots, hits: hits.value ?? []), hits: hits, bots: bots, open: open)
+                        let found: HomeFinds = homeFinds(query, bots: bots, hits: hits.value ?? [], files: files.value ?? [])
+                        HomeResults(
+                            finds: scopedFinds(found, scope: scope), seeAll: scope == .all ? cutShort(found) : [], scope: scope, hits: hits, files: files,
+                            bots: bots, open: open, pick: { scope = $0 })
                     } else {
                         list
                     }
@@ -109,6 +131,9 @@ struct HomeList: View {
                 if bots.count == 1, bots[0].chats.isEmpty, model.list.freshness == .empty, model.transport == .connecting {
                     LoadingState(message: String(localized: "Reaching your Mac…", comment: "Chat list while the first list read is under way"))
                 }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if searching { SearchChips(scope: $scope) }
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: Space.s) {
@@ -135,11 +160,16 @@ struct HomeList: View {
             let words: String = query.trimmingCharacters(in: .whitespaces)
             guard !words.isEmpty else {
                 hits = .loaded([])
+                files = .loaded([])
                 return
             }
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
             hits = .loading
-            hits = await model.searchChats(words)
+            files = .loading
+            async let said: Loadable<[ChatHit]> = model.searchChats(words)
+            async let named: Loadable<[FileHit]> = model.searchFiles(words)
+            hits = await said
+            files = await named
         }
         .confirmationDialog(
             String(localized: "Delete \(deleting?.record.name ?? "")?", comment: "Confirmation of deleting a bot; the argument is its name"),
@@ -160,9 +190,7 @@ struct HomeList: View {
         if let dot = bots.first {
             featured(dot).id(dot.id)
         }
-        if let line = freshnessLine(
-            freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
-        {
+        if let line = listStatus(model) {
             Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).padding(.bottom, Space.s)
         }
         // A new chat still in the outbox (not yet taken by the Mac) shows at once, with where it stands.
@@ -177,7 +205,7 @@ struct HomeList: View {
         }
         LazyVStack(spacing: 0) {
             ForEach(bots.dropFirst()) { bot in
-                Button { open(BotRoute(bot: bot.id, thread: nil)) } label: {
+                Button { open(BotRoute(bot: bot.id, thread: nil, find: nil)) } label: {
                     BotRowView(bot: bot, muted: model.mutedBots.contains(bot.id), pinned: model.pinnedBots.contains(bot.id), now: .now)
                 }
                 .buttonStyle(RowPressStyle())
@@ -195,9 +223,9 @@ struct HomeList: View {
 
     /// Dot, large and centred (Grok's featured bot, in Dot's own face).
     private func featured(_ dot: Bot) -> some View {
-        Button { open(BotRoute(bot: dot.id, thread: nil)) } label: {
+        Button { open(BotRoute(bot: dot.id, thread: nil, find: nil)) } label: {
             VStack(spacing: Space.s) {
-                BotFace(id: dot.id, look: dot.record.look, size: 84)
+                LivingBotFace(id: dot.id, look: dot.record.look, size: 84, alive: botState(dot).isLive)
                     .overlay { BotStateRing(state: botState(dot), size: 96) }
                     .overlay(alignment: .bottomTrailing) {
                         if (dot.unread > 0 || dot.asks > 0), !model.mutedBots.contains(dot.id) {
@@ -297,6 +325,7 @@ struct HomeList: View {
                         query = ""
                         searchFocused = false
                         searching = false
+                        scope = .all
                     }
                     .labelStyle(.iconOnly)
                     .foregroundStyle(Tone.tertiary)
@@ -328,12 +357,17 @@ struct BotRowView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Space.m) {
-            BotFace(id: bot.id, look: bot.record.look, size: 44)
+            LivingBotFace(id: bot.id, look: bot.record.look, size: 44, alive: state.isLive)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
                     Text(bot.record.name).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
                     if pinned { Image(systemName: "pin.fill").font(.system(.caption2, weight: .semibold)).foregroundStyle(Tone.tertiary) }
                     if muted { Image(systemName: "bell.slash").font(.system(.caption2, weight: .semibold)).foregroundStyle(Tone.tertiary) }
+                    // A bot that carries too much (item 2067), quietly: its reasons are on its profile.
+                    if bot.overloaded {
+                        Image(systemName: "gauge.with.dots.needle.100percent").font(.system(.caption2, weight: .semibold)).foregroundStyle(Tone.tertiary)
+                            .accessibilityIdentifier("home.bot.overloaded")
+                    }
                     Spacer(minLength: Space.xs)
                     if let latest = bot.latest {
                         RowTrailing(state: state, time: rowTime(latest.summary.updatedAt, now: now))
@@ -369,43 +403,95 @@ struct BotRowView: View {
 func botLabel(_ bot: Bot) -> String {
     var parts: [String] = [bot.record.name]
     if let words = rowStateWords(botState(bot)) { parts.append(words) }
+    if bot.overloaded { parts.append(String(localized: "Overloaded", comment: "VoiceOver: a bot that carries too much")) }
     if bot.unread > 0 { parts.append(String(localized: "Unread", comment: "VoiceOver: a bot has unread chats")) }
     if let latest = bot.latest, !latest.summary.lastMessage.isEmpty { parts.append(latest.summary.lastMessage) }
     return parts.joined(separator: ", ")
 }
 
-/// The finds of the home's search: bots, chats, and what the chats say.
+/// The chips over the search (the owner's ask of 2026-11-27, after Grok's): All, Messages, Bots, Files, in a row that
+/// scrolls sideways when the words are large; the chosen one in ink.
+struct SearchChips: View {
+    @Binding var scope: SearchScope
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: Space.xs) {
+                ForEach(SearchScope.allCases, id: \.self) { chip in
+                    let on: Bool = chip == scope
+                    Button { scope = chip } label: {
+                        Text(searchScopeTitle(chip))
+                            .textRole(.footnote).fontWeight(.medium)
+                            .foregroundStyle(on ? Tone.onAction : Tone.text)
+                            .padding(.horizontal, Space.m)
+                            .frame(minHeight: 34)
+                            .background(on ? Tone.action : Tone.nested, in: Capsule())
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .frame(minHeight: Metric.hit)
+                    .haptic(.selection, trigger: on)
+                    .accessibilityAddTraits(on ? [.isSelected] : [])
+                    .accessibilityIdentifier("search.chip.\(chip.rawValue)")
+                }
+            }
+            .padding(.horizontal, Space.gutter)
+        }
+        .scrollIndicators(.hidden)
+        .background(Tone.ground)
+    }
+}
+
+/// A chip's word.
+func searchScopeTitle(_ scope: SearchScope) -> String {
+    switch scope {
+    case .all: String(localized: "All", comment: "Search chip: every kind of find")
+    case .messages: String(localized: "Messages", comment: "Home search: finds in what the chats say")
+    case .bots: String(localized: "Bots", comment: "Title of the home: the list of bots")
+    case .files: String(localized: "Files", comment: "Search chip and section: the files attached to the chats or made by their runs")
+    }
+}
+
+/// The finds of the home's search under its chip: bots, chats, what the chats say and their files, each kind under its
+/// heading; under All a few of each, with "See all" for a kind it cut short. A find in a message opens its chat at that
+/// message (Find in chat on its marked word); a file opens the chat it is in.
 struct HomeResults: View {
     let finds: HomeFinds
+    /// The kinds All cut short (`cutShort`), each with its "See all".
+    let seeAll: Set<SearchScope>
+    let scope: SearchScope
     let hits: Loadable<[ChatHit]>
+    let files: Loadable<[FileHit]>
     let bots: [Bot]
     let open: (BotRoute) -> Void
+    let pick: (SearchScope) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.groupedGutter) {
             if !finds.bots.isEmpty {
-                section(String(localized: "Bots", comment: "Title of the home: the list of bots")) {
+                section(String(localized: "Bots", comment: "Title of the home: the list of bots"), more: .bots) {
                     ForEach(finds.bots) { bot in
-                        Button { open(BotRoute(bot: bot.id, thread: nil)) } label: { BotRowView(bot: bot, muted: false, pinned: false, now: .now) }
+                        Button { open(BotRoute(bot: bot.id, thread: nil, find: nil)) } label: { BotRowView(bot: bot, muted: false, pinned: false, now: .now) }
                             .buttonStyle(RowPressStyle())
                     }
                 }
             }
             if !finds.chats.isEmpty {
-                section(String(localized: "Chats", comment: "Title of the chat list")) {
+                section(String(localized: "Chats", comment: "Title of the chat list"), more: .messages) {
                     ForEach(finds.chats, id: \.summary.id) { row in
-                        Button { open(BotRoute(bot: owner(of: row.summary.id), thread: row.summary.id)) } label: {
+                        Button { open(BotRoute(bot: owner(of: row.summary.id), thread: row.summary.id, find: nil)) } label: {
                             ListRow(systemImage: nil, title: row.summary.title, description: row.summary.lastMessage, accessory: .detail(rowTime(row.summary.updatedAt, now: .now)))
                                 .padding(.horizontal, Space.gutter)
                         }
                         .buttonStyle(RowPressStyle())
+                        .accessibilityIdentifier("search.chat")
                     }
                 }
             }
             if !finds.messages.isEmpty {
-                section(String(localized: "Messages", comment: "Home search: finds in what the chats say")) {
+                section(String(localized: "Messages", comment: "Home search: finds in what the chats say"), more: finds.chats.isEmpty ? .messages : nil) {
                     ForEach(finds.messages, id: \.self) { hit in
-                        Button { open(BotRoute(bot: owner(of: hit.threadId), thread: hit.threadId)) } label: {
+                        Button { open(BotRoute(bot: owner(of: hit.threadId), thread: hit.threadId, find: markedWord(hit.snippet).map { ChatFind(word: $0, snippet: hit.snippet) })) } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 // A chat older than the ones the phone holds has no title here (the search names none).
                                 if !title(of: hit.threadId).isEmpty {
@@ -418,32 +504,85 @@ struct HomeResults: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(RowPressStyle())
+                        .accessibilityIdentifier("search.message")
                     }
                 }
             }
-            switch hits {
-            case .loading:
-                ProgressView().frame(maxWidth: .infinity).padding(Space.l)
-            case .failed(let failure):
-                Text(
-                    String(
-                        localized: "Messages could not be searched: \(failureWords(failure, macPlace: ""))",
-                        comment: "Home search: the Mac's search of messages failed; the argument is why")
-                )
-                .textRole(.footnote).foregroundStyle(Tone.secondary).padding(.horizontal, Space.gutter)
-            case .loaded:
-                if finds.isEmpty {
-                    Text(String(localized: "Nothing found", comment: "Home search: no bot, chat or message holds the words"))
-                        .textRole(.body).foregroundStyle(Tone.secondary).frame(maxWidth: .infinity).padding(Space.xl)
+            if !finds.files.isEmpty {
+                section(searchScopeTitle(.files), more: .files) {
+                    ForEach(finds.files, id: \.self) { file in
+                        Button { open(BotRoute(bot: owner(of: file.threadId), thread: file.threadId, find: nil)) } label: {
+                            ListRow(
+                                systemImage: file.kind == "attachment" ? "paperclip" : "doc.text", title: file.name, description: fileLine(file),
+                                accessory: .detail(rowTime(file.at, now: .now)))
+                            .padding(.horizontal, Space.gutter)
+                        }
+                        .buttonStyle(RowPressStyle())
+                        .accessibilityIdentifier("search.file")
+                    }
                 }
+            }
+            if case .failed(let failure) = hits, scope != .bots, scope != .files {
+                problem(String(
+                    localized: "Messages could not be searched: \(failureWords(failure, macPlace: ""))",
+                    comment: "Home search: the Mac's search of messages failed; the argument is why"))
+            }
+            if case .failed(let failure) = files, scope == .all || scope == .files {
+                problem(String(
+                    localized: "Files could not be searched: \(failureWords(failure, macPlace: ""))",
+                    comment: "Home search: the Mac's search of files failed; the argument is why"))
+            }
+            if loading {
+                ProgressView().frame(maxWidth: .infinity).padding(Space.l)
+            } else if finds.isEmpty {
+                Text(String(localized: "Nothing found", comment: "Home search: no bot, chat, message or file under the chosen chip holds the words"))
+                    .textRole(.body).foregroundStyle(Tone.secondary).frame(maxWidth: .infinity).padding(Space.xl)
+                    .accessibilityIdentifier("search.nothing")
             }
         }
         .padding(.vertical, Space.s)
     }
 
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    /// Whether a search this chip shows is still under way (Bots needs none of the Mac's).
+    private var loading: Bool {
+        switch scope {
+        case .bots: false
+        case .messages: isLoading(hits)
+        case .files: isLoading(files)
+        case .all: isLoading(hits) || isLoading(files)
+        }
+    }
+
+    private func isLoading<Value: Sendable>(_ state: Loadable<Value>) -> Bool {
+        if case .loading = state { return true }
+        return false
+    }
+
+    private func problem(_ words: String) -> some View {
+        Text(words).textRole(.footnote).foregroundStyle(Tone.secondary).padding(.horizontal, Space.gutter)
+    }
+
+    /// A file's second line: where it is and the chat it is in.
+    private func fileLine(_ file: FileHit) -> String {
+        let chat: String = title(of: file.threadId)
+        let place: String = file.kind == "attachment" ? String(localized: "Attached", comment: "Search: a file the owner attached to a message") : file.path
+        return chat.isEmpty ? place : "\(place) · \(chat)"
+    }
+
+    private func section<Content: View>(_ title: String, more: SearchScope?, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary).padding(.horizontal, Space.gutter).padding(.bottom, Space.xxs)
+            HStack(alignment: .firstTextBaseline) {
+                Text(title).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary)
+                Spacer(minLength: Space.xs)
+                if let more, seeAll.contains(more) {
+                    Button(String(localized: "See all", comment: "Search: shows every find of a kind, under its chip")) { pick(more) }
+                        .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
+                        .frame(minHeight: Metric.hit)
+                        .accessibilityIdentifier("search.seeAll.\(more.rawValue)")
+                }
+            }
+            .padding(.horizontal, Space.gutter)
+            .padding(.bottom, Space.xxs)
             content()
         }
     }

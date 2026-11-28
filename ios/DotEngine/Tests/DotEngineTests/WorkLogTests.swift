@@ -155,6 +155,39 @@ final class WorkLogTests: XCTestCase {
         XCTAssertEqual(done.filter { if case .answer(_, _, _, .some) = $0 { true } else { false } }.count, 1)
     }
 
+    /// Item 2070: a run done as far as it can go and waiting on the owner (`waiting`), and a failed run that said what it
+    /// needs (item 1061), end "Waiting for you" with what it needs, their answer above; never "The run failed".
+    func testARunThatWaitsOnTheOwnerEndsWaitingWithWhatItNeeds() {
+        let waiting: ChatProjection = chat(
+            [run("run_a", status: "done")],
+            [event(10, "run_finished", ["status": .string("done"), "result": .string("Four forms are filled."),
+                "needs": .string("Press Submit in the four tabs.\nAnswer the Tampere question."), "waiting": .bool(true)])])
+        let ended: [TranscriptItem] = transcript(of: waiting, pending: [], mode: .showAll, streaming: true, context: .none)
+        XCTAssertEqual(ended.last, .ended(id: "e:run_a", status: waitingEnd, detail: "Press Submit in the four tabs."))
+        XCTAssertTrue(ended.contains { if case .answer(_, "Four forms are filled.", _, _) = $0 { true } else { false } })
+        let said: ChatProjection = chat(
+            [run("run_a", status: "failed")],
+            [event(10, "run_finished", ["status": .string("failed"), "result": .string("The bank asks for a code."),
+                "needs": .string("The six-digit code.")])])
+        let failedWaiting: [TranscriptItem] = transcript(of: said, pending: [], mode: .showAll, streaming: true, context: .none)
+        XCTAssertEqual(failedWaiting.last, .ended(id: "e:run_a", status: waitingEnd, detail: "The six-digit code."))
+        XCTAssertTrue(failedWaiting.contains { if case .answer(_, "The bank asks for a code.", _, _) = $0 { true } else { false } })
+        let helper: RunRecord = RunRecord(
+            id: "run_a", threadId: "thr_1", goal: "goal of run_a", mode: "task", model: "m", status: "failed", createdAt: 1, finishedAt: nil,
+            result: "", parentRunId: "run_p", source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
+        let helped: ChatProjection = chat(
+            [helper],
+            [event(10, "run_finished", ["status": .string("failed"), "result": .string("No code."), "needs": .string("The code.")])])
+        XCTAssertEqual(
+            transcript(of: helped, pending: [], mode: .showAll, streaming: true, context: .none).last,
+            .ended(id: "e:run_a", status: "failed", detail: "No code."), "a helper's needs are the run's that asked it")
+        let done: ChatProjection = chat(
+            [run("run_a", status: "done")],
+            [event(10, "run_finished", ["status": .string("done"), "result": .string("Done."), "needs": .string("")])])
+        XCTAssertFalse(
+            transcript(of: done, pending: [], mode: .showAll, streaming: true, context: .none).contains { if case .ended = $0 { true } else { false } })
+    }
+
     func testAUsageLimitIsItsOwnCardAndAFailureSaysItsCauseInOneLine() {
         let limited: ChatProjection = chat(
             [run("run_a", status: "failed")],
@@ -286,7 +319,7 @@ final class WorkLogTests: XCTestCase {
         return event(id, "tool_call", ["call_id": .string(call), "tool": .string("delegate"), "args": .object(args)])
     }
 
-    /// The capsule says "Waiting on N helpers" only while the main run has stopped for them: every open call of its newest
+    /// The capsule says "Waiting for N helpers" only while the main run has stopped for them: every open call of its newest
     /// step waits on a helper. While another call of that step runs, while it thinks or writes, or once the waits were
     /// answered, the run works.
     func testTheRunWaitsOnHelpersOnlyWhileEveryOpenCallIsAWaitOnOne() {
@@ -318,5 +351,24 @@ final class WorkLogTests: XCTestCase {
 
         let ended: ChatProjection = chat([run("run_a", status: "done")], [step, delegate(11, "d1", wait: nil), event(12, "run_finished", [:])])
         XCTAssertFalse(waitsOnHelpers(of: ended, run: "run_a"))
+    }
+
+    // MARK: The plan once its run ended (the owner's report of 2026-11-28)
+
+    func testAFailedOrStoppedRunsPlanShowsItsStepFailedOrStopped() {
+        let steps: [PlanStep] = [
+            PlanStep(text: "Read the CV", status: "done"), PlanStep(text: "Search LinkedIn", status: "in_progress"),
+            PlanStep(text: "Write the letters", status: "pending"),
+        ]
+        XCTAssertEqual(PlanEnd(runStatus: "failed"), .failed)
+        XCTAssertEqual(PlanEnd(runStatus: "cancelled"), .stopped)
+        XCTAssertEqual(PlanEnd(runStatus: "running"), .working)
+        XCTAssertEqual(PlanEnd(runStatus: nil), .working)
+        XCTAssertEqual(planAtEnd(steps, end: .failed).map(\.status), ["done", "failed", "pending"])
+        XCTAssertEqual(planAtEnd(steps, end: .stopped).map(\.status), ["done", "stopped", "pending"])
+        XCTAssertEqual(planAtEnd(steps, end: .working), steps, "at work the step stays in progress")
+        XCTAssertEqual(planCurrentStep(planAtEnd(steps, end: .failed)), 2)
+        XCTAssertEqual(planCurrentStep([PlanStep(text: "a", status: "done"), PlanStep(text: "b", status: "pending")]), 2)
+        XCTAssertNil(planCurrentStep([PlanStep(text: "a", status: "done"), PlanStep(text: "b", status: "skipped")]))
     }
 }

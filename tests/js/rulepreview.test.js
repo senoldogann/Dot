@@ -35,7 +35,7 @@ test("what no rule decides is said apart: the least-asking mode's steps, and the
   const view = { ...VIEW, fits: 6, shadowed_by: [], in_yolo: 4, before_rules: 1, would_decide: 1, stricter: 0, same: 0, stopped: 0, unknown: 0, looser: 1 };
   assert.deepEqual(previewLines(view, 30), [
     "Would have matched 6 of 3200 steps in the last 30 days.",
-    "4 ran in the mode that asks only to pay or send, where no rule decides them.",
+    "4 ran in the mode that asks only to pay, where no rule decides them.",
     "1 is settled before any rule, by checks no rule changes, such as money, credentials, messages and posts, and Dot's own files.",
     "It would decide 1 of them: 1 would ask less.",
   ]);
@@ -70,7 +70,7 @@ test("how a rule was used, said in a line", () => {
   const usage = { rule_id: "rul_2", fits: 12, last_fit_at: 1, decides: 7, in_yolo: 3, before_rules: 1, shadowed_by: [{ rule_id: "rul_1", description: "Do it", steps: 1 }] };
   assert.equal(
     usageLine(usage, view, 30, numberOf),
-    "Fits 12 steps of the last 30 days: decides 7; 3 were in tasks that ask only to pay or send; 1 was settled before any rule; rule #1 decides 1 first.",
+    "Fits 12 steps of the last 30 days: decides 7; 3 were in tasks that ask only to pay; 1 was settled before any rule; rule #1 decides 1 first.",
   );
   assert.equal(usageLine({ ...usage, fits: 1, decides: 1, in_yolo: 0, before_rules: 0, shadowed_by: [] }, view, 30, numberOf), "Fits 1 step of the last 30 days: decides 1.");
   assert.equal(usageLine({ ...usage, fits: 0 }, view, 1, numberOf), "Fits no step of the last 1 day.");

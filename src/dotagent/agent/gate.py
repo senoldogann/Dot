@@ -63,12 +63,13 @@ from dotagent.policy.engine import (
     decide_past_review,
     initiative_guard,
     mode_gate,
-    owners_guard,
+    payment_guard,
     route_for,
     supervised,
     waived_in_yolo,
 )
 from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action, spacing_wait
+from dotagent.policy.sandbox import Seal, sealed_step
 from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
 from dotagent.secrets import known_secrets
@@ -220,10 +221,10 @@ class RunGate:
     keeps the reason it would have asked for. A change of Dot's own files is the user's in every mode but yolo (item
     398); a research run stays read-only and a refusal that stands still refuses. ``owners_word`` is set for a run of
     a chat Dot opened on its own initiative (item 850): a message, a post or a release there is the owner's question
-    in every mode, yolo's and auto's too (:func:`dotagent.policy.engine.initiative_guard`). ``owners_chat`` is set for a
-    run of a chat the owner opened (item 860): in yolo, a payment, a message or mail and a public post there are the
-    owner's question (:func:`dotagent.policy.engine.owners_guard`). ``unattended`` is set for a run nobody started (item
-    2016), whose processes keep the sandbox in every mode.
+    in every mode but yolo, auto's too (:func:`dotagent.policy.engine.initiative_guard`). ``owners_chat`` is set for a
+    run of a chat the owner opened (item 860). In yolo, a payment in either is the owner's question, and nothing else
+    there is (:func:`dotagent.policy.engine.payment_guard`, item 2069). ``unattended`` is set for a run nobody started
+    (item 2016), whose processes keep the sandbox in every mode.
     ``instructions`` are the user's own words so far, which is all the reviewer takes as authority. ``pace`` bounds the
     public and social actions of the browser on each site, in every mode. ``locks`` are the runtime's
     :class:`SiteLocks`, shared with the gates of the other runs.
@@ -249,21 +250,24 @@ class RunGate:
         owner_there: bool = True,
         chat_id: str | None = None,
         unattended: bool = False,
+        seal: Seal | None = None,
     ) -> None:
         self._store: Store = store
         # Whether the run is of a chat Dot opened on its own initiative (item 850), whose messages, posts and releases
-        # wait for the owner whatever the mode.
+        # wait for the owner in every mode but yolo, and whose payments wait for them in yolo (item 2069).
         self.owners_word: bool = owners_word
-        # Whether the run is of a chat the owner opened (item 860), whose payments, messages and posts wait for them in
-        # yolo too.
+        # Whether the run is of a chat the owner opened (item 860), whose payments wait for them in yolo (item 2069).
         self.owners_chat: bool = owners_chat
-        # Whether the owner is there to answer such a step (item 860): in a run that a schedule, a watcher or a notice
-        # started in their chat, the review model judges a message or a post, and passes on what it cannot tell.
+        # Whether the owner is there to answer such a step: a run nobody is there for, in a chat of Dot's own
+        # initiative, keeps a message, a post or a release for their yes rather than waits (item 922).
         self.owner_there: bool = owner_there
         # Whether nobody started the run (item 2016, :func:`dotagent.agent.unattended.unattended_origin`): its
         # processes start in the sandbox in every mode, whatever the owner's switch says. The gate decides nothing by
         # it; the tools read it (``ToolContext.unattended``).
         self.unattended: bool = unattended
+        # What Dot's own tools keep from the run (item 2026): for a run nobody started, the paths its sandbox seals,
+        # refused to a step that reads or writes them in Dot's own process, in every mode; ``None`` for any other run.
+        self._seal: Seal | None = seal
         # The chat whose "don't ask again" yeses answer this run's questions (item 866): its own chat's, or for a
         # delegated run its parent's; ``None``: none answer them.
         self.chat_id: str | None = chat_id
@@ -431,6 +435,7 @@ class RunGate:
         values a login filled masked (the browser and web tools, item 621): the owner's rules are matched against it,
         so that what a rule decides never tells a run whether a word of its own is the password; everything the gate
         records, shows or asks is of ``info``."""
+        await self._keep_seal(info)
         await self._refuse_carried_secret(info, {} if arguments is None else arguments)
         # Before the locks of a site's pace and spend: the review model may take a while, and the other runs' steps
         # on the same site would wait for it (item 525).
@@ -466,6 +471,21 @@ class RunGate:
             await self._space(paced)
             await self._store.record_paced_action(paced.host, paced.pace, time.time(), self._run_id)
         return authorized
+
+    async def _keep_seal(self, info: ActionInfo) -> None:
+        """Refuse a step of a run nobody started that reads or writes, in Dot's own process, what its sandbox seals
+        (item 2026), in every mode, before the policy weighs it and before anything asks: its target when it is a
+        read or a write of a file, and the files it reads besides (``reads``)."""
+        if self._seal is None:
+            return
+        found: str | None = sealed_step(self._seal, info)
+        if found is None:
+            return
+        decision: Decision = Decision(verdict="deny", source="seal", reason=found, rule_id=None)
+        shown, said = await _shown(info, decision)
+        # A refusal before the policy weighs the step: the run's taint as it stands.
+        await self._emit_policy(shown, said, self.tainted)
+        raise PolicyDenied(found, {"action": _describe(shown), "source": decision.source})
 
     async def _keep_pace(self, info: ActionInfo, paced: PacedAction, lead: str) -> None:
         """Refuse the action when its site had as many of its class as the pace allows in the last hour or day; ``lead``
@@ -531,14 +551,16 @@ class RunGate:
                 # would have asked (item 443).
                 decided = rest.model_copy(update={"reason": f"{rest.reason}; also {review.reason}"})
         decision: Decision = supervised(decided, info) if self._mode_now() == "supervised" else decided
-        # The owner's free mode (item 922) asks nothing, these steps neither.
+        # The owner's free mode (item 922) asks nothing, these steps neither. Yolo asks a payment alone, in a chat the
+        # owner opened or one of Dot's own initiative (item 2069); outside yolo a chat of Dot's own initiative asks a
+        # message, a post and a release (item 850).
         held: Decision | None = (
             None
             if self._approvals.free
+            else payment_guard(info)
+            if self._mode_now() == "yolo" and (self.owners_chat or self.owners_word)
             else initiative_guard(info)
             if self.owners_word
-            else owners_guard(info)
-            if self.owners_chat and self._mode_now() == "yolo"
             else None
         )
         # Whether a yes given later may not answer the question by itself (item 483): one raised by what the run read,
@@ -548,22 +570,13 @@ class RunGate:
         # but the run the yes reaches asks the owner for the step itself.
         unkept: bool = decision.source in UNKEPT_SOURCES or tainted
         if held is not None and decision.verdict in ("allow", "ask"):
-            # In a chat of Dot's own initiative a message, a post or a release is the owner's question, in every mode;
-            # in a yolo run of a chat the owner opened, a payment, a message or a post is (item 860): what any rule or
+            # In a chat of Dot's own initiative a message, a post or a release is the owner's question in every mode but
+            # yolo (item 850); in yolo a payment is, there and in a chat the owner opened (item 2069): what any rule or
             # review made of it gives way, but a refusal or a hand-off, which is stricter.
             decision = held
         # Whatever it became, such a step is the owner's: a hand-off of theirs too, which yolo would waive (the
         # independent review of item 850: a hand-off rule, or a step that also carried a credential, went through).
-        judged: bool = (
-            held is not None
-            and held.source == "owner_asks"
-            and not self.owner_there
-            and decision.verdict == "ask"
-            and "financial" not in info.flags
-        )
-        note, answered_by = await self._authorize_decision(
-            info, decision, rules, tainted, unkept, held is not None, judged
-        )
+        note, answered_by = await self._authorize_decision(info, decision, rules, tainted, unkept, held is not None)
         if "message_send" in info.flags:
             await self._note_correspondents(info)
         if allowance is not None and state is not None:
@@ -623,8 +636,7 @@ class RunGate:
         rules: list[RuleRecord],
         tainted: bool,
         unkept: bool,
-        owners: bool = False,
-        judged: bool = False,
+        owners: bool,
     ) -> tuple[str, Answerer]:
         """What the decision means in this approval mode: a waiver, a refusal, the review model or the user; with the
         owner's note and who answered (item 468). ``tainted`` is the taint the policy weighed: the review model reads
@@ -634,9 +646,8 @@ class RunGate:
         if self._mode_now() == "yolo" and decision.verdict != "deny" and not owners:
             # A yolo run asks nothing else (the owner's word of 2026-10-20, item 443): a credential, a spend, Dot's own
             # files, the review's refusal — the step does it, and the record says what it would have asked. A refusal
-            # is not a question and stands below; nor is a step waived that ``owners`` marks: of a chat of Dot's own
-            # initiative that sends, posts or releases (item 850), or of a chat of the owner's that pays, sends or
-            # posts (item 860), its question or hand-off.
+            # is not a question and stands below; nor is a step waived that ``owners`` marks: a payment of a chat the
+            # owner opened or of one of Dot's own initiative (item 2069), its question or hand-off.
             return await self._waive(info, decision), "yolo"
         if decision.verdict == "deny":
             shown, said = await _shown(info, decision)
@@ -675,11 +686,9 @@ class RunGate:
         allowed: ApprovalRecord | None = await self._kept_answer(info, decision, tainted)
         if allowed is not None:
             return allowed.note.strip(), "user"
-        # The question or the hand-off of such a step of a chat of Dot's own initiative is the owner's in every mode
-        # (item 850), and so is one of a yolo run of the owner's chat (item 860), but a message or a post of a run they
-        # are not there for (a schedule's), which the review model judges (``judged``): legal, harmless, and called
-        # for by their words; what it cannot tell goes to them.
-        route: Route = "reviewer" if judged else "user" if owners else route_for(decision, self._mode_now())
+        # The question or the hand-off of such a step of a chat of Dot's own initiative is the owner's in every mode but
+        # yolo (item 850), and a payment of a yolo run is theirs (item 2069), whoever is there to answer it.
+        route: Route = "user" if owners else route_for(decision, self._mode_now())
         if route == "waived":
             return await self._waive(info, decision), "yolo"
         # The owner's yes for the kind in this chat answers before the review model would (item 866: in `auto`, and a

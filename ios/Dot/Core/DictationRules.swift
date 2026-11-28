@@ -81,6 +81,34 @@ enum DictationText {
     }
 }
 
+/// What one go of dictation heard so far (item 2050, DotNext's `DictationTranscript` of item 2048, here as the old app
+/// does not link DotEngine): the utterances the recognizer closed, in order, and the one it is still writing. Since iOS
+/// 18 the recognizer closes an utterance when the speaker pauses, inside the same task and with no final result (the
+/// closing result carries `speechRecognitionMetadata`), and the next results hold only the words said after the pause:
+/// a result replaces only the live utterance, so a pause never takes words away.
+struct DictationTranscript: Equatable, Sendable {
+    /// The utterances the recognizer closed, oldest first.
+    let closed: [String]
+    /// The words of the utterance being written now ("" between two).
+    let live: String
+
+    static let empty: DictationTranscript = DictationTranscript(closed: [], live: "")
+
+    /// Everything heard, one space apart.
+    var text: String {
+        (closed + [live]).filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    /// The transcript after a result: `words` replace the live utterance (an empty result keeps it), and
+    /// `closesUtterance` (a final result, or one with metadata) closes it, so the next words start a new one.
+    func taking(words: String, closesUtterance: Bool) -> DictationTranscript {
+        let said: String = words.trimmingCharacters(in: .whitespacesAndNewlines)
+        let next: DictationTranscript = said.isEmpty ? self : DictationTranscript(closed: closed, live: said)
+        guard closesUtterance, !next.live.isEmpty else { return next }
+        return DictationTranscript(closed: next.closed + [next.live], live: "")
+    }
+}
+
 /// What a go of dictation last wrote to the box.
 final class DictationWritten {
     var text: String?

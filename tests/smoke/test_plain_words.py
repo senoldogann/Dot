@@ -584,12 +584,10 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
             ("slow", "A chat at work", "textarea"),
         ):
             await reader.go(f"/runs/{served.runs[key]}", label, settle)
-        # The composer's menus, on the home. A phone's model pill opens the chat's settings, which hold the options
-        # under the model (items 1202 and 1330): one sheet, read once.
+        # The composer's menus, on the home. The model pill opens the chat's settings on every width, which hold the
+        # reasoning, the mode and the approvals under the models (items 1202 and 2015): one sheet, read once.
         await reader.go("/runs", "New chat", "textarea")
-        await reader.opens("The model menu", page.locator("button[title='ollama:scripted']").first)
-        if width >= 720:
-            await reader.opens("The options menu", page.locator("button[title^='Approvals:']").first)
+        await reader.opens("The chat's settings", page.locator("button[title='ollama:scripted']").first)
         await reader.opens("The plus menu", page.get_by_role("button", name="Add files or teach a task"))
         goal: Locator = page.get_by_role("textbox", name="Goal")
         for trigger, label in (("/", "The slash menu"), ("@", "The at menu")):
@@ -649,8 +647,8 @@ async def test_the_sidebar_and_the_pages_beside_it_say_what_they_mean(browser: B
         await reader.read("The sidebar while chats are chosen")
         await page.keyboard.press("Escape")
         await reader.go("/campaigns", "Campaigns", "main.page")
-        await reader.go("/agents", "Agents", "main.page")
-        await reader.opens("The form that makes an agent", page.get_by_role("button", name="New agent").first)
+        await reader.go("/agents", "Bots", "main.page")
+        await reader.opens("The form that makes a bot", page.get_by_role("button", name="New bot").first)
         # New team is under the page's "…" (item 1136).
         await page.get_by_role("button", name="More actions").first.click()
         await reader.opens("The form that makes a team", page.get_by_role("menuitem", name="New team"))
@@ -660,7 +658,7 @@ async def test_the_sidebar_and_the_pages_beside_it_say_what_they_mean(browser: B
         await reader.opens("The form of the morning brief", page.get_by_role("button", name="Morning brief settings"))
         # The form that adds a schedule is a page of the settings (item 1337).
         await reader.go(
-            "/settings/schedules/new", "Settings › Scheduled tasks › New schedule", ".settings-pane .set-card"
+            "/settings/schedules/new", "Settings › Scheduled tasks › New routine", ".settings-pane .set-card"
         )
         reader.done()
         await page.context.close()

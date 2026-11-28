@@ -166,6 +166,8 @@
             client?.urlProtocolDidFinishLoading(self)
         }
 
+        private let storedRule: String = #"{"id":"rule_example","enabled":true,"behavior":"ask","tool_glob":"shell","match_regex":"rm","description":"Ask before deleting a file.","never_decided_by":null}"#
+
         private func answer(method: String, path: String, behaviour: FixtureBehaviour) -> (Int, String) {
             if path == "/api/health" { return (200, #"{"ok":true,"version":"0.2.0","notifications":"ok","awake":"holding"}"#) }
             if path == "/api/proof" {
@@ -189,7 +191,8 @@
             case ("GET", "/api/phone/push-settings"), ("PUT", "/api/phone/push-settings"):
                 return (200, #"{"needs_you":true,"ready":true,"done":false}"#)
             case ("GET", "/api/models"): return (200, models)
-            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"), ("PUT", "/api/models/kinds"), ("PUT", "/api/models/standby"):
+            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"), ("PUT", "/api/models/kinds"), ("PUT", "/api/models/check-other-family"),
+                ("PUT", "/api/models/standby"):
                 return (200, modelsConfig)
             case ("GET", "/api/models/learning"), ("PUT", "/api/models/learning"):
                 return (200, #"{"proposer":"","composer":"claude_code:opus","selector":"","experience":"","review":"claude_code:opus"}"#)
@@ -208,6 +211,14 @@
                     #"{"model":"claude_code:opus","effort":"high","fallback":["opencode_go:deepseek-v4.1-flash"],"fallback_effort":"high","small_model":"","small_max_lines":150,"max_minutes":15}"#
                 )
             case ("GET", "/api/policy/free"): return (200, #"{"free":false}"#)
+            case ("GET", "/api/rules"): return (200, "[\(storedRule)]")
+            case ("GET", "/api/rules/usage"):
+                return (200, #"{"rules":[{"rule_id":"rule_example","decides":2}],"partial":false,"problem":null}"#)
+            case ("POST", "/api/rules/draft"):
+                return (200, #"{"behavior":"ask","tool_glob":"shell","match_regex":"rm","description":"Ask before deleting a file."}"#)
+            case ("POST", "/api/rules/preview"):
+                return (200, #"{"scanned":10,"fits":3,"would_decide":2,"partial":false,"problem":null}"#)
+            case ("POST", "/api/rules"): return (201, storedRule)
             case ("GET", "/api/memories"): return (200, memories(now: now))
             case ("GET", "/api/memories/trash"): return (200, trash(now: now))
             case ("GET", "/api/agents"): return (200, agents(now: now))
@@ -329,7 +340,7 @@
         }
 
         private var modelsConfig: String {
-            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{},"kinds":{"security":"claude_code:opus"}}"#
+            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{},"kinds":{"security":"claude_code:opus","code":"claude_code:opus"},"check_other_family":"opencode_go:kimi-k3"}"#
         }
 
         private func status(engaged: Bool) -> String {
@@ -337,8 +348,11 @@
         }
 
         private var models: String {
+            let family: (String) -> String = { ref in
+                ["claude", "deepseek", "kimi", "gemma", "qwen"].first { ref.contains($0) } ?? ""
+            }
             let option: (String, String) -> String = { ref, label in
-                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":\#(ref == "claude_code:opus" ? #"["low","medium","high","xhigh","max"]"# : #"["low","medium","high"]"#),"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
+                #"{"ref":"\#(ref)","label":"\#(label)","family":"\#(family(ref))","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":\#(ref == "claude_code:opus" ? #"["low","medium","high","xhigh","max"]"# : #"["low","medium","high"]"#),"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
             }
             return "["
                 + #"{"provider":"claude_code","models":[\#(option("claude_code:sonnet", "Sonnet 5.5")),\#(option("claude_code:opus", "Opus 5.5"))],"error":null},"#

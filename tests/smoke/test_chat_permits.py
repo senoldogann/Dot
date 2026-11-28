@@ -116,7 +116,7 @@ async def test_a_yes_with_the_box_lets_the_steps_of_its_kind_go_in_that_chat_alo
     served: tuple[Runtime, RunManager, httpx.AsyncClient],
 ) -> None:
     runtime, manager, client = served
-    started = await client.post("/api/runs", json={"goal": "Send the five press mails", "approvals": "yolo"})
+    started = await client.post("/api/runs", json={"goal": "Send the five press mails", "approvals": "ask"})
     assert started.status_code == 201, started.text
     run_id: str = started.json()["id"]
     seen: set[str] = set()
@@ -135,7 +135,7 @@ async def test_a_yes_with_the_box_lets_the_steps_of_its_kind_go_in_that_chat_alo
     assert len(answered) == 1 and "press-one" in answered[0].summary
     assert first["id"] in answered[0].note
     # Another chat asks again for the same kind.
-    again = await client.post("/api/runs", json={"goal": "Send one more", "approvals": "yolo"})
+    again = await client.post("/api/runs", json={"goal": "Send one more", "approvals": "ask"})
     elsewhere = await _card(client, seen)
     assert elsewhere["run_id"] == again.json()["id"] and "press-one" in str(elsewhere["summary"])
     await client.post(f"/api/approvals/{elsewhere['id']}/decision", json={"approve": False})
@@ -222,7 +222,7 @@ async def _nobody(request: ReviewRequest) -> ReviewVerdict:
     raise AssertionError(f"the review model must not be asked: {request.action.summary}")
 
 
-def _gate(runtime: Runtime, run: RunRecord, chat: str, owners_word: bool = False, approvals: str = "yolo") -> RunGate:
+def _gate(runtime: Runtime, run: RunRecord, chat: str, owners_word: bool = False, approvals: str = "ask") -> RunGate:
     return RunGate(
         runtime.store,
         runtime.bus,
@@ -247,7 +247,7 @@ async def test_a_permit_never_answers_money_nor_a_step_of_dots_own_initiative(
     served: tuple[Runtime, RunManager, httpx.AsyncClient],
 ) -> None:
     """Even with a permit of the step's kind stored in the chat, by any means: a payment is handed to the owner, and a
-    message of a chat Dot opened on its own initiative is asked."""
+    message of a chat Dot opened on its own initiative is asked (in `ask`: yolo asks no message since item 2069)."""
     runtime, _, _ = served
     chat: str = (await runtime.store.create_thread("Pay and mail", "ui")).id
     run: RunRecord = await runtime.store.create_run(

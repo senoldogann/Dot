@@ -163,6 +163,44 @@ public struct PlanStep: Sendable, Equatable, Hashable {
     }
 }
 
+/// How a plan's run stands, for the plan's sheet: at work, done, failed or stopped (the owner's report of 2026-11-28: a
+/// failed run's plan still showed its step in progress).
+public enum PlanEnd: Sendable, Equatable {
+    case working
+    case done
+    case failed
+    case stopped
+
+    /// From the run's status (`RunRecord.status`); a run not known yet works.
+    public init(runStatus: String?) {
+        switch runStatus {
+        case "done": self = .done
+        case "failed": self = .failed
+        case "cancelled": self = .stopped
+        default: self = .working
+        }
+    }
+}
+
+/// The plan as it stands once its run ended: a step still in progress when the run failed is `failed`, when it was
+/// stopped `stopped`; at work or done, the plan as the run left it. Pure.
+public func planAtEnd(_ steps: [PlanStep], end: PlanEnd) -> [PlanStep] {
+    let settled: String
+    switch end {
+    case .working, .done: return steps
+    case .failed: settled = "failed"
+    case .stopped: settled = "stopped"
+    }
+    return steps.map { $0.status == "in_progress" ? PlanStep(text: $0.text, status: settled) : $0 }
+}
+
+/// The step a plan stands at (1-based): the one in progress, failed or stopped, else the first not done; `nil` when every
+/// step is done or skipped. Pure.
+public func planCurrentStep(_ steps: [PlanStep]) -> Int? {
+    if let index = steps.firstIndex(where: { ["in_progress", "failed", "stopped"].contains($0.status) }) { return index + 1 }
+    return steps.firstIndex(where: { $0.status == "pending" }).map { $0 + 1 }
+}
+
 /// Who settled an ask, as far as the phone can tell (the daemon's `approval_decided` does not say who).
 public enum AskDecider: Sendable, Equatable, Hashable {
     /// The owner on this phone.
@@ -201,19 +239,21 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     /// The model's thinking of a step: `live` while it is being written.
     case thought(id: String, text: String, live: Bool)
     case tool(ToolEntry)
-    /// A call the run told as one of Dot's short messages, which its step's own words did not tell (a `narration` event,
-    /// item 1976): drawn in the conversation of "Show steps" off alone, in the words of the live line for that call.
-    case narration(id: String, step: HelperStep)
     /// The message a routine sent into the chat (a schedule's, a watcher's or a hook's run, owner 2026-11-27): one compact
     /// row, "Routine · <its title>", whose chevron shows the whole `prompt`; never an owner's bubble.
     case automation(id: String, title: String, prompt: String)
+    /// Dot's first words as a run the owner started begins (a `first_words` event, item 2018): the fast model's line of what
+    /// it looks at first, or empty for the words said at once ("Looking into it…"), which the app says in its language.
+    /// Drawn in every way of showing the work and in the conversation: they are Dot's words, not a step.
+    case firstWords(id: String, text: String)
     /// The helpers a run started, each with its current step (plan §18).
     case helpers(id: String, runId: String, helpers: [HelperView])
     /// The run's plan as a checklist, as it stands now.
     case plan(id: String, steps: [PlanStep])
     case decision(AskAnchor)
     case work(WorkFold)
-    /// A run that ended other than done (`failed`, `cancelled`): the cause in one line.
+    /// A run that ended other than done (`failed`, `cancelled`): the cause in one line; or one that waits on the owner
+    /// (`waitingEnd`, item 2070): what it needs from them in one line.
     case ended(id: String, status: String, detail: String)
     /// A run the Claude plan's usage limit stopped; `resetsAt` when the plan said (epoch seconds).
     case limit(id: String, resetsAt: Double?)
@@ -221,7 +261,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .owner(let id, _, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
-            .limit(let id, _), .narration(let id, _), .automation(let id, _, _):
+            .limit(let id, _), .automation(let id, _, _), .firstWords(let id, _):
             id
         case .tool(let entry): entry.id
         case .decision(let anchor): anchor.id
@@ -279,9 +319,9 @@ private func builtRuns(of chat: ChatProjection, streaming: Bool, context: Transc
 }
 
 /// The transcript of "Show steps" off (items 1915 and 1976): the chat told as a conversation, as Grok Bot tells its work.
-/// The owner's words, Dot's words (those on the way to its calls too, which stay where they were said), the lines of the
-/// calls its words did not tell (`narration`), the asks, the helpers and how runs ended; a run at work's steps and
-/// thoughts are left out, a failed call too, its live line saying what it does. A finished run's steps, thoughts and
+/// The owner's words, Dot's words (those on the way to its calls too, which stay where they were said), the asks, the
+/// helpers and how runs ended; a run at work's steps and thoughts are left out, a failed call too, and a call is never
+/// a line of its own (owner 2026-11-27): the one live line says what the run does. A finished run's steps, thoughts and
 /// plan are one fold, "Worked for 2m", before its answer, drawn folded even with a failed step in it: a tap there shows
 /// them, so nothing is lost. Pure.
 public func conversation(of chat: ChatProjection, pending: [PendingMessage], streaming: Bool, context: TranscriptContext) -> [TranscriptItem] {
@@ -349,7 +389,7 @@ enum Category: Equatable {
     case thought
     case decision
     case runEnd
-    case narration
+    case firstWords
 }
 
 /// A row with what the filter and the fold need: its category and when it began and ended.
@@ -406,18 +446,20 @@ private func runItems(
     var calls: [String: Int] = [:]
     var asks: [String: Int] = [:]
     var planAt: Int?
-    // Whether the newest step wrote words, which tell its calls: no line of a call stands beside them (item 1976).
-    var said: Bool = false
     // The step each of Dot's words came from, by its row's id: the run's end names the steps its answer restates.
     var stepOf: [String: Int] = [:]
     let events: [EventRecord] = timeline?.events ?? []
     for event in events {
         switch event.kind {
-        case "narration":
-            guard !said, let tool: String = event.data["tool"]?.string else { continue }
-            let about: String = event.data["args"]?.object?.values.compactMap(\.string).first ?? ""
-            let step: HelperStep = HelperStep(tool: tool, target: about, line: "", at: event.ts)
-            items.append(Built(item: .narration(id: "n:\(event.id)", step: step), category: .narration, start: event.ts, end: event.ts))
+        case "first_words":
+            // The fast model's line takes the place of the words said at once: one row a run.
+            let text: String = event.data["text"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let row: Built = Built(item: .firstWords(id: "fw:\(run.id)", text: text), category: .firstWords, start: event.ts, end: event.ts)
+            if let at: Int = items.firstIndex(where: { $0.category == .firstWords }) {
+                items[at] = Built(item: row.item, category: .firstWords, start: items[at].start, end: items[at].end)
+            } else {
+                items.append(row)
+            }
         case "assistant":
             let thought: String = event.data["thinking"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !thought.isEmpty {
@@ -425,7 +467,6 @@ private func runItems(
                 items.append(Built(item: .thought(id: "th:\(run.id):\(step)", text: thought, live: false), category: .thought, start: event.ts, end: event.ts))
             }
             let text: String = event.data["text"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            said = !text.isEmpty
             guard !text.isEmpty else { continue }
             if let step: Int = event.data["step"]?.int { stepOf["a:\(event.id)"] = step }
             items.append(Built(item: .answer(id: "a:\(event.id)", text: text, writing: false, endedAt: nil), category: .answer(final: false), start: event.ts, end: event.ts))
@@ -522,12 +563,21 @@ private func runItems(
                 items.append(Built(item: .limit(id: "e:\(run.id)", resetsAt: resets), category: .runEnd, start: event.ts, end: event.ts))
             } else {
                 let message: String = error?["message"]?.string ?? ""
+                let needs: String = (event.data["needs"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                // A run that waits on the owner (item 2070: done as far as it can go, `waiting`; item 1061: failed, having
+                // said what it needs) ends "Waiting for you" with what it needs, its answer standing above, not failed.
+                // A helper's needs go to the run that asked it, not to the owner (as the web's `timeline.js` keeps them).
+                let waits: Bool =
+                    run.parentRunId == nil && (event.data["waiting"]?.bool == true || (status == "failed" && !needs.isEmpty))
                 // A failed run's result is its error's words: they stand once, in the card that says it failed.
-                let resultIsTheError: Bool = status != "done" && (message.isEmpty || result == message.trimmingCharacters(in: .whitespacesAndNewlines))
+                let resultIsTheError: Bool =
+                    !waits && status != "done" && (message.isEmpty || result == message.trimmingCharacters(in: .whitespacesAndNewlines))
                 if !result.isEmpty, !resultIsTheError {
                     items.append(Built(item: .answer(id: "r:\(run.id)", text: result, writing: false, endedAt: nil), category: .answer(final: true), start: event.ts, end: event.ts))
                 }
-                if status != "done" {
+                if waits {
+                    items.append(Built(item: .ended(id: "e:\(run.id)", status: waitingEnd, detail: firstLine(needs)), category: .runEnd, start: event.ts, end: event.ts))
+                } else if status != "done" {
                     let cause: String = firstLine(message.isEmpty ? (status == "failed" ? result : "") : message)
                     items.append(Built(item: .ended(id: "e:\(run.id)", status: status, detail: cause), category: .runEnd, start: event.ts, end: event.ts))
                 }
@@ -542,7 +592,9 @@ private func runItems(
         if !result.isEmpty {
             items.append(Built(item: .answer(id: "r:\(run.id)", text: result, writing: false, endedAt: nil), category: .answer(final: true), start: run.createdAt, end: run.createdAt))
         }
-        if run.status != "done" {
+        if run.endReason == ownerWait {
+            items.append(Built(item: .ended(id: "e:\(run.id)", status: waitingEnd, detail: ""), category: .runEnd, start: run.createdAt, end: run.createdAt))
+        } else if run.status != "done" {
             items.append(Built(item: .ended(id: "e:\(run.id)", status: run.status, detail: ""), category: .runEnd, start: run.createdAt, end: run.createdAt))
         }
     }
@@ -620,8 +672,8 @@ private func firstLine(_ text: String) -> String {
 /// Whether a row of `category` shows in `mode` (the table on `ToolCallMode`).
 func shows(_ category: Category, mode: ToolCallMode) -> Bool {
     switch (mode, category) {
-    // A call's line is the conversation's alone (`conversation`), never beside the steps it tells.
-    case (_, .narration): false
+    // Dot's first words are its words, in every mode.
+    case (_, .firstWords): true
     case (.showAll, _): true
     case (_, .owner), (_, .note), (_, .answer(final: true)), (_, .writing), (_, .decision), (_, .runEnd): true
     case (.zen, .thought), (.hideAll, .thought): false
@@ -714,7 +766,7 @@ public let helperWaitTools: Set<String> = ["delegate", "message_agent", "task", 
 /// Whether `run` of `chat` has stopped and only waits for its helpers: it writes and thinks nothing, and every call of
 /// its newest step that has no result yet waits on a helper (`helperWaitTools`; a `delegate` with `wait` false does not).
 /// `false` while any other call of that step runs, while it has no open call, and once it ended: then it works or
-/// rests. The capsule says "Waiting on N helpers" only while this holds (the owner's report of 2026-11-27). Pure.
+/// rests. The capsule says "Waiting for N helpers" only while this holds (the owner's report of 2026-11-27). Pure.
 public func waitsOnHelpers(of chat: ChatProjection, run: String) -> Bool {
     if let words: String = chat.writing[run], !words.isEmpty { return false }
     if let thought: LiveThought = chat.thinking[run], !thought.text.isEmpty { return false }

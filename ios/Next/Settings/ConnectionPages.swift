@@ -262,16 +262,13 @@ struct NotificationsPage: View {
             LoadedPage(state: state, macPlace: String(localized: "Settings › General", comment: "Where on the Mac: the General page"), retry: { Task { await load() } }) { settings in
                 GroupedSection(
                     header: String(localized: "Tell me when", comment: "Notifications section: the kinds of push"),
-                    footer: String(localized: "Dot Next gets notifications once it replaces the old Dot app on this iPhone; until then the old app keeps them. These switches are kept on your Mac for this phone.", comment: "Notifications footer: no push before the swap (owner's decision)")
+                    footer: String(localized: "Your Mac remembers which task notifications to send to this phone.", comment: "Notifications footer: these preferences belong to this phone")
                 ) {
                     ToggleRow(
                         systemImage: "exclamationmark.bubble", title: String(localized: "Dot needs you", comment: "Push kind: an approval or a question waits"),
                         description: String(localized: "Approvals and questions that wait on you", comment: "Push kind description"), isOn: binding(settings, \.needsYou))
                     ToggleRow(
-                        systemImage: "envelope.badge", title: String(localized: "Drafts ready", comment: "Push kind: a draft waits to be sent"),
-                        description: String(localized: "A message Dot wrote for you to send", comment: "Push kind description"), isOn: binding(settings, \.ready))
-                    ToggleRow(
-                        systemImage: "checkmark.circle", title: String(localized: "Done or failed", comment: "Push kind: a task ended"),
+                        systemImage: "checkmark.circle", title: String(localized: "Done, failed or blocked", comment: "Push kind: a task ended"),
                         description: String(localized: "A task you started ended", comment: "Push kind description"), isOn: binding(settings, \.done))
                 }
             }

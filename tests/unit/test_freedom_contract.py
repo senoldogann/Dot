@@ -49,8 +49,8 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.mcp.naming import exposed_name
 from dotagent.mcp.types import McpTool, ToolHints
 from dotagent.policy import engine
-from dotagent.policy.engine import OWNERS_REASON, decide
-from dotagent.policy.sandbox import UNSANDBOXED, SwitchedSandbox
+from dotagent.policy.engine import PAYMENT_REASON, decide
+from dotagent.policy.sandbox import NO_SEAL, UNSANDBOXED, Seal, SwitchedSandbox
 from dotagent.policy.types import ActionInfo, ApprovalMode, Decision, Preset
 from dotagent.runtime import Runtime, _tool_groups, close_runtime, open_runtime
 from dotagent.safari.desk import SafariDesk
@@ -113,9 +113,11 @@ NO_PACE: PaceConfig = PaceConfig(
     public_per_hour=0, public_per_day=0, social_per_hour=0, social_per_day=0, public_spacing_s=0.0
 )
 
-# What the contract lets a yolo run of the owner's chat ask them, and what it lets a yolo run of a chat of Dot's own
-# initiative ask: written here as the owner worded them (items 860 and 850), and compared with the engine's own sets.
-OWNERS_CHAT_ASKS: frozenset[str] = frozenset({"payment", "message", "post"})
+# What the contract lets a yolo run ask the owner, in a chat they opened and in a chat of Dot's own initiative (item
+# 2069, the owner's word of 2026-11-28: "Yolo modda hiçbir şey sormasın, sadece ödeme işlerinde sorsun"), and what a
+# chat of Dot's own initiative asks in the modes that ask (item 850), which no way of this table is: written here as the
+# owner worded them, and compared with the engine's own sets.
+YOLO_ASKS: frozenset[str] = frozenset({"payment"})
 INITIATIVE_CHAT_ASKS: frozenset[str] = frozenset({"message", "post", "release"})
 _FLAG_OF: dict[str, str] = {
     "payment": "financial",
@@ -336,7 +338,7 @@ class World:
             protected=(home / ".ssh", home / "Library" / "Keychains"),
             dot_paths=(self.dot_home,),
             # A run the owner started in yolo, whose processes start with no sandbox (item 2016).
-            sandbox=SwitchedSandbox(UNSANDBOXED, False, False),
+            sandbox=SwitchedSandbox(UNSANDBOXED, NO_SEAL, False, False),
             approvals=SimpleNamespace(free=False),
             judge=_Judge(),
             vault=_Missing("vault"),
@@ -624,6 +626,11 @@ ROWS: tuple[Row, ...] = (
     _row("code: run Python", "code_run", {"code": "print(1 + 1)", "title": "Add two numbers"}),
     # --- the iPhone, a site's own face, and a security scan
     _row("phone: status", "phone_status", {}),
+    # The Dot Next app's calendars, reminders and location (item 2051): the gate decides before the ask goes.
+    _row("phone: calendar events", "phone_calendar_events", {"start": "2026-11-28", "end": "2026-11-29"}),
+    _row("phone: add an event", "phone_calendar_add", {"title": "Dentist", "start": "2026-11-28T14:00"}),
+    _row("phone: add a reminder", "phone_reminder_add", {"title": "Call Ada", "due": "2026-11-28"}),
+    _row("phone: location", "phone_location", {}),
     _row("recon: a site", "recon", {"target": "example.com"}),
     _row("recon: a security scan", "security_scan", {"target": "example.com"}),
     # --- the run's own tools
@@ -709,14 +716,17 @@ class Way:
     tainted: bool = False
     # A run nobody started (item 2016): its processes keep the sandbox, and it asks what such a run asked before.
     unattended: bool = False
+    # Whether the owner is there to answer (item 860's mark, which item 2027 reads from the run's origin for what Dot
+    # resumes on its own): a run nobody watches or started has nobody there.
+    owner_there: bool = True
 
     @property
     def asks(self) -> frozenset[str]:
         if self.free:
             return frozenset()
-        if self.owners_word:
-            return INITIATIVE_CHAT_ASKS
-        return OWNERS_CHAT_ASKS if self.owners_chat and self.approvals == "yolo" else frozenset()
+        if self.approvals == "yolo":
+            return YOLO_ASKS if self.owners_chat or self.owners_word else frozenset()
+        return INITIATIVE_CHAT_ASKS if self.owners_word else frozenset()
 
 
 WAYS: tuple[Way, ...] = (
@@ -729,10 +739,17 @@ WAYS: tuple[Way, ...] = (
     Way("yolo, in the owner's chat", "yolo", False, owners_chat=True),
     Way("yolo, in the owner's chat, after outside content", "yolo", False, owners_chat=True, tainted=True),
     Way("yolo, in a chat of Dot's own", "yolo", False, owners_word=True),
-    Way("yolo, in a run nobody watches", "yolo", False),
-    Way("yolo and free, in a run nobody started", "yolo", True, unattended=True),
-    Way("yolo, in a run nobody started", "yolo", False, unattended=True),
-    Way("yolo, in a run nobody started, in a chat of Dot's own", "yolo", False, owners_word=True, unattended=True),
+    Way("yolo, in a run nobody watches", "yolo", False, owner_there=False),
+    Way("yolo and free, in a run nobody started", "yolo", True, unattended=True, owner_there=False),
+    Way("yolo, in a run nobody started", "yolo", False, unattended=True, owner_there=False),
+    Way(
+        "yolo, in a run nobody started, in a chat of Dot's own",
+        "yolo",
+        False,
+        owners_word=True,
+        unattended=True,
+        owner_there=False,
+    ),
 )
 
 
@@ -843,11 +860,23 @@ def _gate(
         taint_check=taint_check,
         owners_word=way.owners_word,
         owners_chat=way.owners_chat,
-        owner_there=True,
+        owner_there=way.owner_there,
         unattended=way.unattended,
+        # A run nobody started keeps from Dot's own tools what its sandbox seals (item 2026): Dot's own folder.
+        seal=_seal(room.world) if way.unattended else None,
     )
     gate.tainted = way.tainted
     return gate
+
+
+def _seal(world: World) -> Seal:
+    """What the sandbox of a run nobody started seals in the world: Dot's own folder, never written."""
+    return Seal(sealed=(), unwritable=(world.dot_home,), closed=(world.dot_home,), open_folders=())
+
+
+# The rows a run nobody started is refused, in every mode (item 2026, the owner's word of 2026-11-27): the steps of
+# Dot's own tools that change Dot's own files, which the sandbox seals for that run's processes too. Nothing else.
+SEALED_ROWS: frozenset[str] = frozenset({"files: write Dot's own files", "files: edit Dot's own files"})
 
 
 async def _prepared(room: Room, row: Row) -> PreparedCall:
@@ -875,6 +904,7 @@ async def _table(
     broker.switch_free(way.free)
     gate: RunGate = _gate(room, broker, way, preset=preset)
     failures: list[str] = []
+    sealed_rows: set[str] = set()
     for row in ROWS:
         prepared: PreparedCall = await _prepared(room, row)
         info: ActionInfo = prepared.action
@@ -887,6 +917,12 @@ async def _table(
                 failures.append(f"{row.id}: asked the owner, which the contract does not allow here ({asked})")
             elif ("financial" in info.flags) != (asked.severity == "handoff"):
                 failures.append(f"{row.id}: asked with severity {asked.severity!r} for flags {info.flags}")
+            continue
+        except PolicyDenied as denied:
+            sealed: bool = denied.context.get("source") == "seal"
+            if not (way.unattended and sealed and row.id in SEALED_ROWS):
+                failures.append(f"{row.id}: refused, which a yolo or free run never does here ({denied})")
+            sealed_rows.add(row.id)
             continue
         except Exception as error:  # noqa: BLE001 - any refusal of a step is a finding of this table
             failures.append(
@@ -910,6 +946,8 @@ async def _table(
             ]
             if len(notes) != 1 or (notes[0].status, notes[0].decided_by) != ("approved", "yolo") or not notes[0].note:
                 failures.append(f"{row.id}: the policy would have asked ({policy.reason}) and no yolo record says so")
+    if sealed_rows != (SEALED_ROWS if way.unattended else set()):
+        failures.append(f"the seal refused {sorted(sealed_rows)}, and the contract names {sorted(SEALED_ROWS)}")
     assert await room.store.list_approvals("pending", 10) == []
     return failures, set(broker.asked)
 
@@ -968,17 +1006,18 @@ async def test_the_background_driver_changes_how_a_desktop_step_goes_never_what_
 
 def test_every_row_that_names_an_ask_is_a_row_the_contract_lists() -> None:
     kinds: set[str] = {kind for row in ROWS for kind in row.asks}
-    assert kinds <= OWNERS_CHAT_ASKS | INITIATIVE_CHAT_ASKS
+    assert kinds <= YOLO_ASKS | INITIATIVE_CHAT_ASKS
     # A row of every kind the contract names, so that none of them goes unwatched.
     assert kinds == {"payment", "message", "post", "release"}, kinds
 
 
 def test_what_the_engine_asks_in_yolo_is_what_the_contract_lists_and_no_more() -> None:
-    """``owners_guard`` and ``initiative_guard`` are the only questions of a yolo run, and what they ask about is the
-    owner's list: a flag added to either is a new ask."""
-    assert {_FLAG_OF[kind] for kind in OWNERS_CHAT_ASKS} == engine._OWNERS_FLAGS
+    """``payment_guard`` is the only question of a yolo run (item 2069), and ``initiative_guard`` the one of a chat of
+    Dot's own initiative in the modes that ask (item 850): what they ask about is the owner's list, and a flag added to
+    either is a new ask."""
+    assert {_FLAG_OF[kind] for kind in YOLO_ASKS} == engine._PAYMENT_FLAGS
     assert {_FLAG_OF[kind] for kind in INITIATIVE_CHAT_ASKS} == engine._INITIATIVE_FLAGS
-    assert OWNERS_REASON.startswith("In yolo too")
+    assert PAYMENT_REASON.startswith("In yolo too")
 
 
 # ------------------------------------------------------------------------------------------------ every tool is seen
@@ -1183,6 +1222,11 @@ async def test_the_gate_adds_no_wait_in_yolo_and_free_mode(
     gate: RunGate = _gate(room, broker, way)
     for row in ROWS:
         prepared: PreparedCall = await _prepared(room, row)
+        if way.unattended and row.id in SEALED_ROWS:
+            # The seal of a run nobody started refuses these at once (item 2026): no wait either.
+            with pytest.raises(PolicyDenied, match="what Dot loads and runs"):
+                await asyncio.wait_for(gate.authorize_recorded(prepared.action, None, prepared.weighed), 5)
+            continue
         done: Authorization = await asyncio.wait_for(
             gate.authorize_recorded(prepared.action, None, prepared.weighed), 5
         )
@@ -1459,27 +1503,28 @@ async def test_a_free_run_of_shell_files_and_a_browser_ends_done_asking_nothing_
     assert kinds.count("approval_auto") == 2, kinds
 
 
-async def test_a_yolo_run_that_is_not_free_asks_about_a_post_and_nothing_before_it(
+async def test_a_yolo_run_that_is_not_free_asks_about_the_payment_alone(
     loop_factory: Callable[..., Any],
 ) -> None:
-    """The control of the test above: yolo with free mode off keeps what the code keeps, a post in a chat the owner
-    opened, and asks nothing about the shell, the file and the click before it."""
+    """The control of the test above: yolo with free mode off keeps what the code keeps, a payment in a chat the owner
+    opened (item 2069), and asks nothing about the shell, the file, the click and the post before it; the post is
+    recorded as yolo's, with why it would have asked."""
     loop: Loop = await loop_factory(_script(*SHELL_FILES_BROWSER), False)
     run: RunRecord = await _start(loop, "yolo")
-    question: ApprovalRecord = await _pending(loop)
-    assert (question.run_id, question.tool) == (run.id, "browser_act")
-    assert OWNERS_REASON in question.summary, question.summary
+    payment: ApprovalRecord = await _pending(loop)
+    # Handed to the owner by the money stop, as in every mode that asks: their yes is that they paid.
+    assert (payment.run_id, payment.tool, payment.severity) == (run.id, "browser_act", "handoff")
     events: list[EventRecord] = await _events(loop, run)
     before: list[str] = [str(event.data["tool"]) for event in events if event.kind == "tool_call"]
-    assert before == ["shell", "write_file", "browser_act", "show_cards", "browser_act"], before
-    assert [event.kind for event in events if event.kind in {"cards_shown", "approval_requested"}] == [
-        "cards_shown",
-        "approval_requested",
+    assert before == ["shell", "write_file", "browser_act", "show_cards", "browser_act", "browser_act"], before
+    assert [event.kind for event in events if event.kind == "approval_requested"] == ["approval_requested"]
+    waived: list[ApprovalRecord] = [
+        record
+        for record in await loop.runtime.store.list_approvals(None, 100)
+        if record.run_id == run.id and record.decided_by == "yolo"
     ]
-    # The owner says no: the run goes on, and the payment is theirs too.
-    await loop.runtime.approvals.resolve(question.id, False, "test", "")
-    payment: ApprovalRecord = await _pending(loop)
-    assert payment.severity == "handoff"
+    assert len(waived) == 1 and "post in your name" in waived[0].note, waived
+    # The owner says no: the run goes on without paying.
     await loop.runtime.approvals.resolve(payment.id, False, "test", "")
     async with asyncio.timeout(WAIT_S * 4):
         ended: RunRecord = await loop.manager.wait(run.id)
@@ -1553,7 +1598,7 @@ def test_the_page_names_the_test_and_every_known_ask_and_every_ask_of_the_contra
         tool: str = reason.split(":", 1)[0]
         assert f"`{tool}`" in page, f"docs/freedom.md does not name the known ask {tool}"
     for name in (
-        "OWNERS_REASON",
+        "PAYMENT_REASON",
         "_INITIATIVE_REASON",
         "yolo_taint_check",
         "a change that makes a yolo or free run ask",

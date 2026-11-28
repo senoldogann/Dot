@@ -11,6 +11,8 @@ public struct Bot: Sendable, Hashable, Identifiable {
     public let unread: Int
     /// How many asks wait on the owner across its chats.
     public let asks: Int
+    /// What it carries and why it is overloaded (item 2067); `nil` before the agents were read.
+    public let load: BotLoad?
 
     public var id: String { record.id }
     public var isDot: Bool { record.id == dotAgentId }
@@ -19,11 +21,15 @@ public struct Bot: Sendable, Hashable, Identifiable {
     /// When it last moved, for the home's order (its record's birth when it has no chat yet).
     public var movedAt: Double { chats.first?.summary.updatedAt ?? record.createdAt }
 
-    public init(record: AgentRecord, chats: [ThreadRow], unread: Int, asks: Int) {
+    /// Whether it carries too much (item 2067): its reasons are on its profile.
+    public var overloaded: Bool { !(load?.reasons.isEmpty ?? true) }
+
+    public init(record: AgentRecord, chats: [ThreadRow], unread: Int, asks: Int, load: BotLoad?) {
         self.record = record
         self.chats = chats
         self.unread = unread
         self.asks = asks
+        self.load = load
     }
 }
 
@@ -52,6 +58,8 @@ public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fa
     }
     let homes: [String: ThreadSummary] = Dictionary(
         agents.compactMap { summary in summary.home.map { (summary.record.id, $0) } }, uniquingKeysWith: { first, _ in first })
+    let loads: [String: BotLoad] = Dictionary(
+        agents.compactMap { summary in summary.load.map { (summary.record.id, $0) } }, uniquingKeysWith: { first, _ in first })
     func bot(_ record: AgentRecord) -> Bot {
         var held: [ThreadRow] = byBot[record.id] ?? []
         // A home read with the agents is dropped once it went (deleted here, on the Mac or on another phone) or is going
@@ -61,7 +69,8 @@ public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fa
             held.append(ThreadRow(summary: home, revision: 0, asks: home.latestStatus == "blocked" ? 1 : 0, helpers: nil, background: nil))
         }
         let chats: [ThreadRow] = held.sorted { $0.summary.updatedAt > $1.summary.updatedAt }
-        return Bot(record: record, chats: chats, unread: chats.filter { $0.summary.unread && isConversation($0.summary) }.count, asks: chats.reduce(0) { $0 + $1.asks })
+        return Bot(record: record, chats: chats, unread: chats.filter { $0.summary.unread && isConversation($0.summary) }.count, asks: chats.reduce(0) { $0 + $1.asks },
+            load: loads[record.id])
     }
     let rank: [String: Int] = Dictionary(pinned.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
     let agentBots: [Bot] = others.map(bot).sorted { left, right in
@@ -81,19 +90,28 @@ public func unreadBots(_ bots: [Bot], except current: String?, muted: Set<String
     bots.filter { $0.id != current && !muted.contains($0.id) && ($0.unread > 0 || $0.asks > 0) }.count
 }
 
-/// What the home's search finds (PLAN §27: bots, chats, messages): the bots whose name or role holds every word, the
-/// chats whose title or last line does, and the daemon's finds in what the chats say, a chat named once.
+/// What the home's search finds (PLAN §27: bots, chats, messages, files): the bots whose name or role holds every word,
+/// the chats whose title or last line does, the daemon's finds in what the chats say (a chat named once), and the
+/// files of the chats whose name holds the words.
 public struct HomeFinds: Sendable, Equatable {
     public let bots: [Bot]
     public let chats: [ThreadRow]
     public let messages: [ChatHit]
+    public let files: [FileHit]
 
-    public var isEmpty: Bool { bots.isEmpty && chats.isEmpty && messages.isEmpty }
+    public init(bots: [Bot], chats: [ThreadRow], messages: [ChatHit], files: [FileHit]) {
+        self.bots = bots
+        self.chats = chats
+        self.messages = messages
+        self.files = files
+    }
+
+    public var isEmpty: Bool { bots.isEmpty && chats.isEmpty && messages.isEmpty && files.isEmpty }
 }
 
-public func homeFinds(_ query: String, bots: [Bot], hits: [ChatHit]) -> HomeFinds {
+public func homeFinds(_ query: String, bots: [Bot], hits: [ChatHit], files: [FileHit]) -> HomeFinds {
     let words: [String] = query.split(whereSeparator: \.isWhitespace).map(String.init)
-    guard !words.isEmpty else { return HomeFinds(bots: [], chats: [], messages: []) }
+    guard !words.isEmpty else { return HomeFinds(bots: [], chats: [], messages: [], files: []) }
     func holds(_ texts: [String]) -> Bool {
         words.allSatisfy { word in texts.contains { $0.range(of: word, options: [.caseInsensitive, .diacriticInsensitive]) != nil } }
     }
@@ -102,5 +120,44 @@ public func homeFinds(_ query: String, bots: [Bot], hits: [ChatHit]) -> HomeFind
     let named: Set<String> = Set(foundChats.map(\.summary.id))
     var seen: Set<String> = named
     let messages: [ChatHit] = hits.filter { seen.insert($0.threadId).inserted }
-    return HomeFinds(bots: foundBots, chats: foundChats, messages: messages)
+    return HomeFinds(bots: foundBots, chats: foundChats, messages: messages, files: files)
+}
+
+/// The chips over the search's finds (the owner's ask of 2026-11-27): everything, what the chats say (their titles and
+/// their messages), the bots, or the files. Dot has no group chats to show apart: a chat with a team is a chat.
+public enum SearchScope: String, CaseIterable, Sendable {
+    case all, messages, bots, files
+}
+
+/// How many finds of each kind All shows before its "See all" (the kind's chip).
+public let searchAllShown: Int = 3
+
+/// The finds a chip shows (pure): All a few of each kind, the others every find of their kind and nothing else.
+public func scopedFinds(_ finds: HomeFinds, scope: SearchScope) -> HomeFinds {
+    switch scope {
+    case .all:
+        HomeFinds(
+            bots: Array(finds.bots.prefix(searchAllShown)), chats: Array(finds.chats.prefix(searchAllShown)),
+            messages: Array(finds.messages.prefix(searchAllShown)), files: Array(finds.files.prefix(searchAllShown)))
+    case .messages: HomeFinds(bots: [], chats: finds.chats, messages: finds.messages, files: [])
+    case .bots: HomeFinds(bots: finds.bots, chats: [], messages: [], files: [])
+    case .files: HomeFinds(bots: [], chats: [], messages: [], files: finds.files)
+    }
+}
+
+/// The scope whose chip shows every find of a kind All cut short ("See all"), for each of the kinds All shows (pure).
+public func cutShort(_ finds: HomeFinds) -> Set<SearchScope> {
+    var scopes: Set<SearchScope> = []
+    if finds.bots.count > searchAllShown { scopes.insert(.bots) }
+    if finds.chats.count > searchAllShown || finds.messages.count > searchAllShown { scopes.insert(.messages) }
+    if finds.files.count > searchAllShown { scopes.insert(.files) }
+    return scopes
+}
+
+/// The word of a search snippet to find in its chat when the find opens it (the first the daemon marked `[...]`), so
+/// that the chat opens at that message; `nil` for a snippet with no mark (pure).
+public func markedWord(_ snippet: String) -> String? {
+    guard let open = snippet.firstIndex(of: "["), let close = snippet[open...].firstIndex(of: "]") else { return nil }
+    let word: String = String(snippet[snippet.index(after: open)..<close]).trimmingCharacters(in: .whitespaces)
+    return word.isEmpty ? nil : word
 }

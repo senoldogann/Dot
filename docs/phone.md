@@ -61,12 +61,18 @@ settings are on your Mac"), and no row of it opens the web app (item 1791). The 
 on the Mac, and a connected app, 1Password's token or an official sign-in is taken back with Disconnect; adding a
 connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows Dot's version and
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
-which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Its **Campaigns** (item 1895, under Agents) lists each
+which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Under **Permissions**, read rules in the order Dot checks
+them. Open a rule to see what it matches and how often it decided a step in the last 30 days. To add a rule, describe
+the action and choose **Ask me first** or **Leave it to me**. Dot shows the draft and checks it against past steps before
+you can save it. Add rules that let Dot proceed without asking and manage existing rules in the Mac's **Settings › Rules**.
+Its **Campaigns** (item 1895, under Agents) lists each
 campaign with its state, goal and last progress, and a campaign's page stops it (it asks first), resumes it or marks it
 achieved, as the web's page does; deleting one is done on the Mac. Dot Next's composer records your voice (item 1802): the
 microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written
 down on the iPhone (Apple's Speech, on the device: no audio leaves the phone) or, when you choose it in its Settings ›
-Voice, on your Mac (`/api/voice/streams`, as the web page does). Settings › Voice also orders the microphones voice input
+Voice, on your Mac (`/api/voice/streams`, as the web page does). A pause while you speak loses nothing: Apple's
+recognizer closes what was said before it and starts the next words from empty, and the composer keeps both, in
+order (item 2048). Settings › Voice also orders the microphones voice input
 takes (a wired or Bluetooth one is named the first time it is used). The same by hand:
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
@@ -108,8 +114,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
    Work (Work orders, Objectives, with those done or let go below the active ones, and Hand-offs with the two faces and "From → To", each to read, and
-   laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; the web lists them unscoped
-   and writes none, so the phone only reads, and scopes them to the bot itself: an agent's page has the orders given to it,
+   laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; neither the web nor the phone
+   writes them, and both scope them to the bot (the web on a bot's page since item 2035, by the same rules): an agent's page has the orders given to it,
    the objectives those serve and the messages to or from it; Dot's own has every order and objective and the messages it sent
    or was sent, not those between two other agents; all within the newest 60 orders and 60 objectives the daemon sends), a ⋯ menu with Pause bot and Resume bot for an agent (`POST /api/agents/{id}/pause|resume`, item 465), then
    Routines, Model, Activity, and a Notifications switch that is the phone's own count of its unread chats and what waits
@@ -120,9 +126,15 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    the end, item 1923; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
    item 1912; a new chat's half-written words are kept per bot, item 1914; each row, a bot's and a chat's, says where it
    stands, strongest first: Needs you in the accent while an approval, a question or a secret waits, Working… shimmering
-   and a small live mark for its time while a run works, Waiting on N helpers while the run waits on them, Waiting ·
+   and a small live mark for its time while a run works, Waiting for N helpers while the run waits on them, Waiting ·
    what works in the background (a helper let go, a background command, its loop), else its last line, with the unread
-   dot; Dot's face wears a ring while one of its chats works or waits on the owner; all from the list's rows, which carry
+   dot; Dot's face wears a ring while one of its chats works or waits on the owner, and a bot's face lives while a chat
+   of it works, in its row, its profile, its chat's header and the live line (a short bob, a glance to one side and back
+   every few seconds, a blink, a flip about every 16 s, each face at its own moment; still at rest, waiting on the owner
+   or failed; a slow glow instead under Reduce Motion; drawn only on screen and while the app is in front, at most 30
+   frames a second); the home's search opens with chips over it (All, Messages, Bots, Files: the bots, the chats by their
+   titles and what they say, and the files attached to them or written by their runs, three of each under All with See
+   all), a message opening its chat at that message with Find in chat on its word; all from the list's rows, which carry
    `helpers` and `background` and are read again when a chat's revision moves, item 1920; chats selected together are deleted
    in one request and leave every screen at once, coming back if the Mac refuses, and the list refills with older chats
    after a deletion, item 1964-1965; Settings › General › Language chooses English or Türkçe whatever the iPhone's,
@@ -150,7 +162,9 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    does since item 1350, `POST /api/runs`; a model that cannot answer is refused by name with a button that sends the
    message on the default model) and an agent's first message from the strip when it has no chat; the model and level of
    a chat in the inspector's sheet (**Model for this chat**, kept by the daemon as the web's composer keeps them,
-   `PATCH /api/threads/{id}`, and sent with each message together with the chat's mode and its agent); older messages
+   `PATCH /api/threads/{id}`; a follow-up that names none of them starts on them, as the daemon gives a message each
+   choice it leaves out from its chat, item 2071, and the Run section's **Model used** shows the model the newest run
+   worked on); older messages
    (reaching the top of a chat reads a page of older runs, `GET /api/runs?before=`, and keeps the reader's place); a
    tap on a step's line opens its arguments and result (clipped, and it says how much was left out); a hold on a
    message offers Quote, Copy, Select text, the seven reactions on what Dot said, and Edit from here on your own message
@@ -158,9 +172,9 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    for each chat, and for a new chat, across launches; the composer's microphone dictates on the iPhone (Apple's Speech
    framework, `requiresOnDeviceRecognition`: no audio leaves the phone; it asks for the speech and the microphone
    permissions when first pressed, and ends in a line, with a way to the app's page in Settings when a permission is
-   off, whenever it cannot start); and the Live Activity, its rows and a notification's Open action open the chat of
-   their run (`dotagent://run/<run id>`, or the alert's `#/runs/<id>` route). What it still leaves to the web UI is in
-   `roadmap/1353.md`.
+   off, whenever it cannot start; a pause while you speak loses nothing, item 2050); and the Live Activity, its rows
+   and a notification's Open action open the chat of their run (`dotagent://run/<run id>`, or the alert's `#/runs/<id>`
+   route). What it still leaves to the web UI is in `roadmap/1353.md`.
 
    **On a bad link (items 1370, 1371 and 1391)** the app draws what it holds first and never makes the owner wait for the
    network. The list, the agents, each chat (its newest runs and their last 400 events, its queue, schedules and
@@ -173,9 +187,10 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    a long run does not read the whole run: at 500 events or more it asks for the newest 400
    (`GET /api/runs/{id}/events?tail=400`; an older Dot answers with the run's first events and no
    `X-Dot-Events-Tail` header, and the app then reads the pages as before) and says that some steps are not shown. One
-   thin line under the status bar says when the phone has no link (*Offline — showing saved chats · last updated 3 min
-   ago*, or *Offline — 2 waiting to send*), when Dot cannot be reached for more than a moment (*Can't reach Dot*) and when
-   the phone's key was refused; it never covers what is read. **What is done with no link is kept and sent when it
+   quiet line in the chat capsule and chat list says *Mac asleep or unreachable since HH:MM* after five seconds
+   without a link. The time is the last successful contact in the phone's time zone. Before the first contact,
+   the line has no time. DotNext uses this line both for a lost phone network and a Mac that stops answering.
+   **What is done with no link is kept and sent when it
    returns, once and in order**: a message shows at once under the chat as *Waiting to send* (with *Retry now* and
    *Edit*) and goes with the key Dot starts a message once by (`POST /api/threads/{id}/queue` sent again after an answer
    that was lost is the same message; a message that waited more than a day is left to the owner to send again, as
@@ -252,11 +267,11 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    (item 1446): while it is active and shows a chat, an alert about that chat (a run of it or of its helpers, by the run
    its route names) is not drawn, whatever kind it is, since an approval or a question of that chat is its own card; an
    alert about another chat is a banner with its sound, and so is every alert while the app is inactive or shows the list. The app's pushes come in three kinds that each phone switches for itself (item 1421,
-   `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, and Dot's own
+   `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, the end of a run that is blocked or waits on you, and Dot's own
    failures you are to look at: a schedule that did not run or was switched off, learning that stopped, a restart after
-   an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run, a
-   schedule's run or a campaign that ended); all three are on until the phone says otherwise, a kind that is off is not
-   sent to that phone, and a schedule's own level of notices (Settings › Scheduled tasks) still decides whether the end
+   an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run that
+   succeeded or failed without waiting on you, or a schedule's run or campaign that ended). All three are on until the phone
+   says otherwise. A kind that is off is not sent to that phone, and a schedule's own level of notices (Settings › Scheduled tasks) still decides whether the end
    of its run is told at all. Once the app sent
    the activity's token every change goes to it, and an activity whose token came before its run started waits a
    minute for it (one opened by a request that started no run, a message queued behind a held queue, ends then); a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
@@ -365,14 +380,17 @@ on the helpers, the queue, the loops and the commands at work, five panes one up
 capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
 never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
+**Waiting for 2 helpers** while the run has stopped for them, or **Chat updates interrupted** if only the chat stream
+drops), its plan, **2 helpers**, the chat's tasks (**2 tasks**, item 2013), the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**.
+A daemon outage appears in the shared line under the bar. The capsule appears only when it has something to say. A row too narrow says
+**Waiting for 2 helpers** while the run has stopped for them, **Can't reach Dot**), its plan, **2 helpers**, the chat's tasks (**2 tasks**, item 2013), the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
 fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
 "Working") and at 320 px, with everything to say, takes a second line that keeps the status and the Stop in words, never
 a scroll or a cut. A tap on a segment opens its detail as a sheet from the foot of the screen, one
 at a time, which closes by a tap outside, by Escape, by its handle or by a swipe down: the queue's rows with their
 arrows, the loops with when next and **Stop repeating**, the commands with their words wrapped and **Stop**, the helpers
-with **Details** and **Stop**, the plan. What Dot asks, and the Continue of a task that was cut off, are cards of their
+with **Details** and **Stop**, the chat's tasks with how each stands, **Stop** and **Open**, the plan. What Dot asks, and the Continue of a task that was cut off, are cards of their
 own directly over the capsule, never folded into it.
 It respects reduced motion and its segments have focus rings, names and `aria-expanded`. A window wider than 720 px
 keeps the bar of item 401 and the panes over the composer.
@@ -470,7 +488,7 @@ switch off a rule that asks, delete or switch off an allow rule that a pre-appro
 (an allow rule asks of a run that read outside content where a pre-approved one does not; item 981), or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
 shown or connected on the Mac alone (the eye of the vault, 1Password, a sign-in of Google or Microsoft, the microphone's
 pane of System Settings) answers the installation's token alone, never a phone's key, whatever address a phone's request
-names. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is
+names. `yolo`, which asks nothing but a payment, in a chat you opened or one Dot opened on its own initiative (item 2069), is
 yours to use from the phone as from the Mac: a phone's key can start a run, a chat
 or a campaign in `yolo`, make a schedule, a loop of a chat (`/loop`) or an agent kept in `yolo`, switch one on or let
 one go on, and what such a run does is not held by these limits (it may do whatever your account may). Removing a phone
@@ -533,10 +551,9 @@ Tailscale, the same works on the Mac itself (`localhost` counts as secure) and o
 
 **On a bad link: the web app (items 1520 to 1524).** The web app on the Home Screen does what the iPhone app does on a bad
 link (above, items 1370, 1371 and 1391), with the same numbers and the same rules; its layout of files is its own. The
-service worker stays what it is, the shell only, and caches nothing under `/api`: the page keeps its data itself. All of it is the phone's: a page that is not a phone's touch screen (a pointer that
-hovers) keeps no copy, draws none, has no outbox and shows no line. A Mac's page talks to a Dot on the same Mac, which a
-network that is down does not take away, and `navigator.onLine` is false there while Dot answers: a page that took it
-for a lost link would hold what the owner sends.
+service worker caches the shell. The page keeps chat copies and the outbox on touch screens. Desktop and phone
+browsers both show the outage line when they lose contact with the Mac. A desktop browser can still reach Dot
+on the same Mac when the browser reports that the network is down.
 
 - **What it keeps (item 1520).** The list of chats, the agents, the status and the other lists the shell draws, and for
   each chat it opened the record of every run before the one it was opened at, the last 400 events of that run and of the
@@ -615,19 +632,11 @@ for a lost link would hold what the owner sends.
   told and let go, since no row holds it. An answer made with no link is kept under the chat it was made in (its thread,
   not its run), so that it goes in order with what else was done there. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
   could not reach Dot and the words stay in the box.
-- **The line (item 1524).** One thin line stands under the bar, and has no height while nothing is said. The states that
-  last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Can't reach Dot*
-  floats over the room the conversation leaves under the bar, as the notes of a lost stream always did (item 328), so that
-  what is read never moves when it comes or goes: *Offline: showing saved chats, last updated 3 min ago*
-  (the copy a chat is drawn from, and how old it is, kept true by a clock that runs only while it is shown), *Offline: 2
-  waiting to send* (what the outbox holds, which says more than the copy does), *Can't reach Dot* (Dot not reached for more
-  than a moment on a link that is there; a break that mends at once says nothing), and *This phone's key was refused*
-  with **Pair again**, on the sign-in screen the refused key leads to, which takes the owner to the field where the code
-  of Settings › Phone is typed. What it says is one pure function of the facts (`js/linewords.js`, English and Turkish),
-  one line on a phone 390 px wide and two at 320 px, in the light and the dark look, and the one thing in it that is
-  pressed is 44 px tall. While it says the link is down, a request that got no answer shows no toast over the chat. The line is the
-  phone's: a page that is not a phone's touch screen shows none, and keeps its toasts (the Dot it talks to is on the
-  same Mac, where a network that is down takes nothing away).
+- **The connection line (item 1524).** A lasting daemon outage shows *Mac asleep or unreachable since HH:MM*,
+  using the last successful contact in the browser's time zone. Before the first contact the line has no time.
+  It floats under the bar without moving the conversation. A phone without a network link shows *Offline* with
+  the number of waiting messages or the age of the saved chats. A refused key shows **Pair again** beside its
+  message on the sign-in screen.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
@@ -658,6 +667,35 @@ plain block.
 After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
 The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer
 or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
+
+## DotNext push and Live Activities
+
+DotNext registers APNs and Live Activity tokens using its paired key and the existing phone routes. Its lock-screen
+card shows running tasks, each task's live line and its elapsed time. Tapping it opens the task's chat. The daemon
+updates the card and ends it when the last run ends. A long task on the Mac can start a card by push, with the silent
+announcement Apple requires for remote starts.
+
+DotNext shows task alerts for a question or approval, a stored successful or failed end, and an end the goal check
+found blocked. The app opens the chat so the owner can read an ask before answering. The phone's language selects the
+English or Turkish task notice. The web uses Settings › General's language for the same task notices. The alert
+contains fixed copy and the chat's route. Task content stays in the chat. A stopped task stays quiet.
+
+The web and older app still carry routine warnings and ends, campaign ends, drafts, the morning brief and watcher
+notices. DotNext's notification switches cover questions and approvals and the three task outcomes above. The other
+notices stay on their existing surfaces, including the web and the channels that already deliver them.
+
+The daemon's `[apns].topic` selects one application. Use `dev.dotagent.phone.next` for DotNext or
+`dev.dotagent.phone` for the older app. Restart the daemon after changing the topic, then pair and open the selected
+app to register its tokens. The apps can install
+side by side, and a daemon sends native pushes to the configured app's topic. Remove unused phone registrations in
+Settings › Phone when switching topics.
+
+DotNext signs for team `79DZ4AA4DW` and embeds `dev.dotagent.phone.next.liveactivity`. If signing reports that the
+profile lacks `aps-environment`, enable **Push Notifications** on App ID `dev.dotagent.phone.next` in Apple Developer
+› Certificates, Identifiers & Profiles and refresh or regenerate the app's provisioning profile. Automatic signing
+also needs an App ID and profile for the widget extension. A topic-restricted APNs key must allow
+`dev.dotagent.phone.next`. The build's `APS_ENVIRONMENT` must match its profile, `development` for an Xcode install
+and `production` for distribution.
 
 ## The iPhone app's calls
 
@@ -699,6 +737,7 @@ paired`) and nothing is kept for it.
 | `POST /api/runs/{id}/input` | any token | 470, 1840 | 200, what the page took |
 | `POST /api/runs/{id}/handback` | any token | 1840 | 202, the run goes on |
 | `GET /api/threads/search?q=&limit=` | any token | 1882 | 200, finds in what the chats say |
+| `GET /api/threads/search/files?q=&limit=` | any token | 2032 | 200, the files of the chats, by their names |
 | `POST /api/phone/metrics` | the phone's key | 1926 | 204, the phone's performance record kept |
 | `GET /api/phone/metrics` | the phone's key | 1926 | 200, its summary of the last seven days |
 
@@ -740,9 +779,8 @@ Reply, 200:
 `ttl_s` is the time as the daemon took it (capped), `expires_at` is when it ends, in seconds since the epoch. After
 `background` the reply is `{"state": "background", "chat": null, "ttl_s": 0.0, "expires_at": null}`.
 
-What it changes and what it does not: while a lease holds, the end of a run (done, failed, stopped), of a schedule's run
-and of a campaign are not sent to that phone as alerts, for the chat on screen and for any other, as the app shows them
-itself. Everything else is sent whatever the lease says: an approval, a question (also one a run left), a secret and a
+While a lease holds, the older app shows successful, failed and blocked task ends and the ends of scheduled runs
+and campaigns in the app. The daemon keeps those alerts quiet for every chat. Everything else is sent whatever the lease says: an approval, a question (also one a run left), a secret and a
 hand-off, a draft written for you, what Dot tells you on its own and its own warnings (a schedule that did not run or was
 switched off, learning that stopped, a restart). The Live Activity is not touched by the lease, nor are the other phones,
 nor the web push of a browser. A phone that is removed loses its lease.
@@ -774,12 +812,12 @@ Which of the three kinds of push the phone is told (item 1421). The switches are
 app through APNs; the Live Activity is not a kind of push and goes as before. A phone that never set them is told all
 three.
 
-- `needs_you`: something waits for your answer: an approval, a question (also one a run left), a secret, a hand-off;
-  and Dot's own failures that you are to look at (a schedule that did not run or was switched off, learning that
+- `needs_you`: something waits for your answer: an approval, a question (also one a run left), a secret, a hand-off,
+  the end of a run that is blocked or waits on you; and Dot's own failures that you are to look at (a schedule that did not run or was switched off, learning that
   stopped, a restart after an unexpected stop), so that switching the ends of tasks off does not silence them.
 - `ready`: something is ready for you to look over: a draft written for you to send, and what Dot tells you on its own
   (the morning brief, what a watcher found).
-- `done`: something finished or failed: the end of a run (done, failed, stopped), of a schedule's run or of a campaign.
+- `done`: a run's successful or failed end that does not wait on you, or the notice of a schedule's run or a campaign.
   A schedule's level of notices decides, as before, whether its run's end is told; this switch decides whether the
   phone hears what was told.
 
@@ -836,6 +874,65 @@ the app's own `open_min`, `dot_in_mb`, `dot_out_mb`, `requests`, `reconnects` (t
 
 Errors: 403 for the Mac's token (a record is a phone's own; one phone never reads another's); 404 for a phone removed
 while its `POST` was on its way. Removing a phone drops its record.
+
+### Dot's asks to the phone (item 2051)
+
+A run reads the calendars of the owner's iPhone, adds an event or a reminder there, and asks where the phone is, with
+four tools in the group `phone_app`: `phone_calendar_events`, `phone_calendar_add`, `phone_reminder_add` and
+`phone_location`. Dot Next does them on the phone, through EventKit and Core Location (when in use). A run has these tools
+only while a phone is paired (`phones.json` lists one; a run does not start while that file cannot be read, as the
+daemon does not, and the error says to fix or delete it); the group is off at a run's first step, as every group but core,
+and is turned on with `use_tools`.
+
+The daemon cannot open a connection to the phone, so the phone holds one open to the daemon: while Dot Next is on the
+screen it calls `GET /api/phone/asks/next`, which answers the next ask meant for that phone (200) or nothing after 20
+seconds (204), and calls again at once. The answer of an ask goes to `POST /api/phone/asks/{id}` as `{"answer": ...}`
+(204). Only a paired phone's own key reaches either (403 for the Mac's token); an ask is the phone's that took it (404
+for another phone's, or one whose run stopped waiting), and an answer that cannot be read is a 422 (below). iOS lets the
+app's requests go only while it is in front: when it goes to the background the request ends, and a run that asks then
+is told at once that the iPhone cannot be reached and why (Dot Next answers only while it is open). An ask the phone
+does not take within 6 seconds, or does not answer within 75 (the first time, the owner answers iOS's permission
+question first), fails with words that say so; for an add, that whether it was done is not known. The asks live in the
+daemon's memory (`dotagent.phone.asks.PhoneLink`): a restart drops them, and the runs that waited are told.
+
+The asks, each with an `id` and a `kind`; a moment is ISO 8601 with its offset (the Mac's time zone, as a run gives it),
+a day is `yyyy-MM-dd`:
+
+- `calendar_events`: `start`, `end` (moments), `query` (words of the title, place or notes; empty for every event),
+  `limit` (1 to 100).
+- `calendar_add`: `title`, `start`, `end`, `all_day` (with days, `end` the day after the last), `location`, `notes`,
+  `calendar` (a calendar's name; empty for the phone's default for new events).
+- `reminder_add`: `title`, `due` (a moment, a day or `null`), `notes`, `list` (empty for the default list). A due moment
+  also sets an alert at it.
+- `location`: nothing more.
+
+The answers, by `kind`:
+
+- `events`: `events`, each with `id`, `title`, `start`, `end`, `all_day`, `location`, `notes`, `calendar`,
+  `organizer`, and `more` (the time holds more than were listed). The run reads them fenced as content others wrote, as
+  the calendars of the signed-in accounts, so it is tainted by them.
+- `created`: `id` (the event's or the reminder's on the phone) and `calendar` (the calendar or list it went to). The run
+  reads the name fenced, and is tainted by it: a shared or subscribed calendar is named by someone else.
+- `location`: `latitude`, `longitude`, `accuracy_m`, `at` (a moment).
+- `refused`: `reason` (`denied`: the owner said no, or took it back in iOS Settings › Apps › Dot Next; `restricted`:
+  the phone's restrictions forbid it; `failed`: it tried and could not, such as no calendar of that name) and
+  `message`. A permission refused or restricted is said to the run in Dot's own words, with where the owner gives it
+  back; a failure's `message` reaches it fenced, and taints it, since it may list calendars' names.
+
+A time the run could not read (an all-day event whose `start` or `end` is not a day, a moment with no offset, an event
+that ends before it starts, a location's `at` that is not a moment), or an answer of another kind than the ask, makes
+the answer a 422 and ends the run's wait at once: it reads, in Dot's own words, that the answer could not be read and
+that Dot Next and Dot may be of different versions.
+
+Each permission is asked by iOS the first time an ask needs it, never when the app starts: full access to the calendars
+(reading needs it, so an add asks for it too), full access to Reminders, and the location while the app is in use. The
+words iOS shows are in Info.plist in English and in `tr.lproj/InfoPlist.strings` in Turkish.
+
+To the policy a read (`phone_calendar_events`, `phone_location`) is a `read` and an add (`phone_calendar_add`,
+`phone_reminder_add`) is an `app_control` of medium risk, with no flag: it goes through the run's approval mode as any
+other change in one of the owner's apps (cautious and Supervised ask, balanced and aggressive do it, yolo and free mode
+ask nothing), and a research run is offered no add. The web and the phone name each call in the same words in a chat's
+work log (*iPhone calendar*, *Add to iPhone calendar*, *Add iPhone reminder*, *iPhone location*).
 
 ### GET /api/needs-you
 
@@ -1075,6 +1172,14 @@ again every 30 seconds while it is on screen and when it is pulled down.
   each with its habits and tips; Use puts one in use (asking first when a line may come from content others can write;
   one the checks refuse offers no Use) and Set aside keeps it for the record (`POST /api/harness/{id}/adopt` and
   `/retire`).
+- **Skills and plugins** (item 2062): the merges and rewrites of learned skills that wait (`GET /api/skills/proposals`),
+  each with why, the skill it would write (its description, when it fits, its steps) and, for a merge, that Use puts the
+  other skills to rest; Use writes it (asking first when a step may come from content others can write; none offered for
+  one that cannot be applied now) and Drop drops it (`POST /api/skills/proposals/{id}/accept`, `DELETE
+  /api/skills/proposals/{id}`); and the plugins the nightly scout proposes (`GET /api/plugin-scout`), each with what it
+  does, why it fits, what it needs, its publisher and its review's risk; Install (asking first when its review rates it
+  medium or high risk) and Skip (`POST /api/plugin-scout/{id}/install|skip?kind=`). The Skills and Plugins pages
+  (learned skills, versions, installed plugins, Revert and Remove) stay on the Mac (PLAN §26).
 - **Needs you, Working, Later today, Earlier today, Learned today**: the sections of `GET /api/activity`; a row of a run
   opens its chat (a delegated run the chat at the top of its chain), where an ask is answered with its whole card.
 - **Dot comes to you**: the morning brief and the evening check-in with their switches (`PUT /api/brief`, `PUT
@@ -1183,12 +1288,26 @@ web uses:
 ### GET /api/threads/search
 
 The home's search of the iPhone app (item 1882) looks in what the chats say: `q` (1 to 200 characters) and `limit` (1 to
-50, 20 when left out). The answer is a list, best first, of `{"thread_id", "seq", "kind", "ref", "snippet"}`: `kind`
+50, 20 when left out). The answer is a list, best first, of `{"thread_id", "seq", "kind", "ref", "snippet", "run_id"}`
+(`run_id` the run whose work the message is of, which the web opens the chat on; `null` for a chat with no run, a
+find the web leaves out): `kind`
 `m` is a message of the chat's history (`ref` the role that said it, `seq` its place), `r` the answer of a run (`ref`
 the run's id, `seq` -1); `snippet` holds the words around the match with the matched words in `[...]`, and a secret
 Dot holds is masked in it where the snippet holds it whole (a match inside a value, or a snippet cut through one, can
 leave a part unmasked, as the chat's own view shows the words unmasked to the same key). Words are folded as the index folds them (case, accents, the Turkish dotted and dotless i);
 words that fold to nothing find nothing, and an empty `q` is a 422. A tool's output is not in the index.
+
+### GET /api/threads/search/files
+
+The Files chip of the search on the phone and the web finds the files of the chats by their names: `q` and `limit` as
+above. The answer is a list, newest first, of `{"thread_id", "run_id", "kind", "name", "path", "attachment_id", "at"}`,
+each file once per chat: `kind` `attachment` is a file the owner attached to a message (`attachment_id` its upload,
+`path` its name), `made` one a run wrote or edited with `write_file` or `edit_file` in a call that did its job (`path`
+as the call named it, `~/` for the home folder; a path the call gave relative to its folder stays relative). A helper's
+file stands under the chat and the run that started its line, the chat the owner sees (`run_id`, the page the web
+opens). Every word of `q`, folded, must be in the file's name (an attachment) or its path (a file made). The search
+reads the newest 50,000 calls and the newest 5,000 messages of each kind that carry attachments, no further back, so it
+answers in about a tenth of a second whatever the store's size (item 2039); a file older than that is not found.
 
 **Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
 `store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and
@@ -1229,11 +1348,13 @@ An **alert** (`alert_payload`):
   badge again from `count` whenever the app reads the list, since an answer given on the Mac sends no alert that would
   lower it.
 - `title` is one of: "Dot asks for approval", "Dot has a question", "Dot needs your help" (a hand-off, item 1423), "A task
-  is done", "A task failed", "A task was stopped", "A task has ended", "A campaign is achieved", "A campaign stopped", "Dot drafted an email",
+  is done", "A task failed", "A task is blocked", "Dot is waiting for you" (a run that ended waiting on you, item 2070, or failed having said what it needs), "A campaign is achieved", "A campaign stopped", "Dot drafted an email",
   "Dot drafted a message", "A schedule did not run", "A schedule was switched off", "Dot's learning has stopped", "Dot
   restarted after an unexpected stop" and, for a message Dot wrote to you, "Dot has a message for you" (never its own
-  words). `route` is a route of Dot's own pages that the tap opens, always starting `#/`: `#/runs/<run id>`,
-  `#/campaigns/<id>`, `#/settings/schedules`, `#/settings/memory` or `#/runs`.
+  words). Schedule notices can also say that a scheduled task stopped or ended. The tap follows `route` to one of
+  Dot's pages, always starting `#/`: `#/runs/<run id>`, `#/campaigns/<id>`, `#/settings/schedules`,
+  `#/settings/memory` or `#/runs`. DotNext task alerts use `title-loc-key` and `loc-key` so iOS resolves the
+  title and body in the app's language.
 - An **approval** of a step of low or medium risk adds `"category": "DOT_APPROVAL"` to `aps` and `"approval_id":
   "<approval id>"` next to `route`: the app's notification offers Approve and Deny, each after Face ID, and answers with
   `POST /api/approvals/{id}/decision`. A step of high risk, a question, a secret and a hand-off are alerts without the
@@ -1247,8 +1368,8 @@ the fixed title "Dot is working" and the fixed line). A change goes at most ever
 priority 5; a start, a wait and an end go at once at priority 10.
 
 **Which pushes a phone is told.** Each event is one of three kinds, switched by `PUT /api/phone/push-settings`: `needs_you`
-(`approval_requested`, `question_left`, a schedule that did not run or was switched off, learning that stopped, a restart
-after an unexpected stop), `ready` (a draft written for you, what Dot tells you on its own) and `done` (the end of a run,
-of a schedule's run at its schedule's level of notices, of a campaign). A kind that is off is not sent to that phone. While
+(`approval_requested`, `question_left`, the end of a run that is blocked or waits on you, a schedule that did not run or was switched off, learning that stopped, a restart
+after an unexpected stop), `ready` (a draft written for you, what Dot tells you on its own) and `done` (a run's
+successful or failed end that does not wait on you, a schedule's run at its notice level, or a campaign's end). A kind that is off is not sent to that phone. While
 the phone's lease (`POST /api/phone/activity`) holds, the `done` kind's three events are not sent to it as alerts; nothing
 else is held back by it. A phone that is removed is sent nothing.

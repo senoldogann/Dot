@@ -3,7 +3,8 @@
 The native app that replaces `ios/Dot` wave by wave (the plan lives in the owner's workspace,
 `ios-rewrite-2026-11-24/PLAN.md`). It installs beside the old app: bundle id `dev.dotagent.phone.next`, app group
 `group.dev.dotagent.phone.next`, its own Keychain access group, URL scheme `dotnext://`, display name "Dot Next". iOS 26
-and later, iPhone and iPad. No push and no Live Activity until the swap (owner's decision): the old app keeps them.
+and later, iPhone and iPad. DotNext has its own APNs topic and Live Activity extension (item 2042).
+[Phone setup](../../docs/phone.md#dotnext-push-and-live-activities) describes signing and selecting that topic.
 
 Wave N0 gave the design system, the components and the gallery; wave N1-client the engine (`ios/DotEngine`, below)
 and the screens wired to it: pairing, the chat list, a chat, the helpers and background sheets, settings. Wave N2 made
@@ -19,7 +20,7 @@ successful, as a row of the stretch of work with its first sentence; the words a
 in Hide all (the default) and Zen one live line under the last message says what the run does now (`WorkLineView`,
 `workNow`: typing, thinking, the command it runs, the file it reads, waiting for you), and a tap on it shows the steps.
 The floating capsule says Working with a clock that ticks every second whether events come or not, and no spinner;
-"Waiting on N helpers" stands in its place only while the main run has stopped for them, every open call of its step a
+"Waiting for N helpers" stands in its place only while the main run has stopped for them, every open call of its step a
 wait on a helper (`waitsOnHelpers`, DotEngine), never while it works beside them. The link to the Mac is told only when
 it is a lasting problem, and only there: Offline, or Can't reach <the Mac> once it lasted five seconds (`linkLine`,
 `linkLineDelay`); a reconnection that mends and a chat being brought up to date show nowhere, and a bot's header pill is
@@ -40,7 +41,9 @@ a service waits on the Mac. A photo goes at most 1,600 px on its long side and a
 diagnostics' counts, and the app's counters of each time it was open, `App/PerfCounters.swift`) goes to the paired Mac
 alone (`POST /api/phone/metrics`, sent when the app opens) and Settings › Maintenance shows its last seven days. A step's thinking is
 one folded line that a tap opens; the running work is one pill (plain words and clock | Stop | Plan 1/5 | queued |
-helpers done/total), whose plan and people segments open the plan's checklist and the Agents sheet; the stream keeps
+helpers done/total), whose plan and people segments open the plan's sheet (`Components/PlanSheet.swift`: "2 of 6 done", where the run
+stands, a bar, the steps on a line, sized to its content; a failed or stopped run's step says so, `planAtEnd`) and the
+Agents sheet; the stream keeps
 no plan card (item 1880), and a run's helpers are one group row whose tap opens a card of each (item 1957). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
@@ -66,11 +69,12 @@ names, the language, the clock, Queue or Steer, the confirmation of deleting a c
 (light, dark or system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their
 own and word break, the tool calls in chat, response streaming, the reading width), Chat (haptics, reactions'
 follow-ups), Models (the main and fast models from the daemon's list, and the code review's model with its reasoning,
-changed from the phone too: item 1770, a §24 picker sheet), Usage limits and caps (the plan's windows, today's tokens,
+changed from the phone too: item 1770, a §24 picker sheet; the other-family check model and the Task models of
+`[models.kinds]`, as the web's page has them, item 2088; the providers added on the Mac, read only, item 1949), Usage limits and caps (the plan's windows, today's tokens,
 the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
 switch on each row; edit, run now, delete; + makes a new one, item 1911, and a schedule's History lists its runs,
-each opening its chat), Rules (the approval mode tasks start in and what asks in it; free mode,
-switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, a new note, every note to read, edit, pin or
+each opening its chat), Rules (saved rules and their recent use, draft and preview a rule that asks or leaves the step
+to you, the starting approval mode and the switch to turn free mode off), Memory (the runs' proposed rewrites with Use and Drop, search, a new note, every note to read, edit, pin or
 forget, and the Trash to restore from), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
 Mark achieved as the daemon takes them), Health and version, Usage,
 Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on
@@ -132,6 +136,12 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 - `App/`: the shell (the home of bots, PLAN §27: `Home.swift`, a bot's chat `BotChat.swift`, its profile
   `BotProfile.swift` and its Work pages `BotWorkPages.swift`, faces `BotFace.swift`), the gallery, sample content. `scripts/e2e_bots.sh` runs `BotsLiveUITests`
   on a throwaway daemon.
+- `Data/`: the phone's own adapters: dictation, image sizing, the performance record, and `PhoneAsks`, which does Dot's
+  asks on the phone (item 2051, `docs/phone.md` "Dot's asks to the phone"): the calendars read and an event added
+  (EventKit), a reminder added, and where the phone is (Core Location, when in use). iOS asks for each permission the
+  first time an ask needs it (Info.plist's `NSCalendarsFullAccessUsageDescription`,
+  `NSRemindersFullAccessUsageDescription`, `NSLocationWhenInUseUsageDescription`, Turkish in `tr.lproj/InfoPlist.strings`);
+  the engine's `PhoneAskLoop` brings the asks while the app is in front.
 - `Resources/`: the asset catalog (app icon, accent = the ink) and `Localizable.xcstrings`.
 - `Tests/`: `DotNextTests`. `scripts/`: the icon, the strings check, the screenshot harness.
 
@@ -152,7 +162,8 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 Every user-visible string goes through `String(localized: "…", comment: "…")` and lives in
 `Resources/Localizable.xcstrings` with a Turkish translation (the owner reads Turkish). `StringCatalogTests` fails on a
 key without Turkish, without a comment, or stale; `scripts/check_strings.sh <derived data>` fails on a string of the code
-that the catalog lacks and on raw literals in SwiftUI calls. To add strings: build, run the check, copy the synced
+that the catalog lacks, on raw literals in SwiftUI calls, and on an English unit (a key that is not its English,
+`task.open`) not marked translated, which the build would leave out of `en.lproj`. To add strings: build, run the check, copy the synced
 catalog it names over `Resources/Localizable.xcstrings`, add the Turkish to `scripts/translations_tr.py`, run
 `python3 ios/Next/scripts/apply_translations.py`.
 

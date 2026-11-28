@@ -1,13 +1,14 @@
 """The line under the bar on a phone (item 1524), in the browsers that draw the owner's phone, at 390 by 844 and at 320
 by 640, in the light and the dark look: "Offline: showing saved chats, last updated 3 min ago" over a chat drawn from
 the phone's copy, "Offline: 1 waiting to send" over a message that waits (the row *Waiting to send* under the chat),
-"Reconnecting…" while Dot cannot be reached on a link that is there, and "This phone's key was refused" with the way to
+"Mac asleep or unreachable since HH:MM" when Dot cannot be reached, and "This phone's key was refused" with the way to
 pair again on the sign-in. The line stands in the bar and covers nothing, is never cut, is one line (two at 320 px) and
 what can be pressed in it is 44 px tall. Where ``DOT_PWA_SHOTS`` names a folder, the screenshots are saved there.
 """
 
 import asyncio
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -111,7 +112,7 @@ async def test_the_line_says_how_the_link_stands_and_covers_nothing(login_env: d
                     tag: str = f"{width}x{height}-{scheme}"
                     context: BrowserContext = await phone(chromium, playwright, width, height, scheme)
                     page: Page = await open_chat(context, working.address, working.token, working.run.id)
-                    await expect(page.locator(".capsule")).to_contain_text("Waiting on 2 helpers", timeout=20_000)
+                    await expect(page.locator(".capsule")).to_contain_text("Waiting for 2 helpers", timeout=20_000)
                     await until_kept(page, chats=1, lists=2)
                     # With the link well the line is not there.
                     assert await page.locator(".link-line:not([hidden])").count() == 0
@@ -219,9 +220,13 @@ async def test_a_daemon_that_cannot_be_reached_on_a_link_that_is_there_is_reconn
         browser: Browser = await playwright.webkit.launch(headless=True)
         try:
             pages: list[tuple[int, int, str, BrowserContext, Page]] = []
-            for width, height in _SIZES:
+            for width, height in ((1440, 900), *_SIZES):
                 for scheme in _SCHEMES:
-                    context: BrowserContext = await phone(browser, playwright, width, height, scheme)
+                    context = (
+                        await browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
+                        if width == 1440
+                        else await phone(browser, playwright, width, height, scheme)
+                    )
                     page: Page = await open_chat(context, resting.address, resting.token, resting.run.id)
                     await expect(page.locator(".link-line:not([hidden])")).to_have_count(0)
                     await expect(page.get_by_role("article", name="Answer")).to_be_visible(timeout=20_000)
@@ -232,7 +237,9 @@ async def test_a_daemon_that_cannot_be_reached_on_a_link_that_is_there_is_reconn
             resting.stop_serving()
             for (width, height, scheme, context, page), was in zip(pages, before, strict=True):
                 line = page.locator(".link-line:not([hidden])")
-                await expect(line).to_have_text("Can't reach Dot", timeout=30_000)
+                await expect(line).to_have_text(
+                    re.compile(r"^Mac asleep or unreachable since \d{2}:\d{2}$"), timeout=30_000
+                )
                 await asyncio.sleep(0.4)
                 seen: dict[str, Any] = await page.evaluate(_MEASURE)
                 _fits(seen, f"reconnecting {width}x{height} {scheme}", 2 if width <= 320 else 1, floating=True)

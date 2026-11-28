@@ -30,6 +30,7 @@ from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.checks import evaluate_checks, workspace_path
 from dotagent.evals.metrics import ASSISTANT_EVENT, run_metrics, run_trace, took_easy_way
+from dotagent.evals.real_runs import OWNER_PREFIX, REAL_PREFIX
 from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome, TraceStep
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.site import serve_recording_site, with_site
@@ -90,6 +91,9 @@ def eval_config(config: AppConfig) -> AppConfig:
                     # A message sent while a run works asks the fast model whether it stands on its own (item 915):
                     # an attempt sends none, and a test of the queue means the queue.
                     "busy_parallel": False,
+                    # Dot's first words in a chat (item 2018) ask the fast model, which the script would answer with a
+                    # reply meant for the run.
+                    "first_words": False,
                     # The catalog opts into goal mode per task. The product default (on for an owner's task) must not
                     # turn every reference on: eval check plays the script, and a task that does not opt in has no
                     # verdict in that script.
@@ -233,13 +237,19 @@ def site_config(config: AppConfig) -> AppConfig:
     return config.model_copy(update={"web": config.web.model_copy(update={"allow_private_hosts": True})})
 
 
+# The ids of the tasks held to the scratch workspace (:func:`held_to_workspace`).
+HELD_PREFIXES: tuple[str, ...] = (OWN_PREFIX, REAL_PREFIX, OWNER_PREFIX)
+
+
 def held_to_workspace(config: AppConfig, task: EvalTask) -> AppConfig:
     """The configuration of an attempt at a task the improvement loop wrote (item 904, an id of
     :data:`dotagent.harness.tasks.OWN_PREFIX`): its run under the balanced preset at least, which asks before a write or
     a command outside the workspace, and an attempt declines what it asks. A model wrote the task from the owner's run,
     so what it steers a run to do is kept to the scratch workspace, as a task of the catalog, which a developer wrote,
-    need not be (the security review). A task of the catalog is played as the owner's preset says."""
-    if not task.id.startswith(OWN_PREFIX) or config.policy.preset != "aggressive":
+    need not be (the security review). A case of the suite of real runs (:data:`REAL_PREFIX`, :data:`OWNER_PREFIX`) is
+    held the same way: its goal was the owner's to a run on their own Mac, and replayed it must not touch that Mac
+    outside the scratch workspace. A task of the catalog is played as the owner's preset says."""
+    if not task.id.startswith(HELD_PREFIXES) or config.policy.preset != "aggressive":
         return config
     return config.model_copy(update={"policy": config.policy.model_copy(update={"preset": "balanced"})})
 
@@ -399,8 +409,10 @@ async def _run_in(
     attempt: int,
     harness: GivenText,
     taken: Callable[[], tuple[SiteRecord, ...]],
+    notes: Sequence[str],
 ) -> TaskOutcome:
-    """One attempt in an open runtime: seed the workspace, adopt ``harness`` in the attempt's own store as it stands
+    """One attempt in an open runtime: seed the workspace, save ``notes`` in the attempt's own memory (an ablation's
+    variant, docs/development.md; none for any other attempt), adopt ``harness`` in the attempt's own store as it stands
     when it is not Dot's own text alone (item 391: a probe of the harness; the owner's limits of now apply to new text
     only, item 589), run the goal, judge what is left: the workspace, the answer, the run's events and what the task's
     site took (``taken``, read once the run is over; item 1147)."""
@@ -408,6 +420,8 @@ async def _run_in(
         await runtime.router.register(parse_model_ref(model).provider, stand_in)
     if harness != NO_HARNESS:
         await install(runtime.store, harness, "probed text", "probe", time.time())
+    for note in notes:
+        await runtime.store.add_memory(note, (), None, None, None, False)
     await asyncio.to_thread(seed_workspace, runtime.workspace, task.files)
     manager: RunManager = RunManager(runtime)
     started: float = time.monotonic()
@@ -466,6 +480,7 @@ async def _attempt(
     scripted: bool,
     attempt: int,
     harness: GivenText,
+    notes: Sequence[str],
 ) -> TaskOutcome:
     """One attempt in a throw-away home that is removed afterwards, holding the skills the task brings, its run given
     the MCP servers the task brings, with the task's site (if it has one) served for its length and its address put
@@ -483,7 +498,9 @@ async def _attempt(
             {**login_env, **_ATTEMPT_ENV},
         )
         try:
-            outcome: TaskOutcome = await _run_in(runtime, placed, model, stand_in, attempt, harness, served.taken)
+            outcome: TaskOutcome = await _run_in(
+                runtime, placed, model, stand_in, attempt, harness, served.taken, notes
+            )
         finally:
             await close_runtime(runtime)
     log.info(
@@ -516,7 +533,21 @@ async def play(
     ``dotx eval check`` does: what a probe of the harness is checked with (item 391)."""
     for attempt in range(1, repeats + 1):
         for task in tasks:
-            yield await _attempt(task, config, login_env, secrets, model, scripted, attempt, harness)
+            yield await _attempt(task, config, login_env, secrets, model, scripted, attempt, harness, ())
+
+
+async def play_attempt(
+    task: EvalTask,
+    config: AppConfig,
+    login_env: Mapping[str, str],
+    secrets: Mapping[str, str],
+    model: str,
+    attempt: int,
+    notes: Sequence[str],
+) -> TaskOutcome:
+    """One attempt at ``task`` against ``model`` with Dot's own text, ``notes`` saved in its own memory first: a variant
+    of an ablation (docs/development.md, "dotx eval ablate")."""
+    return await _attempt(task, config, login_env, secrets, model, False, attempt, NO_HARNESS, notes)
 
 
 async def replay_reference(task: EvalTask, config: AppConfig, login_env: Mapping[str, str]) -> TaskOutcome:
@@ -527,7 +558,7 @@ async def replay_reference(task: EvalTask, config: AppConfig, login_env: Mapping
         if task.goal_mode
         else config
     )
-    return await _attempt(task, replay, login_env, {}, SCRIPTED_MODEL, True, 1, NO_HARNESS)
+    return await _attempt(task, replay, login_env, {}, SCRIPTED_MODEL, True, 1, NO_HARNESS, ())
 
 
 async def do_nothing_passes(task: EvalTask, env: Mapping[str, str]) -> bool:

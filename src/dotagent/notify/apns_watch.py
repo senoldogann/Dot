@@ -27,6 +27,7 @@ from dotagent.evals import EVAL_SOURCE
 from dotagent.events import SYSTEM_RUN_ID, Subscription
 from dotagent.notify.apns import (
     DISMISS_AFTER_S,
+    DOT_NEXT_TOPIC,
     FLEET_ID,
     FLEET_ROWS,
     ApnsReply,
@@ -42,6 +43,8 @@ from dotagent.notify.apns import (
     live_end_payload,
     live_start_payload,
     live_update_payload,
+    localized_alert_payload,
+    localized_live_start_payload,
     short_title,
 )
 from dotagent.notify.leases import PhoneLeases
@@ -52,8 +55,8 @@ from dotagent.notify.push import (
     PUSH_KINDS,
     PushGroup,
     PushMessage,
+    message_group,
     notice_message,
-    push_group,
     push_message,
     quiet_while_shown,
 )
@@ -206,7 +209,13 @@ class ApnsWatch:
             log.info("apns_device_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
 
     async def alert(self, message: PushMessage, now: float, kind: str) -> None:
-        await self._alert(alert_payload(message.title, message.route), now, kind)
+        group: PushGroup | None = message_group(kind, message)
+        if self._sender.topic != DOT_NEXT_TOPIC:
+            await self._alert(alert_payload(message.title, message.route), now, kind, group)
+        elif message.title_tr is not None:
+            await self._alert(localized_alert_payload(message.title, message.route), now, kind, group)
+        else:
+            log.info("apns_notice_outside_dotnext_task_alerts", kind=kind)
 
     def _shown(self, phone_id: str, now: float) -> bool:
         """Whether the app of ``phone_id`` said it is in the foreground and its lease still holds at ``now``."""
@@ -227,11 +236,11 @@ class ApnsWatch:
             log.warning("apns_badge_not_counted", error=str(error))
             return payload
 
-    async def _alert(self, payload: JsonObject, now: float, kind: str) -> None:
-        """Send ``payload``, the alert of an event of ``kind``, to every phone that is told pushes of its kind (item
-        1421: each phone switches the three kinds of :data:`dotagent.notify.push.PUSH_GROUPS` for itself) and, for the
-        end of a run, which the app shows itself, is not showing Dot now (item 1420)."""
-        group: PushGroup | None = push_group(kind)
+    async def _alert(self, payload: JsonObject, now: float, kind: str, group: PushGroup | None) -> None:
+        """Send ``payload``, the alert of an event of ``kind`` told as the kind of push ``group``
+        (:func:`dotagent.notify.push.message_group`), to every phone that is told pushes of that kind (item 1421: each
+        phone switches the three kinds of :data:`dotagent.notify.push.PUSH_GROUPS` for itself) and, for the end of a
+        run, which the app shows itself, is not showing Dot now (item 1420)."""
         quiet: bool = quiet_while_shown(kind)
         payload = await self._badged(payload)
         for device in await self._store.list_apns_devices():
@@ -288,7 +297,10 @@ class ApnsWatch:
                 # iOS has ended it: the token goes nowhere, and the app opens a new one at the next run it starts.
                 await self._store.delete_live_activity(FLEET_ID, device.phone_id)
                 activity = None
-            if not state.rows:
+            if self._sender.topic == DOT_NEXT_TOPIC and activity is not None and state.rows and state.active == 0:
+                await self._send(device, activity.token, _AT_ONCE, live_end_payload(state, now))
+                await self._store.delete_live_activity(FLEET_ID, device.phone_id)
+            elif not state.rows:
                 if activity is not None and now - activity.created_at < OPEN_WAIT_S:
                     opened: float = activity.created_at
                     self._empty_at = opened if self._empty_at is None else min(self._empty_at, opened)
@@ -321,6 +333,11 @@ class ApnsWatch:
             return
         showing: set[str] = {activity.phone_id for activity in await self._store.live_activities_of(FLEET_ID)}
         state: FleetState = fleet_state(self._rows)
+        start_payload: JsonObject = (
+            localized_live_start_payload(state, now)
+            if self._sender.topic == DOT_NEXT_TOPIC
+            else live_start_payload(state, now)
+        )
         for device in await self._store.list_apns_devices():
             if device.phone_id in showing or self._shown(device.phone_id, now):
                 continue
@@ -336,7 +353,7 @@ class ApnsWatch:
             self._started[device.phone_id] = (now, frozenset() if started is None else started[1])
             try:
                 reply: ApnsReply = await self._sender.send(
-                    device.environment, token, "liveactivity", _AT_ONCE, live_start_payload(state, now)
+                    device.environment, token, "liveactivity", _AT_ONCE, start_payload
                 )
             except DotError as error:
                 log.warning("apns_live_start_failed", phone=device.phone_id, error=error.message)
@@ -355,8 +372,12 @@ class ApnsWatch:
         """Send what ``event`` says: an alert as Web Push would, and the change of the run's row."""
         if event.kind == LIVE_REGISTERED_EVENT:
             # The app opens the activity as the run it starts is made, and its token may come before the run's start:
-            # an activity of no row yet waits for it (:data:`OPEN_WAIT_S`).
-            await self._tell(_AT_ONCE, now)
+            # an activity of no row yet waits for it (:data:`OPEN_WAIT_S`). Initialize any new working row before
+            # DotNext considers ending a newly registered card that still has rows from earlier runs.
+            if self._sender.topic == DOT_NEXT_TOPIC:
+                await self.settle(now)
+            else:
+                await self._tell(_AT_ONCE, now)
             return
         if event.run_id == SYSTEM_RUN_ID:
             notice: PushMessage | None = notice_message(event)
@@ -369,8 +390,13 @@ class ApnsWatch:
         run: RunRecord = await self._store.get_run(event.run_id)
         message: PushMessage | None = push_message(event, run) if event.kind in PUSH_KINDS else None
         answerable: str | None = approval_answerable(event)
-        if message is not None and answerable is not None:
-            await self._alert(approval_payload(message.title, message.route, answerable), now, event.kind)
+        if message is not None and answerable is not None and self._sender.topic != DOT_NEXT_TOPIC:
+            await self._alert(
+                approval_payload(message.title, message.route, answerable),
+                now,
+                event.kind,
+                message_group(event.kind, message),
+            )
         elif message is not None:
             await self.alert(message, now, event.kind)
         if not follows_live(run):

@@ -147,10 +147,10 @@ send to yourself in Messages on your iPhone starts a run too, and its answer com
   money and credentials are handed to you and a message or a post in your name needs a yes (the review model's in
   `auto`), whatever your rules say; a `yolo` run asks nothing else — the other steps it does, and each step's record
   keeps the reason it would have asked for — and what the other modes refuse, a read of your secrets or data sent out,
-  it does as well, but in a chat you opened a payment, a message or mail sent for you and a public post are yours in
-  `yolo` too: you answer them, and in a run of a schedule there the review model judges a message or a post (item 860).
-  In a chat Dot opened on its own initiative, a message, a post or a project's change put live waits for your own yes in
-  every mode, `yolo` and `auto` too (item 850, [Proactive](docs/proactive.md)). See [Autonomy](docs/autonomy.md).
+  it does as well, but a payment is yours in `yolo` too, in a chat you opened and in one Dot opened on its own
+  initiative (item 2069): a message, a mail, a post and a release go unasked in `yolo`. In a chat Dot opened on its own
+  initiative, a message, a post or a project's change put live waits for your own yes in every other mode, `auto` too
+  (item 850, [Proactive](docs/proactive.md)). See [Autonomy](docs/autonomy.md).
 - **What leaves this Mac.** There is no telemetry; the desktop app asks GitHub for its latest version and, on your
   yes, downloads it from there. The models get the run's conversation, and the sites, search engines and services a run
   uses get what it sends them. See [What leaves this Mac](docs/safety.md#what-leaves-this-mac).
@@ -183,7 +183,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Memory and schedules](docs/memory-and-schedules.md)
 - [Dot comes to you](docs/proactive.md): the morning brief and the watchers
 - [Hooks](docs/hooks.md): a signed call from a service starts a schedule or an agent
-- [Agents and campaigns](docs/agents-and-campaigns.md)
+- [Bots and campaigns](docs/agents-and-campaigns.md)
 - [Watching videos](docs/video.md): a video file or a link, seen in frames and heard in a transcript, for any model
 - [Making pictures](docs/image-generation.md): a logo, diagram or card drawn by Dot's browser, or a photo from Google's picture model
 - [Meetings](docs/meetings.md): your Google Meet calls: Dot answers in them and takes notes; a task's post asks you

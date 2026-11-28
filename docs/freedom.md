@@ -10,15 +10,16 @@ contract, and `tests/unit/test_freedom_contract.py` is what makes it executable.
 
 **A run in yolo, and every run while free mode is on, asks the owner nothing, and every tool action runs unasked.**
 
-- **Yolo** (`approvals = "yolo"` of the run; the chat's pill "Pay or send", item 443): the gate waives every question and
+- **Yolo** (`approvals = "yolo"` of the run; the chat's pill "Pay", item 443): the gate waives every question and
   every hand-off, each with the reason it would have asked for: the question that outside content raises, the one about
   Dot's own files (`_OWN_FILES_REASON`), money and credentials, a login filled from a vault (`_VAULT_REASON`), a message
-  or a post in the owner's name, a pre-approved spend, the preset's and the owner's `ask` rules', and the refusal of a
-  read of their secrets or of data sent out; all but the exceptions of the first two rows of the table below. The step
-  runs and its record says what it would have asked.
+  or a post in the owner's name, a release, a pre-approved spend, the preset's and the owner's `ask` rules', and the
+  refusal of a read of their secrets or of data sent out; all but the payment of the table below. The step runs and its
+  record says what it would have asked.
 - **Free mode** (`[policy] free = true`, Settings › Rules › How Dot asks, `PUT /api/policy/free`, item 922): the same
   for every run of every chat, whatever its own approval mode, from its next step on (a run reads the switch for its own questions when it starts), and the payment, the message or
-  mail sent for the owner, the public post and the release too (the gate's `held` is empty while it is on).
+  mail sent for the owner, the public post and the release too, and the payment (the gate's `held` is empty while it is
+  on).
 
 **Freedom costs no speed.** The gate of such a run is one policy decision and one record; it awaits no answer and no kept
 step (the pace the owner set for a site, which spaces the public actions of the browser, is the one wait left, and is
@@ -36,11 +37,22 @@ What still waits for the owner's yes. Nothing else does.
 
 | Where | What asks | The code |
 | --- | --- | --- |
-| Yolo, a chat the owner opened (item 860) | a payment (handed to them, never answered by a model), a message or mail sent for them, a public post | `owners_guard`, `OWNERS_REASON` and `_OWNERS_FLAGS` (`financial`, `message_send`, `public_post`) in `policy/engine.py`; `held` in `RunGate._decide_spent` |
-| A chat Dot opened on its own initiative, in every mode but free (item 850) | a message, a post, a release | `initiative_guard`, `_INITIATIVE_REASON` and `_INITIATIVE_FLAGS` in `policy/engine.py` |
-| Yolo, a schedule's run in the owner's chat (nobody is there) | a message or a post is judged by the review model, and what it cannot tell goes to the owner; a payment is always theirs | `RunGate._decide_spent` (`judged`) |
+| Yolo, a chat the owner opened (item 860) or one Dot opened on its own initiative (item 2069) | a payment, handed to them by the money stop (one within the caps they pre-approved for its site is their question instead), never answered by a model, a schedule's run in their chat included | `payment_guard`, `PAYMENT_REASON` and `_PAYMENT_FLAGS` (`financial`) in `policy/engine.py`; `held` in `RunGate._decide_spent` |
 
-Free mode keeps neither of the first two. What it keeps is below, as known asks: they are not decisions of the gate.
+That is yolo's one ask, the owner's word of 2026-11-28 (item 2069): "Yolo modda hiçbir şey sormasın, sadece ödeme
+işlerinde sorsun". Before it, item 860 asked a message or mail sent for the owner and a public post in their chats too,
+and had the review model judge such a step of a schedule's run there; item 850 asked a message, a post and a release
+in a chat Dot opened on its own initiative, in yolo as in every mode. In yolo all of these go now, unasked and recorded,
+**in a chat Dot opened on its own initiative too**: a run of Dot's own initiative in yolo (`[initiative] approvals`,
+yolo by default) sends a mail, posts and puts a change live without the owner's yes, and only its payments wait for
+them. A run nobody watches (a chat a schedule or a watcher opened) asked nothing in yolo and still asks nothing, a
+payment neither.
+
+Outside yolo and free mode, a chat Dot opened on its own initiative still asks before a message, a post or a release, in
+`ask`, `auto` and `supervised` (item 850: `initiative_guard`, `_INITIATIVE_REASON` and `_INITIATIVE_FLAGS` in
+`policy/engine.py`); that is no part of this contract, whose modes are yolo and free.
+
+Free mode keeps not even the payment. What it keeps is below, as known asks: they are not decisions of the gate.
 
 ## What still refuses
 
@@ -61,8 +73,13 @@ or free run deny something it allowed is a regression too.
   nor what Dot loads and runs, nor hand work to launchd, Shortcuts or Launch Services, nor reach the clipboard
   ([Safety](safety.md)). macOS refuses such a step (`Operation not permitted`); the gate asks nothing new, waits for
   nothing and decides every call as before, and the rest of the task's reach (the network, the owner's files, their
-  programs) is unchanged. This is the one thing such a run no longer does. A run the owner started has no sandbox in
-  yolo, as before.
+  programs) is unchanged. Dot's own tools, which act in the daemon's process, keep the same seal for such a run (item
+  2026, `RunGate._keep_seal`, `sealed_step` in `policy/sandbox.py`): a step of `write_file`, `edit_file`,
+  `read_file` and the others that name a file is refused (policy event `seal`) when the file is one the sandbox seals,
+  before anything is weighed, so nothing asks; a read of Dot's own files and of `[policy] sealed_paths` is refused too,
+  and a write of what Dot runs. The test's table names the rows it refuses (`SEALED_ROWS`: a write and an edit of Dot's
+  own files; its world holds no file that is read-sealed) and fails on any other. This is the one thing such a run no
+  longer does. A run the owner started has no sandbox and no seal in yolo, as before.
 - **A hand-off past the hop limit refuses nothing in yolo and free mode** (item 1741). Every hand-off from one agent to
   another (a run another run delegated or messaged, a work order's attempt, the lead's run woken by its agent's answer,
   a thing on Dot's list a run put there) is one hop further than the run it came from (`runs.hops`, set by Dot and never
@@ -120,15 +137,16 @@ is told so. A run that did what the policy would have asked about can always be 
   that row of the table is, so it adds no ask. A real
   `RunGate` on a real store decides each in every way a run can stand: yolo and free (also over `ask`, `auto` and
   `supervised`, in a chat of Dot's own, after outside content), and yolo alone in each kind of chat. Where this page names an
-  ask the owner is asked and nothing else; everywhere else the call goes through unasked and a step the policy would have
-  asked about leaves a record saying why.
+  ask (a payment, in yolo, in a chat of the owner's or of Dot's own initiative) the owner is asked and nothing else;
+  everywhere else the call goes through unasked and a step the policy would have asked about leaves a record saying
+  why.
 - **Every tool of the registry has a row** or says why it has none, so a tool added later without one fails the test.
 - **Every place of the source that asks the owner is named**; a new one fails the test. It reads a call of the approval
   broker, its method taken as a value and `getattr`, and which modules import the broker's class; a call made through a name
   it cannot tie to the broker is for the review to find.
 - **A scripted run through the real loop**, with a browser that presses nothing, ends done in free mode with no approval
-  event and no `ask_user`, and records why it would have asked; the same run in yolo alone asks only about the post and the
-  payment.
+  event and no `ask_user`, and records why it would have asked; the same run in yolo alone asks only about the payment,
+  and records the post as yolo's.
 - **The gate adds no wait**: no approval and no sleep is awaited in a run that asks nothing, with no pace set for the site
   (a pace is the owner's own wait, above).
 - The exceptions are compared with the engine's own flags, and each refusal above but the desktop's has a test.

@@ -108,4 +108,21 @@ final class SettingsWordsTests: XCTestCase {
         XCTAssertTrue(ids("budget").contains("caps"))
         XCTAssertEqual(Set(index.map(\.0.id)).count, index.count, "every entry has its own id")
     }
+
+    /// Item 2088: the other-family check offers a model whose lineage is known and that answers review questions (the
+    /// Claude plan does, Zen's free models do not), as the daemon's route takes it.
+    func testTheOtherFamilyCheckOffersOnlyModelsOfAKnownFamily() throws {
+        let decoded: (String) throws -> [ModelOption] = { json in try JSONDecoder().decode([ModelOption].self, from: Data(json.utf8)) }
+        let options: [ProviderModels] = [
+            ProviderModels(
+                provider: "openrouter",
+                models: try decoded(#"[{"ref":"openrouter:kimi","label":"Kimi","efforts":[],"tools":true,"family":"kimi"},{"ref":"openrouter:odd","label":"Odd","efforts":[],"tools":true}]"#),
+                error: nil),
+            ProviderModels(provider: "claude_code", models: try decoded(#"[{"ref":"claude_code:opus","label":"Opus","efforts":[],"tools":true,"family":"claude"}]"#), error: nil),
+            ProviderModels(provider: "opencode", models: try decoded(#"[{"ref":"opencode:big","label":"Big","efforts":[],"tools":true,"family":"glm"}]"#), error: nil),
+        ]
+        let offered: [String] = modelCandidates(options, for: .otherFamilyCheck).flatMap { $0.models.map(\.ref) }
+        XCTAssertEqual(offered, ["openrouter:kimi", "claude_code:opus"])
+        XCTAssertEqual(TaskKindRow.all.map(\.kind), ["security", "quick", "deep", "writing", "code"], "the web's order")
+    }
 }

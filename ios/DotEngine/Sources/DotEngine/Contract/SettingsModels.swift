@@ -109,9 +109,17 @@ public struct ModelsConfig: Codable, Sendable, Hashable {
     public let effort: String
     public let helpers: [String]
     public let standby: [String]
-    /// The model a run of a kind of task starts on when none is chosen for it (item 1889; `security`), absent from a
-    /// daemon before it and for a kind left to the main model.
+    /// The model a run of a kind of task starts on when none is chosen for it (items 1889 and 1928: `security`, `quick`,
+    /// `deep`, `writing`, `code`), absent from a daemon before it and for a kind left to the main model.
     public let kinds: [String: String]?
+    /// The model of another family that checks goals and helpers' results (item 1929), "" when off; `nil` from a daemon
+    /// before it.
+    public let checkOtherFamily: String?
+
+    enum CodingKeys: String, CodingKey {
+        case main, vision, fast, review, effort, helpers, standby, kinds
+        case checkOtherFamily = "check_other_family"
+    }
 
     public init(main: String, vision: String, fast: String, review: String, effort: String, helpers: [String], standby: [String]) {
         self.main = main
@@ -122,6 +130,7 @@ public struct ModelsConfig: Codable, Sendable, Hashable {
         self.helpers = helpers
         self.standby = standby
         self.kinds = nil
+        self.checkOtherFamily = nil
     }
 }
 
@@ -710,4 +719,61 @@ public struct RepairWorkerView: Codable, Sendable, Hashable {
         case worker
         case workerLost = "worker_lost"
     }
+}
+
+/// One model of a custom provider (item 1949), as `GET /api/providers/custom` names it.
+public struct CustomProviderModel: Codable, Sendable, Hashable {
+    public let id: String
+
+    public init(id: String) { self.id = id }
+}
+
+/// A custom provider's table (`[providers.custom.<name>]`), the parts the phone shows.
+public struct CustomProviderConfig: Codable, Sendable, Hashable {
+    public let baseURL: String
+    public let wire: String
+    public let models: [CustomProviderModel]
+    public let listModels: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case baseURL = "base_url"
+        case wire = "protocol"
+        case models
+        case listModels = "list_models"
+    }
+
+    public init(baseURL: String, wire: String, models: [CustomProviderModel], listModels: Bool) {
+        self.baseURL = baseURL
+        self.wire = wire
+        self.models = models
+        self.listModels = listModels
+    }
+}
+
+/// A provider the owner added on the Mac (item 1949): its name (the prefix of its models), its table and whether
+/// its key is set. The key itself never leaves the Mac.
+public struct CustomProviderView: Codable, Sendable, Hashable, Identifiable {
+    public let name: String
+    public let config: CustomProviderConfig
+    public let keySet: Bool
+
+    public var id: String { name }
+
+    enum CodingKeys: String, CodingKey {
+        case name, config
+        case keySet = "key_set"
+    }
+
+    public init(name: String, config: CustomProviderConfig, keySet: Bool) {
+        self.name = name
+        self.config = config
+        self.keySet = keySet
+    }
+}
+
+/// `GET /api/providers/custom` (item 1949).
+public struct CustomProvidersView: Codable, Sendable, Hashable {
+    public let providers: [CustomProviderView]
+
+    public init(providers: [CustomProviderView]) { self.providers = providers }
 }

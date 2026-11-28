@@ -29,6 +29,7 @@ from typing import Literal
 
 import pytest
 from fastapi import FastAPI
+from link_state import link_line
 from playwright.async_api import (
     APIResponse,
     Browser,
@@ -416,7 +417,7 @@ async def _chat_page(context: BrowserContext, proxy: Proxy, run: RunRecord) -> P
     await page.clock.install()
     await page.goto(ui_url("127.0.0.1", proxy.port, TOKEN))
     await page.goto(f"http://127.0.0.1:{proxy.port}/#/runs/{run.id}")
-    await expect(page.locator(".capsule")).to_contain_text("Waiting on 2 helpers", timeout=15_000)
+    await expect(page.locator(".capsule")).to_contain_text("Waiting for 2 helpers", timeout=15_000)
     await expect(page.locator(".helpers-body")).to_contain_text("Running sleep", timeout=15_000)
     await page.wait_for_timeout(1_500)
     return page
@@ -494,15 +495,15 @@ async def test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_n
             for kept in (back["sidebar"], back["helpers"]):
                 assert isinstance(kept, list) and kept != [] and all(kept), json.dumps(back)
 
-            # A network that stays away: the bar says so once the grace is over, not before, and the chat still does
-            # not move; once the network is back, the bar says nothing again.
+            # A network that stays away: the line under the bar says so once the grace is over, not before (item
+            # 2043), and the chat still does not move; once the network is back, it says nothing again.
             await _away_and_back(page, proxy, _LOST_S)
-            pill: Locator = page.locator(".pill:has(.live-dot)")
+            line: Locator = link_line(page)
             await page.wait_for_timeout((_GRACE_S - 1) * 1000)
-            await expect(pill).to_be_hidden()
-            await expect(pill).to_be_visible(timeout=3_000)
+            await expect(line).to_be_hidden()
+            await expect(line).to_be_visible(timeout=3_000)
             await page.screenshot(path=str(tmp_path / "lost.png"))
-            await expect(pill).to_be_hidden(timeout=(_LOST_S - _GRACE_S + 6) * 1000)
+            await expect(line).to_be_hidden(timeout=(_LOST_S - _GRACE_S + 6) * 1000)
             lost: JsonObject = await page.evaluate(_READ, earlier)
             assert lost["moves"] == [], json.dumps(lost)
             await context.close()

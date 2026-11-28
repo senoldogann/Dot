@@ -97,6 +97,7 @@ Your tool list starts with the core tools. The other tools come in the groups be
 - meetings: the owner's Google Meet call: joining it to take notes and answer, reading them, posting on their yes (meeting_join, meeting_read, meeting_post, meeting_leave)
 - video: watching a video file or a video link: frames of what it shows and a transcript of what is said (watch_video)
 - terminal: programs that ask questions, REPLs and servers that stay up, on a terminal of their own (terminal_open, terminal_send, terminal_read, terminal_close)
+- phone_app: the owner's iPhone through the Dot Next app, while it is open: its calendars, reminders and place (phone_calendar_events, phone_calendar_add, phone_reminder_add, phone_location)
 - desktop: the Mac's applications, windows, clipboard and AppleScript, and Safari's pages (desktop_apps, desktop_open_app, desktop_snapshot, desktop_screenshot, desktop_act, desktop_read, desktop_clipboard_read, desktop_clipboard_write, apple_script, safari_open, safari_read, safari_act)
 
 # Pages in the conversation

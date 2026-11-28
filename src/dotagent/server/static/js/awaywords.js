@@ -31,7 +31,7 @@ export function awayLine(view) {
   return parts.join(" · ");
 }
 
-/** Who made the decisions, and how many of them said no: `9 without asking, 5 by the reviewer; 2 denied` ("without asking": let through by the mode that asks only to pay or send). */
+/** Who made the decisions, and how many of them said no: `9 without asking, 5 by the reviewer; 2 denied` ("without asking": let through by the mode that asks only to pay). */
 export function decidedBy(yolo, reviewer, denied) {
   const who = [yolo > 0 ? t("awaywords.yoloWithoutAsking", { yolo }) : null, reviewer > 0 ? t("awaywords.reviewerByTheReviewer", { reviewer }) : null].filter((part) => part !== null);
   return `${who.join(", ")}${denied > 0 ? t("awaywords.deniedDenied", { denied }) : ""}`;

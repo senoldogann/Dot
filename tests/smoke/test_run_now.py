@@ -357,7 +357,7 @@ async def test_run_now_starts_the_run_its_page_opens_and_the_firings_list_it(
                 )
                 await expect(button).to_be_visible()
                 await expect(button).to_have_attribute(
-                    "title", re.compile(r"approvals: Ask only to pay or send.*asking only to pay or send", re.I)
+                    "title", re.compile(r"approvals: Ask only to pay.*asking only to pay", re.I)
                 )
                 await button.click()
                 await expect(page).to_have_url(re.compile(r"#/runs/run_"))

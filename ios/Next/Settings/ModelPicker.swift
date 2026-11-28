@@ -18,6 +18,8 @@ enum ModelUse: Sendable {
     case dotsTools
     /// Reads pictures for another model in one call: a model that sees, of no agent program.
     case vision
+    /// Checks goals and helpers' results from another lineage (item 1929): a model of Dot's tools whose family is known.
+    case otherFamilyCheck
 }
 
 /// The models of `options` that may be chosen for `use`, by provider, providers left empty dropped (pure).
@@ -28,10 +30,17 @@ func modelCandidates(_ options: [ProviderModels], for use: ModelUse) -> [Provide
         case .fast: ["opencode", "claude_code"]
         case .dotsTools: ["opencode"]
         case .vision: ["opencode", "claude_code"]
+        case .otherFamilyCheck: ["opencode"]
         }
     return options.compactMap { provider in
         guard !shut.contains(provider.provider) else { return nil }
-        let fit: [ModelOption] = provider.models.filter { use == .vision ? $0.vision == true : $0.tools != false }
+        let fit: [ModelOption] = provider.models.filter { option in
+            switch use {
+            case .vision: option.vision == true
+            case .otherFamilyCheck: option.tools != false && option.family != nil
+            case .main, .fast, .dotsTools: option.tools != false
+            }
+        }
         return fit.isEmpty ? nil : ProviderModels(provider: provider.provider, models: fit, error: nil)
     }
 }

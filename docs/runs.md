@@ -66,20 +66,25 @@ pressed. Approvals, questions, notes and the messages stay in sight either way; 
 steps, with **What it is doing** (item 830), and an agent's message is folded until you open it, in either choice
 (item 859). The choice is kept by the browser. A third choice, **Messages only** (item 1976, after Grok Bot's chats),
 tells the run as a conversation: the steps and thoughts fold out as with *What it is doing*; what the run says on the way
-to its calls is drawn as one of its messages and stays where it was said; and a call that turns the run to other work
-which its own words did not tell is one of Dot's short messages too, in the words the line uses for it ("Searching the
-web for “GistSmith contact”", "Looking at gistsmith.com", "Running a command"). The line under them says what the run
-does now and for how long ("Reading README.md… · 2 min"). Those lines come from the daemon's `narration` events
-(`agent/narration.py`), one beside a call's `tool_call` in every harness (Dot's own loop, Claude Code, OpenCode, whose own tools are told as the Dot tool that does the same): no model
-is asked for them and the model never reads them, so they cost no token. A stretch of one kind of work is one line: a
-call of a kind one of the run's four newest lines told is not told again, but for a search of other words or a page on
-another site; a line names a page by its site, a file by its name and a search by its words, never a command's text. Over
-the owner's 279 runs of two weeks that made a median of one line a run on Claude Code (at most 17) and six on OpenCode
-(at most 43, a run of 226 steps), where the models' own words told 6 % and 1 % of their steps. A line is not drawn after
-the step's own words, which tell its calls (Dot's own loop and OpenCode tell a step's words before its calls; Claude Code
-may tell them after, and its line then stays). On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
+to its calls is drawn as one of its messages and stays where it was said; a call is never a message of its own (the
+owner's word of 2026-11-27: stacked "Code run" and "Running a command" lines read as noise): the one line under the
+conversation says what the run does now, in plain words and never by a tool's name ("Running a command… · 2 min",
+"Reading README.md… · 2 min"; a tool with no phrase of its own is "Working"). The daemon still records a `narration` event
+beside a call's `tool_call` (`agent/narration.py`), in every harness; no model is asked for it, and neither the web
+nor the iPhone draws it as a line. A task you start in a chat says its first words
+the moment it starts (item 2018, `agent/first_words.py`, `[agent] first_words`): *Looking into it…* at once, then in its
+place a line of the fast model (`[models] fast`) of what Dot looks at first, written from your message alone while the
+task gets ready and takes its first step ("Looking at your calendar first."). The line is told only while the task has
+said nothing yet (no words of its own, no call, no question): once it speaks the call is dropped, so the line is never a
+second voice beside the task's own words, and a fast model that fails or takes more than 12 s leaves the first words as
+they were. Neither is a message the task's model reads; the line costs one short call of the fast model and nothing of
+the task's steps. A schedule's, a helper's or a review's task has none.
+On the iPhone, *Show steps* off (Settings › Chat, or a chat's This chat sheet) is this choice:
 the line wears the bot's face, no step shows while the run works (a failed one neither), and a finished run's steps fold
-behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A run
+behind one *Worked for* line before its answer, folded even with a failed step in it (item 1996). A helper's chat
+shows its steps as the chat that started it does, unless its own This chat sheet chose, and opens as the bottom sheet
+from the chat's helpers row as from its Agents sheet; a helper is listed by its goal's first sentence, a label it opens
+with ("Task:") left out, and what it does names a file by its name, never its path. A run
 says what it does as it works, in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it,
 now …"): those lines are its messages in the conversation, in either choice. The first of them after someone else
 spoke (you, its helpers, its agents) wears its face at the left, as a chat shows who speaks, and the lines that follow
@@ -134,7 +139,7 @@ is the answer (a small model that is offered both writes the call out as text).
   a schedule, an approval, an objective; the newest 60, item 924), each of which `recall` reads back with the ids next
   to it (the chat of a run, the runs of a chat, the run of a thing to do), so that a run that comes back to old work
   recalls it step by step rather than from a summary that lost it (`recall` fences what a run that read outside content
-  wrote and marks the reader untrusted); and a check lists names, paths and links in the summary that the conversation
+  wrote and marks the reader untrusted; a run deleted with its chat is read back from the run ledger, which keeps where it came from, its model, how it ended and when it was deleted and none of its words, item 2077; a record that is gone without a trace is an error that says it was deleted or is no id of Dot's); and a check lists names, paths and links in the summary that the conversation
   never had (an address cut short, with the ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
   it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
   `compacted` event names the model,
@@ -227,7 +232,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full` offers all of them at every step. `grouped`, the default
   since item 1280, starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
-  `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, `waits`, `recon`, `skills`, and `mcp__<server>` for
+  `terminal`, `memory_admin`, `drafts`, `accounts`, `phone_app`, `team`, `pages`, `waits`, `recon`, `skills`, and `mcp__<server>` for
   each MCP server) are
   listed in the system prompt with what they are for and
   their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. A
@@ -315,7 +320,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer. A run that failed so is stored `failed`, but
   its page says "Waiting on you", not "The task failed", and the line that offers Continue says that a message below
-  answers it (item 1061).
+  answers it (item 1061); the phone ends it "Waiting for you" too. A run the goal check found waits on you ends done
+  and waiting ([Autonomy](autonomy.md), item 2070), and reads the same.
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`
   did in most trial runs). Dot does not reinterpret such text: it is nudged first when tools were used, otherwise it
   becomes the result as written. Use a larger model as `main` for task and research runs.
@@ -419,7 +425,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the router of DeepSeek Harness's Super-agent design (2026-11-01): with one session that does the work itself, a new
   request waits; in its measure, a model left to decide whether to hand work out did so in none of five runs.
 - Several tasks in one chat (item 1984, slice 1 of [item 1982](../roadmap/1982.md)'s design): with `[agent]
-  chat_tasks` above 1 (1 by default, since the pages do not show lanes yet), a request of its own sent while the chat
+  chat_tasks` above 1 (1 by default: the owner switches it on, as their Dot's `config.toml` says), a request of its
+  own sent while the chat
   works starts in a **lane** of the chat rather than a chat of its own: a thread of its own (`threads.lane_of` names
   the chat) that the chat list does not show, whose first run is given what the chat said so far (the owner's words
   and Dot's reply of the chat's newest runs and its lanes', not their steps), in front of the owner's words, which
@@ -453,6 +460,18 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   (`to_thread_id: null`). It is checked as a queued message is before anything moves; a message with picks, for one
   level, for an agent, following a reaction, or answering a question card stays where it is. After a restart of the
   daemon a queue held for a free task waits for the owner's **Resume**.
+- The tasks on the pages and the phone (item 2013, slice 3): a chat with a lane lists its tasks over the composer,
+  **Tasks**, the chat's own first (*This chat*), each with how it stands (*Working*, *Waits for you*, *Done*,
+  *Stopped*, *Failed*), a **Stop** for one at work and **Open** for another than the page's; on a phone the capsule
+  says *2 tasks* and opens the same rows in a sheet. A task's own page says *A task of <chat>* with **Back to the
+  chat**. The composer's Stop of a chat with tasks stops every one of them; a row's Stop stops its task alone. A
+  message routed elsewhere is told in a toast (*Sent to <task>*, *Started a new task: <task>*, *Stopped every task*),
+  with **Move** for a message queued in a task, a task's run its words started, or a new task: it offers the chat's
+  other tasks and, but for a new task, **New task**. A message steered into a run already at work on its own task
+  offers no Move, which would stop that run. With `chat_tasks` above 1 the pages send every message of a chat of
+  Dot's own through its queue, which routes it, as the phone does. `GET /api/threads/{id}/tasks` and the chat's view
+  (`tasks`) say the tasks; a thread's revision is the newest of its family's (the chat's and every lane's of it),
+  since the chat's view and each lane's show the chat's tasks, so a change of any of them moves every one's view.
 - A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
@@ -733,6 +752,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts` or a registered scope, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write`, and the pages of the owner's own Safari: `safari_open`, `safari_read`, `safari_act` (item 1959, [Browser and computer use](browser-and-computer-use.md#the-owners-own-safari)) |
 | Phone           | while `[phone] enabled` (item 1196): `phone_status`, whether the owner's iPhone answers over WebDriverAgent and is locked ([Dot and your iPhone](phone-control.md)) |
+| iPhone app      | while a phone is paired (item 2051, tool group `phone_app`): `phone_calendar_events`, `phone_calendar_add`, `phone_reminder_add`, `phone_location`, done by Dot Next on the iPhone while it is open there ([Dot's asks to the phone](phone.md#dots-asks-to-the-phone-item-2051)) |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `ask_secret` (a key on a card, item 857), `react`, `finish`, `use_tools`, `recall` (a record a compaction named, read back, item 924) |
@@ -974,14 +994,17 @@ sessions whose program runs (3; 0 removes the tools); one whose program ended do
 exit status with it, until a read or `terminal_close` closes it (item 1990). Each is closed after `terminal_idle_s`
 without use (30 minutes) and all of them when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
-**A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
-answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the
-checks are pending, and it runs no `gh pr checks` loop, no `sleep` and no `wait_until` on them. Over a week on the
-owner's Mac, 382 shell calls of that kind took 9.3 of the 29 hours of the helpers' shell time, in 37 of 76 helper
-runs, and each poll of a Claude Code helper read its whole context again. The parent, which has a chat, starts
-`gh pr checks <number> --watch` with `terminal_open` and `background` (the shell's and the delegate tool's descriptions
-say so) and ends its run or goes on; the chat is told when the command ends, and a run reads the checks then, as for
-any command in the background. This asks the owner nothing and changes no policy: it is words in two prompts.
+**A helper can hand off its pull request checks (items 1953 and 2046).** Once the PR is pushed and open, the helper
+calls `terminal_open` with `background: true` and a single `gh pr checks <number or GitHub PR URL> --watch` command.
+Add `--fail-fast` to report the first failing check. The watch starts in the helper's working directory and sandbox
+and appears in the top-level chat that delegated the work, where it can be stopped. The helper can finish as soon as it has
+the session ID. It reports the PR URL and whether it started a watch. If it could not start one, the parent can
+register the watch in its chat.
+
+The daemon waits in the background terminal, with zero model turns while it polls. The chat receives the terminal
+session ID and exit status once the command ends, including an error contacting GitHub. The check output is available
+through `terminal_read`. The daemon's usual rules for background commands apply, including stop behavior and delivery
+to a run already at work in the chat. This handoff is available to delegated runs in the daemon, outside campaigns.
 
 `wait_until` (item 887, after OpenMausBot's waits) waits for something to happen, checked in code, with no model turn
 spent on the wait. It names one condition:
@@ -1043,9 +1066,11 @@ messages and their order stay as they were. Right above the
 composer, the chat's page shows each of its commands at work, with the time it has run and a Stop; the dot of a command
 in the background pulses, as its end will wake Dot. A command stopped there, closed by the run or ended by the daemon's
 stop tells nothing, and neither does one whose end a run has read itself with `terminal_read` before it was told (item
-427): a run that waited for its command and saw it end is not told the same again. A delegated run or a campaign's
-session opens none, having no chat of its own to tell: it is not offered `background`, nor the sentence of `shell` that
-sends a long command there (item 1760), and a call that sets it anyway is refused. Neither does a `dotx` command, which
+427): a run that waited for its command and saw it end is not told the same again. A campaign's session opens none,
+having no chat of its own to tell: it is not offered `background`, nor the sentence of `shell` that sends a long
+command there (item 1760), and a call that sets it anyway is refused. A delegated run is offered `background` for
+one command only, a single `gh pr checks <number or URL> --watch [--fail-fast]` handed to its parent chat (item 2046,
+above); any other command it sets there is refused. Neither does a `dotx` command, which
 ends with its run: a command in the background lives as long as the daemon. The end of a helper that a run stopped waiting for tells the chat
 the same way ([Delegation](#delegation), item 1351).
 
@@ -1089,8 +1114,9 @@ writes down what it was handed.
 accounts you signed in on Settings › Connectors ([Accounts](extending.md#accounts-googles-and-microsofts-own-sign-in)),
 through Gmail's, Google Calendar's and Microsoft Graph's own APIs, so that neither Mail, Outlook nor a browser has to be
 open. They are a run's only once an account is signed in: until then neither they nor their part of the prompt are in
-it. `account` is the address of one of the accounts: the run's prompt names them, and an address no account has is
-refused with their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`) or Outlook's
+it. `account` is the address of one of the accounts: the run's prompt names them, says that they take no other
+address, not even one of yours that its notes name (item 2073), and an address no account has is refused with
+their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`) or Outlook's
 (`from:ada`, `subject:invoice`) and, without any, lists the newest messages of the inbox; `mail_read` reads one whole:
 its people, its date, its text (the HTML of a message with no text made text) and the names of its files;
 `calendar_events` lists the events between two days or moments, in the Mac's time zone, each repeat on its own, with
@@ -1172,7 +1198,7 @@ restarts), or when a call that pays, sends or posts for you was cut while it ran
 chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the
 work again rather than taking it as a failed part. A helper the run still waited for when the daemon stopped ends with
 that run, whose own resume note names the cut `delegate` call. The bar over the
-composer says "Waiting on N helpers" in place of Working only while the run has stopped for them (every call of its
+composer says "Waiting for N helpers" in place of Working only while the run has stopped for them (every call of its
 step that has no answer yet waits on a helper; while a command of the same step still runs, or the model thinks, it
 says Working and the helpers keep their own part), with no spinner, and the line over it says what the first helper
 does now; "N helpers keep working in the background" once it was released, and nothing when none work; on a phone

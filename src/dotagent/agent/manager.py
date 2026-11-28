@@ -5,7 +5,7 @@ import contextlib
 import json
 import sqlite3
 import time
-from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterator, Sequence
+from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterator, Sequence, Set
 from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from functools import partial
@@ -37,6 +37,8 @@ from dotagent.agent.campaign import (
     render_brief,
     sessions_without_progress,
 )
+from dotagent.agent.chat_choices import MessageChoices, ResumeChoices, message_choices, resume_choices
+from dotagent.agent.first_words import tell_first_words, tells_first_words
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.held_notes import dismiss_held_note, save_held_note
 from dotagent.agent.helper_check import check_helper_result
@@ -131,6 +133,7 @@ from dotagent.agent.resume import (
     helper_not_resumed,
     identities_of,
     interrupted_calls,
+    origin_short_of_the_owner,
     origin_source,
     resume_note,
     resumes_on_start,
@@ -2601,18 +2604,21 @@ class RunManager:
                 "note would have it do unasked what this run asks first. Say it in this chat instead",
                 {"run_id": note.from_run_id, "thread_id": thread_id, "approvals": asks, "reader": reader_asks},
             )
-        # A run of a chat the owner opened (an agent's chat among them) asks a payment, a message, a mail and a post
-        # itself, or has the review model judge them (item 860), and a release there is checked by the review model,
-        # since the note marks its reader (items 962 and 963, the owner's choice), unless the owner turned that check
-        # off; and the reader, marked, sends no note on.
+        # A run of a chat the owner opened (a bot's chat among them) asks what its mode asks, and in yolo the review
+        # model checks the steps a note planted, since the note marks its reader (items 962 and 963, the owner's
+        # choice), unless the owner turned that check off; and the reader, marked, sends no note on. A run of Dot's
+        # own initiative asks the owner a payment in yolo (item 2069), and a message, a post or a release in the other
+        # modes (item 850): its note goes to none that would do them unasked (the security review of item 2069: a yolo
+        # sender's note had a schedule's yolo run pay unasked).
         owners_reader: bool = target.gate.owners_chat and (
             target.gate.approval_mode_now() != "yolo" or self._runtime.config.policy.yolo_taint_check
         )
         if sender.gate.owners_word and not (target.gate.owners_word or owners_reader):
             raise PolicyDenied(
-                "a run of Dot's own initiative asks the owner before a message, a post or a release, and the run at "
-                "work in that chat (a schedule's or a watcher's, or one of yours in yolo with [policy] "
-                "yolo_taint_check off) does not: a note would have it do them unasked. Say it in this chat instead",
+                "a run of Dot's own initiative asks the owner before a payment, or a message, a post or a release "
+                "outside yolo, and the run at work in that chat (a schedule's or a watcher's, or one of yours in yolo "
+                "with [policy] yolo_taint_check off) does not: a note would have it do them unasked. Say it in this "
+                "chat instead",
                 {"run_id": note.from_run_id, "thread_id": thread_id},
             )
         tainted: bool = True
@@ -2979,6 +2985,14 @@ class RunManager:
             chat_id, chosen, text, files, mode, model, effort, speed, approvals, goal_mode, source
         )
 
+    async def tasks_of_chat(self, thread_id: str) -> list[ChatTask]:
+        """The tasks of the chat of ``thread_id`` (itself, or the chat it is a lane of), as the pages show them (item
+        2013); none while the chat has no lane."""
+        chat_id: str = await self._chat_of(thread_id)
+        if not await self._runtime.store.lanes_of(chat_id):
+            return []
+        return await self._chat_tasks_of(chat_id)
+
     async def _chat_tasks_of(self, chat_id: str) -> list[ChatTask]:
         """The tasks of the chat ``chat_id`` (item 2012): the chat's own and each lane's, each with its newest run of
         the owner's, whether it works, the question it waits on (a card left unanswered, or a reply ending with a
@@ -3004,6 +3018,7 @@ class RunManager:
                 ChatTask(
                     thread_id=thread_id,
                     newest_run_id=newest.id,
+                    status=newest.status,
                     goal="" if owners is None else owners.goal,
                     at_work=at_work,
                     asked=asked,
@@ -3066,11 +3081,13 @@ class RunManager:
             chat_id, task_thread, text, files, mode, model, effort, speed, approvals, goal_mode, source
         )
         started: RunHandle | None = self._active_on(task_thread)
+        # A free task took the message at once and it left the queue: only its run can be moved, never its message.
+        waiting: bool = any(queued.id == message.id for queued in await self._runtime.store.list_queued(task_thread))
         return RoutedMessage(
             kind="queued",
             thread_id=task_thread,
             run_id=None if started is None else started.run_id,
-            message_id=message.id,
+            message_id=message.id if waiting else None,
         )
 
     async def _start_routed(
@@ -4384,17 +4401,27 @@ class RunManager:
         reason: HandOff | None = handoff_of(old)
         if reason is None:
             raise RunConflict("this run cannot be resumed", {"run_id": old.id, "status": old.status})
+        # The chat's model when the owner picked another one since the run started (item 2071), refused at once when
+        # its provider cannot answer, as a message on it would be.
+        chosen: ResumeChoices = resume_choices(
+            old.model, old.effort, old.speed, await self._runtime.store.chat_choices(old.thread_id)
+        )
+        if chosen.model != old.model:
+            await self.check_model_answers(parse_model_ref(chosen.model))
+            if chosen.effort is not None and not await self._level_offered(chosen.model, chosen.effort):
+                chosen = chosen.model_copy(update={"effort": None})
+            log.info("run_resumed_on_the_chats_model", run_id=old.id, model=chosen.model, was=old.model)
         resumption: Resumption = await self._resumption(old, reason, calls, automatic)
         cut_off: HandOff = reason
         run, _ = await self._launch(
             old.goal,
             old.mode,
-            old.model,
+            chosen.model,
             old.thread_id,
             RESUME_SOURCE,
             None,
-            old.effort,
-            old.speed,
+            chosen.effort,
+            chosen.speed,
             old.approvals,
             old.goal_mode,
             RunOpening(
@@ -4414,23 +4441,16 @@ class RunManager:
         log.info("run_resumed", run_id=run.id, from_run_id=old.id, cut_off=cut_off, automatic=automatic)
         return run
 
-    async def _unattended(
-        self,
-        marked_by: tuple[str, str],
-        run_id: str,
-        ended_parent: RunRecord | None,
-        opening: RunOpening,
-        opener: str | None,
-    ) -> bool:
-        """Whether the run ``run_id``, whose chat and source are ``marked_by``, is one nobody started (item 2016): by
-        the origin of its chain and its chat's opener (:func:`unattended_origin`), and, for a run that goes on in a
-        chat without the owner's message (:data:`_CARRIED_SOURCES`), by the chat's runs before it too: a schedule's
-        firing in the owner's chat (``/loop``) leaves a command in the background, and the run that tells its end
-        goes on from that firing (the security review of item 2016)."""
-        origin: str | None = await self._origin(marked_by[1], ended_parent, opening)
+    async def _unattended(self, thread_id: str, run_id: str, origin: str | None, opener: str | None) -> bool:
+        """Whether the run ``run_id`` of the chat ``thread_id``, whose chain began with a run of the source ``origin``
+        (:meth:`_origin`), is one nobody started (item 2016): by that origin and its chat's opener
+        (:func:`unattended_origin`), and, for a run that goes on in a chat without the owner's message
+        (:data:`_CARRIED_SOURCES`), by the chat's runs before it too: a schedule's firing in the owner's chat
+        (``/loop``) leaves a command in the background, and the run that tells its end goes on from that firing (the
+        security review of item 2016)."""
         if unattended_origin(origin, opener):
             return True
-        return origin in _CARRIED_SOURCES and await self._carried_unattended(marked_by[0], run_id)
+        return origin in _CARRIED_SOURCES and await self._carried_unattended(thread_id, run_id)
 
     async def _carried_unattended(self, thread_id: str, run_id: str) -> bool:
         """Whether a run that goes on in the chat ``thread_id`` without the owner's message goes on from a run nobody
@@ -4463,6 +4483,23 @@ class RunManager:
         except NotFoundError:
             return None
         return await origin_source(self._runtime, resumed)
+
+    async def _dot_origin(self, ended_parent: RunRecord | None, opening: RunOpening) -> str | None:
+        """The source the marks of a run Dot resumes on its own are read from (item 2027): for a helper whose parent
+        ended (``ended_parent``), the run at the top of its delegations; for a run the daemon resumed, the run it
+        resumes (``opening.from_run_id``); each followed back through the resumes the daemon made, up to one the
+        owner made by hand (:func:`dotagent.agent.resume.origin_short_of_the_owner`). ``None`` when it cannot be
+        read."""
+        if ended_parent is not None:
+            top: RunRecord | None = await self._top_of(ended_parent)
+            return None if top is None else await origin_short_of_the_owner(self._runtime, top)
+        if opening.from_run_id is None:
+            return None
+        try:
+            resumed: RunRecord = await self._runtime.store.get_run(opening.from_run_id)
+        except NotFoundError:
+            return None
+        return await origin_short_of_the_owner(self._runtime, resumed)
 
     async def _top_of(self, run: RunRecord) -> RunRecord | None:
         """The run at the top of ``run``'s delegations: ``run`` itself when no run delegated it. ``None`` when a run of
@@ -5001,35 +5038,50 @@ class RunManager:
                 else (ended_parent.thread_id, ended_parent.source)
             )
             # A chat Dot opened on its own initiative (item 850): its runs, the ones the owner's answers start there
-            # among them, and their helpers ask the owner before a message, a post or a release, in every mode.
+            # among them, and their helpers ask the owner before a message, a post or a release, in every mode but
+            # yolo, and before a payment in yolo (item 2069).
             opener: str | None = None if marked_by is None else await runtime.store.opened_by(marked_by[0])
+            # The source the run's chain began with (item 2016's origin): a resumed run's is the run it resumes, a
+            # resumed helper's the run at the top of its delegations.
+            origin: str | None = None if marked_by is None else await self._origin(marked_by[1], ended_parent, opening)
+            # For what Dot resumes on its own (item 2027), the marks below are read from the run its work began with: a
+            # helper whose parent ended, and a run the daemon resumed as it started, are not the owner's word, and were
+            # marked by "resume" or the parent's own source as runs of the owner's there to answer. The walk back stops
+            # at a resume the owner made by hand (the security review), which is their word. A run the owner resumes by
+            # hand is theirs, there to answer, as before (docs/safety.md). From the run's own source when the origin
+            # cannot be read.
+            by_dot: bool = ended_parent is not None or (opening.resumed is not None and opening.resumed.automatic)
+            dot_origin: str | None = await self._dot_origin(ended_parent, opening) if by_dot else None
+            marked_source: str | None = (
+                None if marked_by is None else dot_origin if dot_origin is not None else marked_by[1]
+            )
             owners_word: bool = (
                 (parent is not None and parent.gate.owners_word)
                 if marked_by is None
-                else marked_by[1] == INITIATIVE_SOURCE or opener == INITIATIVE_SOURCE
+                else marked_source == INITIATIVE_SOURCE or opener == INITIATIVE_SOURCE
             )
-            # A chat the owner opened (item 860): in yolo its payments, messages and posts are theirs, whatever started
-            # the run there (a schedule a run of the chat made goes on in it: the third pre-push review of item 860). A
-            # chat of a schedule, a watcher or Dot's own is not. A delegated run takes its parent's.
+            # A chat the owner opened (item 860): in yolo its payments are theirs (item 2069), whatever started the run
+            # there (a schedule a run of the chat made goes on in it: the third pre-push review of item 860). A chat of
+            # a schedule, a watcher or Dot's own is not. A delegated run takes its parent's.
             owners_chat: bool = (
                 (parent is not None and parent.gate.owners_chat)
                 if marked_by is None
                 else not owners_word and opener not in _NOBODY_WATCHES
             )
-            # Whether the owner is there to answer (item 860): a run of theirs is; one a schedule, a watcher or a notice
-            # started is not, and the review model judges its messages and posts (the owner's word of 2026-10-30:
-            # "e-posta … legal ise, tehlike arz etmiyorsa ve bir amaç içinse yollasın; ajanın niyeti önemli").
+            # Whether the owner is there to answer: a run of theirs is; one a schedule, a watcher or a notice started is
+            # not, and in a chat of Dot's own initiative it keeps a message, a post or a release for their yes rather
+            # than waits (item 922).
             owner_there: bool = (
                 (parent is not None and parent.gate.owner_there)
                 if marked_by is None
-                else marked_by[1] not in _NOBODY_WATCHES
+                else marked_source not in _NOBODY_WATCHES
             )
             # Whether nobody started the run (item 2016): its processes keep the sandbox in every mode. A delegated run
             # is as its parent; a resumed one as the run its chain began with; one whose parent is not known is.
             unattended: bool = (
                 (parent is None or parent.gate.unattended)
                 if marked_by is None
-                else await self._unattended(marked_by, run.id, ended_parent, opening, opener)
+                else await self._unattended(marked_by[0], run.id, origin, opener)
             )
             gate: RunGate = RunGate(
                 runtime.store,
@@ -5055,6 +5107,8 @@ class RunManager:
                 owners_chat=owners_chat,
                 owner_there=owner_there,
                 unattended=unattended,
+                # A run nobody started keeps from Dot's own tools what its sandbox seals (item 2026).
+                seal=runtime.sandbox.seal_for(unattended),
                 # The chat whose "don't ask again" answers its questions (item 866): a delegated run's parent's.
                 chat_id=(parent.gate.chat_id if parent is not None else None) if marked_by is None else marked_by[0],
             )
@@ -5064,8 +5118,8 @@ class RunManager:
             # where [policy] unanswered says so (items 482, 483): in its chat, or for a session of a campaign in the
             # campaign's conversation, shared by its sessions (item 484); a delegated run keeps them where the run that
             # delegated it does, so that the answer reaches the run at the top (item 485); never in yolo or an eval.
-            # A yolo run of a chat of Dot's own initiative asks its questions of item 850, and keeps them as a run that
-            # asks does.
+            # A yolo run of a chat of Dot's own initiative asks a payment (item 2069), and keeps it as a run that asks
+            # does.
             kept_mode: ApprovalMode = "ask" if owners_word and approval_mode == "yolo" else approval_mode
             if parent_run_id is not None:
                 gate.keep_for(None if parent is None or kept_mode == "yolo" else parent.gate.parking)
@@ -5200,6 +5254,28 @@ class RunManager:
             return effort
         return effective_effort(info.efforts, effort)
 
+    async def chat_message_choices(self, thread_id: str, sent: MessageChoices, named: Set[str]) -> MessageChoices:
+        """The choices a message to the chat ``thread_id`` starts with (item 2071, :func:`message_choices`): each one
+        its request left out (``named`` are those it set) is the chat's. A level taken from the chat is given only when
+        the model it starts on (the chat's, or the default one) offers it, as the composer gives it (item 116): the
+        level a chat kept from its first run is the one that run resolved, which a model without levels refuses."""
+        chosen: MessageChoices = message_choices(sent, named, await self._runtime.store.chat_choices(thread_id))
+        if chosen.effort is None or "effort" in named or "model" in named:
+            return chosen
+        # The model is asked for its levels only once it can answer: one that cannot is refused by name, as a message
+        # on it is (:meth:`check_model_answers`), not with the bare error of its provider.
+        await self.check_model_answers(parse_model_ref(self._main_model if chosen.model is None else chosen.model))
+        if await self._level_offered(chosen.model, chosen.effort):
+            return chosen
+        return chosen.model_copy(update={"effort": None})
+
+    async def _level_offered(self, model: str | None, effort: Effort) -> bool:
+        """Whether ``model`` (``None`` for the default one) offers the level ``effort``."""
+        info: ModelInfo = await self._runtime.router.model_info(
+            parse_model_ref(self._main_model if model is None else model)
+        )
+        return _offers(info, effort)
+
     async def _check_effort(self, ref: ModelRef, effort: Effort) -> None:
         """A level chosen for a run has to be one the model offers (a model with fewer than two has no choice)."""
         info: ModelInfo = await self._runtime.router.model_info(ref)
@@ -5289,6 +5365,8 @@ class RunManager:
         error: JsonObject | None = None
         lessons: LessonCase | None = None
         restated: tuple[int, ...] = ()
+        goal_blocked: bool = False
+        first_words: asyncio.Task[None] | None = None
         try:
             async with self._place_for(run):
                 if not await runtime.store.set_run_status(run.id, "running"):
@@ -5297,6 +5375,9 @@ class RunManager:
                 await runtime.bus.emit(
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
+                # The owner hears Dot at once, while the run gets ready and takes its first step (item 2018).
+                if tells_first_words(run.source, run.parent_run_id, runtime.config.agent.first_words, UI_SOURCE):
+                    first_words = asyncio.create_task(tell_first_words(runtime, run))
                 agent: AgentRun = AgentRun(runtime, run, gate, cancel, inbox, self, opening)
                 # The other runs know it from now on, and what it holds (item 301).
                 runtime.peers.begin(run.id, run.thread_id, run.goal)
@@ -5308,6 +5389,7 @@ class RunManager:
                 status, result, needs = outcome.status, outcome.result, outcome.needs
                 lessons = ended.lessons
                 restated = outcome.restated
+                goal_blocked = outcome.goal_blocked
         except RunHoldLapsed as exc:
             status, result = "cancelled", exc.message
         except (RunCancelled, asyncio.CancelledError):
@@ -5336,6 +5418,8 @@ class RunManager:
             status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)
         finally:
+            if first_words is not None:
+                first_words.cancel()
             runtime.peers.end(run.id)
             inbox.shutdown()
             if status != "done" and any(one.parent_run_id == run.id for one in self._detached.values()):
@@ -5343,7 +5427,9 @@ class RunManager:
                 # comes meanwhile is dropped (:func:`_to_its_end`): the end below must still be recorded. The daemon's
                 # own stop cuts them too, but keeps them: the next start resumes them (item 1668).
                 await _to_its_end(self._wait_detached_of(run.id) if self._stopping else self._stop_detached_of(run.id))
-            recorded: bool = await self._close(run, status, result, needs, error, inbox, finished, restated)
+            recorded: bool = await self._close(
+                run, status, result, needs, error, inbox, finished, restated, goal_blocked
+            )
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         learns: bool = recorded and not self._stopping and not self._learning_dropped
         if learns and lessons is None and parse_model_ref(run.model).provider in WHOLE_RUN_AGENTS:
@@ -5410,7 +5496,8 @@ class RunManager:
         error: JsonObject | None,
         inbox: RunInbox,
         finished: asyncio.Event,
-        restated: tuple[int, ...] = (),
+        restated: tuple[int, ...],
+        goal_blocked: bool,
     ) -> bool:
         """Record the end of the run (:meth:`_record_end`), then release its handle and set ``finished`` whatever
         happens; returns whether the end was recorded. A stop that comes meanwhile waits for the record and stops
@@ -5418,7 +5505,9 @@ class RunManager:
         failure to record it is logged here with its traceback; an end the store refused is stored later
         (:meth:`store_left_ends`), and the run stays as the store has it until then."""
         try:
-            recorded: bool = await _to_its_end(self._record_end(run, status, result, needs, error, inbox, restated))
+            recorded: bool = await _to_its_end(
+                self._record_end(run, status, result, needs, error, inbox, restated, goal_blocked)
+            )
             # The orders a Stop ends are ended under the same shield: a second stop meanwhile cuts nothing short (the
             # pre-push review of item 907). An end not stored, as the run had ended already, follows nothing twice.
             if recorded:
@@ -5455,7 +5544,8 @@ class RunManager:
         needs: str,
         error: JsonObject | None,
         inbox: RunInbox,
-        restated: tuple[int, ...] = (),
+        restated: tuple[int, ...],
+        goal_blocked: bool,
     ) -> bool:
         """Store how the run ended and tell about it: its waiters are released, the answers that reached its inbox
         (shut by :meth:`_drive`) too late are kept, the status and result are stored with the scores of the notes it
@@ -5469,6 +5559,11 @@ class RunManager:
         clean: str = truncate_tail(redact_known(result, held), _RESULT_CHARS)
         needed: str = redact_known(needs, held)
         data: JsonObject = {"status": status, "result": clean, "needs": needed}
+        if classify_ending(status, clean) == "owner_wait":
+            # Done as far as it can go, waiting on the owner (item 2070): the pages say "Waiting for you", not done.
+            data["waiting"] = True
+        if goal_blocked:
+            data["goal_blocked"] = True
         if error is not None:
             data["error"] = redact_json(error, held)
         if restated:

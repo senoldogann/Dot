@@ -1,8 +1,8 @@
 import Foundation
 
-// Settings › Models on the phone, as the web's page has them (item 1907): the security research kind, the fallbacks, the
-// night's learning, Dot's own work and self-repair; the routes are the daemon's own (`routes_system.py`,
-// `routes_proactive.py`, `routes_repair.py`).
+// Settings › Models on the phone, as the web's page has them (item 1907): the task models, the other-family check, the
+// fallbacks, the night's learning, Dot's own work and self-repair; the routes are the daemon's own
+// (`routes_system.py`, `routes_proactive.py`, `routes_repair.py`).
 
 private struct KindBody: Encodable {
     let kind: String
@@ -19,9 +19,20 @@ private struct LearningBody: Encodable {
 private struct LookBody: Encodable { let model: String }
 
 extension DaemonAPI {
+    /// `GET /api/providers/custom` (item 1949): the providers the owner added on the Mac, read only on the phone.
+    public func customProviders() async throws(DaemonRequestError) -> CustomProvidersView {
+        try await get("/api/providers/custom", query: [])
+    }
+
     /// `PUT /api/models/kinds`: the model a run of `kind` starts on, "" for the main model.
     public func setKindModel(_ kind: String, model: String) async throws(DaemonRequestError) -> ModelsConfig {
         try await send("PUT", "/api/models/kinds", body: Self.json(KindBody(kind: kind, model: model)))
+    }
+
+    /// `PUT /api/models/check-other-family` (item 1929): the model of another family that checks goals and helpers'
+    /// results, "" to switch the check off.
+    public func setCheckOtherFamily(_ model: String) async throws(DaemonRequestError) -> ModelsConfig {
+        try await send("PUT", "/api/models/check-other-family", body: Self.json(LookBody(model: model)))
     }
 
     /// `PUT /api/models/standby`: the fallbacks, in their order.

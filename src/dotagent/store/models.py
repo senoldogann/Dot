@@ -71,6 +71,8 @@ WORK_ORDER_MOVES: dict[WorkOrderStatus, frozenset[WorkOrderStatus]] = {
 }
 # An order in one of these is open: somebody still has to do or judge something about it.
 OPEN_WORK_ORDERS: tuple[WorkOrderStatus, ...] = ("assigned", "working", "in_review", "returned", "escalated")
+# The open orders a bot still holds: an escalated one waits for the owner, not for its bot (item 2067).
+BOT_HELD_WORK_ORDERS: tuple[WorkOrderStatus, ...] = ("assigned", "working", "in_review", "returned")
 # Where an objective of the owner's stands (item 908).
 ObjectiveStatus = Literal["active", "done", "dropped"]
 # The moves the store allows. A dropped objective stays dropped. Opening a done one again is the one way back, and the
@@ -216,6 +218,23 @@ class ChatHit(FrozenModel):
     snippet: str
 
 
+class FileHit(FrozenModel):
+    """One find of the files search (the Files chip of the chat search): a file the owner attached to a message of a
+    chat (``kind`` ``attachment``, ``attachment_id`` its upload) or one a run of it wrote or edited with ``write_file``
+    or ``edit_file`` and that call did its job (``kind`` ``made``, ``attachment_id`` ``None``). ``thread_id`` and
+    ``run_id`` are the chat the owner sees and its run that opens it, a helper's file under the run at the root of its
+    line (the web opens ``#/runs/<run_id>``); ``name`` is the file's name, ``path`` as the call named it (``~/`` for
+    the home folder; an attachment's own name), ``at`` when it was attached or last written."""
+
+    thread_id: str
+    run_id: str
+    kind: Literal["attachment", "made"]
+    name: str
+    path: str
+    attachment_id: str | None
+    at: float
+
+
 class ChatMessage(FrozenModel):
     """A user's or an assistant's message of a chat's history, with its place in it (item 1740)."""
 
@@ -272,6 +291,22 @@ class RunRecord(FrozenModel):
     # it came from. Set by the manager that launches the run and never by a model, so no run can lower it; 0 for a run
     # that began a chain.
     hops: int = 0
+
+
+class DeletedRunRecord(FrozenModel):
+    """What the run ledger of item 1323 keeps of a run deleted with its chat, as the recall tool reads it back (item
+    2077): where it came from, its model, how it ended, when, and the ids of its parent run and of its chat's schedule;
+    no words of it."""
+
+    id: str
+    source: str
+    model: str
+    status: RunStatus
+    created_at: float
+    finished_at: float | None
+    deleted_at: float
+    parent_run_id: str | None
+    schedule_id: str | None
 
 
 class RewindCut(FrozenModel):
@@ -354,6 +389,27 @@ class AgentRecord(FrozenModel):
     look: AgentLook | None
     paused_at: float | None
     refuses: str = ""
+
+
+class BotLoadRow(FrozenModel):
+    """What one bot carries, counted from the store with no model (item 2067): its open work orders, its routines
+    switched on (and all of them), the active objectives its open orders serve (Dot's: every active one), and its
+    runs (Dot's own, not the parts its runs handed out) of the window and of the window before it: how many, how many
+    ended done or failed, their steps in all, and when its newest run of any age (of those counted) began.
+    ``agent_id`` is Dot's id for Dot."""
+
+    agent_id: str
+    open_orders: int
+    active_routines: int
+    routines: int
+    objectives: int
+    runs: int
+    done: int
+    failed: int
+    steps: int
+    prior_runs: int
+    prior_done: int
+    last_run_at: float | None
 
 
 DOT_AGENT_ID: str = "dot"

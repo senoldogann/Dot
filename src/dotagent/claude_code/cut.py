@@ -28,8 +28,7 @@ from datetime import datetime
 
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
-from dotagent.policy.engine import owners_guard
-from dotagent.policy.types import ActionInfo
+from dotagent.policy.types import OUTWARD_FLAGS, ActionInfo
 
 log = get_logger(__name__)
 
@@ -219,11 +218,10 @@ def resume_refused(said: str) -> bool:
 
 
 def outward(action: ActionInfo) -> bool:
-    """Whether ``action`` is one the policy keeps for the owner even in yolo: it pays, sends a message or mail for them,
-    or posts in their name (:func:`dotagent.policy.engine.owners_guard`). A call of such an action that was in flight
-    when the program was cut may have been done, and the model, told its result may be lost, could do it a second
-    time."""
-    return owners_guard(action) is not None
+    """Whether ``action`` reaches other people in the owner's name: it pays, sends a message or mail for them, or posts
+    in their name (:data:`dotagent.policy.types.OUTWARD_FLAGS`). A call of such an action that was in flight when the
+    program was cut may have been done, and the model, told its result may be lost, could do it a second time."""
+    return not OUTWARD_FLAGS.isdisjoint(action.flags)
 
 
 def run_refusal(*, cancelled: bool, continued: int, allowed: int) -> str | None:

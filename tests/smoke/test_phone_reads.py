@@ -212,7 +212,7 @@ async def test_a_chat_that_was_away_through_a_long_run_reads_the_end_of_it_and_s
             context: BrowserContext = await phone(browser, playwright, workers="block")
             asked: list[str] = []
             page: Page = await open_chat(context, working.address, working.token, working.run.id)
-            await expect(page.locator(".capsule")).to_contain_text("Waiting on 2 helpers", timeout=20_000)
+            await expect(page.locator(".capsule")).to_contain_text("Waiting for 2 helpers", timeout=20_000)
             await until_kept(page, chats=1, lists=2)
             await page.close()
 

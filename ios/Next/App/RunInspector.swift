@@ -108,6 +108,8 @@ struct RunInspector: View {
             if let approvals = run.approvals {
                 FactRow(title: String(localized: "Approval mode", comment: "Inspector row: the run's approval mode"), value: approvalWords(approvals))
             }
+            // The model the run worked on, which the chat's own choice below may not be (item 2071).
+            FactRow(title: String(localized: "Model used", comment: "Inspector row: the model the newest run worked on"), value: model.modelLabel(run.model))
         }
     }
 
@@ -202,7 +204,7 @@ struct RunInspector: View {
             ) {
                 ForEach(helpers, id: \.runId) { helper in
                     NavigationLink {
-                        ChatScreen(thread: helper.threadId, initialPanel: nil, editsFirstQueued: false)
+                        ChatScreen(thread: helper.threadId, initialPanel: nil, editsFirstQueued: false, find: nil)
                     } label: {
                         HStack(spacing: Space.s) {
                             Text(helper.shortTitle).textRole(.body).foregroundStyle(Tone.text).lineLimit(1)
@@ -288,7 +290,7 @@ struct RunInspector: View {
                         Text(
                             work.kind == "loop"
                                 ? String(localized: "Loop", comment: "Background work kind: a repeating message of the chat")
-                                : String(localized: "Subagent", comment: "Background work kind: a helper let go to the background")
+                                : String(localized: "Helper", comment: "Background work kind: a helper let go to the background")
                         )
                         .textRole(.body).foregroundStyle(Tone.secondary)
                     }
@@ -413,7 +415,7 @@ struct RunInspector: View {
         }
     }
 
-    private var showsSteps: Bool { model.stepsOverrides[thread] ?? showStepsEverywhere }
+    private var showsSteps: Bool { model.showsSteps(of: thread, everywhere: showStepsEverywhere) }
     private var onWord: String { String(localized: "On", comment: "This chat sheet: a folded section's switch is on") }
     private var offWord: String { String(localized: "Off", comment: "This chat sheet: a folded section's switch is off") }
 

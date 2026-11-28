@@ -92,6 +92,10 @@ that the daemon never sees it. The apps the reader looks at are bundles written 
 of the unit tests is a stand-in that says what the real one says; the one test that runs the real `codesign`
 (`tests/smoke/test_desktop_app_signature.py`) signs throwaway bundles ad hoc, with no identity and no keychain.
 
+A run of a test says no first words in a chat (item 2018) unless the test is marked `first_words`: they ask the fast
+model, which a test's scripted model would answer with a reply meant for its run, and a test on the defaults would send
+to the fast model they name (`tests/conftest.py`). The marker needs nothing; its tests play the fast model themselves.
+
 A test never finds your keys unless it is marked `hosted`, `internet` or `live` (item 558, `tests/conftest.py`): in a
 run where none of those is selected the variables of the providers' keys are out of the environment and the login
 Keychain is never asked, from the first fixture on; in a run that holds some, each of the others goes without them
@@ -699,6 +703,10 @@ it.
 | `dotx eval memory [--embeddings scripted\|configured]` | Measures whether a search finds the newest fact when a fact changed (item 1728): 46 cases, each in a store of its own, of owner facts a run saves over time (a city, a rate, a port, a client's state; some in Turkish), most of them replaced later (twice for four), with a question whose right answer is the newest fact, and eight facts that are both true and must both stay found; four more (E01 to E04, item 1866) have a second run that was handed the old fact save it again after the newer one, a group of their own. A fact is saved as `memory_save` saves a note, with the subject a run may give or without one, and some old notes are handed to a run in between (which lifts them in a search); the question is then searched as `memory_search` does, the three best notes. It prints per group how often the newest fact came first, was among the three, and an outdated one was among them too. No model is asked: `scripted` (the default) embeds from the cosines `bge-m3` measured on these texts, offline, as `tests/unit/test_eval_memory.py` runs it; `configured` embeds with the model of `[memory]` (`tests/smoke/test_eval_memory_live.py`, marked `live`, measures the scripted numbers again). It reads and writes a scratch folder, never your notes. A store of two or three notes ties the two versions of a fact in the fusion and the older wins the tie, so "first" is a floor there, not a rate for a large store; "outdated shown" is not affected. The cases are in `evals/memory_cases.py`. |
 | `dotx eval tools [--model REF] [--case ID]... [--repeat N]` | Asks a model the moments of tool use Dot's runs got wrong (item 736), one call each: each case's goal is started as a run of the scripted model, whose first request (the system prompt and the tools' schemas, as Dot makes them) is asked of the model with the steps before the moment, and the first call that does work is judged (the tool, its arguments, the calls it must not make). The request is captured in `yolo`, so that no case waits on an approval. It spends the tokens of that model, about 20,000 a call; its key comes from the environment and the home's `.env` alone, and the Keychain is not asked while the cases play: a key in neither is missing, and the command says so before the first case. The cases are in `evals/tool_cases.py`, each saying which failure it comes from. |
 | `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims, unproven steps, the share of the easy ways taken); without a file, every run saved under `<home>/evals/`. |
+| `dotx eval suite [--days N] [--size N]` | Builds the suite of real runs (below) from your runs of the last `--days` (30 by default), at most `--size` cases (40), and writes it to `<home>/evals/real/suite.json`. It reads Dot's record opened read-only and calls no model. |
+| `dotx eval real [--model REF] [--repeat N]` | Plays the saved suite against a model and grades each attempt on the order of its tools and on its ending (below), then prints the pass rate of each kind of case. It spends the tokens of that model. |
+| `dotx eval ablate (--skill NAME [--parts] \| --note TEXT) [--case ID]... [--model REF] [--judge REF]` | Plays real goals of the suite with and without a skill or learned skill (and with `--parts`, with each of its `## ` parts left out) or a memory note, and has the judge model (the review model if none is given) pick the better answer of each pair blind (below). Without `--case` it plays the cases whose run read the skill. It spends the tokens of both models. |
+| `dotx eval costs [--days N]` | What each tool and skill call cost in tokens, per day of the last `--days` (7), the dearest first (below). It reads Dot's record opened read-only and calls no model. |
 
 Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
 Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off (a task that brings skills or an
@@ -766,6 +774,41 @@ start from a workbook whose formulas hold the results Excel saved and from a Wor
 one place and split over two runs in another; their easy way is the skill that comes with Dot for them, and their checks
 read the files with Dot's own Python (`python -I -m dotagent.evals.office_tasks`). To add one, write it there and run
 `dotx eval check`.
+
+### Evals from real runs
+
+The catalog's tasks are passed almost always, so a change scores the same before and after; a suite whose pass rate sits
+between 70 and 90 % shows one. `dotx eval suite` builds such a suite from the goals you gave Dot (`evals/real_runs.py`).
+About 5 % of it are *golden* cases, catalog tasks that play on files and a site of their own (`GOLDEN_TASKS`); about 80 %
+are *real* cases, the goals of your runs started from the chat, the command line, a schedule or a resume of one (never a
+delegated run, a reply to someone else, a code review or an evaluation's), those that failed or were cancelled first,
+then those you marked wrong or asked again, then the rest, newest first; and about 15 % are cases you write yourself in
+`<home>/evals/real/owner.json`, a list of `{"goal": ..., "mode": "task", "tools": [...], "skills": [...]}`. A kind with
+fewer cases than its share gives what it has and the suite is shorter; it says so.
+
+A real run that ended done and was not marked sets its *trajectory*: its acting tools in their order (bookkeeping such
+as the plan, the memory, `finish` and the skill tool left out, a tool called again at once counted once, the first 12).
+A run that went wrong sets none, its way having been the wrong one. `dotx eval real` plays each case in a throw-away home,
+in an empty workspace and held to it as a task the improvement loop wrote is (the balanced preset at least, every
+question declined), with the skills its run read seeded and checked to be read; each is found among the skills a run can read before any
+case is played, and one that is gone stops the command before it spends tokens. An attempt *ends well* when it ends
+done and those checks hold, and *passes* when it also calls at least half of the case's trajectory in the same order.
+Above a 90 % pass rate the command says the suite shows little: add harder cases to `owner.json`.
+
+`dotx eval ablate` plays each case with three arms, *with* the skill or note, *without* it, and *without* again, and
+with `--parts` one more arm per `## ` part of the skill with that part left out (`evals/ablation.py`). The judge model
+sees the goal and two answers, in an order drawn from the case and the pair and never which arm gave which, each in a
+fence only a nonce closes, and calls `pick`; a judge that does not pick stops the ablation. The two *without* arms are
+judged against each other: the margin they reach by chance (wins less losses as a share of the pairs) is the noise
+band. *With* is judged against *without*, and each part against the whole skill. A variant helps when its margin is
+above the band, hurts when it is below its negative, and is within the noise otherwise; fewer than three pairs give no
+verdict. Beside each verdict the command prints the mean change in tokens an attempt, since a skill can help and cost.
+
+`dotx eval costs` charges each tool call the run's token total just after it less the total just before it
+(`evals/call_costs.py`): from the end of the step that asked for it to the end of the step that read its result, the
+side calls it made on the way (the page extractor, a consult) included, a step shared equally by the calls it asked
+for; a call after which no step came is charged its side calls alone. A call of the skill tool is counted under
+`skill:<name>`. The sums are per day of the Mac's time zone, the evaluation's runs left out.
 
 ### The choice of help, and what the purpose lines change
 

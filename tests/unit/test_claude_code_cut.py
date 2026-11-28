@@ -241,11 +241,11 @@ def _action(*flags: Flag, kind: str = "message") -> ActionInfo:
         (("destructive",), False),
     ],
 )
-def test_an_action_is_outward_when_the_policy_keeps_it_for_the_owner_even_in_yolo(
+def test_an_action_is_outward_when_it_reaches_other_people_in_the_owners_name(
     flags: tuple[Flag, ...], kept_for_the_owner: bool
 ) -> None:
-    """Item 1581: the classes are the policy's own (``owners_guard``: a payment, a message or mail sent for the owner, a
-    public post), not a list of tool names."""
+    """Item 1581: the classes are the policy's own (``OUTWARD_FLAGS``: a payment, a message or mail sent for the owner,
+    a public post), not a list of tool names."""
     assert outward(_action(*flags)) is kept_for_the_owner
 
 

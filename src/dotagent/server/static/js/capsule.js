@@ -34,7 +34,7 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
   // A group, not a live region: its time changes every second, which a screen reader would read out each time.
   const element = el("div", { class: "capsule", role: "group", "aria-label": t("capsule.label"), hidden: true }, work, plan, helpers, queued);
   // The line over the bar while the run waits for its helpers (item 1331): what the first of them does now, Details
-  // (the Agents tab) and Stop; the bar's own part says "Waiting on 2 helpers".
+  // (the Agents tab) and Stop; the bar's own part says "Waiting for 2 helpers".
   const waitText = el("span", { class: "wait-line-text" });
   const waitNow = el("span", { class: "wait-line-now" });
   const wait = el(
@@ -59,7 +59,7 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
     plan.setAttribute("aria-label", total === 0 ? t("capsule.planLabel") : t("capsule.planDone", { done: steps.done, total }));
     const blocked = status === "blocked";
     const { live, letGo, waitedFor } = waitCounts(statuses, released);
-    // "Waiting on N helpers" only while the run has stopped for them (`waits`, waitsOnHelpers in waitcounts.js); while it
+    // "Waiting for N helpers" only while the run has stopped for them (`waits`, waitsOnHelpers in waitcounts.js); while it
     // works beside them it says Working, and its helpers keep their own part (the owner's report of 2026-11-27).
     const waitsNow = waits && waitedFor > 0 && status === "running";
     work.hidden = !working;
