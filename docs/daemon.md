@@ -851,7 +851,13 @@ session. The box holds the home's choices too, in its Chat settings (item 2015):
 for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a
 chat from before has the open run's until its next run starts; a Task kept before Auto, item 495, reads as Auto, which
 settles a task unless a message's words ask only to look). They are not kept in the browser as the home's are, and
-Keep going stays a new chat's choice. The run under way keeps its own: while it works, the model's pill steps back and says that the choices wait for the next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
+Keep going stays a new chat's choice. A message to a chat that leaves a choice out of its request takes the chat's
+(item 2071: the iPhone's follow-up names none, and a chat on Claude Haiku ran on the default model): `POST
+/threads/{id}/queue`, and `POST /runs` with a `thread_id`; a choice the request names, `"model": null` (the daemon's
+default) among them, stays its own, and a model it names brings its own level and speed. The chat's model then wins over
+the agent's own and over a model `[models] kinds` names for the message's kind of task; a resume starts on the chat's
+model too when the chat names another one than the run it resumes (with the chat's level and speed). A chat whose model
+cannot answer (no key for its provider) refuses the message by name and starts nothing. The run under way keeps its own: while it works, the model's pill steps back and says that the choices wait for the next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
 window up to 200 000, items 396 and 732); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows
 the figures, the point past which Dot summarizes the older part of the run, the model's window, and why the budget is
