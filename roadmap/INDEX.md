@@ -11,6 +11,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2079](2079.md) | done | 2026-11-28 | A stuck tab with a navigation under way is said after one timeout, within browser_snapshot's limit |
 | [2077](2077.md) | done | 2026-11-28 | Recall reads back a run whose chat was deleted, and says a record it cannot find may be deleted |
 | [2076](2076.md) | done | 2026-11-28 | A page opened from the tab a login was filled into opens in a new tab in its place |
+| [2074](2074.md) | done | 2026-11-28 | A bot's Model page is the model picker: Main model on top, the providers as groups that fold, a search |
 | [2073](2073.md) | done | 2026-11-28 | A run is told that the mail and calendar tools take no address but the accounts signed in |
 | [2066](2066.md) | done | 2026-11-28 | A code_run that cannot open a file is told that its code opens only its scratch folder |
 | [2065](2065.md) | done | 2026-11-28 | A code review whose chat has a run under way starts in a new chat instead of failing |

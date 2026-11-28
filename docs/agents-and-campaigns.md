@@ -11,7 +11,9 @@ model, a reasoning level, approvals, the actions it may use (its tools); each le
 over the actions' boxes, means every tool, any added later too: a bot with every tool opens with every box ticked,
 every box ticked saves as every tool, a bot that names each tool there is keeps them named through a save until you
 tick All actions yourself, and none ticked is refused, item 512) and a look: a shape, a rest expression and a colour of
-the character (see the design system), picked in the editor's Look field with a moving preview, worn as a still face
+the character (see the design system); the model is picked on the chat settings' list of models, in the editor and on
+the iPhone app's Model page alike (item 2074): **Main model** on top, the favourites, the providers as sections that
+fold (the chosen model's open), a tick on the one chosen and a search; the look is picked in the editor's Look field with a moving preview, worn as a still face
 wherever the bot shows, and until you choose one the shape and colour its id's hue gives it (`PUT
 /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
 for every browser: its face and **Change**, which opens the picker and Save). **Bots** in the sidebar lists Dot first and then your bots, each with its newest chat; **New
