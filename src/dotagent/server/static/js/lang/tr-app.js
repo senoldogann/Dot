@@ -179,6 +179,8 @@ export const TR_APP = {
   "attachments.removeTheFilesThatFailed": "Yüklenemeyen dosyaları kaldırın ya da yeniden ekleyin",
   // attention.js
   "attention.aTaskIsDone": "Bir görev bitti",
+  "attention.aTaskIsBlocked": "Bir görev ilerleyemedi",
+  "attention.openDotToSeeIt": "Görmek için Dot'u açın.",
   "attention.aTaskFailed": "Bir görev başarısız oldu",
   "attention.aTaskWasStopped": "Bir görev durduruldu",
   "attention.dotHasAQuestion": "Dot'un bir sorusu var",

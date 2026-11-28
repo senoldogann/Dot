@@ -36,6 +36,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>DotApsEnvironment</key>
+	<string>$(APS_ENVIRONMENT)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -51,6 +53,10 @@
 	<string>Dot opens your photo library when you choose a photo or video to attach.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Dot turns your voice into the words of a message on this iPhone when you press the microphone.</string>
+	<key>NSSupportsFrequentLiveActivityUpdates</key>
+	<true/>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

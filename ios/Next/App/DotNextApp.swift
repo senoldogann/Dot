@@ -4,7 +4,8 @@ import UIKit
 
 @main
 struct DotNextApp: App {
-    @State private var model: AppModel = AppModel()
+    @UIApplicationDelegateAdaptor(PhonePushDelegate.self) private var delegate: PhonePushDelegate
+    private var model: AppModel { delegate.model }
     @Environment(\.scenePhase) private var scenePhase: ScenePhase
 
     var body: some Scene {
@@ -12,10 +13,6 @@ struct DotNextApp: App {
             RootView(launch: LaunchOptions.read(UserDefaults.standard))
                 .environment(model)
                 .onOpenURL { url in model.open(url: url) }
-                .onAppear {
-                    // A fixture scene draws its own snapshot: no engine starts beneath it to replace it (debug only).
-                    if !LaunchOptions.read(UserDefaults.standard).drawsFixture { model.load() }
-                }
         }
         .onChange(of: scenePhase) { _, phase in model.scene(phase) }
     }

@@ -55,6 +55,22 @@ struct HomeShell: View {
         }
         .sheet(isPresented: $showsApps) { ConnectAppsSheet(opensDetail: nil) }
         .task { await model.loadAgents() }
+        .task(id: model.requestedRun) {
+            guard let run = model.requestedRun, let api = model.engine?.api else { return }
+            do {
+                let head: RunHead = try await api.runHead(run)
+                guard !Task.isCancelled, model.requestedRun == run else { return }
+                showsSettings = false
+                showsNewBot = false
+                showsApps = false
+                selection = BotRoute(bot: head.run.agentId ?? dotAgentId, thread: head.run.threadId)
+            } catch {
+                if !Task.isCancelled {
+                    PhonePush.log.warning("Could not open the notified run run=\(run, privacy: .public) error=\(String(describing: error), privacy: .private)")
+                }
+            }
+            if !Task.isCancelled, model.requestedRun == run { model.requestedRun = nil }
+        }
         // Back on the home: the agents' home chats (outside the list's window) are read again, so a chat read stops
         // counting as unread.
         .onChange(of: selection == nil) { _, home in if home { Task { await model.loadAgents() } } }
