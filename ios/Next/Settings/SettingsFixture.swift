@@ -24,6 +24,7 @@
         case memory = "settings-memory"
         case memoryTrash = "settings-memory-trash"
         case agents = "settings-agents"
+        case teamEditing = "team-editing"
         case campaigns = "settings-campaigns"
         case campaign = "settings-campaign"
         case system = "settings-system"
@@ -58,7 +59,7 @@
         /// The page the scene opens in Settings' stack.
         var page: SettingsPage? {
             switch self {
-            case .root, .search, .stopped: nil
+            case .root, .search, .stopped, .teamEditing: nil
             case .connection, .diagnosis, .offline, .keyRefused: .mac
             case .notifications: .notifications
             case .general: .general
@@ -166,6 +167,10 @@
             client?.urlProtocolDidFinishLoading(self)
         }
 
+        private var fixtureTeam: String {
+            #"{"id":"team_fixture","name":"Launch","purpose":"Ship it","agents":["ag_scout"]}"#
+        }
+
         private func answer(method: String, path: String, behaviour: FixtureBehaviour) -> (Int, String) {
             if path == "/api/health" { return (200, #"{"ok":true,"version":"0.2.0","notifications":"ok","awake":"holding"}"#) }
             if path == "/api/proof" {
@@ -210,6 +215,11 @@
             case ("GET", "/api/policy/free"): return (200, #"{"free":false}"#)
             case ("GET", "/api/memories"): return (200, memories(now: now))
             case ("GET", "/api/memories/trash"): return (200, trash(now: now))
+            case ("GET", "/api/teams/team_fixture"):
+                return (200, #"{"record":\#(fixtureTeam),"members":[\#(agent("ag_scout", "Scout", "Finds leads", now: now))],"chats":[]}"#)
+            case ("PUT", "/api/teams/team_fixture"): return (200, fixtureTeam)
+            case ("DELETE", "/api/teams/team_fixture"): return (204, "")
+            case ("GET", "/api/teams"): return (200, "[]")
             case ("GET", "/api/agents"): return (200, agents(now: now))
             case ("GET", _) where path.hasPrefix("/api/agents/"):
                 return (200, #"{"record":\#(agent("ag_scout", "Scout", "Finds leads and checks them", now: now)),"runs":[],"messages":[],"learned":{"lessons":[],"scores":{},"skills":[]},"usage":null,"work":null,"home":null}"#)

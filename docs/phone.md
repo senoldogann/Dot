@@ -109,8 +109,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    from a template, item 2061: `GET /api/agent-templates`, its questions answered and its suggested schedule added switched
    off, as the web's Agents page makes one) or a group chat (a team of the owner's bots, or a ready team, item 2061:
    `POST /api/teams`, `/api/agent-teams/{id}/use`; the home lists the teams under "Group chats", and a team's sheet lists
-   its bots and chats and starts a chat with the team, `team_id`; it also edits or removes the team, keeping its bots
-   and chats), a bot's chat under its
+   its bots and chats and starts a chat with the team, `team_id`; it also edits or removes the team (`PUT` or `DELETE
+   /api/teams/{id}`), keeping its bots and chats), a bot's chat under its
    own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
    Work (Work orders, Objectives, with those done or let go below the active ones, and Hand-offs with the two faces and "From → To", each to read, and
    laid out as the web's Agents page and Handoffs page are, item 2009: `GET /api/work-orders`, `/api/objectives` and `/api/team`; neither the web nor the phone

@@ -2469,7 +2469,7 @@
       }
     },
     "Cancel": {
-      "comment": "Edit sheet toolbar: discards the edits",
+      "comment": "Edit sheet toolbar: discards the edits\nGroup chat: cancels editing",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10608,7 +10608,7 @@
       }
     },
     "Remove": {
-      "comment": "Own initiative: takes a thing off the list\nQueue sheet: removes a queued message",
+      "comment": "Own initiative: takes a thing off the list\nQueue sheet: removes a queued message\nGroup chat: removes the team",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11125,7 +11125,7 @@
       }
     },
     "Save": {
-      "comment": "Edit sheet toolbar: keeps the edits",
+      "comment": "Edit sheet toolbar: keeps the edits\nGroup chat: saves the team",
       "localizations": {
         "tr": {
           "stringUnit": {

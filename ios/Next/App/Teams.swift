@@ -63,6 +63,7 @@ struct TeamSheet: View {
                 Button(String(localized: "Remove", comment: "Group chat: removes the team"), role: .destructive) {
                     Task { await remove() }
                 }
+                Button(String(localized: "Cancel", comment: "Group chat: cancels removal"), role: .cancel) {}
             } message: {
                 Text(String(localized: "Its bots and chats stay.", comment: "Group chat: what remains after removing the team"))
             }
