@@ -1,6 +1,7 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# MS1: the last confirmed contact with the Mac.
 # Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
@@ -1220,6 +1221,8 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
+        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
         "User input needed": "Senden bir cevap bekleniyor",
         "%lld / %lld": "%lld / %lld",
         "Submit answers": "Yanıtları gönder",
@@ -1729,14 +1732,6 @@ TR.update(
         "Routine: %@": "Rutin: %@",
         "Hides the message": "Mesajı gizler",
         "Shows the whole message": "Mesajın tamamını gösterir",
-    }
-)
-
-# MS1: the last confirmed contact with the Mac.
-TR.update(
-    {
-        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
-        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
     }
 )
 

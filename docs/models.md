@@ -287,6 +287,7 @@ answer keeps its words, Ollama's too.
 | Antigravity | `antigravity:<model>`      | Cloud Code Assist, the models of a Google Antigravity plan                      | none; the Google login Antigravity holds                   |
 | Google      | `google:<model>`           | Chat Completions, the Gemini API's OpenAI-compatible route of a Google AI Studio key | `GOOGLE_API_KEY` (aistudio.google.com; free tier)         |
 | OpenCode    | `opencode:<model>`         | OpenCode's own agent, in the `opencode serve` Dot starts (Zen's free models)    | none; the `opencode` program                                   |
+| Custom      | `<name>:<model>`           | the one its table names: Chat Completions, Responses or Messages (see [Custom providers](#custom-providers)) | its own (`DOT_CUSTOM_<NAME>_API_KEY` from Settings), or none |
 
 - **Ollama**: `[providers.ollama] base_url` is `http://localhost:11434` by default. Cloud models go through the local
   server, so nothing else is needed once you are signed in. `OLLAMA_API_KEY` is only for the hosted web search and for
@@ -682,6 +683,86 @@ sent the prompt again. The memory search (an OpenAI or ollama.com key) and the M
 read their keys when the daemon starts: after changing a key they use, restart the daemon (`dotx service restart`; a
 run in `yolo` asks for `dotx service restart --when-idle`, see [Daemon](daemon.md)).
 
+## Custom providers
+
+Any service that speaks one of the three protocols Dot already speaks can be added as a provider of its own (item
+1949): OpenAI's Chat Completions (`chat`: Groq, DeepInfra, Together, Mistral, Fireworks, a local LM Studio, vLLM
+or llama.cpp server, and most "OpenAI-compatible" APIs), OpenAI's Responses (`responses`) or Anthropic's Messages
+(`messages`: the "Anthropic-compatible" endpoints some labs offer beside their own). Its table in `config.toml` is named
+after it, and the name is the prefix of its models in every role, schedule, agent and model picker:
+
+```toml
+[providers.custom.groq]
+base_url = "https://api.groq.com/openai/v1"     # the part before /chat/completions
+protocol = "chat"
+api_key_env = "DOT_CUSTOM_GROQ_API_KEY"         # "" for a server that takes no key
+models = [
+  { id = "llama-4-scout-17b", tools = true, vision = true, context = 131072, max_output = 8192 },
+  { id = "qwen3-32b", thinking = true, efforts = ["low", "medium", "high"] },
+]
+list_models = false        # true: also the models its GET /models lists
+headers = {}               # extra headers that hold no secret
+connect_timeout_s = 10.0
+read_timeout_s = 600.0
+attempts = 4
+max_concurrent = 4
+```
+
+An Anthropic-compatible one reads the same with `protocol = "messages"` and the base before `/messages`, for example
+`base_url = "https://api.example.com/anthropic/v1"`. Then `groq:llama-4-scout-17b` is a model like any other:
+`[models] main = "groq:llama-4-scout-17b"`, a standby model, an agent's model.
+
+- **Name**: lower case letters, digits, `_` and `-`, from a letter, up to 32; never a built-in provider's name nor
+  `typesafe`. A model the configuration names of a provider neither built in nor in `[providers.custom]` is a
+  configuration error that names the setting.
+- **Address**: `https://`, or `http://` to this Mac alone (`localhost`, `127.0.0.1`, `::1`), with no user name, query or
+  fragment. Dot follows no redirect from it, so the key goes to that address and nowhere else.
+- **Key**: `api_key_env` names the key in Dot's `.env`, the environment or the Keychain, as every provider's key is
+  found; a provider without one sends no key. It cannot be a built-in provider's key, the typed judge's or another
+  custom provider's. Settings names it `DOT_CUSTOM_<NAME>_API_KEY` (the name in capitals, `-` as `_`), which nothing
+  else of Dot uses, and keeps it as it keeps the others: written once, its last four characters shown, never sent back.
+  Settings never sends a key it did not save there to a new address: a key under that name in the environment or the
+  Keychain, or one a table names by hand, is attached by writing the table in `config.toml`.
+  Chat Completions and Responses send it as `Authorization: Bearer`, Messages as `x-api-key` with `anthropic-version:
+  2023-06-01`.
+- **Headers**: extra headers for a service that wants one (`X-Title`), up to 512 printable characters each. A header whose
+  name speaks of a key, a token, a secret, a password, a passphrase, a cookie, a session, a signature, a bearer, a credential or
+  authorization is refused, as are the ones Dot sets itself: a secret has no place in the config file. It is a check of
+  the name: a secret under another name is still written into the file as typed.
+- **Models**: what a model can do is what its entry says, as such an API does not say it: `tools` (true by default),
+  `vision`, `thinking` with its reasoning labels in `efforts` (none on Messages sends the plain thinking switch),
+  `context` (128,000 by default) and `max_output` (8,192). With `list_models = true` the models its `GET /models` lists
+  join them, each taken to call tools, read no images and hold 128,000 tokens; a model it neither lists nor names is
+  refused before any call. At least one model, or `list_models`, is required.
+
+What is supported is the protocol and nothing beyond it: Dot sends what a run sends (the conversation, its tools, its
+images to a model marked `vision`, the reasoning level as `reasoning_effort` on Chat Completions, `reasoning` on
+Responses and the thinking switch on Messages, Messages' automatic prompt cache mark on a run's steps) and reads a
+streamed answer, its tool calls and its token counts. Nothing of a particular service is known: no provider routing, no
+usage or balance page, no prices (a run's dollars are **unknown**, below), no web search relay, no fast mode, no
+embeddings, no OpenAI encrypted reasoning beyond what the Responses wire carries. An error is read as OpenAI's (Chat
+Completions, Responses) or Anthropic's (Messages): 401 a refused key, 402 and a spent quota a model's pause, 429 a rate
+limit, the others an HTTP failure with the service's own words.
+
+**Settings › AI services › Add provider** does the same without the file: the name, the base URL, the protocol, whether
+it takes a key and the key, the models (each with what it can do) or "Also list the models it offers", and extra headers.
+**Fill from docs** takes the address of the provider's API documentation: Dot reads the page with its own web reader
+(public addresses only) and proposes the base URL, the protocol and the model ids the page's examples name; only when
+the page does not state the address or the protocol plainly is Dot's fast model asked once, and an address or a model it
+gives that the page does not hold is dropped. The fields are filled for you to check: nothing is saved until **Save**.
+**Test** makes one small real call only when pressed, with the key typed in the form (used for that call and kept
+nowhere) or the one saved, at the address it was saved for alone: the provider's `GET /models` when it lists them, else one word asked of its first model (a
+few tokens). Save writes `[providers.custom.<name>]` into `config.toml` (the rest of the file as it was) and the key
+into `.env`, and the next call of one of its models goes to it as saved, without a restart; **Change** opens the form
+filled (a new address drops the key Settings saved and takes it typed again, as a key goes to the address it was
+saved for; a key from the environment, the Keychain or a name the file chose keeps its provider's address, which only
+`config.toml` changes; a table that stops taking a key drops it too), and **Remove provider** takes the table out, and the key Settings saved for it, once no setting of the file
+names one of its models (a schedule or an agent that still does fails with "unknown provider" at its next run). A
+provider's page shows its address, protocol and models, its key like any provider's, with **Check** asking it as Test
+does. A phone lists the providers you added in Settings › Models, read only; adding, testing and removing one is done on
+the Mac. `dotx doctor` lists each: its key, and its `GET /models` when it lists them (else its models, not called);
+`dotx models` lists their models with the others'.
+
 ## What a run costs in dollars
 
 Dot estimates what tokens cost from the public price list of [models.dev](https://models.dev) (item 1856), never from
@@ -704,8 +785,8 @@ How a model's tokens are paid for decides what is shown:
 - **plan**: the Claude plan (`claude_code`), OpenCode Go, Antigravity and Ollama's cloud models are subscriptions, with
   no price per token: they add no dollars, and the line says `+ plan` (`on a plan` when all of it was);
 - **local**: Ollama's models on this Mac cost no dollars;
-- **unknown**: a model of a priced provider that the list has no price for, a call whose model was not recorded, or any
-  priced model before a list was fetched. Then the whole estimate is **cost unknown**, never a smaller number.
+- **unknown**: a model of a priced provider that the list has no price for, a model of a custom provider, a call whose
+  model was not recorded, or any priced model before a list was fetched. Then the whole estimate is **cost unknown**, never a smaller number.
 
 It is an estimate: a provider may bill otherwise (a discount, a batch price, OpenRouter's own provider routing), and
 the caps of what runs spend stay in tokens ([Limits](limits.md)). The API: `cost` of each day and of each of `top_runs`

@@ -26,7 +26,9 @@ async def cmd_models(command: ModelsCommand) -> int:
     config: AppConfig = load_user_config()
     router: ModelRouter = ModelRouter(config, log_model_call, os.environ)
     failures: int = 0
-    names: list[str] = [command.provider] if command.provider is not None else list(KNOWN_PROVIDERS)
+    names: list[str] = (
+        [command.provider] if command.provider is not None else [*KNOWN_PROVIDERS, *config.providers.custom]
+    )
     try:
         for provider_name in names:
             try:
@@ -52,7 +54,8 @@ async def cmd_models(command: ModelsCommand) -> int:
 
 
 async def cmd_auth_set(command: AuthSetCommand) -> int:
-    known: dict[str, str] = providers_by_key(load_user_config())
+    config: AppConfig = load_user_config()
+    known: dict[str, str] = providers_by_key(config, config.providers.custom)
     if command.key not in known:
         raise ConfigError("unknown key name", {"key": command.key, "known": list(sorted(known))})
     if sys.stdin.isatty():
@@ -67,7 +70,8 @@ async def cmd_auth_set(command: AuthSetCommand) -> int:
 
 
 async def cmd_auth_status(command: AuthStatusCommand) -> int:
-    for variable, provider_name in providers_by_key(load_user_config()).items():
+    config: AppConfig = load_user_config()
+    for variable, provider_name in providers_by_key(config, config.providers.custom).items():
         state: str = "set" if await asyncio.to_thread(resolve_secret, variable) is not None else "missing"
         sys.stdout.write(f"{provider_name:<12} {variable:<18} {state}\n")
     return 0
