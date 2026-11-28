@@ -30,7 +30,10 @@ let phonePdfPages: Int = 40
 enum FileContent {
     case image(UIImage, URL)
     case pdf(PDFDocument, URL)
-    case text(String, cut: Bool, code: Bool, URL)
+    /// A text read by its format (`fileTextFormat`): its text, for Copy and the Markdown source, and what is drawn of it.
+    case text(String, cut: Bool, format: FileTextFormat, FileTextBody, URL)
+    /// A CSV or TSV file's rows.
+    case table(FileTable, URL)
     /// The facts alone, and why nothing more shows.
     case facts(String)
 }
@@ -41,9 +44,10 @@ enum PreviewState {
     case ready(ShownFile, FileContent)
 }
 
-/// A file's preview in a sheet (backlog LF1): an image zoomable, a PDF's pages, a text or code selectable; a file too
-/// large or of a kind the phone does not show, its facts. Open on Mac, Share and Save to Files at the bottom; a swipe
-/// down closes it.
+/// A file's preview in a sheet (backlog LF1): an image zoomable, a PDF's pages, a text by its format (Markdown drawn as
+/// the chat draws an answer with its source a tap away, JSON laid out, code coloured and never wrapped, plain text
+/// selectable), a CSV or TSV file as a grid; a file too large or of a kind the phone does not show, its facts. Open on
+/// Mac, Share and Save to Files float at the bottom, and every page's end scrolls clear of them; a swipe down closes it.
 struct FilePreviewSheet: View {
     let path: String
     let close: () -> Void
@@ -52,6 +56,7 @@ struct FilePreviewSheet: View {
     @State private var saving: URL?
     @State private var notice: (tone: NoticeTone, words: String)?
     @State private var opening: Bool = false
+    @State private var showsSource: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -63,6 +68,9 @@ struct FilePreviewSheet: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
+                    }
+                    if case .ready(_, .text(_, _, .markdown, _, _)) = state {
+                        ToolbarItem(placement: .principal) { markdownPicker }
                     }
                     if case .ready(let file, let shown) = state { actions(file, shown) }
                 }
@@ -98,23 +106,20 @@ struct FilePreviewSheet: View {
             ZoomableImage(image: image, label: file.name).ignoresSafeArea(edges: .bottom)
         case .ready(_, .pdf(let document, _)):
             PDFPages(document: document).ignoresSafeArea(edges: .bottom)
-        case .ready(_, .text(let text, let cut, let code, _)):
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.s) {
-                    Text(verbatim: text)
-                        .textRole(code ? .code : .body)
-                        .foregroundStyle(Tone.text)
-                        .textSelection(.enabled)
+        case .ready(_, .text(let text, let cut, let format, let body, _)):
+            VStack(spacing: 0) {
+                textBody(text, format: format, body: body)
+                if cut {
+                    Text(String(localized: "Only the start of the file shows here; open it on the Mac for the rest.", comment: "File preview: the text was cut"))
+                        .textRole(.footnote).foregroundStyle(Tone.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    if cut {
-                        Text(String(localized: "Only the start of the file shows here; open it on the Mac for the rest.", comment: "File preview: the text was cut"))
-                            .textRole(.footnote).foregroundStyle(Tone.tertiary)
-                    }
+                        .padding(.horizontal, Space.gutter).padding(.vertical, Space.xs)
                 }
-                .padding(Space.gutter)
-                .readableColumn()
             }
-            .accessibilityIdentifier("file.text")
+            .contentMargins(.bottom, floatingClearance, for: .scrollContent)
+        case .ready(_, .table(let table, _)):
+            FileTableView(table: table)
+                .contentMargins(.bottom, floatingClearance, for: .scrollContent)
         case .ready(let file, .facts(let why)):
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.l) {
@@ -139,9 +144,38 @@ struct FilePreviewSheet: View {
                 .padding(Space.gutter)
                 .readableColumn()
             }
+            .contentMargins(.bottom, floatingClearance, for: .scrollContent)
             .accessibilityIdentifier("file.facts")
         }
     }
+
+    /// A text's body by its format; a Markdown file's source, when asked for, as its lines of code.
+    @ViewBuilder private func textBody(_ text: String, format: FileTextFormat, body: FileTextBody) -> some View {
+        switch body {
+        case .markdown(let blocks) where !showsSource:
+            MarkdownDocument(blocks: blocks)
+        case .markdown:
+            CodeLinesView(lines: codeLines(text: text, language: .markdown))
+        case .code(let lines):
+            CodeLinesView(lines: lines)
+        case .plain(let pieces):
+            PlainTextDocument(pieces: pieces)
+        }
+    }
+
+    private var markdownPicker: some View {
+        Picker(String(localized: "View", comment: "Change sheet: how a Markdown file is shown"), selection: $showsSource) {
+            Text(String(localized: "Formatted", comment: "Change sheet: a Markdown file shown formatted")).tag(false)
+            Text(String(localized: "Source", comment: "Change sheet: a Markdown file shown as it is written")).tag(true)
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+        .accessibilityIdentifier("file.view")
+    }
+
+    /// How far a page's end scrolls above the bottom edge: clear of Open on Mac and the Share and Save pill that float
+    /// over it (the owner's shot of 2026-11-28 had the last lines under them).
+    private var floatingClearance: CGFloat { Metric.hit + Space.l }
 
     @ToolbarContentBuilder private func actions(_ file: ShownFile, _ shown: FileContent) -> some ToolbarContent {
         ToolbarItemGroup(placement: .bottomBar) {
@@ -173,7 +207,7 @@ struct FilePreviewSheet: View {
 
     private func localFile(_ shown: FileContent) -> URL? {
         switch shown {
-        case .image(_, let url), .pdf(_, let url), .text(_, _, _, let url): url
+        case .image(_, let url), .pdf(_, let url), .text(_, _, _, _, let url), .table(_, let url): url
         case .facts: nil
         }
     }
@@ -243,10 +277,15 @@ extension AppModel {
                 guard let data: Data = document.dataRepresentation() else { return .ready(file, .facts("")) }
                 return .ready(file, .pdf(document, try keptFile(data, named: file.name)))
             case .text(let text, let cut):
-                let kind: AnswerFileKind = answerFileKind(file.name)
-                return .ready(file, .text(text, cut: cut, code: kind == .code, try keptFile(Data(text.utf8), named: file.name)))
+                let format: FileTextFormat = fileTextFormat(name: file.name)
+                let body: FileTextBody = await Task.detached(priority: .userInitiated) { fileTextBody(text, format: format) }.value
+                return .ready(file, .text(text, cut: cut, format: format, body, try keptFile(Data(text.utf8), named: file.name)))
+            case .table(let table):
+                let delimiter: Character = file.name.lowercased().hasSuffix(".tsv") ? "\t" : ","
+                let written: String = await Task.detached(priority: .userInitiated) { fileTableText(table.rows, delimiter: delimiter) }.value
+                return .ready(file, .table(table, try keptFile(Data(written.utf8), named: file.name)))
             case .drawn:
-                return .ready(file, .facts(String(localized: "The phone shows this kind of file by its facts; open it on the Mac to read it.", comment: "File preview: a table or an Office file")))
+                return .ready(file, .facts(String(localized: "The phone shows this kind of file by its facts; open it on the Mac to read it.", comment: "File preview: an Office file")))
             case .unshown(let reason):
                 return .ready(file, .facts(reason))
             }

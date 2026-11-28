@@ -59,13 +59,9 @@ struct ChangeSheet: View {
     @ViewBuilder private var content: some View {
         switch layout {
         case .newFile(let text, .markdown) where !showsSource:
-            ScrollView {
-                AnswerView(markdown: text, writing: false)
-                    .textSelection(.enabled)
-                    .padding(Space.gutter)
-                    .readableColumn()
-            }
-            .accessibilityIdentifier("change.markdown")
+            MarkdownDocument(blocks: markdownBlocks(text))
+                .textSelection(.enabled)
+                .accessibilityIdentifier("change.markdown")
         case .note(let why):
             EmptyState(
                 title: String(localized: "No diff to show", comment: "Change sheet: the daemon has no diff of the file"), systemImage: "doc.questionmark",

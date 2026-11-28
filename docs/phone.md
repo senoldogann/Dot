@@ -129,8 +129,11 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    item 1966) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in (a file an answer's words name is its name after its kind's symbol, in
-   the words, and opens a preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open
-   on Mac, Share and Save to Files; a link is its site's own icon before the words it was written with, a bare address
+   the words, and opens a preview sheet, an image zoomable, a PDF's pages, a text by its format (Markdown drawn as an
+   answer is, its tables as grids and its source a tap away; JSON laid out; code coloured, numbered and never wrapped;
+   plain text that wraps), a CSV or TSV file as a grid whose header stays in sight, or a file's facts, each drawn as it
+   scrolls into sight so a file of 200 KB or 5,000 rows opens at once, its end scrolling clear of the floating Open on
+   Mac, Share and Save to Files, item 2098; a link is its site's own icon before the words it was written with, a bare address
    shortened to its site or, for a GitHub pull request, `#1012` after the GitHub mark, and opens in Safari's in-app
    view, the icons asked of a site only once the answer is whole; nothing is listed under the answer, items 1935 and 1961; a
    table's long cells wrap inside their rows, its columns fitting the screen, item 1961), the approvals and questions a run asks with Allow and Deny, one capsule

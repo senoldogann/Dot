@@ -112,6 +112,7 @@ struct RootView: View {
                         ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing)
                     }
                     .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }
+                    .modifier(FixtureFileSheet(shows: fixture == .file))
                 case .settingsFixture(let fixture):
                     paired(HomeShell(opensFirstChat: false, settings: fixture.start))
                         .onAppear { model.showSettingsFixture(fixture) }
@@ -142,6 +143,21 @@ struct RootView: View {
 }
 
 #if DEBUG
+    /// The `n2-file` scene's file preview, open at launch on the file `-DotNextFile` names.
+    struct FixtureFileSheet: ViewModifier {
+        let shows: Bool
+        @State private var file: OpenedFile?
+
+        func body(content: Content) -> some View {
+            content
+                .sheet(item: $file) { opened in FilePreviewSheet(path: opened.path, close: { file = nil }) }
+                .task {
+                    guard shows else { return }
+                    file = OpenedFile(path: "/Users/owner/Desktop/" + (UserDefaults.standard.string(forKey: "DotNextFile") ?? "C8.out.md"))
+                }
+        }
+    }
+
     /// Tells the screenshot harness the scene is drawn: after the first frame and a settle for glass and fonts, the
     /// scene's name is written to `Library/Caches/dotnext-ready.txt` in the app's container, which the script polls.
     enum SceneReady {

@@ -1730,3 +1730,13 @@ TR.update(
         "Shows the whole message": "Mesajın tamamını gösterir",
     }
 )
+
+# File preview by format (the owner's shot of 2026-11-28): Markdown formatted, tables as grids.
+TR.update(
+    {
+        "Table": "Tablo",
+        "Show all %lld rows": "%lld satırın tümünü göster",
+        "The table stops at row %lld here; open it on the Mac for the rest.": "Tablo burada %lld. satırda bitiyor; geri kalanı için Mac'te açın.",
+    }
+)
+EN_PLURALS.update({"Show all %lld rows": ("Show the %lld row", "Show all %lld rows")})

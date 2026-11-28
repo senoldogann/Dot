@@ -539,7 +539,7 @@
       }
     },
     "%lld min": {
-      "comment": "Work line: how long the run has worked, in whole minutes",
+      "comment": "A short span of time: minutes\nWork line: how long the run has worked, in whole minutes",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -860,7 +860,7 @@
       }
     },
     "%lld tries": {
-      "comment": "Own initiative: how many times Dot tried a thing",
+      "comment": "Own initiative: how many times Dot tried a thing\nWork order: how many attempts it has had",
       "localizations": {
         "en": {
           "variations": {
@@ -2799,7 +2799,7 @@
       }
     },
     "Close": {
-      "comment": "Sheet toolbar: closes an inspector sheet\nSheet toolbar: closes the sheet",
+      "comment": "Sheet toolbar: closes an inspector sheet\nSheet toolbar: closes the sheet\nVoiceOver: closes the full-screen video",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6863,7 +6863,7 @@
       }
     },
     "Let go": {
-      "comment": "Own initiative: a thing taken off the list",
+      "comment": "Objective: the owner and Dot let it go\nOwn initiative: a thing taken off the list",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7344,7 +7344,7 @@
       }
     },
     "Message": {
-      "comment": "Draft: an iMessage",
+      "comment": "Draft: an iMessage\nHand-off: what was asked",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8165,7 +8165,7 @@
       }
     },
     "None": {
-      "comment": "Find in chat: no block holds the words\nMaintenance › Performance: no hang, no crash",
+      "comment": "Bot profile: nothing in a group of its work\nFind in chat: no block holds the words\nMaintenance › Performance: no hang, no crash",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8990,7 +8990,7 @@
       }
     },
     "Open": {
-      "comment": "VoiceOver: an open provider group",
+      "comment": "VoiceOver: an open provider group\nWork orders: the section of those not over",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9739,7 +9739,7 @@
       }
     },
     "Progress": {
-      "comment": "Campaign note: progress",
+      "comment": "Campaign note: progress\nObjective: its dated lines of progress",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11901,6 +11901,35 @@
         }
       }
     },
+    "Show all %lld rows": {
+      "comment": "File preview: opens a long table whole; the argument is its row count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show the %lld row"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show all %lld rows"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld satırın tümünü göster"
+          }
+        }
+      }
+    },
     "Show all apps": {
       "comment": "Connect apps: leaves the connected list",
       "localizations": {
@@ -12646,6 +12675,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sekme çubuğu · normal"
+          }
+        }
+      }
+    },
+    "Table": {
+      "comment": "File preview: the title of a long table opened whole",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tablo"
           }
         }
       }
@@ -13454,7 +13494,7 @@
       }
     },
     "The phone shows this kind of file by its facts; open it on the Mac to read it.": {
-      "comment": "File preview: a table or an Office file",
+      "comment": "File preview: an Office file",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -13570,6 +13610,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yan soru sorulamadı: %@"
+          }
+        }
+      }
+    },
+    "The table stops at row %lld here; open it on the Mac for the rest.": {
+      "comment": "File preview: a table too large was read only to a row; the argument is that row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tablo burada %lld. satırda bitiyor; geri kalanı için Mac'te açın."
           }
         }
       }
@@ -13916,7 +13967,7 @@
       }
     },
     "To": {
-      "comment": "Draft card: the recipients",
+      "comment": "Draft card: the recipients\nHand-off: who it was sent to",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14224,7 +14275,7 @@
       }
     },
     "Typing": {
-      "comment": "Live caption: the run types\nWork line: the run waits for its model to answer",
+      "comment": "Work line: the run waits for its model to answer",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14774,7 +14825,7 @@
       }
     },
     "Waiting for you": {
-      "comment": "Campaign section: questions that wait\nWork line: an approval or a question waits for the owner",
+      "comment": "Campaign section: questions that wait\nWork line: an approval or a question waits for the owner\nWork order: it waits for the owner's decision",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -15353,7 +15404,7 @@
       }
     },
     "Work orders": {
-      "comment": "Tool row of Dot's own tool: the agents' work orders",
+      "comment": "Bot profile: the work the lead handed to the bot\nTool row of Dot's own tool: the agents' work orders",
       "localizations": {
         "tr": {
           "stringUnit": {

@@ -255,10 +255,8 @@
             case ("POST", "/api/phone/metrics"): return (204, "")
             // A file an answer names (backlog LF1): its facts and text, and its open on the Mac.
             case ("GET", "/api/files/preview"):
-                return (
-                    200,
-                    #"{"path":"/Users/owner/Desktop/ci-notes.md","name":"ci-notes.md","size":2150,"modified":\#(now - 600),"opens":true,"preview":{"kind":"text","text":"CI notes\n\nNode 22 is pinned on CI.\n","cut":false}}"#
-                )
+                let named: String = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "path" }?.value ?? ""
+                return (200, FileFixture.preview(path: named.isEmpty ? "/Users/owner/Desktop/ci-notes.md" : named, now: now))
             case ("POST", "/api/files/open"): return (204, "")
             // What a chat's runs changed (item 2017): a new Python file, a file changed in two hunks, a new Markdown
             // file, a new JSON file on one line and a picture, which has no diff.

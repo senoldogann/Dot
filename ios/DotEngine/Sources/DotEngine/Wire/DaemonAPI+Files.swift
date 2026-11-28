@@ -14,15 +14,17 @@ public struct FilePageSize: Codable, Sendable, Hashable {
     }
 }
 
-/// What the Mac shows of a file (`ShownFile.preview`): a PDF's pages, an image, a text of at most 512 KB, or a kind
-/// the phone shows by its facts alone (a table, an Office file) and a file the Mac does not show, with why.
+/// What the Mac shows of a file (`ShownFile.preview`): a PDF's pages, an image, a text of at most 512 KB, a CSV or TSV
+/// table, or a kind the phone shows by its facts alone (an Office file) and a file the Mac does not show, with why.
 public enum FilePreview: Sendable, Hashable, Decodable {
     /// The pages' sizes and the widths in pixels a page is drawn at (`/api/files/page`).
     case pdf(pages: [FilePageSize], widths: [Int])
     case image
     /// `cut` when the file holds more than the text.
     case text(String, cut: Bool)
-    /// A kind the Mac draws for its own panel (`table`, `document`, `workbook`, `presentation`).
+    /// A CSV or TSV file's rows, the first its header.
+    case table(FileTable)
+    /// A kind the Mac draws for its own panel (`document`, `workbook`, `presentation`).
     case drawn(kind: String)
     case unshown(reason: String)
 
@@ -33,6 +35,7 @@ public enum FilePreview: Sendable, Hashable, Decodable {
         case text
         case cut
         case reason
+        case sheet
     }
 
     public init(from decoder: any Decoder) throws {
@@ -45,6 +48,9 @@ public enum FilePreview: Sendable, Hashable, Decodable {
             self = .image
         case "text":
             self = .text(try container.decode(String.self, forKey: .text), cut: try container.decode(Bool.self, forKey: .cut))
+        case "table":
+            let sheet: FileSheet = try container.decode(FileSheet.self, forKey: .sheet)
+            self = .table(FileTable(rows: fileTableRows(sheet.cells), cutAtRow: sheet.cutAtRow))
         case "unshown":
             self = .unshown(reason: try container.decode(String.self, forKey: .reason))
         default:
