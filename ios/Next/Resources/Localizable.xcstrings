@@ -5348,6 +5348,17 @@
         }
       }
     },
+    "Fast": {
+      "comment": "The composer's model chip: fast mode is on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hızlı"
+          }
+        }
+      }
+    },
     "Fast mode": {
       "comment": "Chat settings row: the model's fast mode",
       "localizations": {
