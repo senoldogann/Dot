@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [2086](2086.md) | done | 2026-11-28 | main's iPhone tests green again: the English of a key that is not its English, and the keyboard's first-use tip |
+| [2085](2085.md) | done | 2026-11-28 | main's smoke gate: a bot file naming unknown actions says "bot", and the capsule test knows the chat's tasks |
 | [2084](2084.md) | done | 2026-11-28 | An agent file the web cannot read is called a bot file, as the test and the page say |
 | [2080](2080.md) | done | 2026-11-28 | The iPhone's question card keeps its arrows in place while paging; main's chat UI tests green again |
 | [2079](2079.md) | done | 2026-11-28 | A stuck tab with a navigation under way is said after one timeout, within browser_snapshot's limit |
