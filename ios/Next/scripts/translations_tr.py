@@ -1742,3 +1742,16 @@ TR.update(
 
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+
+TR.update(
+    {
+        "Updating Dot is done on the Mac: Settings › System.": "Dot'u Mac'te güncelleyin: Ayarlar › Sistem.",
+        "Health checks": "Sağlık denetimleri",
+        "Failing": "Başarısız",
+        "Optional": "İsteğe bağlı",
+        "Restart Dot": "Dot'u yeniden başlat",
+        "Restart now?": "Şimdi yeniden başlatılsın mı?",
+        "Dot is back": "Dot yeniden bağlandı",
+        "Dot has not confirmed the restart yet. Check your Mac if it stays unreachable.": "Dot yeniden başladığını henüz doğrulamadı. Ulaşılamamaya devam ederse Mac'inizi kontrol edin.",
+    }
+)

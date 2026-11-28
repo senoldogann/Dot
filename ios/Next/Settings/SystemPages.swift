@@ -19,7 +19,7 @@ func uptimeWords(_ seconds: Double, locale: Locale) -> String {
 }
 
 /// Settings › System › Health and version: whether Dot answers and how it stands (runs, approvals, scheduler, stop),
-/// its version and the app's, and what is done on the Mac (update, restart, permissions).
+/// its version and the app's, its health checks, and restarting Dot when the Mac's service can bring it back.
 struct SystemPage: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var state: Loadable<SystemPicture> = .loading
@@ -46,9 +46,10 @@ struct SystemPage: View {
                         ListRow(systemImage: "checkmark.shield", title: String(localized: "Approval mode", comment: "Inspector row: the run's approval mode"), description: nil, accessory: .detail(approvalWords(status.approvals)))
                     }
                 }
+                SystemRestartRow(reconnected: load)
                 GroupedSection(
                     header: String(localized: "This app", comment: "System section: DotNext itself"),
-                    footer: String(localized: "Updating or restarting Dot is done on the Mac: Settings › System.", comment: "System: update and restart are the Mac's")
+                    footer: String(localized: "Updating Dot is done on the Mac: Settings › System.", comment: "System: updating Dot is done on the Mac")
                 ) {
                     ListRow(systemImage: "iphone", title: String(localized: "Dot Next version", comment: "System: the app's version"), description: nil, accessory: .detail(appVersionWords()))
                 }

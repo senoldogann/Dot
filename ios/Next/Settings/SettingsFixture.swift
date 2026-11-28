@@ -241,6 +241,10 @@
             case ("DELETE", let route) where route.hasPrefix("/api/mcp/servers/"): return (200, connectServers)
             case ("GET", "/api/reactions/settings"):
                 return (200, #"{"follow_ups":true,"follow_ups_per_hour":20,"hold_minutes":30,"good":"feedback","love":"feedback","wrong":"follow_up","again":"follow_up","explain":"follow_up","hold":"follow_up"}"#)
+            case ("GET", "/api/desktop/permissions"): return (200, #"{"service":true,"service_problem":null}"#)
+            case ("GET", "/api/doctor"):
+                return (200, #"[{"name":"Google Chrome","ok":true,"required":true,"detail":"Chrome is installed."}]"#)
+            case ("POST", "/api/system/restart"): return (200, #"{"restarting":true}"#)
             case ("GET", "/api/diagnostics/programs"):
                 return (
                     200,
