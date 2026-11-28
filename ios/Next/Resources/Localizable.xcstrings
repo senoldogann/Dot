@@ -2578,6 +2578,17 @@
         }
       }
     },
+    "Change this skill?": {
+      "comment": "Skills: asks before restoring or removing a learned skill",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beceri değiştirilsin mi?"
+          }
+        }
+      }
+    },
     "Changed": {
       "comment": "File preview row: when the file last changed",
       "localizations": {
@@ -3466,6 +3477,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cron biçimi"
+          }
+        }
+      }
+    },
+    "Current": {
+      "comment": "Skills: the version in use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geçerli"
           }
         }
       }
@@ -6433,6 +6455,17 @@
         }
       }
     },
+    "Installed plugins": {
+      "comment": "Settings: installed plugins and their versions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurulu eklentiler"
+          }
+        }
+      }
+    },
     "Instructions": {
       "comment": "Agents: an agent's instructions\nBot profile: what the agent was told to do",
       "localizations": {
@@ -6642,6 +6675,17 @@
         }
       }
     },
+    "Its connected apps stop now and its skills leave new tasks.": {
+      "comment": "Plugins: explains removing a connected plugin",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı uygulamaları hemen durur ve becerileri yeni görevlerden çıkarılır."
+          }
+        }
+      }
+    },
     "Its last look failed: %@": {
       "comment": "Watcher: why its last look failed",
       "localizations": {
@@ -6671,6 +6715,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalıştıkça çalışmaları burada görünür."
+          }
+        }
+      }
+    },
+    "Its skills leave new tasks.": {
+      "comment": "Plugins: explains removing a plugin",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Becerileri yeni görevlerden çıkarılır."
           }
         }
       }
@@ -7295,6 +7350,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gizli modelleri yönet"
+          }
+        }
+      }
+    },
+    "Managed on your Mac": {
+      "comment": "Plugins: set up in the Mac's configuration",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inizden yönetilir"
           }
         }
       }
@@ -8061,6 +8127,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardımcı yok"
+          }
+        }
+      }
+    },
+    "No installed plugins": {
+      "comment": "Plugins: the list is empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurulu eklenti yok"
+          }
+        }
+      }
+    },
+    "No learned skills yet": {
+      "comment": "Skills: the list is empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz öğrenilmiş beceri yok"
           }
         }
       }
@@ -9914,6 +10002,28 @@
         }
       }
     },
+    "Put back the earlier version of %@?": {
+      "comment": "Plugins: confirmation of a revert; the argument is the plugin name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ eklentisinin eski sürümü geri yüklensin mi?"
+          }
+        }
+      }
+    },
+    "Put to rest": {
+      "comment": "Skills: stop offering this skill until it is woken",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dinlendir"
+          }
+        }
+      }
+    },
     "Quality": {
       "comment": "Live viewer: the menu of the picture's quality",
       "localizations": {
@@ -10486,6 +10596,17 @@
         }
       }
     },
+    "Remove %@ from Dot?": {
+      "comment": "Plugins: confirmation of removal; the argument is the plugin name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Dot'tan kaldırılsın mı?"
+          }
+        }
+      }
+    },
     "Remove %@ from favourites": {
       "comment": "VoiceOver: unstars a model; the argument is its name",
       "localizations": {
@@ -10629,6 +10750,17 @@
         }
       }
     },
+    "Resting": {
+      "comment": "Skills: a skill is resting",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dinleniyor"
+          }
+        }
+      }
+    },
     "Restore": {
       "comment": "Memory: brings a forgotten note back",
       "localizations": {
@@ -10713,6 +10845,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu mesaj yeniden denensin mi?"
+          }
+        }
+      }
+    },
+    "Revert": {
+      "comment": "Plugins: restores the earlier version",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri al"
           }
         }
       }
@@ -11817,6 +11960,17 @@
         }
       }
     },
+    "Settings › Plugins": {
+      "comment": "Where on the Mac: installed plugins",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Eklentiler"
+          }
+        }
+      }
+    },
     "Settings › Rules": {
       "comment": "Where on the Mac: the Rules page",
       "localizations": {
@@ -11835,6 +11989,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ayarlar › Zamanlanmış görevler"
+          }
+        }
+      }
+    },
+    "Settings › Skills": {
+      "comment": "Where on the Mac: learned skills",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Beceriler"
           }
         }
       }
@@ -11890,6 +12055,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Şablon olarak paylaş…"
+          }
+        }
+      }
+    },
+    "Share with all bots": {
+      "comment": "Skills: make this bot's skill available to all",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm botlarla paylaş"
           }
         }
       }
@@ -13266,6 +13442,17 @@
         }
       }
     },
+    "The earlier steps become a new version.": {
+      "comment": "Skills: restoring keeps both versions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önceki adımlar yeni bir sürüm olarak kaydedilir."
+          }
+        }
+      }
+    },
     "The file cannot be shown": {
       "comment": "File preview: the Mac did not give the file",
       "localizations": {
@@ -13706,6 +13893,17 @@
         }
       }
     },
+    "The updated version goes to the Trash.": {
+      "comment": "Plugins: explains reverting",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güncellenen sürüm Çöp Kutusu'na taşınır."
+          }
+        }
+      }
+    },
     "Their times and choices are set on your Mac.": {
       "comment": "Activity: where the brief's time and the watchers' choices are set",
       "localizations": {
@@ -13724,6 +13922,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Burada dinlenecek mikrofon yok. Mesajı yazarak gönder."
+          }
+        }
+      }
+    },
+    "These steps may come from outside content.": {
+      "comment": "Skills: the version may include third-party content",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu adımlar dışarıdan gelen içerikten alınmış olabilir."
           }
         }
       }
@@ -13867,6 +14076,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu iPhone'un ağı"
+          }
+        }
+      }
+    },
+    "This permanently deletes the skill and its versions. A later task may learn it again.": {
+      "comment": "Skills: deletion is permanent and includes all versions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beceri ve tüm sürümleri kalıcı olarak silinir. Dot ileride bir görevden bu beceriyi yeniden öğrenebilir."
           }
         }
       }
@@ -14663,6 +14883,28 @@
         }
       }
     },
+    "Version %lld": {
+      "comment": "Skills: the number of a version",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sürüm %lld"
+          }
+        }
+      }
+    },
+    "Versions": {
+      "comment": "Skills: past versions of a learned skill",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sürümler"
+          }
+        }
+      }
+    },
     "Video %@": {
       "comment": "VoiceOver: a video in the composer that is being prepared; the argument is its name",
       "localizations": {
@@ -14758,6 +15000,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bekle"
+          }
+        }
+      }
+    },
+    "Wait for the current change to finish.": {
+      "comment": "Skills: a change is already saving",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişikliğin tamamlanmasını bekleyin."
           }
         }
       }
@@ -14974,6 +15227,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Onayını bekliyor"
+          }
+        }
+      }
+    },
+    "Wake": {
+      "comment": "Skills: bring a resting skill back",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uyandır"
           }
         }
       }

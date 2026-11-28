@@ -1739,3 +1739,37 @@ TR.update(
 
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+
+TR.update(
+    {
+        "Settings › Skills": "Ayarlar › Beceriler",
+        "No learned skills yet": "Henüz öğrenilmiş beceri yok",
+        "Resting": "Dinleniyor",
+        "Versions": "Sürümler",
+        "Version %lld": "Sürüm %lld",
+        "Current": "Geçerli",
+        "Change this skill?": "Beceri değiştirilsin mi?",
+        "The earlier steps become a new version.": "Önceki adımlar yeni bir sürüm olarak kaydedilir.",
+        "Share with all bots": "Tüm botlarla paylaş",
+        "Wake": "Uyandır",
+        "Put to rest": "Dinlendir",
+        "These steps may come from outside content.": "Bu adımlar dışarıdan gelen içerikten alınmış olabilir.",
+        "Installed plugins": "Kurulu eklentiler",
+        "Settings › Plugins": "Ayarlar › Eklentiler",
+        "No installed plugins": "Kurulu eklenti yok",
+        "Revert": "Geri al",
+        "Managed on your Mac": "Mac'inizden yönetilir",
+        "The updated version goes to the Trash.": "Güncellenen sürüm Çöp Kutusu'na taşınır.",
+        "Its connected apps stop now and its skills leave new tasks.": "Bağlı uygulamaları hemen durur ve becerileri yeni görevlerden çıkarılır.",
+        "Its skills leave new tasks.": "Becerileri yeni görevlerden çıkarılır.",
+        "Put back the earlier version of %@?": "%@ eklentisinin eski sürümü geri yüklensin mi?",
+        "Remove %@ from Dot?": "%@ Dot'tan kaldırılsın mı?",
+    }
+)
+
+TR.update(
+    {
+        "This permanently deletes the skill and its versions. A later task may learn it again.": "Beceri ve tüm sürümleri kalıcı olarak silinir. Dot ileride bir görevden bu beceriyi yeniden öğrenebilir.",
+        "Wait for the current change to finish.": "Değişikliğin tamamlanmasını bekleyin.",
+    }
+)

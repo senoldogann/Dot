@@ -208,6 +208,12 @@
                     #"{"model":"claude_code:opus","effort":"high","fallback":["opencode_go:deepseek-v4.1-flash"],"fallback_effort":"high","small_model":"","small_max_lines":150,"max_minutes":15}"#
                 )
             case ("GET", "/api/policy/free"): return (200, #"{"free":false}"#)
+            case ("GET", "/api/skills/learned"):
+                return (200, #"{"items":[{"name":"weekly-review","description":"Read the week's notes","pinned":false,"resting":false,"retired":false,"shared":false,"agent_id":null}]}"#)
+            case ("GET", "/api/skills/learned/weekly-review/versions"):
+                return (200, #"{"items":[{"note":{"n":1,"at":1,"tainted":false},"current":false,"text":{"description":"Read the week's notes","when":"On Friday","steps":["Read notes"]}}]}"#)
+            case ("GET", "/api/plugin-gallery"):
+                return (200, #"{"plugins":[{"id":"reports","name":"Reports","does":"Writes reports","state":"updated","revertible":true}],"others":[]}"#)
             case ("GET", "/api/memories"): return (200, memories(now: now))
             case ("GET", "/api/memories/trash"): return (200, trash(now: now))
             case ("GET", "/api/agents"): return (200, agents(now: now))
