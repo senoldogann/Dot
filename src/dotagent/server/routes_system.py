@@ -433,7 +433,7 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
             await asyncio.gather(
                 *(
                     _provider_models(ctx.runtime.router, name, default_effort, config.agent, ctx.runtime.context_sizes)
-                    for name in KNOWN_PROVIDERS
+                    for name in (*KNOWN_PROVIDERS, *sorted(ctx.runtime.router.custom))
                 )
             )
         )

@@ -14,7 +14,10 @@ from dotagent.secrets import resolve_secret
 
 def test_an_offline_test_finds_no_key_of_the_owner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = load_default_config()
-    names: tuple[str, ...] = (*providers_by_key(config), config.providers.openai.organization_env)
+    names: tuple[str, ...] = (
+        *providers_by_key(config, config.providers.custom),
+        config.providers.openai.organization_env,
+    )
     monkeypatch.setenv("DOT_HOME", str(tmp_path))
     assert not [name for name in names if name in os.environ]
     assert secrets._from_keychain(config.providers.openai.api_key_env) is None

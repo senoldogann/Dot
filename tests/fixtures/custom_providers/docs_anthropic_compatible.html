@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><title>Anthropic API compatibility | Sample AI</title></head>
+<body>
+<main>
+<h1>Use Sample AI with the Anthropic SDK</h1>
+<p>Sample AI offers an Anthropic-compatible endpoint, so tools built on the Anthropic Messages API work unchanged.</p>
+<pre><code>export ANTHROPIC_BASE_URL=https://api.sample-ai.example/anthropic
+export ANTHROPIC_API_KEY=$SAMPLE_API_KEY</code></pre>
+<pre><code>curl https://api.sample-ai.example/anthropic/v1/messages \
+  -H "x-api-key: $SAMPLE_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{"model": "sample-m2", "max_tokens": 1024, "messages": [{"role": "user", "content": "Hello"}]}'</code></pre>
+<p>Supported models: sample-m2, sample-m2-mini.</p>
+</main>
+</body></html>

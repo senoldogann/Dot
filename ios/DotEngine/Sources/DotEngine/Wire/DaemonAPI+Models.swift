@@ -19,6 +19,11 @@ private struct LearningBody: Encodable {
 private struct LookBody: Encodable { let model: String }
 
 extension DaemonAPI {
+    /// `GET /api/providers/custom` (item 1949): the providers the owner added on the Mac, read only on the phone.
+    public func customProviders() async throws(DaemonRequestError) -> CustomProvidersView {
+        try await get("/api/providers/custom", query: [])
+    }
+
     /// `PUT /api/models/kinds`: the model a run of `kind` starts on, "" for the main model.
     public func setKindModel(_ kind: String, model: String) async throws(DaemonRequestError) -> ModelsConfig {
         try await send("PUT", "/api/models/kinds", body: Self.json(KindBody(kind: kind, model: model)))

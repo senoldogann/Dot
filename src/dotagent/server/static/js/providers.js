@@ -54,13 +54,20 @@ export function providerMark(provider) {
   return drawInked(mark, `/icons/providers/${FILES[named] ?? named}.svg`);
 }
 
-/** The name of a provider as people know it, for headings and menus. */
+// The name of a custom provider the owner added (item 1949, `CUSTOM_PROVIDER_NAME` in llm/types.py).
+const CUSTOM_NAME = /^[a-z][a-z0-9_-]{0,31}$/;
+
+/** The name of a provider as people know it, for headings and menus: a custom provider is called by the name the
+ * owner gave it. */
 export function providerLabel(provider) {
   const label = LABELS[provider];
-  if (label === undefined) {
-    throw new Error(`unknown provider: ${provider}`);
+  if (label !== undefined) {
+    return label;
   }
-  return label;
+  if (CUSTOM_NAME.test(provider)) {
+    return provider;
+  }
+  throw new Error(`unknown provider: ${provider}`);
 }
 
 /** The provider of a model reference such as "openai:gpt-5.5" ("" when the reference names none). */

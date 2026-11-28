@@ -11,12 +11,12 @@ from collections.abc import Collection, Mapping, Sequence
 from glob import glob
 from pathlib import Path
 
-from dotagent.config import ProvidersConfig
+from dotagent.config import CustomProviderConfig, ProvidersConfig
 from dotagent.core.errors import ConfigError
 from dotagent.core.text import until_text
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.router import ModelRouter, Pause, parse_model_ref, unavailable_reason
-from dotagent.llm.types import WHOLE_RUN_AGENTS
+from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS
 from dotagent.secrets import secret_state
 
 # A helper model could not answer the question a run asked it.
@@ -89,7 +89,14 @@ def _key_name(providers: ProvidersConfig, provider: str) -> str | None:
             raise ConfigError("unknown provider", {"provider": provider})
 
 
-def _has_key(providers: ProvidersConfig, provider: str) -> bool:
+def _has_key(providers: ProvidersConfig, custom: Mapping[str, CustomProviderConfig], provider: str) -> bool:
+    """Whether ``provider`` has what it answers with. A custom provider (item 1949) of ``custom``, the ones in use, has
+    its key, or takes none; one no longer in use (removed in Settings while a setting still named it) has nothing."""
+    own: CustomProviderConfig | None = custom.get(provider)
+    if own is not None:
+        return own.api_key_env == "" or secret_state(own.api_key_env).source is not None
+    if provider not in KNOWN_PROVIDERS:
+        return False
     if provider == "antigravity":
         # No key: the login the Antigravity client keeps on this Mac is what the route answers with, and a roster that
         # switched to a model of a missing login would die on its first call.
@@ -99,12 +106,16 @@ def _has_key(providers: ProvidersConfig, provider: str) -> bool:
     return key is None or secret_state(key).source is not None
 
 
-def _keyed(providers: ProvidersConfig, names: frozenset[str]) -> frozenset[str]:
+def _keyed(
+    providers: ProvidersConfig, custom: Mapping[str, CustomProviderConfig], names: frozenset[str]
+) -> frozenset[str]:
     """Blocking: the Keychain is read by a subprocess when neither the environment nor the env file has a key."""
-    return frozenset(name for name in names if _has_key(providers, name))
+    return frozenset(name for name in names if _has_key(providers, custom, name))
 
 
-async def keyed_providers(providers: ProvidersConfig, models: Sequence[str]) -> frozenset[str]:
+async def keyed_providers(
+    providers: ProvidersConfig, custom: Mapping[str, CustomProviderConfig], models: Sequence[str]
+) -> frozenset[str]:
     """The providers of ``models`` that have the key they need, from wherever Dot reads keys."""
     names: frozenset[str] = frozenset(
         provider
@@ -113,12 +124,12 @@ async def keyed_providers(providers: ProvidersConfig, models: Sequence[str]) -> 
     )
     if not names:
         return names
-    return await asyncio.to_thread(_keyed, providers, names)
+    return await asyncio.to_thread(_keyed, providers, custom, names)
 
 
 async def current_roster(router: ModelRouter, providers: ProvidersConfig, models: Sequence[str]) -> Roster:
     """``models`` as they stand now: with the keys of their providers and the pauses of ``router``."""
-    keyed: frozenset[str] = await keyed_providers(providers, models)
+    keyed: frozenset[str] = await keyed_providers(providers, router.custom, models)
     return roster_for(models, keyed, router.paused(time.time()))
 
 

@@ -12,6 +12,17 @@
         }
       }
     },
+    "%@ + listed": {
+      "comment": "Models: a custom provider also lists the models it offers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ + listelenenler"
+          }
+        }
+      }
+    },
     "%@ MB": {
       "comment": "Maintenance › Performance: megabytes",
       "localizations": {
@@ -585,6 +596,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "bir etkinlikten %lld dakika önce"
+          }
+        }
+      }
+    },
+    "%lld models": {
+      "comment": "Models: how many models a custom provider names",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld model"
           }
         }
       }
@@ -1434,6 +1456,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yapılacak ekle"
+          }
+        }
+      }
+    },
+    "Added and changed in the Mac's Settings › AI services. Their models are in every model list.": {
+      "comment": "Models: where custom providers are added",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'teki Ayarlar › Yapay zekâ hizmetleri'nde eklenir ve değiştirilir. Modelleri her model listesinde yer alır."
           }
         }
       }
@@ -9844,6 +9877,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlayıcı programları"
+          }
+        }
+      }
+    },
+    "Providers you added": {
+      "comment": "Models section: the custom providers added on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklediğin sağlayıcılar"
           }
         }
       }

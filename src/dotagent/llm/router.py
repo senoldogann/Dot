@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager, suppress
 
 from dotagent.agent.sizes import ContextSizes
 from dotagent.claude_code.models import fast_model
-from dotagent.config import AppConfig
+from dotagent.config import AppConfig, CustomProviderConfig
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -26,6 +26,7 @@ from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
 from dotagent.llm.antigravity import AntigravityProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, ClaudeCodeProvider
+from dotagent.llm.custom import CustomProvider
 from dotagent.llm.google import GoogleProvider
 from dotagent.llm.google_image import GeneratedImage, ImageRequest
 from dotagent.llm.ollama import OllamaProvider
@@ -66,7 +67,8 @@ class ModelRef(FrozenModel):
 
 
 def parse_model_ref(text: str) -> ModelRef:
-    """Split ``provider:model`` at the first colon (model names may contain colons, e.g. ``qwen3:8b``)."""
+    """Split ``provider:model`` at the first colon (model names may contain colons, e.g. ``qwen3:8b``); a custom
+    provider's name is taken as it is shaped, and whether one is in use is for :meth:`ModelRouter.provider` to say."""
     split: tuple[str, str] | None = split_model_ref(text)
     if split is None:
         raise ConfigError(
@@ -213,6 +215,9 @@ class ModelRouter:
 
     def __init__(self, config: AppConfig, recorder: CallRecorder, login_env: Mapping[str, str]) -> None:
         self._config: AppConfig = config
+        # The custom providers in use (docs/models.md): the configuration's, as Settings adds, changes and removes them
+        # while the daemon runs (:meth:`set_custom`).
+        self._custom: dict[str, CustomProviderConfig] = dict(config.providers.custom)
         # The context sizes chosen for models (item 250), which runs read as they start and a side call as it is made:
         # a model whose own window is larger than its provider is asked for by default gets the window its size needs
         # (item 520, :meth:`window_of`).
@@ -244,8 +249,35 @@ class ModelRouter:
         # What is told each time a model begins a pause for one of :data:`MONEY_REASONS` (:meth:`on_money_pause`).
         self._money_listeners: list[Callable[[ModelRef, Pause, str], Awaitable[None]]] = []
 
+    @property
+    def custom(self) -> dict[str, CustomProviderConfig]:
+        """The custom providers in use, by name (a copy)."""
+        return dict(self._custom)
+
+    def _known(self, name: str) -> bool:
+        """Whether ``name`` is a built-in provider or a custom one in use."""
+        return name in KNOWN_PROVIDERS or name in self._custom
+
+    def _unknown(self, name: str) -> ConfigError:
+        return ConfigError(
+            "unknown provider", {"provider": name, "providers": [*KNOWN_PROVIDERS, *sorted(self._custom)]}
+        )
+
+    async def set_custom(self, name: str, config: CustomProviderConfig | None) -> None:
+        """Serve the custom provider ``name`` with ``config`` from the next call on, or no longer for ``None``: its
+        connector is retired (:meth:`retire`), so that the next call makes one with the new address, models and key.
+        A call it is serving ends on the old one."""
+        if name in KNOWN_PROVIDERS:
+            raise ConfigError("a built-in provider is not a custom one", {"provider": name})
+        if config is None:
+            self._custom.pop(name, None)
+        else:
+            self._custom[name] = config
+        await self.retire(name)
+
     def _maker(self, name: str) -> asyncio.Lock:
-        """The lock of the provider ``name`` (a known one: :data:`KNOWN_PROVIDERS` bounds the locks)."""
+        """The lock of the provider ``name`` (a known one: :data:`KNOWN_PROVIDERS` and the custom providers bound the
+        locks)."""
         lock: asyncio.Lock | None = self._making.get(name)
         if lock is None:
             lock = self._making[name] = asyncio.Lock()
@@ -285,7 +317,15 @@ class ModelRouter:
             case "claude_code":
                 return ClaudeCodeProvider(self._config.providers.claude_code, self._login_env, ToolBridge())
             case _:
-                raise ConfigError("unknown provider", {"provider": name})
+                custom: CustomProviderConfig | None = self._custom.get(name)
+                if custom is None:
+                    raise self._unknown(name)
+                custom_key: str | None = (
+                    None
+                    if custom.api_key_env == ""
+                    else await asyncio.to_thread(require_secret, custom.api_key_env, f"the {name} provider")
+                )
+                return CustomProvider(name, custom, custom_key)
 
     async def provider(self, name: str) -> ChatProvider:
         """The connector of the provider ``name``: the one in service, which every call takes without waiting for
@@ -293,8 +333,8 @@ class ModelRouter:
         existing: ChatProvider | None = self._providers.get(name)
         if existing is not None:
             return existing
-        if name not in KNOWN_PROVIDERS:
-            raise ConfigError("unknown provider", {"provider": name, "providers": list(KNOWN_PROVIDERS)})
+        if not self._known(name):
+            raise self._unknown(name)
         async with self._maker(name):
             existing = self._providers.get(name)
             if existing is not None:
@@ -311,8 +351,8 @@ class ModelRouter:
     async def register(self, name: str, provider: ChatProvider) -> None:
         """Serve the provider name ``name`` with ``provider`` instead of a connector made from the configuration (the
         scripted model of the evals and of the tests). It has to come before the name is used for the first time."""
-        if name not in KNOWN_PROVIDERS:
-            raise ConfigError("unknown provider", {"provider": name, "providers": list(KNOWN_PROVIDERS)})
+        if not self._known(name):
+            raise self._unknown(name)
         async with self._maker(name):
             if name in self._providers:
                 raise ConfigError("a connector for this provider exists already", {"provider": name})
@@ -504,7 +544,8 @@ class ModelRouter:
             case "google":
                 return providers.google.base_url
             case _:
-                return None
+                custom: CustomProviderConfig | None = self._custom.get(ref.provider)
+                return None if custom is None else custom.base_url
 
     async def reaches(self, ref: ModelRef) -> bool:
         """Whether this Mac can connect to the server of ``ref`` now (:func:`~dotagent.llm.reach.reaches`); yes when it
