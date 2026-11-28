@@ -1798,9 +1798,11 @@ the agent itself. On a Mac that has no Dot, the shell installs one first (**Inst
   The page's commands are the shell's own (`installer_inspect`, `installer_status`, `installer_start`,
   `installer_retry`, `installer_open`), which only the page of that window may call (below). The runtime folder is Dot's
   own code to the sandbox, like Dot.app: a run's commands cannot change it.
-- **One interface.** The window is the web UI at the size the screenshot tour reviews (1280 × 860, down to a
-  phone's 390 wide). The system draws only the traffic lights over the page, on the centre line of the top bars with
-  room above and below them; the page keeps room for them in the sidebar's head, as tall as the top bar so that its
+- **One interface.** The window is the web UI, first at the size the screenshot tour reviews (1280 × 860, down to a
+  phone's 390 wide), then where you left it: its place and size, and whether it was zoomed, are kept in
+  `~/Library/Application Support/dev.dot.desktop/window.json` as it hides, loses the focus or the app quits, only when
+  they changed, and a place no display shows any more (a display taken away) is not used. The system draws only the
+  traffic lights over the page, on the centre line of the top bars with room above and below them; the page keeps room for them in the sidebar's head, as tall as the top bar so that its
   button stands on the same line (the settings' nav has the same head, item 577, and Back to chats at its foot, item
   852), or in
   the top bar while the sidebar is away, and the window drags by those bars.
@@ -1823,6 +1825,17 @@ the agent itself. On a Mac that has no Dot, the shell installs one first (**Inst
 run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from
 `GET /api/activity/count` every second, and set again only when what it shows changes. A click opens the window;
 the menu has Open Dot, New chat, Check for Updates… and Quit. Closing the window keeps the shell in the menu bar.
+- **At login.** Settings › General › Desktop app › Open Dot.app at login (`[desktop_app] start_at_login`, on by
+  default) gives the shell a login item: `~/Library/LaunchAgents/dev.dot.desktop.plist`, which opens the app at each
+  login with `--at-login`, in the menu bar with its window hidden, so that the count, the menu and ⌘⇧Space are there
+  after a restart of the Mac without opening Dot. The shell reads the setting from `config.toml` at each poll and writes
+  or removes the file when it changes; writing it starts nothing at once. Only an app run from its bundle where it
+  stays has a login item: not one run from its disk image or the copy macOS makes of a downloaded app, nor a build run
+  from `target/`.
+- **Its own words** (the menu, the tip, the page shown while the daemon is down, the update dialogs) are in the language
+  of the web UI in its window, English or Turkish (Settings › General › Language): the page writes that language into
+  `[desktop_app] language` when it opens in the shell and the config holds another, and the shell redraws its menu and
+  its page within a second. The words of the system and of the TOML parser it quotes stay as they are.
 - **⌘⇧Space** anywhere brings the window up on New chat, with the cursor in the box. When another app holds the
   shortcut, the shell starts without it and its menu says so; New chat stays in the menu. While the window shows the
   page of a daemon that is down, New chat brings it up as it is, and what the page says stays.
@@ -1860,13 +1873,16 @@ the menu has Open Dot, New chat, Check for Updates… and Quit. Closing the wind
   `codesign -d --entitlements - --xml`) must have no hardened runtime or carry `com.apple.security.device.audio-input`.
   What it read is kept while the app's `Info.plist` and the seal of its signature stay as they were, so an update is
   seen at the next press.
-- **Updates** (item 432). As it starts, and from **Check for Updates…**, the shell reads `latest.json` of the latest
+- **Updates** (item 432). As it starts, once a day after while it runs (by the wall clock, so a day the Mac slept
+  counts), and from **Check for Updates…**, the shell reads `latest.json` of the latest
   release on GitHub (`plugins.updater` in `desktop/src-tauri/tauri.conf.json`). A newer version is offered in a dialog:
   **Install and Restart** downloads it, checks that it is signed with the updater's key and that the signature names the
-  version offered, puts it in place of the app and starts the shell again; **Later** leaves it for the next look. The
-  look at start says something only when it finds a newer Dot; the one from the menu also says when this Dot is the
-  newest, or why it could not look, and that Dot is looking already while a look is under way, so that an update is
-  never installed twice. The dialogs are the system's, shown by the shell itself: no page can show one. The daemon stays
+  version offered, puts it in place of the app and starts the shell again; **Later** leaves it for the next look.
+  While it downloads, the menu bar item shows how far it is beside the count (`↓ 45%`, or the megabytes when the release
+  gives no size) and its tip says it downloads, then installs. The look at start and the daily one say something only
+  when they find a newer Dot; the one from the menu also says when this Dot is the newest, or why it could not look, and
+  that Dot is looking already (or downloading, and how far) while a look is under way, so that an update is never
+  installed twice. The dialogs are the system's, shown by the shell itself: no page can show one. The daemon stays
   as it was installed, from its checkout or from PyPI, with one exception (item 575): in an install the app made, its
   package follows the app. At its start, when the package installed (read from its metadata folder) is older than the
   app, which has just updated itself, the shell runs `uv --no-config tool install --reinstall --constraints <the

@@ -948,6 +948,15 @@ launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0
 
+[desktop_app]
+# The desktop shell (Dot.app): start_at_login opens it at every login, in the menu bar with its window hidden (its
+# count, its menu and ⇧⌘Space, without a click on Dot first); the shell writes or removes its own login item
+# (~/Library/LaunchAgents/dev.dot.desktop.plist) as this changes. language is the language of the shell's own words
+# (menu, tip, the page shown while the daemon is down, update dialogs), "en" or "tr": the web UI in the shell's window
+# writes it when its own language, chosen in Settings › General, differs.
+start_at_login = true
+language = "en"
+
 [assistant]
 # Who Dot is to you (item 420): the name you call it by (1 to 24 characters), your own name (at most 40; empty: the
 # first name of your account on this Mac), and whether Dot has had its first conversation with you, which the home

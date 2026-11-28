@@ -790,6 +790,15 @@ class DesktopConfig(FrozenModel):
     osascript_timeout_s: float = Field(gt=0, allow_inf_nan=False)
 
 
+class DesktopAppConfig(FrozenModel):
+    """What the desktop shell (Dot.app, ``desktop/src-tauri``) reads of this file each second: whether it opens at
+    login, in the menu bar with its window hidden, and the language its own words (menu, tip, the page shown while the
+    daemon is down, update dialogs) are in, which the web UI in its window writes when its own language differs."""
+
+    start_at_login: bool
+    language: Literal["en", "tr"]
+
+
 type SnapshotSound = Literal["click", "pop", "glass", "off"]
 
 
@@ -1535,6 +1544,7 @@ class AppConfig(FrozenModel):
     web: WebConfig
     browser: BrowserConfig
     desktop: DesktopConfig
+    desktop_app: DesktopAppConfig
     snapshots: SnapshotsConfig
     channels: ChannelsConfig
     reactions: ReactionsConfig

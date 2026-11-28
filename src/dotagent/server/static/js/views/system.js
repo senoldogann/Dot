@@ -275,6 +275,41 @@ function buildNotifications() {
   return section(t("views.system.notifications"), null, element);
 }
 
+/** The desktop app (Dot.app, `[desktop_app]`): whether it opens at login, in the menu bar with its window hidden. The
+ * shell reads the config file each second and writes or removes its login item; the phone app has no such card. */
+function buildDesktopAppCard() {
+  let settings = null;
+  const body = el("div", { class: "card-pad stack" }, inlineLoading());
+  const atLogin = switchSetting({
+    label: t("views.system.openDotAppAtLogin"),
+    hint: t("views.system.openDotAppAtLoginHint"),
+    read: () => settings !== null && settings.start_at_login === true,
+    write: async (on) => {
+      settings = await api.put("/desktop-app", { start_at_login: on });
+    },
+    onToggled: () => atLogin.paint(),
+  });
+
+  async function load() {
+    try {
+      settings = await api.get("/desktop-app");
+    } catch (error) {
+      body.replaceChildren(
+        inlineError(error, () => {
+          body.replaceChildren(inlineLoading());
+          load();
+        }),
+      );
+      return;
+    }
+    body.replaceChildren(atLogin.element);
+    atLogin.paint();
+  }
+
+  load();
+  return section(t("views.system.desktopApp"), null, body);
+}
+
 /** The composer's keys (item 230), kept in this browser: the key that sends, and what a message to a run at work
  * does. */
 function buildComposerCard() {
@@ -3055,6 +3090,7 @@ export function mountGeneral(root, ctx) {
     buildNameCard(),
     look.element,
     buildNotifications(),
+    ...(inPhoneApp() ? [] : [buildDesktopAppCard()]),
     buildComposerCard(),
     voice.element,
     buildChatCard(),

@@ -7,8 +7,14 @@
 //! down the window shows the page that says how to start it, or which of the daemon's files the shell could not read
 //! and why (`Unread`), and opens the UI by itself when the daemon answers. On a Mac that has no Dot at all, a window of
 //! its own shows the installer instead (`installer`, item 575): the only page that may call the install commands.
+//! `[desktop_app]` of the daemon's config.toml, read at each poll, says whether the shell has a login item
+//! (`login_item`) and the language of its own words (`words`); the window keeps its place across launches
+//! (`window_place`), and the releases are looked at once a day while the shell runs.
 
 mod installer;
+mod login_item;
+mod window_place;
+mod words;
 
 use std::collections::HashSet;
 use std::env;
@@ -19,7 +25,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use hmac::{Hmac, KeyInit, Mac};
 use rfd::{AsyncMessageDialog, MessageButtons, MessageDialogResult, MessageLevel};
@@ -34,8 +40,11 @@ use tauri::{
     AppHandle, LogicalPosition, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
+use tauri::{LogicalSize, Wry};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_updater::{Update, UpdaterExt};
+use window_place::{Area, Place};
+use words::{fill, Lang, Words};
 
 const WINDOW: &str = "main";
 const TRAY: &str = "main";
@@ -50,8 +59,13 @@ const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 8765;
 const CONFIG_FILE: &str = "config.toml";
 const TOKEN_FILE: &str = "api-token";
-/// What the down page says of a token file that is there but empty, which the daemon refuses too.
-const EMPTY_TOKEN: &str = "it is empty; delete it and the daemon makes a new one when it starts";
+/// How often the releases are looked at while the shell runs (and once as it starts), by the wall clock, which goes on
+/// while the Mac sleeps.
+const UPDATE_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
+/// The window's size when it has no place kept yet (item 88), and the least it may be.
+const WINDOW_SIZE: (f64, f64) = (1280.0, 860.0);
+const WINDOW_MIN: (f64, f64) = (390.0, 600.0);
+const PLACE_FILE: &str = "window.json";
 /// What the daemon's proof puts before the nonce (`daemon_proof` in `dotagent.server.guard`).
 const PROOF_LABEL: &[u8] = b"dot daemon proof\n";
 const NONCE_BYTES: usize = 32;
@@ -79,9 +93,38 @@ struct ServerSection {
     port: Option<u16>,
 }
 
+/// `[desktop_app]` of the daemon's config.toml (`DesktopAppConfig` in `dotagent.config`); what is not set keeps the
+/// daemon's default.
+#[derive(Deserialize, Default)]
+struct DesktopAppSection {
+    start_at_login: Option<bool>,
+    language: Option<String>,
+}
+
 #[derive(Deserialize, Default)]
 struct ConfigFile {
     server: Option<ServerSection>,
+    desktop_app: Option<DesktopAppSection>,
+}
+
+/// What the shell does as `[desktop_app]` says: whether it has a login item, and the language of its words.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DesktopApp {
+    start_at_login: bool,
+    lang: Lang,
+}
+
+impl DesktopApp {
+    /// The settings `config` gives, the daemon's defaults (`defaults.toml`) for what it leaves out.
+    fn of(config: &ConfigFile) -> DesktopApp {
+        let section = config.desktop_app.as_ref();
+        DesktopApp {
+            start_at_login: section.and_then(|app| app.start_at_login).unwrap_or(true),
+            lang: section
+                .and_then(|app| app.language.as_deref())
+                .map_or(Lang::En, Lang::of),
+        }
+    }
 }
 
 /// `GET /api/activity/count`.
@@ -124,42 +167,44 @@ enum Unread {
     /// config.toml could not be read, or is not valid TOML, or is not the shape of a config: the system's or the
     /// parser's words, with the line and column of what the parser found.
     Config { path: PathBuf, error: String },
-    /// The token file is there but could not be read, or is empty.
+    /// The token file is there but could not be read.
     Token { path: PathBuf, error: String },
+    /// The token file is there but empty, which the daemon refuses too.
+    EmptyToken { path: PathBuf },
     /// There is no token file: the daemon makes it the first time it starts with this home.
     NoToken { path: PathBuf },
 }
 
 impl Unread {
-    /// What the menu bar item's tip says after "Dot · ".
-    fn tip(&self) -> &'static str {
+    /// What the menu bar item's tip says.
+    fn tip(&self, words: &Words) -> &'static str {
         match self {
-            Unread::Config { .. } => "its config.toml could not be read",
-            Unread::Token { .. } => "its token could not be read",
-            Unread::NoToken { .. } => "the daemon has not made its token yet",
+            Unread::Config { .. } => words.tip_config,
+            Unread::Token { .. } | Unread::EmptyToken { .. } => words.tip_token,
+            Unread::NoToken { .. } => words.tip_no_token,
         }
     }
 
     /// What the down page says instead of "Dot is not running" and the advice to start it: with a file the shell could
     /// not read the daemon may well run. A home without a token is one where the daemon has never started.
-    fn title(&self) -> Option<&'static str> {
+    fn title(&self, words: &Words) -> Option<&'static str> {
         match self {
-            Unread::Config { .. } => Some("Dot could not read its config.toml"),
-            Unread::Token { .. } => Some("Dot could not read its token"),
+            Unread::Config { .. } => Some(words.title_config),
+            Unread::Token { .. } | Unread::EmptyToken { .. } => Some(words.title_token),
             Unread::NoToken { .. } => None,
         }
     }
 
-    /// The file and what is wrong with it, as the down page shows it.
-    fn detail(&self) -> String {
+    /// The file and what is wrong with it, as the down page shows it: the system's or the parser's words as they are.
+    fn detail(&self, words: &Words) -> String {
         match self {
             Unread::Config { path, error } | Unread::Token { path, error } => {
                 format!("{}: {error}", path.display())
             }
-            Unread::NoToken { path } => format!(
-                "{}: there is none yet; the daemon makes it the first time it starts",
-                path.display()
-            ),
+            Unread::EmptyToken { path } => {
+                format!("{}: {}", path.display(), words.detail_empty_token)
+            }
+            Unread::NoToken { path } => format!("{}: {}", path.display(), words.detail_no_token),
         }
     }
 }
@@ -233,6 +278,11 @@ fn toml_error(text: &str, error: &toml::de::Error) -> String {
 /// the shell could not read is told (`Unread`), and no address is guessed in its place. The installer asks it too
 /// (item 575), before there is a token.
 fn read_base(home: &Path) -> Result<String, Unread> {
+    read_config(home).map(|config| base_of(&config))
+}
+
+/// The daemon's config.toml as the shell reads it; without one, the daemon's defaults.
+fn read_config(home: &Path) -> Result<ConfigFile, Unread> {
     let config_path = home.join(CONFIG_FILE);
     let config: ConfigFile = match read_file(&config_path) {
         Ok(None) => ConfigFile::default(),
@@ -247,21 +297,39 @@ fn read_base(home: &Path) -> Result<String, Unread> {
             })
         }
     };
-    let server = config.server.unwrap_or_default();
-    let host = server.host.unwrap_or_else(|| DEFAULT_HOST.to_string());
-    let port = server.port.unwrap_or(DEFAULT_PORT);
+    Ok(config)
+}
+
+/// Where the daemon `config` describes listens.
+fn base_of(config: &ConfigFile) -> String {
+    let server = config.server.as_ref();
+    let host = server
+        .and_then(|server| server.host.clone())
+        .unwrap_or_else(|| DEFAULT_HOST.to_string());
+    let port = server
+        .and_then(|server| server.port)
+        .unwrap_or(DEFAULT_PORT);
     // An IPv6 host goes in brackets, as `dotagent.server.links.base_url` writes it.
     let bracketed = if host.contains(':') {
         format!("[{host}]")
     } else {
         host
     };
-    Ok(format!("http://{bracketed}:{port}"))
+    format!("http://{bracketed}:{port}")
 }
 
-/// Where the daemon of `home` listens and its token (`read_base`). The token file must be there and not empty.
+/// Where the daemon of `home` listens and its token (`read_base`, `read_token`).
+#[cfg(test)]
 fn read_daemon(home: &Path) -> Result<Daemon, Unread> {
     let base = read_base(home)?;
+    Ok(Daemon {
+        base,
+        token: read_token(home)?,
+    })
+}
+
+/// The token of the daemon of `home`: the token file must be there and not empty.
+fn read_token(home: &Path) -> Result<String, Unread> {
     let token_path = home.join(TOKEN_FILE);
     let token = match read_file(&token_path) {
         Ok(None) => return Err(Unread::NoToken { path: token_path }),
@@ -274,12 +342,9 @@ fn read_daemon(home: &Path) -> Result<Daemon, Unread> {
         }
     };
     if token.is_empty() {
-        return Err(Unread::Token {
-            path: token_path,
-            error: EMPTY_TOKEN.to_string(),
-        });
+        return Err(Unread::EmptyToken { path: token_path });
     }
-    Ok(Daemon { base, token })
+    Ok(token)
 }
 
 /// What the pages of the daemon's own address may do through the shell (`PAGE_PERMISSIONS`). A page that another
@@ -316,7 +381,7 @@ fn ui_url(daemon: &Daemon) -> String {
 
 /// What the down page says of something that answers at `address` without the proof (`Seen::Unproven`): the shell
 /// sent it nothing, so it is not this home's daemon, and the way to see what it is, as `dotx service` gives it.
-fn unproven_detail(address: &str) -> String {
+fn unproven_detail(address: &str, words: &Words) -> String {
     let listening = match url::Url::parse(address)
         .ok()
         .and_then(|parsed| parsed.port())
@@ -324,33 +389,42 @@ fn unproven_detail(address: &str) -> String {
         Some(port) => format!("lsof -nP -iTCP:{port} -sTCP:LISTEN"),
         None => "lsof -nP -iTCP -sTCP:LISTEN".to_string(),
     };
-    format!(
-        "It does not prove that it holds this Dot's token, so the shell sent it nothing: another program holds the \
-         port, or a daemon of another Dot home or of an older version answers. See what listens with '{listening}', \
-         stop it, and this window opens the web UI by itself."
-    )
+    fill(words.detail_unproven, &[("listening", &listening)])
 }
 
 /// The down page, told in its fragment what kept the shell from the daemon (`down.js`): `title` stands for "Dot is
 /// not running" and the advice to start it, `detail` says which file and what is wrong with it, or what answers at
-/// the daemon's address instead of it. A daemon that does not answer gets the page as it is.
-fn down_url(seen: &Seen) -> String {
+/// the daemon's address instead of it, and `lang` the language of its own words when it is not English. A daemon that
+/// does not answer, in English, gets the page as it is.
+fn down_url(seen: &Seen, lang: Lang) -> String {
     let page = format!("tauri://localhost/{DOWN_PAGE}");
+    let words = lang.words();
     let mut told = url::form_urlencoded::Serializer::new(String::new());
+    if lang == Lang::Tr {
+        told.append_pair("lang", "tr");
+    }
     match seen {
         Seen::Unread(unread) => {
-            if let Some(title) = unread.title() {
+            if let Some(title) = unread.title(words) {
                 told.append_pair("title", title);
             }
-            told.append_pair("detail", &unread.detail());
+            told.append_pair("detail", &unread.detail(words));
         }
         Seen::Unproven(address) => {
-            told.append_pair("title", &format!("Something else answers at {address}"));
-            told.append_pair("detail", &unproven_detail(address));
+            told.append_pair(
+                "title",
+                &fill(words.title_unproven, &[("address", address)]),
+            );
+            told.append_pair("detail", &unproven_detail(address, words));
         }
-        Seen::Counted(_) | Seen::Silent => return page,
+        Seen::Counted(_) | Seen::Silent => {}
     }
-    format!("{page}#{}", told.finish())
+    let fragment = told.finish();
+    if fragment.is_empty() {
+        page
+    } else {
+        format!("{page}#{fragment}")
+    }
 }
 
 /// Whether `answer` is the proof of `nonce` that only a holder of `token` gives: HMAC-SHA256 keyed with the token over
@@ -413,11 +487,45 @@ fn look(daemon: &Daemon) -> Seen {
     }
 }
 
+/// What one poll found.
+struct Polled {
+    seen: Seen,
+    /// The daemon it looked at, when the shell could read where it listens and its token.
+    daemon: Option<Daemon>,
+    /// `[desktop_app]`, when the shell could read config.toml.
+    app: Option<DesktopApp>,
+}
+
 /// One poll: what the shell reads of the daemon's `home`, then, when it could read it, what answers at its address.
-fn poll(home: &Path) -> (Seen, Option<Daemon>) {
-    match read_daemon(home) {
-        Ok(daemon) => (look(&daemon), Some(daemon)),
-        Err(unread) => (Seen::Unread(unread), None),
+fn poll(home: &Path) -> Polled {
+    let config = match read_config(home) {
+        Ok(config) => config,
+        Err(unread) => {
+            return Polled {
+                seen: Seen::Unread(unread),
+                daemon: None,
+                app: None,
+            }
+        }
+    };
+    let app = Some(DesktopApp::of(&config));
+    match read_token(home) {
+        Ok(token) => {
+            let daemon = Daemon {
+                base: base_of(&config),
+                token,
+            };
+            Polled {
+                seen: look(&daemon),
+                daemon: Some(daemon),
+                app,
+            }
+        }
+        Err(unread) => Polled {
+            seen: Seen::Unread(unread),
+            daemon: None,
+            app,
+        },
     }
 }
 
@@ -458,24 +566,104 @@ struct TrayLook {
     tip: String,
 }
 
-/// What the menu bar item shows after a poll that saw `seen`, while the installer's window is up or not.
-fn tray_look(seen: &Seen, setting_up: bool) -> TrayLook {
+/// How far the download of an update is (`offer_update`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Progress {
+    received: u64,
+    /// The update's size, when the release says it.
+    total: Option<u64>,
+    /// The download is over and the update is being put in place.
+    installing: bool,
+}
+
+impl Progress {
+    /// How far it is in a few characters: the share of the size, else the megabytes so far.
+    fn short(&self) -> String {
+        match self.total {
+            Some(total) if total > 0 => {
+                format!("{}%", (self.received.saturating_mul(100) / total).min(100))
+            }
+            _ => format!("{:.1} MB", self.received as f64 / 1_000_000.0),
+        }
+    }
+}
+
+/// The download under way, which the menu bar item shows at each poll; `None` when there is none.
+#[derive(Default)]
+struct Downloading(Mutex<Option<Progress>>);
+
+/// The language of the shell's words, as the last poll that read config.toml found it.
+struct Speech(Mutex<Lang>);
+
+/// Whether ⇧⌘Space could not be had, which the menu says in each language.
+struct ShortcutTaken(bool);
+
+/// The place of the window last saved (`window_place`), so that only a change is written.
+#[derive(Default)]
+struct SavedPlace(Mutex<Option<Place>>);
+
+/// The language of the shell's words now.
+fn lang_of(app: &AppHandle) -> Lang {
+    *app.state::<Speech>()
+        .0
+        .lock()
+        .expect("nothing panics while it holds the language")
+}
+
+/// The download under way now.
+fn download_of(app: &AppHandle) -> Option<Progress> {
+    *app.state::<Downloading>()
+        .0
+        .lock()
+        .expect("nothing panics while it holds the download")
+}
+
+fn set_download(app: &AppHandle, progress: Option<Progress>) {
+    *app.state::<Downloading>()
+        .0
+        .lock()
+        .expect("nothing panics while it holds the download") = progress;
+}
+
+/// What the menu bar item shows after a poll that saw `seen`, while the installer's window is up or not and while an
+/// update downloads (`download`): then the count beside the item says how far it is too, and the tip says only that.
+fn tray_look(seen: &Seen, setting_up: bool, download: Option<Progress>, words: &Words) -> TrayLook {
     let (face, waiting, working) = match seen {
         Seen::Counted(count) => (Face::of(&count.state), count.waiting, count.working),
         Seen::Silent | Seen::Unproven(_) | Seen::Unread(_) => (Face::Idle, 0, 0),
     };
     let tip = match seen {
-        _ if setting_up => "Dot · being set up".to_string(),
-        Seen::Counted(_) => format!("Dot · {waiting} waiting for you · {working} working"),
-        Seen::Silent => "Dot · the daemon is not running".to_string(),
-        Seen::Unproven(_) => "Dot · something else answers at the daemon's address".to_string(),
-        Seen::Unread(unread) => format!("Dot · {}", unread.tip()),
+        _ if download.is_some_and(|progress| progress.installing) => {
+            words.tip_installing.to_string()
+        }
+        _ if download.is_some() => fill(
+            words.tip_downloading,
+            &[(
+                "progress",
+                &download
+                    .map(|progress| progress.short())
+                    .unwrap_or_default(),
+            )],
+        ),
+        _ if setting_up => words.tip_setting_up.to_string(),
+        Seen::Counted(_) => fill(
+            words.tip_counted,
+            &[
+                ("waiting", &waiting.to_string()),
+                ("working", &working.to_string()),
+            ],
+        ),
+        Seen::Silent => words.tip_silent.to_string(),
+        Seen::Unproven(_) => words.tip_unproven.to_string(),
+        Seen::Unread(unread) => unread.tip(words).to_string(),
     };
-    TrayLook {
-        face,
-        title: (waiting > 0).then(|| waiting.to_string()),
-        tip,
-    }
+    let count = (waiting > 0).then(|| waiting.to_string());
+    let title = match (count, download) {
+        (Some(count), Some(progress)) => Some(format!("{count} · ↓ {}", progress.short())),
+        (None, Some(progress)) => Some(format!("↓ {}", progress.short())),
+        (count, None) => count,
+    };
+    TrayLook { face, title, tip }
 }
 
 /// Show `look` on the menu bar item; whether every part of it was set.
@@ -491,18 +679,53 @@ fn show_look(tray: &TrayIcon, look: &TrayLook) -> bool {
 /// (`TRAFFIC_LIGHTS`), the page keeps room for them (`data-shell="desktop"`, set by the UI when it runs in the shell)
 /// and drags the window by its bars. The shell's own drag-and-drop handler is off so the composer's HTML drop works.
 /// A link the page opens in a new window (every link of a model's answer) goes to the default browser. What a page asks
-/// of the web view itself, the microphone among it, is `permission_for`'s to answer.
-fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
+/// of the web view itself, the microphone among it, is `permission_for`'s to answer. It opens where it was last
+/// (`window_place`), when a display still shows that place, and hidden when `visible` is not set (the shell opened at
+/// login).
+fn window(app: &AppHandle, url: WebviewUrl, visible: bool) -> tauri::Result<WebviewWindow> {
     if let Some(existing) = app.get_webview_window(WINDOW) {
         return Ok(existing);
     }
-    WebviewWindowBuilder::new(app, WINDOW, url)
+    let saved = place_path(app).and_then(|path| window_place::read(&path));
+    *app.state::<SavedPlace>()
+        .0
+        .lock()
+        .expect("nothing panics while it holds the window's place") = saved;
+    // Without the displays the place cannot be checked, so the window opens at its default size, as before item 2095.
+    let monitors = app.available_monitors().unwrap_or_else(|error| {
+        eprintln!("dot-shell: the displays could not be listed, so the window opens at its default place: {error}");
+        Vec::new()
+    });
+    let displays: Vec<Area> = monitors
+        .iter()
+        .map(|monitor| {
+            let scale = monitor.scale_factor();
+            let position = monitor.position().to_logical::<f64>(scale);
+            let size = monitor.size().to_logical::<f64>(scale);
+            Area {
+                x: position.x,
+                y: position.y,
+                width: size.width,
+                height: size.height,
+            }
+        })
+        .collect();
+    let place = saved.and_then(|saved| window_place::usable(saved, &displays, WINDOW_MIN));
+    let builder = WebviewWindowBuilder::new(app, WINDOW, url)
         .title("Dot")
         .title_bar_style(TitleBarStyle::Overlay)
         .hidden_title(true)
         .traffic_light_position(TRAFFIC_LIGHTS)
-        .inner_size(1280.0, 860.0)
-        .min_inner_size(390.0, 600.0)
+        .min_inner_size(WINDOW_MIN.0, WINDOW_MIN.1)
+        .visible(visible);
+    let builder = match place {
+        Some(place) => builder
+            .inner_size(place.width, place.height)
+            .position(place.x, place.y)
+            .maximized(place.maximized),
+        None => builder.inner_size(WINDOW_SIZE.0, WINDOW_SIZE.1),
+    };
+    builder
         .disable_drag_drop_handler()
         .on_new_window(|url, _features| {
             open_outside(url);
@@ -518,6 +741,66 @@ fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
             permission_for(page.as_ref(), kind, &addresses)
         })
         .build()
+}
+
+/// Where the window's place is kept: the shell's own folder (`~/Library/Application Support/dev.dot.desktop`).
+fn place_path(app: &AppHandle) -> Option<PathBuf> {
+    match app.path().app_config_dir() {
+        Ok(folder) => Some(folder.join(PLACE_FILE)),
+        Err(error) => {
+            eprintln!("dot-shell: the shell's own folder is not known, so the window keeps no place: {error}");
+            None
+        }
+    }
+}
+
+/// Save where the window is and how big, when that changed since it was last saved. A minimized window or one in full
+/// screen keeps the place it had.
+fn save_place(window: &WebviewWindow) {
+    let app = window.app_handle();
+    let Some(path) = place_path(app) else {
+        return;
+    };
+    let frame = (|| -> tauri::Result<Option<(Place, bool)>> {
+        if window.is_minimized()? || window.is_fullscreen()? {
+            return Ok(None);
+        }
+        let scale = window.scale_factor()?;
+        let position = window.outer_position()?.to_logical::<f64>(scale);
+        let size: LogicalSize<f64> = window.inner_size()?.to_logical(scale);
+        let frame = Place {
+            x: position.x,
+            y: position.y,
+            width: size.width,
+            height: size.height,
+            maximized: false,
+        };
+        Ok(Some((frame, window.is_maximized()?)))
+    })();
+    let (frame, maximized) = match frame {
+        Ok(Some(frame)) => frame,
+        Ok(None) => return,
+        Err(error) => {
+            eprintln!("dot-shell: the window's place could not be read: {error}");
+            return;
+        }
+    };
+    let saved = app.state::<SavedPlace>();
+    let mut last = saved
+        .0
+        .lock()
+        .expect("nothing panics while it holds the window's place");
+    let place = window_place::to_save(frame, maximized, *last);
+    if *last == Some(place) {
+        return;
+    }
+    match window_place::write(&path, &place) {
+        Ok(()) => *last = Some(place),
+        Err(error) => eprintln!(
+            "dot-shell: the window's place could not be saved to {}: {error}",
+            path.display()
+        ),
+    }
 }
 
 /// What a page of the window is given of what it asks of the web view (item 594): the microphone, for the composer's
@@ -657,7 +940,7 @@ fn open_ui(app: &AppHandle, daemon: &Daemon) {
     }
     match url::Url::parse(&target) {
         Ok(page) => {
-            if let Err(error) = window(app, WebviewUrl::External(page)) {
+            if let Err(error) = window(app, WebviewUrl::External(page), true) {
                 eprintln!("dot-shell: the window of the UI could not be made: {error}");
             }
         }
@@ -670,21 +953,94 @@ fn leaves_ui(misses: u32) -> bool {
     misses >= MISSES_BEFORE_DOWN
 }
 
+/// Whether a look at the releases is due: `UPDATE_EVERY` after the last, by the wall clock. A clock set back before the
+/// last look makes one due, rather than none for as long as it was set back.
+fn update_due(last: SystemTime, now: SystemTime) -> bool {
+    now.duration_since(last)
+        .map_or(true, |since| since >= UPDATE_EVERY)
+}
+
+/// Make the shell's login item what `[desktop_app] start_at_login` says (`login_item`), for an app run from its bundle;
+/// a build run from elsewhere has none and touches none. What could not be done is said, and tried again at the next
+/// change or start.
+fn keep_login_item(start_at_login: bool) {
+    let bundle = match env::current_exe() {
+        Ok(exe) => login_item::bundle_of(&exe),
+        Err(error) => {
+            eprintln!("dot-shell: the app's own path is not known, so its login item is left as it is: {error}");
+            return;
+        }
+    };
+    let Some(bundle) = bundle else {
+        return;
+    };
+    let Ok(home) = env::var("HOME") else {
+        eprintln!("dot-shell: HOME is not set, so the login item is left as it is");
+        return;
+    };
+    let path = login_item::job_path(Path::new(&home));
+    let job = start_at_login.then(|| login_item::job(&bundle));
+    match login_item::apply(&path, job.as_deref()) {
+        Ok(login_item::Done::AsItWas) => {}
+        Ok(done) => eprintln!("dot-shell: login item {done:?}: {}", path.display()),
+        Err(error) => eprintln!(
+            "dot-shell: the login item {} could not be changed: {error}",
+            path.display()
+        ),
+    }
+}
+
 /// Every second: the count for the menu bar item, and the window's page when the daemon comes or goes or what keeps
 /// the shell from it changes. `shown` is the page `setup` opened: the window leaves the UI after `MISSES_BEFORE_DOWN`
-/// polls in a row that did not count, and opens it again at the first that does.
+/// polls in a row that did not count, and opens it again at the first that does. `[desktop_app]` is applied when it
+/// changes (the login item, the language of the menu, the tip and the down page), and the releases are looked at once
+/// `UPDATE_EVERY` has passed since the look at start: a comparison of two times a second, no timer of its own.
 fn watch(app: AppHandle, shown: Shown) {
     thread::spawn(move || {
         let mut shown = shown;
         let mut misses: u32 = 0;
         let mut shown_look: Option<TrayLook> = None;
+        let mut login_applied: Option<bool> = None;
+        let mut last_update_look = SystemTime::now();
         loop {
-            let (seen, daemon) = poll(&dot_home());
+            let Polled {
+                seen,
+                daemon,
+                app: settings,
+            } = poll(&dot_home());
+            if let Some(settings) = settings {
+                if login_applied != Some(settings.start_at_login) {
+                    keep_login_item(settings.start_at_login);
+                    login_applied = Some(settings.start_at_login);
+                }
+                if settings.lang != lang_of(&app) {
+                    *app.state::<Speech>()
+                        .0
+                        .lock()
+                        .expect("nothing panics while it holds the language") = settings.lang;
+                    if let Err(error) = redraw_menu(&app) {
+                        eprintln!(
+                            "dot-shell: the menu could not be drawn in its new language: {error}"
+                        );
+                    }
+                }
+            }
+            let lang = lang_of(&app);
+            let now = SystemTime::now();
+            if update_due(last_update_look, now) {
+                last_update_look = now;
+                check_for_update(app.clone(), UpdateCheck::Daily);
+            }
             let counted = matches!(seen, Seen::Counted(_));
             misses = if counted { 0 } else { misses.saturating_add(1) };
             // The item is set only when what it shows changes (item 2089), not at every poll: each set decodes the
             // icon's PNG and hands the app's main thread three calls to AppKit.
-            let look = tray_look(&seen, matches!(shown, Shown::Installer));
+            let look = tray_look(
+                &seen,
+                matches!(shown, Shown::Installer),
+                download_of(&app),
+                lang.words(),
+            );
             if shown_look.as_ref() != Some(&look) {
                 if let Some(tray) = app.tray_by_id(TRAY) {
                     shown_look = show_look(&tray, &look).then_some(look);
@@ -711,7 +1067,7 @@ fn watch(app: AppHandle, shown: Shown) {
                     Shown::Ui(ui_url(&daemon))
                 }
                 (shown, _) => {
-                    let page = down_url(&seen);
+                    let page = down_url(&seen, lang);
                     if !matches!(&shown, Shown::Down(old) if *old == page) {
                         open(&app, &page);
                     }
@@ -724,15 +1080,13 @@ fn watch(app: AppHandle, shown: Shown) {
 }
 
 /// Who asked for a look at the releases (item 432): the owner, from the menu, is told also that Dot is the newest or
-/// why it could not look; the look Dot takes as it starts speaks only when it found a newer Dot.
+/// why it could not look; the look Dot takes as it starts, and once a day after, speaks only when it found a newer Dot.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum UpdateCheck {
     Asked,
     AtStart,
+    Daily,
 }
-
-/// The button of the offer that installs the update.
-const INSTALL: &str = "Install and Restart";
 
 /// Whether a look at the releases is under way, its offer and the install included: one at a time, so that the look at
 /// start and the menu's, or two clicks of the menu, never install twice. A message that only tells what a look found
@@ -775,13 +1129,17 @@ async fn tell(level: MessageLevel, message: String) {
 /// started again.
 fn check_for_update(app: AppHandle, how: UpdateCheck) {
     tauri::async_runtime::spawn(async move {
+        let words = lang_of(&app).words();
         let Some(looking) = Looking::start() else {
             if how == UpdateCheck::Asked {
-                tell(
-                    MessageLevel::Info,
-                    "Dot is looking for an update already.".to_string(),
-                )
-                .await;
+                let said = match download_of(&app) {
+                    Some(progress) => fill(
+                        words.downloading_already,
+                        &[("progress", &progress.short())],
+                    ),
+                    None => words.looking_already.to_string(),
+                };
+                tell(MessageLevel::Info, said).await;
             }
             return;
         };
@@ -790,12 +1148,16 @@ fn check_for_update(app: AppHandle, how: UpdateCheck) {
             Err(error) => Err(error),
         };
         match found {
-            Ok(Some(update)) => offer_update(&app, update, looking).await,
+            Ok(Some(update)) => offer_update(&app, update, looking, words).await,
             Ok(None) => {
                 drop(looking);
                 if how == UpdateCheck::Asked {
                     let current = app.package_info().version.to_string();
-                    tell(MessageLevel::Info, format!("Dot {current} is the newest.")).await;
+                    tell(
+                        MessageLevel::Info,
+                        fill(words.newest, &[("current", &current)]),
+                    )
+                    .await;
                 }
             }
             Err(error) => {
@@ -804,7 +1166,7 @@ fn check_for_update(app: AppHandle, how: UpdateCheck) {
                 if how == UpdateCheck::Asked {
                     tell(
                         MessageLevel::Warning,
-                        format!("Dot could not look for an update: {error}"),
+                        fill(words.could_not_look, &[("error", &error.to_string())]),
                     )
                     .await;
                 }
@@ -813,62 +1175,100 @@ fn check_for_update(app: AppHandle, how: UpdateCheck) {
     });
 }
 
-/// Ask whether to install `update`; on yes, install it and start the shell again. The look (`looking`) ends with the
-/// answer Later, or once the install failed, before that is told.
-async fn offer_update(app: &AppHandle, update: Update, looking: Looking) {
+/// Ask whether to install `update`; on yes, download it, with how far it is on the menu bar item (`Downloading`), install
+/// it and start the shell again. The look (`looking`) ends with the answer Later, or once the install failed, before that
+/// is told.
+async fn offer_update(app: &AppHandle, update: Update, looking: Looking, words: &'static Words) {
     let answer = AsyncMessageDialog::new()
-        .set_title("A newer Dot")
+        .set_title(words.newer_title)
         .set_level(MessageLevel::Info)
-        .set_description(format!(
-            "Dot {} is out (this one is {}). Install it now? Dot starts again with it.",
-            update.version, update.current_version
+        .set_description(fill(
+            words.newer_body,
+            &[
+                ("version", &update.version),
+                ("current", &update.current_version),
+            ],
         ))
         .set_buttons(MessageButtons::OkCancelCustom(
-            INSTALL.to_string(),
-            "Later".to_string(),
+            words.install.to_string(),
+            words.later.to_string(),
         ))
         .show()
         .await;
-    if !matches!(answer, MessageDialogResult::Custom(ref button) if button == INSTALL) {
+    if !matches!(answer, MessageDialogResult::Custom(ref button) if button == words.install) {
         return;
     }
-    match update.download_and_install(|_, _| {}, || {}).await {
-        Ok(()) => app.restart(),
+    set_download(
+        app,
+        Some(Progress {
+            received: 0,
+            total: None,
+            installing: false,
+        }),
+    );
+    let chunks = app.clone();
+    let finished = app.clone();
+    let installed = update
+        .download_and_install(
+            move |chunk, total| {
+                let held = chunks.state::<Downloading>();
+                let mut progress = held
+                    .0
+                    .lock()
+                    .expect("nothing panics while it holds the download");
+                if let Some(progress) = progress.as_mut() {
+                    progress.received = progress.received.saturating_add(chunk as u64);
+                    progress.total = total;
+                }
+            },
+            move || {
+                set_download(
+                    &finished,
+                    download_of(&finished).map(|progress| Progress {
+                        installing: true,
+                        ..progress
+                    }),
+                );
+            },
+        )
+        .await;
+    match installed {
+        Ok(()) => {
+            if let Some(window) = app.get_webview_window(WINDOW) {
+                save_place(&window);
+            }
+            app.restart()
+        }
         Err(error) => {
+            set_download(app, None);
             drop(looking);
             eprintln!("dot-shell: the update could not be installed: {error}");
             tell(
                 MessageLevel::Warning,
-                format!("The update could not be installed: {error}"),
+                fill(words.could_not_install, &[("error", &error.to_string())]),
             )
             .await;
         }
     }
 }
 
-/// The menu bar item. `shortcut_taken` says that ⇧⌘Space could not be had: the menu then says so, and New chat is
-/// only in the menu.
-fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open Dot", true, None::<&str>)?;
+/// The menu of the menu bar item, in the shell's language. `shortcut_taken` says that ⇧⌘Space could not be had: the
+/// menu then says so, and New chat is only in the menu.
+fn tray_menu(app: &AppHandle, words: &Words, shortcut_taken: bool) -> tauri::Result<Menu<Wry>> {
+    let open = MenuItem::with_id(app, "open", words.open, true, None::<&str>)?;
     let chat = MenuItem::with_id(
         app,
         "chat",
-        "New chat",
+        words.new_chat,
         true,
         (!shortcut_taken).then_some("CmdOrCtrl+Shift+Space"),
     )?;
-    let taken = MenuItem::with_id(
-        app,
-        "shortcut",
-        "⇧⌘Space is taken by another app",
-        false,
-        None::<&str>,
-    )?;
-    let update = MenuItem::with_id(app, "update", "Check for Updates…", true, None::<&str>)?;
+    let taken = MenuItem::with_id(app, "shortcut", words.shortcut_taken, false, None::<&str>)?;
+    let update = MenuItem::with_id(app, "update", words.check_updates, true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let before_quit = PredefinedMenuItem::separator(app)?;
-    let quit = PredefinedMenuItem::quit(app, Some("Quit Dot"))?;
-    let menu = if shortcut_taken {
+    let quit = PredefinedMenuItem::quit(app, Some(words.quit))?;
+    if shortcut_taken {
         Menu::with_items(
             app,
             &[
@@ -880,13 +1280,27 @@ fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
                 &before_quit,
                 &quit,
             ],
-        )?
+        )
     } else {
         Menu::with_items(
             app,
             &[&open, &chat, &separator, &update, &before_quit, &quit],
-        )?
+        )
+    }
+}
+
+/// Draw the menu again, in the language the shell now speaks.
+fn redraw_menu(app: &AppHandle) -> tauri::Result<()> {
+    let Some(tray) = app.tray_by_id(TRAY) else {
+        return Ok(());
     };
+    let taken = app.state::<ShortcutTaken>().0;
+    tray.set_menu(Some(tray_menu(app, lang_of(app).words(), taken)?))
+}
+
+/// The menu bar item, with its menu (`tray_menu`).
+fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
+    let menu = tray_menu(app, lang_of(app).words(), shortcut_taken)?;
     TrayIconBuilder::with_id(TRAY)
         .icon(tray_icon(Face::Idle))
         .tooltip("Dot")
@@ -976,28 +1390,44 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Granted::default())
+        .manage(Downloading::default())
+        .manage(SavedPlace::default())
         .setup(|app| {
             let handle = app.handle().clone();
             let context = installer::context_of(&handle, dot_home());
             let installing = context.as_ref().is_some_and(installer::wanted);
             app.manage(installer::Installer::new(context));
+            // Opened at login by its login item, the shell starts in the menu bar: the window is made hidden.
+            let visible = !env::args().any(|argument| argument == login_item::AT_LOGIN);
             let shown = if installing {
+                app.manage(Speech(Mutex::new(Lang::En)));
                 installer_window(&handle)?;
                 Shown::Installer
             } else {
-                let (seen, daemon) = poll(&dot_home());
+                let Polled {
+                    seen,
+                    daemon,
+                    app: settings,
+                } = poll(&dot_home());
+                let lang = settings.map_or(Lang::En, |settings| settings.lang);
+                app.manage(Speech(Mutex::new(lang)));
                 match daemon {
                     Some(daemon) if matches!(seen, Seen::Counted(_)) => {
                         grant(&handle, &daemon)?;
                         window(
                             &handle,
                             WebviewUrl::External(url::Url::parse(&ui_url(&daemon))?),
+                            visible,
                         )?;
                         Shown::Ui(ui_url(&daemon))
                     }
                     _ => {
-                        let page = down_url(&seen);
-                        window(&handle, WebviewUrl::External(url::Url::parse(&page)?))?;
+                        let page = down_url(&seen, lang);
+                        window(
+                            &handle,
+                            WebviewUrl::External(url::Url::parse(&page)?),
+                            visible,
+                        )?;
                         Shown::Down(page)
                     }
                 }
@@ -1010,6 +1440,7 @@ pub fn run() {
                     true
                 }
             };
+            app.manage(ShortcutTaken(shortcut_taken));
             tray(&handle, shortcut_taken)?;
             check_for_update(handle.clone(), UpdateCheck::AtStart);
             if !installing {
@@ -1018,11 +1449,27 @@ pub fn run() {
             watch(handle, shown);
             Ok(())
         })
-        // Closing the window keeps the shell in the menu bar; the window hides and comes back from there.
+        // Closing the window keeps the shell in the menu bar; the window hides and comes back from there. Its place is
+        // saved as it hides or loses the focus, not while it moves.
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+            let main = window
+                .app_handle()
+                .get_webview_window(WINDOW)
+                .filter(|main| main.label() == window.label());
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    if let Some(main) = &main {
+                        save_place(main);
+                    }
+                    let _ = window.hide();
+                }
+                WindowEvent::Focused(false) => {
+                    if let Some(main) = &main {
+                        save_place(main);
+                    }
+                }
+                _ => {}
             }
         });
     let app = build_app(builder);
@@ -1030,6 +1477,9 @@ pub fn run() {
         RunEvent::Reopen { .. } => show(app),
         // An install that is at work ends with the app: its program is stopped, not left to run on alone.
         RunEvent::Exit => {
+            if let Some(window) = app.get_webview_window(WINDOW) {
+                save_place(&window);
+            }
             if let Some(installer) = app.try_state::<installer::Installer>() {
                 installer.stop();
             }
@@ -1279,10 +1729,7 @@ mod tests {
         home.write(TOKEN_FILE, " \n");
         assert_eq!(
             read_daemon(&home.0).err(),
-            Some(Unread::Token {
-                path: token,
-                error: EMPTY_TOKEN.to_string()
-            })
+            Some(Unread::EmptyToken { path: token })
         );
     }
 
@@ -1303,7 +1750,7 @@ mod tests {
                 state: state.to_string(),
             })
         };
-        let waiting = tray_look(&counted(2, 1, "waiting"), false);
+        let waiting = tray_look(&counted(2, 1, "waiting"), false, None, Lang::En.words());
         assert_eq!(
             waiting,
             TrayLook {
@@ -1313,26 +1760,137 @@ mod tests {
             }
         );
         // The same count a second later is the same look, so the item is not set again.
-        assert_eq!(tray_look(&counted(2, 1, "waiting"), false), waiting);
-        let idle = tray_look(&counted(0, 0, "idle"), false);
+        assert_eq!(
+            tray_look(&counted(2, 1, "waiting"), false, None, Lang::En.words()),
+            waiting
+        );
+        let idle = tray_look(&counted(0, 0, "idle"), false, None, Lang::En.words());
         assert_eq!((idle.face, idle.title), (Face::Idle, None));
         assert_eq!(
-            tray_look(&counted(0, 1, "working"), false).face,
+            tray_look(&counted(0, 1, "working"), false, None, Lang::En.words()).face,
             Face::Working
         );
-        assert_eq!(tray_look(&counted(0, 0, "new"), false).face, Face::Idle);
-        let down = tray_look(&Seen::Silent, false);
+        assert_eq!(
+            tray_look(&counted(0, 0, "new"), false, None, Lang::En.words()).face,
+            Face::Idle
+        );
+        let down = tray_look(&Seen::Silent, false, None, Lang::En.words());
         assert_eq!(
             (down.face, down.title, down.tip.as_str()),
             (Face::Idle, None, "Dot · the daemon is not running")
         );
-        assert_eq!(tray_look(&Seen::Silent, true).tip, "Dot · being set up");
+        assert_eq!(
+            tray_look(&Seen::Silent, true, None, Lang::En.words()).tip,
+            "Dot · being set up"
+        );
+        // In Turkish, as the web UI in the window speaks it.
+        assert_eq!(
+            tray_look(&counted(2, 1, "waiting"), false, None, Lang::Tr.words()).tip,
+            "Dot · 2 sizi bekliyor · 1 çalışıyor"
+        );
+    }
+
+    #[test]
+    fn the_menu_bar_item_says_how_far_an_update_has_downloaded() {
+        let counted = Seen::Counted(Count {
+            waiting: 2,
+            working: 0,
+            state: "waiting".to_string(),
+        });
+        let half = Progress {
+            received: 5_000_000,
+            total: Some(10_000_000),
+            installing: false,
+        };
+        let words = Lang::En.words();
+        let look = tray_look(&counted, false, Some(half), words);
+        assert_eq!(look.title.as_deref(), Some("2 · ↓ 50%"));
+        assert_eq!(look.tip, "Dot · downloading the update · 50%");
+        let no_size = Progress {
+            total: None,
+            ..half
+        };
+        assert_eq!(
+            tray_look(&Seen::Silent, false, Some(no_size), words)
+                .title
+                .as_deref(),
+            Some("↓ 5.0 MB")
+        );
+        let installing = Progress {
+            installing: true,
+            ..half
+        };
+        assert_eq!(
+            tray_look(&counted, false, Some(installing), words).tip,
+            "Dot · installing the update"
+        );
+        // Each chunk changes the look, which the item shows at the next poll: once a second, not once a chunk.
+        let more = Progress {
+            received: 6_000_000,
+            ..half
+        };
+        assert_ne!(tray_look(&counted, false, Some(more), words), look);
+        assert_eq!(
+            Progress {
+                received: 20,
+                total: Some(10),
+                installing: false
+            }
+            .short(),
+            "100%"
+        );
+    }
+
+    #[test]
+    fn the_releases_are_looked_at_once_a_day_by_the_wall_clock() {
+        let start = SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        assert!(!update_due(start, start));
+        assert!(!update_due(
+            start,
+            start + UPDATE_EVERY - Duration::from_secs(1)
+        ));
+        assert!(update_due(start, start + UPDATE_EVERY));
+        // A clock set back makes a look due, not one put off for as long.
+        assert!(update_due(start, start - Duration::from_secs(60)));
+    }
+
+    #[test]
+    fn the_desktop_apps_settings_are_read_from_the_daemons_config() {
+        let home = Home::new("desktop-app");
+        let read = |home: &Home| DesktopApp::of(&read_config(&home.0).expect("the config is read"));
+        assert_eq!(
+            read(&home),
+            DesktopApp {
+                start_at_login: true,
+                lang: Lang::En
+            }
+        );
+        home.write(
+            CONFIG_FILE,
+            "[server]\nport = 9001\n\n[desktop_app]\nstart_at_login = false\nlanguage = \"tr\"\n",
+        );
+        assert_eq!(
+            read(&home),
+            DesktopApp {
+                start_at_login: false,
+                lang: Lang::Tr
+            }
+        );
+        assert_eq!(
+            read_base(&home.0).expect("the address"),
+            "http://127.0.0.1:9001"
+        );
+        // The shell reads the settings with the token missing, so that the down page speaks the language.
+        let polled = poll(&home.0);
+        assert!(matches!(polled.seen, Seen::Unread(Unread::NoToken { .. })));
+        assert_eq!(polled.app.map(|app| app.lang), Some(Lang::Tr));
     }
 
     #[test]
     fn a_new_chat_leaves_the_down_page_as_it_is_and_opens_on_the_ui() {
         let page = |address: &str| url::Url::parse(address).expect("an address");
-        assert!(is_down_page(&page(&down_url(&Seen::Silent))));
+        assert!(is_down_page(&page(&down_url(&Seen::Silent, Lang::En))));
+        assert!(is_down_page(&page(&down_url(&Seen::Silent, Lang::Tr))));
         assert!(is_down_page(&page(
             "tauri://localhost/down.html#title=Dot+cannot+read&detail=x"
         )));
@@ -1342,9 +1900,17 @@ mod tests {
 
     #[test]
     fn the_down_page_is_told_what_kept_the_shell_from_the_daemon() {
-        assert_eq!(down_url(&Seen::Silent), "tauri://localhost/down.html");
+        assert_eq!(
+            down_url(&Seen::Silent, Lang::En),
+            "tauri://localhost/down.html"
+        );
+        assert_eq!(
+            down_url(&Seen::Silent, Lang::Tr),
+            "tauri://localhost/down.html#lang=tr"
+        );
         let told = |unread: Unread| -> Vec<(String, String)> {
-            let page = url::Url::parse(&down_url(&Seen::Unread(unread))).expect("an address");
+            let page =
+                url::Url::parse(&down_url(&Seen::Unread(unread), Lang::En)).expect("an address");
             assert_eq!(
                 page.as_str().split('#').next(),
                 Some("tauri://localhost/down.html")
@@ -1380,14 +1946,44 @@ mod tests {
                 )
             )]
         );
+        let turkish = url::Url::parse(&down_url(
+            &Seen::Unread(Unread::EmptyToken {
+                path: token.clone(),
+            }),
+            Lang::Tr,
+        ))
+        .expect("an address");
+        let told: Vec<(String, String)> = url::form_urlencoded::parse(
+            turkish
+                .fragment()
+                .expect("what the page is told")
+                .as_bytes(),
+        )
+        .into_owned()
+        .collect();
+        assert_eq!(
+            told,
+            vec![
+                pair("lang", "tr"),
+                pair("title", "Dot, anahtarını (token) okuyamadı"),
+                pair(
+                    "detail",
+                    &format!(
+                        "{}: boş; silin, arka plan hizmeti başladığında yenisini oluşturur",
+                        token.display()
+                    )
+                ),
+            ]
+        );
     }
 
     #[test]
     fn the_down_page_says_that_something_else_answers_at_the_daemons_address() {
         let told = {
-            let page = url::Url::parse(&down_url(&Seen::Unproven(
-                "http://127.0.0.1:8765".to_string(),
-            )))
+            let page = url::Url::parse(&down_url(
+                &Seen::Unproven("http://127.0.0.1:8765".to_string()),
+                Lang::En,
+            ))
             .expect("an address");
             assert_eq!(
                 page.as_str().split('#').next(),
@@ -1408,7 +2004,8 @@ mod tests {
         assert_eq!(told[1].0, "detail");
         assert!(told[1].1.contains("lsof -nP -iTCP:8765 -sTCP:LISTEN"));
         assert!(!told[1].1.contains("  "), "{}", told[1].1);
-        assert!(unproven_detail("not an address").contains("lsof -nP -iTCP -sTCP:LISTEN"));
+        assert!(unproven_detail("not an address", Lang::En.words())
+            .contains("lsof -nP -iTCP -sTCP:LISTEN"));
     }
 
     #[test]
