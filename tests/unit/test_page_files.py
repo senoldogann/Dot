@@ -556,17 +556,8 @@ def test_the_writing_in_has_a_time_limit_after_which_the_rest_is_as_written_and_
     for number in range(300):
         (page.parent / f"f{number}.png").write_bytes(b"\x89PNG" + bytes([number % 256]) * 8)
     html: str = "".join(f'<img src="f{number}.png">' for number in range(300))
-    monkeypatch.setattr(page_files, "WORK_S", 0.0)
-    files: PageFiles = with_its_files(html, page, workspace, (), ())
-    # The time was up at the first file: nothing is written in, and the page is as it was written.
-    assert files.html == html and files.written == [] and files.too_large == []
-    assert files.cut == (
-        "Writing the files in took more than 0 seconds, so the files named in the rest of the page are not written in."
-    )
-    # Given a little time it goes on a while and stops: what is written in is a whole number of tags, the rest is as
-    # it was written.
-    # The writer's clock is a counter that moves 0.01 s per reading, so what "a little time" holds does not depend on
-    # how fast or how loaded the machine is: the deadline is read at 0.00, the files at 0.01, 0.02 (inside) and 0.03.
+    # The writer's clock is a counter that moves 0.01 s per reading, so what a time limit holds does not depend on how
+    # fast or how loaded the machine is.
     ticks: list[float] = [0.0]
 
     def tick() -> float:
@@ -575,9 +566,20 @@ def test_the_writing_in_has_a_time_limit_after_which_the_rest_is_as_written_and_
         return now
 
     monkeypatch.setattr(page_files, "time", SimpleNamespace(monotonic=tick))
+    monkeypatch.setattr(page_files, "WORK_S", 0.0)
+    files: PageFiles = with_its_files(html, page, workspace, (), ())
+    # The time was up at the first file: nothing is written in, and the page is as it was written.
+    assert files.html == html and files.written == [] and files.too_large == []
+    assert files.cut == (
+        "Writing the files in took more than 0 seconds, so the files named in the rest of the page are not written in."
+    )
+    # Given a little time it goes on a while and stops: what is written in is a whole number of tags, the rest is as
+    # it was written. The deadline is read at the start, then the clock moves on by each reading, so a few files fit
+    # (one to a few, however often a file reads the clock) and far from all 300.
+    ticks[0] = 0.0
     monkeypatch.setattr(page_files, "WORK_S", 0.02)
     more: PageFiles = with_its_files(html, page, workspace, (), ())
-    assert len(more.written) == 2 and more.cut.startswith("Writing the files in took more than 0.02 seconds")
+    assert 1 <= len(more.written) <= 2 and more.cut.startswith("Writing the files in took more than 0.02 seconds")
     done: str = "".join(
         f'<img src="{_address(b"\x89PNG" + bytes([number % 256]) * 8)}">' for number in range(len(more.written))
     )
