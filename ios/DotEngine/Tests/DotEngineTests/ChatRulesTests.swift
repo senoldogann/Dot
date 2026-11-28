@@ -180,7 +180,7 @@ final class ChatRulesTests: XCTestCase {
             ThreadView(revision: 1, thread: thread, summary: nil, runs: runs, older: false, newest: nil, newestEvents: [], newestEventsCut: false,
                 queue: queue, asks: [], helpers: [], background: [], reactions: [], drafts: [])
         }
-        let sent: AcceptedMessage = AcceptedMessage(key: "k", thread: "thr_1", text: "First", kind: .queue, queuedId: "q1", runId: nil, at: 1, runsBefore: ["run_a"])
+        let sent: AcceptedMessage = AcceptedMessage(key: "k", thread: "thr_1", text: "First", kind: .queue, queuedId: "q1", runId: nil, at: 1, runsBefore: ["run_a"], newestEventBefore: 1)
         chat.view = view(queue, [])
         let edited: QueueView = QueueView(
             held: false, messages: [QueuedMessageView(id: "q1", threadId: "thr_1", position: 1, text: "First, edited", createdAt: 1, source: "phone")],
@@ -193,6 +193,29 @@ final class ChatRulesTests: XCTestCase {
         chat.view = view(QueueView(held: false, messages: [], besideRunId: nil, besideThreadId: nil), [started])
         XCTAssertNil(delivery(of: followed, in: chat), "the run with the edited words shows: the overlay goes")
         XCTAssertEqual(delivery(of: sent, in: chat), .delivered, "with the old words it would have stayed as Sent")
+    }
+
+    /// The owner's report of 2026-11-28: a message queued while a run worked and then sent on into that run (the queue's
+    /// steer) starts no run of its own, so the overlay that waited for one kept the message under the run's answer,
+    /// "Sent" with a "Starting…" line, long after the run ended. Its steer in the run is its place.
+    func testAQueuedMessageSteeredIntoTheRunAtWorkLeavesTheOverlayOnceItsSteerShows() {
+        let thread: ThreadRecord = ThreadRecord(id: "thr_1", title: "Chat", source: "ui", createdAt: 1, updatedAt: 1, agentId: nil)
+        let working: RunRecord = RunRecord(id: "run_a", threadId: "thr_1", goal: "Look at X", mode: "task", model: "m", status: "done",
+            createdAt: 1, finishedAt: 3, result: "", parentRunId: nil, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
+        var chat: ChatProjection = ChatProjection(threadId: "thr_1")
+        chat.view = ThreadView(revision: 1, thread: thread, summary: nil, runs: [working], older: false, newest: nil, newestEvents: [], newestEventsCut: false,
+            queue: QueueView(held: false, messages: [], besideRunId: nil, besideThreadId: nil), asks: [], helpers: [], background: [], reactions: [], drafts: [])
+        let sent: AcceptedMessage = AcceptedMessage(key: "k", thread: "thr_1", text: "I will type the password here", kind: .queue, queuedId: "q1", runId: nil, at: 2, runsBefore: ["run_a"], newestEventBefore: 1)
+        let started: EventRecord = EventRecord(id: 1, runId: "run_a", ts: 1, kind: "run_started", data: [:])
+        chat.runs["run_a"] = RunTimeline().adding(started)
+        XCTAssertEqual(delivery(of: sent, in: chat), .delivered, "out of the queue with no run or steer seen yet: Sent")
+        let steer: EventRecord = EventRecord(id: 2, runId: "run_a", ts: 2, kind: "steer", data: ["text": .string("I will type the password here"), "files": .array([])])
+        chat.runs["run_a"] = chat.runs["run_a"]?.adding(steer)
+        XCTAssertNil(delivery(of: sent, in: chat), "steered into the run: the transcript shows it, the overlay goes")
+        let other: AcceptedMessage = AcceptedMessage(key: "k2", thread: "thr_1", text: "Something else", kind: .queue, queuedId: "q2", runId: nil, at: 2, runsBefore: ["run_a"], newestEventBefore: 1)
+        XCTAssertEqual(delivery(of: other, in: chat), .delivered, "another message's steer is not this one's place")
+        let again: AcceptedMessage = AcceptedMessage(key: "k3", thread: "thr_1", text: "I will type the password here", kind: .queue, queuedId: "q3", runId: nil, at: 3, runsBefore: ["run_a"], newestEventBefore: 2)
+        XCTAssertEqual(delivery(of: again, in: chat), .delivered, "the same words sent again: the older steer is not this one's place")
     }
 
     func testOneSubmitSendsEveryAnsweredQuestionAndTheRecommendedOptionComesFirst() {

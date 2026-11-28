@@ -416,6 +416,12 @@ final class FakeDaemon: @unchecked Sendable {
         if method == "POST", let found: [String] = Self.match(parts, ["api", "queue", "*", "now"]) {
             return sendQueuedNow(found[0])
         }
+        if method == "DELETE", let found: [String] = Self.match(parts, ["api", "queue", "*"]) {
+            guard let (thread, _) = takeQueued(found[0]) else { return Self.refused(404, "no such queued message") }
+            bump(thread, tell: true)
+            let view: QueueView = lock.withLock { QueueView(held: false, messages: chats[thread]?.queue ?? [], besideRunId: nil, besideThreadId: nil) }
+            return Reply(status: 200, body: Self.json(view), stream: false, lost: false)
+        }
         if method == "POST", let found: [String] = Self.match(parts, ["api", "runs", "*", "steer"]) {
             let run: String = found[0]
             return steer(run: run, body: body)

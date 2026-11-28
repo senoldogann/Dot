@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2107](2107.md) | in progress | 2026-11-28 | A queued message sent on into the run no longer reappears under the answer |
 | [2106](2106.md) | in progress | 2026-11-28 | Send now on a queued message stops the run and starts it at once |
 | [2105](2105.md) | in progress | 2026-11-28 | The capsule over the composer drops Working and its Stop |
 | [2024](2024.md) | done | 2026-11-27 | The chat header keeps the bot's face and name; only a lasting link problem shows, in the capsule |

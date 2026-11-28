@@ -382,6 +382,45 @@ final class SyncTests: XCTestCase {
         XCTAssertEqual(items.filter { if case .owner(_, "And add it to my calendar", _, _) = $0 { true } else { false } }.count, 1, "shown once")
     }
 
+    /// The owner's report of 2026-11-28: a message queued while the run worked and then sent on into that run from the
+    /// queue's sheet stood under the run's answer as "Sent" with a "Starting…" line after the run ended, since its
+    /// overlay waited for a run of its own words that never came. Its steer is its place: the overlay goes.
+    func testAQueuedMessageSteeredIntoTheRunAtWorkLeavesNoOverlayOnceTheRunEnds() async throws {
+        _ = try await openLive()
+        _ = try await rig.engine.send("I will type the password here", thread: "thr_1", photos: [], picks: .none)
+        let queued: EngineSnapshot = try await snapshot(of: rig.store, "the message waits in the chat's queue") {
+            $0.outbox.isEmpty && $0.pending(in: "thr_1").map(\.delivery) == [.queued(position: 1)]
+        }
+        let id: String = try XCTUnwrap(queued.chats["thr_1"]?.view?.queue.messages.first?.id)
+        _ = try await rig.engine.perform(.steerQueued(thread: "thr_1", message: id))
+        _ = try await snapshot(of: rig.store, "the steer is in the run") { $0.outbox.isEmpty && $0.chats["thr_1"]?.runs["run_1"]?.events.contains { $0.kind == "steer" } == true }
+        daemon.say("run_1", "run_finished", ["status": .string("done"), "result": .string("Booked")])
+        // The picture as the phone holds it once the Mac's view says the queue is empty and the run's end has come.
+        let ended: EngineSnapshot = try await snapshot(of: rig.store, "the queue is read empty and the run ended") {
+            $0.chats["thr_1"]?.view?.queue.messages.isEmpty == true
+                && $0.chats["thr_1"]?.runs["run_1"]?.events.contains { $0.kind == "run_finished" } == true
+        }
+        XCTAssertEqual(ended.pending(in: "thr_1"), [], "nothing of the message stands under the answer, and no Starting… line")
+        XCTAssertTrue(ended.accepted.isEmpty)
+    }
+
+    /// Item 2107: a queued message taken out of the queue from this phone starts nothing and is steered nowhere; its overlay
+    /// goes once the Mac took the removal, rather than standing as "Sent" with a "Starting…" line for good.
+    func testAQueuedMessageRemovedFromThisPhoneLeavesNoOverlay() async throws {
+        _ = try await openLive()
+        _ = try await rig.engine.send("Never mind this one", thread: "thr_1", photos: [], picks: .none)
+        let queued: EngineSnapshot = try await snapshot(of: rig.store, "the message waits in the chat's queue") {
+            $0.outbox.isEmpty && $0.pending(in: "thr_1").map(\.delivery) == [.queued(position: 1)]
+        }
+        let id: String = try XCTUnwrap(queued.chats["thr_1"]?.view?.queue.messages.first?.id)
+        _ = try await rig.engine.perform(.removeQueued(thread: "thr_1", message: id))
+        let gone: EngineSnapshot = try await snapshot(of: rig.store, "the removal went and the queue is read empty") {
+            $0.outbox.isEmpty && $0.chats["thr_1"]?.view?.queue.messages.isEmpty == true
+        }
+        XCTAssertEqual(gone.pending(in: "thr_1"), [])
+        XCTAssertTrue(gone.accepted.isEmpty)
+    }
+
     /// Item 2106: Send now on a queued message stops the run at work and starts the message as a run of its own; the overlay
     /// says Sent until that run is in the picture, then goes.
     func testAQueuedMessageSentNowStartsItsOwnRunAndTheOverlayGoesOnceItShows() async throws {

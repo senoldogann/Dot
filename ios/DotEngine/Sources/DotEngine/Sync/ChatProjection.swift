@@ -149,6 +149,12 @@ public struct ChatProjection: Codable, Sendable, Equatable {
         for helper in view?.helpers ?? [] { ids.insert(helper.runId) }
         return ids
     }
+
+    /// The newest event id the store holds of the chat's runs, 0 for none. Event ids only grow across every run, so a
+    /// steer with a higher id came after it, whatever older run's timeline is read later (item 2107).
+    public var newestEventId: Int {
+        runs.values.compactMap { $0.events.map(\.id).max() }.max() ?? 0
+    }
 }
 
 /// The reducer of a chat: pure functions from a projection and what happened to the next projection and the effects.

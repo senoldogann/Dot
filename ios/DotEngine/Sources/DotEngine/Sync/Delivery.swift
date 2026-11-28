@@ -36,11 +36,16 @@ public struct AcceptedMessage: Codable, Sendable, Equatable {
     /// The chat's runs when it was taken: a run with its words that is not among them is the one it started (no clock of
     /// the phone is compared with the Mac's).
     public let runsBefore: Set<String>
+    /// The newest event id of the chat the phone held when it was sent: a steer of its words with a higher id is this
+    /// message sent on into the run at work, not an older one of the same words ("continue").
+    public let newestEventBefore: Int
 
     public init(
-        key: String, thread: String?, text: String, kind: SendingKind, queuedId: String?, runId: String?, at: Double, runsBefore: Set<String>
+        key: String, thread: String?, text: String, kind: SendingKind, queuedId: String?, runId: String?, at: Double, runsBefore: Set<String>,
+        newestEventBefore: Int
     ) {
         self.runsBefore = runsBefore
+        self.newestEventBefore = newestEventBefore
         self.key = key
         self.thread = thread
         self.text = text
@@ -52,7 +57,7 @@ public struct AcceptedMessage: Codable, Sendable, Equatable {
 }
 
 /// The accepted message an outcome makes; `nil` for an outcome that is no message. Pure.
-public func accepted(from outcome: OutboxOutcome, at: Double, runsBefore: Set<String>) -> AcceptedMessage? {
+public func accepted(from outcome: OutboxOutcome, at: Double, runsBefore: Set<String>, newestEventBefore: Int) -> AcceptedMessage? {
     switch outcome {
     case .delivered(let item, let queue):
         guard let text: String = item.text else { return nil }
@@ -60,13 +65,13 @@ public func accepted(from outcome: OutboxOutcome, at: Double, runsBefore: Set<St
         let queued: QueuedMessageView? = queue.messages.last { $0.text == text }
         return AcceptedMessage(
             key: item.id, thread: item.thread, text: text, kind: .queue, queuedId: queued?.id, runId: queue.besideRunId, at: at,
-            runsBefore: runsBefore)
+            runsBefore: runsBefore, newestEventBefore: newestEventBefore)
     case .steered(let item):
         guard let text: String = item.text, case .steer(let run, _, _, _, _) = item.action else { return nil }
-        return AcceptedMessage(key: item.id, thread: item.thread, text: text, kind: .steer, queuedId: nil, runId: run, at: at, runsBefore: runsBefore)
+        return AcceptedMessage(key: item.id, thread: item.thread, text: text, kind: .steer, queuedId: nil, runId: run, at: at, runsBefore: runsBefore, newestEventBefore: newestEventBefore)
     case .started(let item, let run):
         guard let text: String = item.text else { return nil }
-        return AcceptedMessage(key: item.id, thread: run.threadId, text: text, kind: .run, queuedId: nil, runId: run.id, at: at, runsBefore: runsBefore)
+        return AcceptedMessage(key: item.id, thread: run.threadId, text: text, kind: .run, queuedId: nil, runId: run.id, at: at, runsBefore: runsBefore, newestEventBefore: newestEventBefore)
     default:
         return nil
     }
@@ -80,7 +85,7 @@ public func following(_ message: AcceptedMessage, in chat: ChatProjection) -> Ac
     else { return message }
     return AcceptedMessage(
         key: message.key, thread: message.thread, text: queued.text, kind: message.kind, queuedId: message.queuedId, runId: message.runId,
-        at: message.at, runsBefore: message.runsBefore)
+        at: message.at, runsBefore: message.runsBefore, newestEventBefore: message.newestEventBefore)
 }
 
 /// Where an accepted message stands in the chat's picture, or `nil` once the chat shows it in its own place (the overlay
@@ -93,13 +98,28 @@ public func delivery(of message: AcceptedMessage, in chat: ChatProjection) -> De
         {
             return view.queue.held ? .held(position: at + 1) : .queued(position: at + 1)
         }
-        // Not queued (or no longer): it became a run of the chat; once that run is seen, the transcript shows it.
-        return startedRunSeen(message, chat) ? nil : .delivered
+        // Not queued (or no longer): it became a run of the chat, or was sent on into the run at work (the queue's
+        // steer, from this phone or another screen); once either is seen, the transcript shows it in its place. A
+        // steered message starts no run, so waiting for one kept it under the newest answer, "Sent" with a
+        // "Starting…" line, long after its run ended (the owner's report of 2026-11-28).
+        return startedRunSeen(message, chat) || steerSeen(message, chat) ? nil : .delivered
     case .run:
         return startedRunSeen(message, chat) ? nil : .delivered
     case .steer:
         guard let run: String = message.runId, let timeline: RunTimeline = chat.runs[run] else { return .sentToRun }
-        return timeline.events.contains { $0.kind == "steer" && $0.data["text"]?.string == message.text } ? nil : .sentToRun
+        return steered(message.text, in: timeline) ? nil : .sentToRun
+    }
+}
+
+private func steered(_ text: String, in timeline: RunTimeline) -> Bool {
+    timeline.events.contains { $0.kind == "steer" && $0.data["text"]?.string == text }
+}
+
+/// Whether a run of the chat holds a steer of the message's words that came after it was sent: the queued message sent
+/// on into the run at work.
+private func steerSeen(_ message: AcceptedMessage, _ chat: ChatProjection) -> Bool {
+    chat.runs.values.contains { timeline in
+        timeline.events.contains { $0.kind == "steer" && $0.data["text"]?.string == message.text && $0.id > message.newestEventBefore }
     }
 }
 

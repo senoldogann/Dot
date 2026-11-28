@@ -112,6 +112,7 @@ public actor SyncStore {
     private var identity: DaemonIdentity?
     private var watchers: [UUID: AsyncStream<EngineSnapshot>.Continuation] = [:]
     private var runsAtSend: [String: Set<String>] = [:]
+    private var eventsAtSend: [String: Int] = [:]
 
     public init(cache: SyncCache, clock: any EngineClock) {
         self.cache = cache
@@ -171,6 +172,7 @@ public actor SyncStore {
             state.accepted = [:]
             state.startedChats = [:]
             runsAtSend = [:]
+            eventsAtSend = [:]
         }
         publish()
     }
@@ -394,6 +396,7 @@ public actor SyncStore {
         // started (no clock of the phone is compared with the Mac's).
         for item in items where item.isMessage && runsAtSend[item.id] == nil {
             runsAtSend[item.id] = item.thread.flatMap { state.chats[$0]?.knownRunIds } ?? []
+            eventsAtSend[item.id] = item.thread.flatMap { state.chats[$0]?.newestEventId } ?? 0
         }
         state.outbox = items
         state.deletesAwaiting.formUnion(deletesUnderWay(items))
@@ -412,6 +415,13 @@ public actor SyncStore {
             state.deletesAwaiting.subtract(threads)
             for thread in threads { state.refusedDeletes[thread] = if case .refused(_, let detail) = failure { detail } else { "" } }
             publish()
+            return
+        }
+        if case .done(let item) = outcome, case .removeQueued(_, let queued) = item.action {
+            // Taken out of the queue here: it starts nothing and is steered nowhere, so its overlay goes now.
+            let before: Int = state.accepted.count
+            state.accepted = state.accepted.filter { $0.value.queuedId != queued }
+            if state.accepted.count != before { publish() }
             return
         }
         if case .done(let item) = outcome {
@@ -436,12 +446,13 @@ public actor SyncStore {
             default: nil
             }
         let before: Set<String> = key.flatMap { runsAtSend.removeValue(forKey: $0) } ?? []
+        let newestEventBefore: Int = key.flatMap { eventsAtSend.removeValue(forKey: $0) } ?? 0
         var changed: Bool = false
         if case .started(let item, let run) = outcome {
             state.startedChats[item.id] = run.threadId
             changed = true
         }
-        if let message: AcceptedMessage = accepted(from: outcome, at: clock.now(), runsBefore: before) {
+        if let message: AcceptedMessage = accepted(from: outcome, at: clock.now(), runsBefore: before, newestEventBefore: newestEventBefore) {
             state.accepted[message.key] = message
             pruneAccepted()
             changed = true
