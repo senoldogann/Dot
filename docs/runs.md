@@ -1094,8 +1094,9 @@ writes down what it was handed.
 accounts you signed in on Settings › Connectors ([Accounts](extending.md#accounts-googles-and-microsofts-own-sign-in)),
 through Gmail's, Google Calendar's and Microsoft Graph's own APIs, so that neither Mail, Outlook nor a browser has to be
 open. They are a run's only once an account is signed in: until then neither they nor their part of the prompt are in
-it. `account` is the address of one of the accounts: the run's prompt names them, and an address no account has is
-refused with their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`) or Outlook's
+it. `account` is the address of one of the accounts: the run's prompt names them, says that they take no other
+address, not even one of yours that its notes name (item 2073), and an address no account has is refused with
+their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`) or Outlook's
 (`from:ada`, `subject:invoice`) and, without any, lists the newest messages of the inbox; `mail_read` reads one whole:
 its people, its date, its text (the HTML of a message with no text made text) and the names of its files;
 `calendar_events` lists the events between two days or moments, in the Mac's time zone, each repeat on its own, with
