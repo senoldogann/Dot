@@ -15,7 +15,7 @@ import { icon } from "./icons.js";
 // Stop without its word; the status's time alone; and, when even that does not fit, a second line rather than a cut.
 const FITS = ["roomy", "counts", "compact", "tight", "wrapped"];
 // The segments that open a sheet of their own, in the order of the capsule.
-const SHEETED = ["plan", "helpers", "loops", "queue", "running"];
+const SHEETED = ["plan", "helpers", "tasks", "loops", "queue", "running"];
 
 /**
  * @typedef {import("./dockwords.js").DockState} DockState
@@ -48,6 +48,7 @@ export function createDockBar({ onWork, onStop, onEnd, sheets }) {
   const stop = part("stop", "stop", () => onStop());
   const plan = part("plan", "squareCheck", () => undefined);
   const helpers = part("helpers", "users", () => undefined);
+  const tasks = part("tasks", "layers", () => undefined);
   const loops = part("loops", "refresh", () => undefined);
   const queue = part("queue", "listOrdered", () => undefined);
   const running = part("running", "terminal", () => undefined);
@@ -57,7 +58,7 @@ export function createDockBar({ onWork, onStop, onEnd, sheets }) {
   // A group, not a live region: its time changes every second, which a screen reader would read out each time.
   // The secondary segments stand in one box that draws none of its own (`display: contents`), so that a row too narrow for
   // them takes it as a second line of its own.
-  const chips = el("div", { class: "dockbar-chips" }, plan, helpers, loops, queue, running);
+  const chips = el("div", { class: "dockbar-chips" }, plan, helpers, tasks, loops, queue, running);
   const capsule = el("div", { class: "dockbar-capsule", role: "group", "aria-label": t("capsule.label"), "data-fit": FITS[0], hidden: true }, status, stop, chips);
   const end = el("button", { class: "dock-end", type: "button", hidden: true, onclick: () => onEnd() }, icon("arrowDown"));
   const element = el("div", { class: "dockbar", hidden: true }, capsule, end);
