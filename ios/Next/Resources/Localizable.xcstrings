@@ -4632,17 +4632,6 @@
         }
       }
     },
-    "Dot will no longer offer this skill to tasks.": {
-      "comment": "Skills: explains removing a skill",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot artık bu beceriyi görevlere sunmayacak."
-          }
-        }
-      }
-    },
     "Dot works on its own while the Mac is idle.": {
       "comment": "Own initiative: switched on",
       "localizations": {
@@ -14091,6 +14080,17 @@
         }
       }
     },
+    "This permanently deletes the skill and its versions. A later task may learn it again.": {
+      "comment": "Skills: deletion is permanent and includes all versions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beceri ve tüm sürümleri kalıcı olarak silinir. Dot ileride bir görevden bu beceriyi yeniden öğrenebilir."
+          }
+        }
+      }
+    },
     "This phone forgets its key for the Mac it is paired with; then one tap pairs it with the Mac of the link.": {
       "comment": "Alert: what pairing again does",
       "localizations": {
@@ -15000,6 +15000,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bekle"
+          }
+        }
+      }
+    },
+    "Wait for the current change to finish.": {
+      "comment": "Skills: a change is already saving",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişikliğin tamamlanmasını bekleyin."
           }
         }
       }

@@ -109,7 +109,7 @@ private struct LearnedSkillPage: View {
             case .restore:
                 Text(String(localized: "The earlier steps become a new version.", comment: "Skills: restoring keeps both versions"))
             case .remove:
-                Text(String(localized: "Dot will no longer offer this skill to tasks.", comment: "Skills: explains removing a skill"))
+                Text(String(localized: "This permanently deletes the skill and its versions. A later task may learn it again.", comment: "Skills: deletion is permanent and includes all versions"))
             }
         }
     }
@@ -173,7 +173,10 @@ private struct LearnedSkillPage: View {
     }
 
     private func change(_ call: (DaemonAPI) async throws(DaemonRequestError) -> LearnedSkills) async {
-        guard !busy else { return }
+        guard !busy else {
+            problem = .other(String(localized: "Wait for the current change to finish.", comment: "Skills: a change is already saving"))
+            return
+        }
         busy = true
         defer { busy = false }
         switch await model.write(call) {

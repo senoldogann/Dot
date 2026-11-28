@@ -1750,7 +1750,6 @@ TR.update(
         "Current": "Geçerli",
         "Change this skill?": "Beceri değiştirilsin mi?",
         "The earlier steps become a new version.": "Önceki adımlar yeni bir sürüm olarak kaydedilir.",
-        "Dot will no longer offer this skill to tasks.": "Dot artık bu beceriyi görevlere sunmayacak.",
         "Share with all bots": "Tüm botlarla paylaş",
         "Wake": "Uyandır",
         "Put to rest": "Dinlendir",
@@ -1765,5 +1764,12 @@ TR.update(
         "Its skills leave new tasks.": "Becerileri yeni görevlerden çıkarılır.",
         "Put back the earlier version of %@?": "%@ eklentisinin eski sürümü geri yüklensin mi?",
         "Remove %@ from Dot?": "%@ Dot'tan kaldırılsın mı?",
+    }
+)
+
+TR.update(
+    {
+        "This permanently deletes the skill and its versions. A later task may learn it again.": "Beceri ve tüm sürümleri kalıcı olarak silinir. Dot ileride bir görevden bu beceriyi yeniden öğrenebilir.",
+        "Wait for the current change to finish.": "Değişikliğin tamamlanmasını bekleyin.",
     }
 )

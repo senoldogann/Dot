@@ -61,9 +61,10 @@ settings are on your Mac"), and no row of it opens the web app (item 1791). The 
 on the Mac, and a connected app, 1Password's token or an official sign-in is taken back with Disconnect; adding a
 connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows Dot's version and
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
-which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). **Skills** lists learned skills and their versions, with
-pinning, resting, waking, sharing, restoring and removal. **Installed plugins** can revert an update or remove a plugin
-that Dot manages. Those actions ask first, and the Mac moves the removed version or plugin to its Trash. Its **Campaigns** (item 1895, under Agents) lists each
+which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). In Settings, **Skills** lists learned skills and their
+versions. Pin, rest, wake or share a skill from its page. Restoring creates a new version. Deleting permanently
+removes the skill and its versions. **Installed plugins** shows the plugins Dot reads. It moves a removed plugin or
+the version replaced by a revert to the Mac's Trash. Restore, Delete, Remove and Revert ask first. Its **Campaigns** (item 1895, under Agents) lists each
 campaign with its state, goal and last progress, and a campaign's page stops it (it asks first), resumes it or marks it
 achieved, as the web's page does; deleting one is done on the Mac. Dot Next's composer records your voice (item 1802): the
 microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written
