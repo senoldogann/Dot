@@ -457,6 +457,11 @@ class PhoneRefused(DotError):
     good what runs may do without asking, which would outlast the phone's removal."""
 
 
+class TooManyRequests(DotError):
+    """A phone asked more often than a route lets it (item 2054): changing the API keys, or asking a provider's check.
+    The context names ``retry_after_s``, the seconds until it may ask again."""
+
+
 class PhoneOnly(DotError):
     """What only a paired phone's own key asks (item 997): registering its app for APNs pushes."""
 

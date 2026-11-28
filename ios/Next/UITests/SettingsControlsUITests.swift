@@ -112,7 +112,7 @@ final class SettingsControlsUITests: XCTestCase {
         // Each row of the settings sheet (PLAN §27) and the title of its page.
         let pages: [(String, String)] = [
             ("Dot's computer", "This Mac"), ("Notifications", "Notifications"), ("General", "General"), ("Appearance", "Appearance"), ("Chat", "Chat"),
-            ("Models", "Models"), ("Usage limits and caps", "Usage limits and caps"), ("Scheduled tasks", "Scheduled tasks"), ("Permissions", "Rules"),
+            ("Models", "Models"), ("AI services", "AI services"), ("Usage limits and caps", "Usage limits and caps"), ("Scheduled tasks", "Scheduled tasks"), ("Permissions", "Rules"),
             ("Memory", "Memory"), ("Agents", "Agents"), ("Campaigns", "Campaigns"), ("Health and version", "Health and version"), ("Usage", "Usage"),
         ]
         var dead: [String] = []

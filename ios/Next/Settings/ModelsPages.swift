@@ -41,7 +41,7 @@ func modelLabel(_ ref: String, in options: [ProviderModels]) -> String {
 /// main, fast, vision and review models, the security research model (item 1889), the fallbacks in their order, Dot's own
 /// work, the night's learning, self-repair (its model, effort and fast mode) and the code review; the default level of
 /// reasoning as the Mac's config holds it, read only, as the web shows it. Each model is picked on the app's one model
-/// catalog. The chat size and the providers are set on the Mac.
+/// catalog. The chat size is set on the Mac; the providers' keys are Settings › AI services (item 2054).
 struct ModelsPage: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var state: Loadable<ModelsPicture> = .loading

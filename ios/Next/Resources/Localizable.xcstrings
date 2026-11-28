@@ -177,6 +177,17 @@
         }
       }
     },
+    "%@ refused the key": {
+      "comment": "AI services: the check failed; the argument is the provider",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ anahtarı reddetti"
+          }
+        }
+      }
+    },
     "%@ s in %@ min open": {
       "comment": "Maintenance › Performance: CPU seconds used over minutes on screen",
       "localizations": {
@@ -184,6 +195,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%2$@ dk açıkken %1$@ sn"
+          }
+        }
+      }
+    },
+    "%@ took the key": {
+      "comment": "AI services: the check passed; the argument is the provider",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ anahtarı kabul etti"
           }
         }
       }
@@ -1130,6 +1152,39 @@
         }
       }
     },
+    "A key goes to your Mac and is never shown again, here or on the Mac: only its last four characters.": {
+      "comment": "AI services: what the page shows of a key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtar Mac'ine gider ve bir daha ne burada ne Mac'te gösterilir: yalnızca son dört karakteri."
+          }
+        }
+      }
+    },
+    "A key has no spaces or line breaks inside.": {
+      "comment": "AI services: the pasted key holds a space or a character a key never has",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir anahtarın içinde boşluk ya da satır sonu olmaz."
+          }
+        }
+      }
+    },
+    "A key you save or remove here is told on your Mac, so that a change you did not make is seen.": {
+      "comment": "AI services: a phone's change is told to the owner",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burada kaydettiğin ya da kaldırdığın anahtar Mac'inde bildirilir; böylece senin yapmadığın bir değişiklik görülür."
+          }
+        }
+      }
+    },
     "A lesson": {
       "comment": "Activity: a lesson Dot wrote today",
       "localizations": {
@@ -1306,6 +1361,28 @@
         }
       }
     },
+    "AI services": {
+      "comment": "Settings row: the model providers and their API keys",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yapay zekâ hizmetleri"
+          }
+        }
+      }
+    },
+    "API key": {
+      "comment": "AI services: the field's header",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API anahtarı"
+          }
+        }
+      }
+    },
     "Accepted": {
       "comment": "Work order: the lead accepted the result",
       "localizations": {
@@ -1405,6 +1482,17 @@
         }
       }
     },
+    "Add key": {
+      "comment": "AI services: saves a first key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtar ekle"
+          }
+        }
+      }
+    },
     "Add schedule": {
       "comment": "Tool row of Dot's own tool: a schedule added",
       "localizations": {
@@ -1412,6 +1500,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zamanlama ekle"
+          }
+        }
+      }
+    },
+    "Add the %@ key": {
+      "comment": "AI services: the sheet that saves a first key; the argument is the provider",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ anahtarını ekle"
           }
         }
       }
@@ -1962,6 +2061,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Senden gizli bilgi iste"
+          }
+        }
+      }
+    },
+    "Asking %@…": {
+      "comment": "AI services: a check is under way; the argument is the provider",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ soruluyor…"
           }
         }
       }
@@ -2655,6 +2765,17 @@
         }
       }
     },
+    "Check key": {
+      "comment": "AI services: asks the provider whether it takes the key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtarı denetle"
+          }
+        }
+      }
+    },
     "Check the deposit with Finance": {
       "comment": "Sample helper title (wave N0)",
       "localizations": {
@@ -3158,6 +3279,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlı hesap"
+          }
+        }
+      }
+    },
+    "Connected · ••••%@": {
+      "comment": "AI services: a key is set; the argument is its last four characters",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı · ••••%@"
           }
         }
       }
@@ -4335,6 +4467,17 @@
         }
       }
     },
+    "Dot deletes the saved key from your Mac. The key itself stays valid at %@ until you cancel it there.": {
+      "comment": "AI services: what Remove key does; the argument is the provider's site",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot kayıtlı anahtarı Mac'inden siler. Anahtarın kendisi, sen orada iptal edene kadar %@ adresinde geçerli kalır."
+          }
+        }
+      }
+    },
     "Dot does a task by itself, every morning or once at a time you pick.": {
       "comment": "Schedules: what one is",
       "localizations": {
@@ -4386,6 +4529,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot bir Mac ile eşleşmemiş. Ayarlar › Ses'te Bu cihaz'ı seç."
+          }
+        }
+      }
+    },
+    "Dot keeps it on your Mac, in a file only you can read. This phone keeps nothing of it.": {
+      "comment": "AI services: where a saved key is kept",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot onu Mac'inde, yalnızca senin okuyabildiğin bir dosyada tutar. Bu telefon ondan hiçbir şey saklamaz."
           }
         }
       }
@@ -4562,6 +4716,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu görev çalışırken Dot kapatıldı."
+          }
+        }
+      }
+    },
+    "Dot was started with %@ already set, which comes before a key saved here. Change it on your Mac.": {
+      "comment": "AI services: the key Dot was started with wins over one saved from the phone; the argument is the variable",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot, %@ zaten ayarlıyken başlatıldı; bu, burada kaydedilen anahtardan önce gelir. Onu Mac'inde değiştir."
           }
         }
       }
@@ -5817,6 +5982,17 @@
         }
       }
     },
+    "From the Keychain": {
+      "comment": "AI services: the key in use comes from the Mac's Keychain",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtar Zinciri'nden"
+          }
+        }
+      }
+    },
     "Gallery": {
       "comment": "Component gallery (debug builds): a heading or sample text\nSettings row of debug builds: the component gallery",
       "localizations": {
@@ -6719,6 +6895,17 @@
         }
       }
     },
+    "Kept": {
+      "comment": "AI services: where the key in use comes from",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nerede"
+          }
+        }
+      }
+    },
     "Kept for you": {
       "comment": "Ask dock title: a step kept after nobody answered in time",
       "localizations": {
@@ -6759,6 +6946,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Son 7 gün"
+          }
+        }
+      }
+    },
+    "Last check": {
+      "comment": "AI services: the last time the provider was asked about the key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son denetim"
           }
         }
       }
@@ -7229,6 +7427,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajan oluştur"
+          }
+        }
+      }
+    },
+    "Make one at %@.": {
+      "comment": "AI services: where a key is made; the argument is the site",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ adresinden bir tane oluştur."
           }
         }
       }
@@ -8021,6 +8230,17 @@
         }
       }
     },
+    "No key yet": {
+      "comment": "AI services: a provider without a key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz anahtar yok"
+          }
+        }
+      }
+    },
     "No model matches.": {
       "comment": "Chat settings: the search or filter left no model",
       "localizations": {
@@ -8230,6 +8450,17 @@
         }
       }
     },
+    "Not checked since the key changed or Dot started": {
+      "comment": "AI services: no check is known",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtar değiştiğinden ya da Dot başladığından beri denetlenmedi"
+          }
+        }
+      }
+    },
     "Not checked yet.": {
       "comment": "This Mac: the proof was not asked",
       "localizations": {
@@ -8407,7 +8638,7 @@
       }
     },
     "Not set": {
-      "comment": "Models: a role with no model of its own",
+      "comment": "AI services: no key is set\nModels: a role with no model of its own",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9187,6 +9418,17 @@
         }
       }
     },
+    "Optional": {
+      "comment": "AI services: an optional service without a key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İsteğe bağlı"
+          }
+        }
+      }
+    },
     "Optional, separated by commas.": {
       "comment": "Memory: the tags' hint",
       "localizations": {
@@ -9194,6 +9436,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "İsteğe bağlı, virgülle ayrılır."
+          }
+        }
+      }
+    },
+    "Optional: an extra checker that reads button labels no rule knows and checks what a campaign claims.": {
+      "comment": "AI services: what TypeSafe's key is for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İsteğe bağlı: hiçbir kuralın bilmediği düğme etiketlerini okuyan ve bir kampanyanın iddialarını denetleyen ek bir denetleyici."
+          }
+        }
+      }
+    },
+    "Optional: the online web search, and ollama.com without the Ollama app. The models the app runs need no key.": {
+      "comment": "AI services: what Ollama's key is for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İsteğe bağlı: çevrimiçi web araması ve Ollama uygulaması olmadan ollama.com. Uygulamanın çalıştırdığı modeller anahtar gerektirmez."
           }
         }
       }
@@ -9393,6 +9657,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Görseli yapıştır"
+          }
+        }
+      }
+    },
+    "Paste the key": {
+      "comment": "AI services: the key field's placeholder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtarı yapıştır"
           }
         }
       }
@@ -10387,6 +10662,17 @@
         }
       }
     },
+    "Refused at the last check · ••••%@": {
+      "comment": "AI services: the provider refused the key; the argument is its last four characters",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son denetimde reddedildi · ••••%@"
+          }
+        }
+      }
+    },
     "Refused: %@. A version like this is not put in use.": {
       "comment": "Self-improvement: the checks refuse the version; their words",
       "localizations": {
@@ -10410,7 +10696,7 @@
       }
     },
     "Remove": {
-      "comment": "Own initiative: takes a thing off the list\nQueue sheet: removes a queued message",
+      "comment": "AI services: removes the saved key\nOwn initiative: takes a thing off the list\nQueue sheet: removes a queued message",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10442,6 +10728,17 @@
         }
       }
     },
+    "Remove key": {
+      "comment": "AI services: deletes the key saved in Dot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtarı kaldır"
+          }
+        }
+      }
+    },
     "Remove reaction: %@": {
       "comment": "VoiceOver: takes a reaction off; the argument is its meaning",
       "localizations": {
@@ -10449,6 +10746,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tepkiyi kaldır: %@"
+          }
+        }
+      }
+    },
+    "Remove the %@ key?": {
+      "comment": "AI services: confirmation of Remove key; the argument is the provider",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ anahtarı kaldırılsın mı?"
           }
         }
       }
@@ -10504,6 +10812,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tekrar"
+          }
+        }
+      }
+    },
+    "Replace key": {
+      "comment": "AI services: saves a new key in place of the one in use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtarı değiştir"
+          }
+        }
+      }
+    },
+    "Replace the %@ key": {
+      "comment": "AI services: the sheet that saves a new key; the argument is the provider",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ anahtarını değiştir"
           }
         }
       }
@@ -10955,6 +11285,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dosyalar'a kaydet"
+          }
+        }
+      }
+    },
+    "Saved in Dot": {
+      "comment": "AI services: the key in use is in Dot's own file",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'ta kayıtlı"
           }
         }
       }
@@ -11630,6 +11971,17 @@
         }
       }
     },
+    "Set when Dot was started": {
+      "comment": "AI services: the key in use comes from Dot's environment",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot başlatılırken ayarlandı"
+          }
+        }
+      }
+    },
     "Setback": {
       "comment": "Campaign note: a setback",
       "localizations": {
@@ -11659,6 +12011,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ayarlar"
+          }
+        }
+      }
+    },
+    "Settings › AI services": {
+      "comment": "Where on the Mac: the AI services page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Yapay zekâ hizmetleri"
           }
         }
       }
@@ -12980,6 +13343,17 @@
         }
       }
     },
+    "The Claude models.": {
+      "comment": "AI services: what Anthropic's key is for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude modelleri."
+          }
+        }
+      }
+    },
     "The Claude plan's usage limit was reached": {
       "comment": "Usage limit card title",
       "localizations": {
@@ -12987,6 +13361,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude planının kullanım sınırına ulaşıldı"
+          }
+        }
+      }
+    },
+    "The GPT models.": {
+      "comment": "AI services: what OpenAI's key is for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPT modelleri."
+          }
+        }
+      }
+    },
+    "The Gemini models of a Google AI Studio key, free within their daily limits.": {
+      "comment": "AI services: what Google's key is for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir Google AI Studio anahtarının Gemini modelleri, günlük sınırları içinde ücretsiz."
           }
         }
       }
@@ -13398,6 +13794,17 @@
         }
       }
     },
+    "The models of many labs, on one key and one balance.": {
+      "comment": "AI services: what OpenRouter's key is for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Birçok laboratuvarın modelleri, tek anahtar ve tek bakiyeyle."
+          }
+        }
+      }
+    },
     "The next message writes its plan and asks before it changes anything.": {
       "comment": "Chat settings: what plan first does",
       "localizations": {
@@ -13427,6 +13834,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un bu bota verdiği işlerin hedefleri burada görünür."
+          }
+        }
+      }
+    },
+    "The open models of an OpenCode Go subscription.": {
+      "comment": "AI services: what OpenCode Go's key is for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir OpenCode Go aboneliğinin açık modelleri."
           }
         }
       }
@@ -14582,6 +15000,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sayfayı telefondan kullanmak Mac'inde kapalı: Ayarlar › Tarayıcı › Görevi tutarken sayfayı ekrandan kullan."
+          }
+        }
+      }
+    },
+    "Variable": {
+      "comment": "AI services: the name of the key's variable",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişken"
           }
         }
       }
@@ -16268,6 +16697,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "sürüyor"
+          }
+        }
+      }
+    },
+    "keys api key providers token": {
+      "comment": "Settings search synonyms of AI services (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "anahtarlar api anahtarı sağlayıcılar token anahtar"
           }
         }
       }

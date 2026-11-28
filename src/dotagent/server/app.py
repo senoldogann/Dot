@@ -38,6 +38,7 @@ from dotagent.core.errors import (
     SkillError,
     ToolExecutionError,
     ToolInputError,
+    TooManyRequests,
     UndoError,
     VaultRefused,
     VoiceError,
@@ -113,6 +114,7 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (PhoneRefused, 403),
     (PhoneOnly, 403),
     (VaultRefused, 403),
+    (TooManyRequests, 429),
     (NotFoundError, 404),
     (RunConflict, 409),
     (UndoError, 409),
@@ -234,7 +236,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(connections_router(ctx))
     app.include_router(mcp_router(ctx))
     app.include_router(gallery_router(ctx))
-    app.include_router(keys_router(ctx))
+    app.include_router(keys_router(ctx, phones))
     app.include_router(websearch_router(ctx))
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))

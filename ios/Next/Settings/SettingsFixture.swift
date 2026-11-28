@@ -26,6 +26,8 @@
         case agents = "settings-agents"
         case campaigns = "settings-campaigns"
         case campaign = "settings-campaign"
+        case keys = "settings-keys"
+        case key = "settings-key"
         case system = "settings-system"
         case stopped = "settings-stopped"
         case offline = "settings-offline"
@@ -74,6 +76,8 @@
             case .agents: .agents
             case .campaigns: .campaigns
             case .campaign: .campaign("cmp_fixture")
+            case .keys: .keys
+            case .key: .key("OPENROUTER_API_KEY")
             case .system: .system
             case .maintenance: .maintenance
             case .loading: .usage
@@ -263,7 +267,7 @@
             // What a chat's runs changed (item 2017): a new Python file, a file changed in two hunks, a new Markdown
             // file, a new JSON file on one line and a picture, which has no diff.
             case ("GET", let route) where route.hasPrefix("/api/runs/") && route.hasSuffix("/changes"): return (200, Self.runChanges)
-            default: return CampaignFixture.answer(method: method, path: path) ?? (404, #"{"detail":"Not Found"}"#)
+            default: return CampaignFixture.answer(method: method, path: path) ?? KeyFixture.answer(method: method, path: path) ?? (404, #"{"detail":"Not Found"}"#)
             }
         }
 
