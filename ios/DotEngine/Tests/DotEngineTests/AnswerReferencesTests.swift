@@ -39,11 +39,6 @@ final class AnswerReferencesTests: XCTestCase {
         XCTAssertEqual(fileTableColumnCharacters([], sample: 10, minimum: 3, maximum: 40), [])
     }
 
-    func testATableIsWrittenAgainAsItsText() {
-        XCTAssertEqual(fileTableText([["a", "b,c"], ["say \"hi\"", "x\ny"]], delimiter: ","), "a,\"b,c\"\n\"say \"\"hi\"\"\",\"x\ny\"\n")
-        XCTAssertEqual(fileTableText([["a", "b,c"]], delimiter: "\t"), "a\tb,c\n")
-    }
-
     func testANumberCellIsTold() {
         XCTAssertTrue(fileTableCellIsNumber("1,234.50"))
         XCTAssertTrue(fileTableCellIsNumber("-12%"))

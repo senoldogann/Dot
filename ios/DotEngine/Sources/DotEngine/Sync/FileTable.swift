@@ -97,16 +97,3 @@ public func textPieces(_ text: String, lines: Int) -> [String] {
     let all: [Substring] = text.split(separator: "\n", omittingEmptySubsequences: false)
     return stride(from: 0, to: all.count, by: max(1, lines)).map { all[$0..<min($0 + max(1, lines), all.count)].joined(separator: "\n") }
 }
-
-/// `rows` written as a CSV (or TSV) text again, a cell that holds the delimiter, a quote or a line break quoted, for
-/// Share and Save to Files of a table the Mac read (pure).
-public func fileTableText(_ rows: [[String]], delimiter: Character) -> String {
-    rows.map { row in
-        row.map { cell in
-            guard cell.contains(delimiter) || cell.contains("\"") || cell.contains("\n") || cell.contains("\r") else { return cell }
-            return "\"" + cell.replacingOccurrences(of: "\"", with: "\"\"") + "\""
-        }
-        .joined(separator: String(delimiter))
-    }
-    .joined(separator: "\n") + "\n"
-}

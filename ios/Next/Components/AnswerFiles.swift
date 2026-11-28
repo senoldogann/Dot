@@ -32,8 +32,9 @@ enum FileContent {
     case pdf(PDFDocument, URL)
     /// A text read by its format (`fileTextFormat`): its text, for Copy and the Markdown source, and what is drawn of it.
     case text(String, cut: Bool, format: FileTextFormat, FileTextBody, URL)
-    /// A CSV or TSV file's rows.
-    case table(FileTable, URL)
+    /// A CSV or TSV file's rows: no file kept, as the rows read are not the file (cut at the cells the Mac reads, its
+    /// delimiter and empty rows not kept), so Share and Save to Files are not offered.
+    case table(FileTable)
     /// The facts alone, and why nothing more shows.
     case facts(String)
 }
@@ -117,7 +118,7 @@ struct FilePreviewSheet: View {
                 }
             }
             .contentMargins(.bottom, floatingClearance, for: .scrollContent)
-        case .ready(_, .table(let table, _)):
+        case .ready(_, .table(let table)):
             FileTableView(table: table)
                 .contentMargins(.bottom, floatingClearance, for: .scrollContent)
         case .ready(let file, .facts(let why)):
@@ -207,8 +208,8 @@ struct FilePreviewSheet: View {
 
     private func localFile(_ shown: FileContent) -> URL? {
         switch shown {
-        case .image(_, let url), .pdf(_, let url), .text(_, _, _, _, let url), .table(_, let url): url
-        case .facts: nil
+        case .image(_, let url), .pdf(_, let url), .text(_, _, _, _, let url): url
+        case .facts, .table: nil
         }
     }
 }
@@ -281,9 +282,7 @@ extension AppModel {
                 let body: FileTextBody = await Task.detached(priority: .userInitiated) { fileTextBody(text, format: format) }.value
                 return .ready(file, .text(text, cut: cut, format: format, body, try keptFile(Data(text.utf8), named: file.name)))
             case .table(let table):
-                let delimiter: Character = file.name.lowercased().hasSuffix(".tsv") ? "\t" : ","
-                let written: String = await Task.detached(priority: .userInitiated) { fileTableText(table.rows, delimiter: delimiter) }.value
-                return .ready(file, .table(table, try keptFile(Data(written.utf8), named: file.name)))
+                return .ready(file, .table(table))
             case .drawn:
                 return .ready(file, .facts(String(localized: "The phone shows this kind of file by its facts; open it on the Mac to read it.", comment: "File preview: an Office file")))
             case .unshown(let reason):
