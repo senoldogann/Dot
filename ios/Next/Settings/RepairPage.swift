@@ -6,6 +6,7 @@ struct RepairPage: View {
     @State private var state: Loadable<RepairStatus> = .loading
     @State private var problem: SettingsFailure?
     @State private var busy: Bool = false
+    @State private var polling: Bool = false
     @State private var confirmsStop: Bool = false
 
     private var macPlace: String {
@@ -140,10 +141,10 @@ struct RepairPage: View {
         while !Task.isCancelled {
             let running: Bool = state.value?.running == true
             do { try await Task.sleep(for: .seconds(running ? 5 : 30)) } catch { return }
-            guard !Task.isCancelled, !busy, state.value != nil else { continue }
-            busy = true
+            guard !Task.isCancelled, !busy, !polling, state.value != nil else { continue }
+            polling = true
             let latest: Loadable<RepairStatus> = await model.read { api throws(DaemonRequestError) in try await api.repairStatus() }
-            busy = false
+            polling = false
             guard !Task.isCancelled else { return }
             switch latest {
             case .loaded:
