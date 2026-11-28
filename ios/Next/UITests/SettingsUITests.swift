@@ -44,6 +44,28 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")
     }
 
+    func testTheTeamEditorOpensWithCurrentValuesAndRemovalAsksFirst() {
+        let app: XCUIApplication = launch("team-editing")
+        let edit: XCUIElement = app.buttons["Edit the team"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        if !edit.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        edit.tap()
+        let save: XCUIElement = app.navigationBars.buttons["Save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        let name: XCUIElement = app.textFields["editTeam.name"]
+        XCTAssertEqual(name.value as? String, "Launch")
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+        app.navigationBars.buttons["Cancel"].tap()
+        XCTAssertTrue(app.navigationBars["Launch"].waitForExistence(timeout: 5))
+        let remove: XCUIElement = app.buttons["Remove the team"]
+        if !remove.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        remove.tap()
+        XCTAssertTrue(app.buttons["Remove"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Launch"].exists)
+    }
+
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
     func testTheMacsEmergencyStopIsShownAndReleased() {
         let app: XCUIApplication = launch("settings-stopped")

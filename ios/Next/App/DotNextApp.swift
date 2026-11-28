@@ -118,8 +118,19 @@ struct RootView: View {
                     }
                     .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }
                 case .settingsFixture(let fixture):
-                    paired(HomeShell(opensFirstChat: false, settings: fixture.start))
-                        .onAppear { model.showSettingsFixture(fixture) }
+                    Group {
+                        if fixture == .teamEditing {
+                            ZStack {
+                                Color.clear
+                                if model.phase == .ready {
+                                    TeamSheet(id: "team_fixture", close: {})
+                                }
+                            }
+                        } else {
+                            paired(HomeShell(opensFirstChat: false, settings: fixture.start))
+                        }
+                    }
+                    .onAppear { model.showSettingsFixture(fixture) }
             #endif
             case .home(let scene):
                 paired(HomeShell(opensFirstChat: false, settings: scene == .settings ? SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed) : nil))

@@ -1764,3 +1764,12 @@ TR.update(
 
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+
+TR.update(
+    {
+        "Edit the team": "Takımı düzenle",
+        "Remove the team": "Takımı kaldır",
+        "Remove the team?": "Takım kaldırılsın mı?",
+        "Its bots and chats stay.": "Botları ve sohbetleri kalır.",
+    }
+)

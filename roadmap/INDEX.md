@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2081](2081.md) | done | 2026-11-28 | Edit and remove a group chat's team from Dot Next |
 | [2061](2061.md) | done | 2026-11-28 | DotNext's "+" makes a bot from a template and a group chat with the owner's bots |
 | [2046](2046.md) | done | 2026-11-27 | A coding helper hands its pull request checks to the chat's background watcher |
 | [2045](2045.md) | done | 2026-11-27 | Measure the character line against the injection evals |

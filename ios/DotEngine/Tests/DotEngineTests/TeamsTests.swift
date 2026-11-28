@@ -17,6 +17,21 @@ final class TeamsTests: XCTestCase {
         XCTAssertNil(TeamEdit.checked(name: "Launch", purpose: "", agents: (0...50).map(String.init)), "50 bots at most")
     }
 
+    func testEditingAndRemovingUseTheExistingTeamRoutes() async throws {
+        let daemon = FakeDaemon(version: "1")
+        daemon.failNext("PUT", path: "/api/teams/t1", status: 200,
+                        body: #"{"id":"t1","name":"Research","purpose":"Read sources","agents":["a2","a1"]}"#)
+        daemon.failNext("DELETE", path: "/api/teams/t1", status: 204, body: "")
+        let api: DaemonAPI = daemon.api()
+        let edit = try XCTUnwrap(TeamEdit.checked(name: "Research", purpose: "Read sources", agents: ["a2", "a1"]))
+        let saved: TeamRecordView = try await api.updateTeam("t1", edit: edit)
+        XCTAssertEqual(saved.agents, ["a2", "a1"])
+        let body: Data = try XCTUnwrap(daemon.bodies("PUT", "/api/teams/t1").last)
+        XCTAssertEqual(try JSONDecoder().decode(TeamEdit.self, from: body), edit)
+        try await api.deleteTeam("t1")
+        XCTAssertTrue(daemon.requests.contains { $0.method == "DELETE" && $0.path == "/api/teams/t1" })
+    }
+
     func testATemplatesAnswersGoOnlyWhenOneWasGiven() {
         XCTAssertNil(templateAnswers(["", "  "]), "no body: the template's own instructions")
         XCTAssertNil(templateAnswers([]))

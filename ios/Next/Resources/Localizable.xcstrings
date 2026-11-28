@@ -2469,7 +2469,7 @@
       }
     },
     "Cancel": {
-      "comment": "Edit sheet toolbar: discards the edits",
+      "comment": "Edit sheet toolbar: discards the edits\nGroup chat: cancels editing",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4974,6 +4974,17 @@
         }
       }
     },
+    "Edit the team": {
+      "comment": "Group chat: edits the team",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takımı düzenle"
+          }
+        }
+      }
+    },
     "Edited %@": {
       "comment": "Tool row: a file edited; the argument is its path",
       "localizations": {
@@ -6649,6 +6660,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajanı duraklatıldı"
+          }
+        }
+      }
+    },
+    "Its bots and chats stay.": {
+      "comment": "Group chat: what remains after removing the team",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botları ve sohbetleri kalır."
           }
         }
       }
@@ -10586,7 +10608,7 @@
       }
     },
     "Remove": {
-      "comment": "Own initiative: takes a thing off the list\nQueue sheet: removes a queued message",
+      "comment": "Own initiative: takes a thing off the list\nQueue sheet: removes a queued message\nGroup chat: removes the team",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10636,6 +10658,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alıntıyı kaldır"
+          }
+        }
+      }
+    },
+    "Remove the team": {
+      "comment": "Group chat: opens removal confirmation",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takımı kaldır"
+          }
+        }
+      }
+    },
+    "Remove the team?": {
+      "comment": "Group chat: asks before removing the team",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takım kaldırılsın mı?"
           }
         }
       }
@@ -11081,7 +11125,7 @@
       }
     },
     "Save": {
-      "comment": "Edit sheet toolbar: keeps the edits",
+      "comment": "Edit sheet toolbar: keeps the edits\nGroup chat: saves the team",
       "localizations": {
         "tr": {
           "stringUnit": {
