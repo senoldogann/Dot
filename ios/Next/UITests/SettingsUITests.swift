@@ -54,7 +54,8 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         let name: XCUIElement = app.textFields["editTeam.name"]
         XCTAssertEqual(name.value as? String, "Launch")
-        XCTAssertTrue(save.isEnabled)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
         app.navigationBars.buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Launch"].waitForExistence(timeout: 5))
         let remove: XCUIElement = app.buttons["Remove the team"]
