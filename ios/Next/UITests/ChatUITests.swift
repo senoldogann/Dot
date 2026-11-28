@@ -75,7 +75,8 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(answer.waitForExistence(timeout: 10))
         drag(answer, by: 200)
         XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on Dot's message quotes it")
-        XCTAssertTrue(chip.label.contains("merged"), chip.label)
+        // The whole message is quoted and the chip shows its first line, the answer's "## Fixed" heading.
+        XCTAssertTrue(chip.label.contains("Fixed"), chip.label)
         XCTAssertFalse(home.exists, "the chat is still open")
         app.buttons["composer.quote.remove"].tap()
 
