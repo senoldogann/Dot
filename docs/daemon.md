@@ -1819,8 +1819,8 @@ the agent itself. On a Mac that has no Dot, the shell installs one first (**Inst
   once the daemon is back.
 - **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
 run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from
-`GET /api/activity/count` every second. A click opens the window; the menu has Open Dot, New chat, Check for Updates…
-and Quit. Closing the window keeps the shell in the menu bar.
+`GET /api/activity/count` every second, and set again only when what it shows changes. A click opens the window;
+the menu has Open Dot, New chat, Check for Updates… and Quit. Closing the window keeps the shell in the menu bar.
 - **⌘⇧Space** anywhere brings the window up on New chat, with the cursor in the box. When another app holds the
   shortcut, the shell starts without it and its menu says so; New chat stays in the menu. While the window shows the
   page of a daemon that is down, New chat brings it up as it is, and what the page says stays.
