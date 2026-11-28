@@ -222,7 +222,7 @@ window.paint = (done, working) => {
   now = steps.map((step, index) => ({ ...step, status: statusAt(index, done) }));
   bar.paint({
     status: working ? "running" : null, took: 97, stopping: false, reconnecting: false,
-    plan: { done, total: now.length }, helpers: { live: 0, waitedFor: 0, letGo: 0 }, waits: false,
+    plan: { done, total: now.length }, helpers: { live: 0, waitedFor: 0, letGo: 0 }, tasks: { open: 0 }, waits: false,
     loops: { count: 0, rhythm: null, problem: false }, queue: { count: 0, held: false, problem: false, sending: false },
     running: { count: 0, problem: false },
   });
