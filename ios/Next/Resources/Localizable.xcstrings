@@ -6722,6 +6722,17 @@
         }
       }
     },
+    "Install a plugin the review rates risky?": {
+      "comment": "Plugin proposal: asks before installing one of medium or high risk",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İncelemenin riskli bulduğu eklenti kurulsun mu?"
+          }
+        }
+      }
+    },
     "Installed: the tasks that start from now on are offered its skills.": {
       "comment": "Plugin proposal: it was installed",
       "localizations": {
@@ -15229,6 +15240,17 @@
         }
       }
     },
+    "Use a skill written from outside content?": {
+      "comment": "Skill proposal: asks before using a tainted draft",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dış içerikten yazılmış beceri kullanılsın mı?"
+          }
+        }
+      }
+    },
     "Use a version written from outside content?": {
       "comment": "Self-improvement: asks before using a version from outside content",
       "localizations": {
@@ -15269,6 +15291,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "iPhone'un metin boyutunu kullan"
+          }
+        }
+      }
+    },
+    "Use writes this as %@ and puts the others to rest.": {
+      "comment": "Skill proposal: what Use does to the merged skills; the argument is the one that stays",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullan bunu %@ olarak yazar ve diğerlerini dinlendirir."
           }
         }
       }
@@ -16002,6 +16035,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu bot ile bir başkası birbirine mesaj yazdığında, gün boyunca burada görünür."
+          }
+        }
+      }
+    },
+    "When: %@": {
+      "comment": "Skill proposal: when the skill fits; the argument is that",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne zaman: %@"
           }
         }
       }
