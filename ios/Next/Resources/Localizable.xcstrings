@@ -2809,6 +2809,17 @@
         }
       }
     },
+    "Closed": {
+      "comment": "Self-repair: the proposed fix was closed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapandı"
+          }
+        }
+      }
+    },
     "Cloud": {
       "comment": "Bot shape",
       "localizations": {
@@ -4357,6 +4368,17 @@
         }
       }
     },
+    "Dot has found nothing going wrong again and again.": {
+      "comment": "Self-repair: empty problems list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot tekrar tekrar ters giden bir şey bulmadı."
+          }
+        }
+      }
+    },
     "Dot is asking you": {
       "comment": "Ask dock title: a question",
       "localizations": {
@@ -5564,6 +5586,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kararsız ayrıştırıcı testini düzelt"
+          }
+        }
+      }
+    },
+    "Fixed": {
+      "comment": "Self-repair: a problem that was fixed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzeltildi"
           }
         }
       }
@@ -8527,6 +8560,17 @@
         }
       }
     },
+    "Nothing in line": {
+      "comment": "Self-repair: no problems to fix",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sırada bir şey yok"
+          }
+        }
+      }
+    },
     "Nothing in motion today": {
       "comment": "Activity: no run works, waits, ended or is due today",
       "localizations": {
@@ -9264,6 +9308,17 @@
         }
       }
     },
+    "Overview": {
+      "comment": "Self-repair: current state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genel bakış"
+          }
+        }
+      }
+    },
     "Own work model": {
       "comment": "Models: the model that looks for Dot's own work",
       "localizations": {
@@ -9727,6 +9782,17 @@
         }
       }
     },
+    "Problems": {
+      "comment": "Self-repair: problems Dot has found",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sorunlar"
+          }
+        }
+      }
+    },
     "Processor": {
       "comment": "Maintenance › Performance: CPU time row",
       "localizations": {
@@ -9844,6 +9910,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlayıcı programları"
+          }
+        }
+      }
+    },
+    "Pull request": {
+      "comment": "Self-repair: opens the proposed change",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişiklik isteği"
           }
         }
       }
@@ -11784,6 +11861,17 @@
         }
       }
     },
+    "Settings › Self-repair": {
+      "comment": "Where on the Mac: the Self-repair page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Kendini onarma"
+          }
+        }
+      }
+    },
     "Settings › System": {
       "comment": "Where on the Mac: the System page",
       "localizations": {
@@ -12414,6 +12502,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Okumayı durdur"
+          }
+        }
+      }
+    },
+    "Stop the night?": {
+      "comment": "Self-repair: confirms stopping the current work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gece durdurulsun mu?"
           }
         }
       }
@@ -14784,6 +14883,17 @@
         }
       }
     },
+    "Waiting for the checks": {
+      "comment": "Self-repair: CI checks are pending",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontroller bekleniyor"
+          }
+        }
+      }
+    },
     "Waiting for the link": {
       "comment": "Under an owner's message: it is kept and goes when the phone is online",
       "localizations": {
@@ -14802,6 +14912,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sayfa bekleniyor"
+          }
+        }
+      }
+    },
+    "Waiting for the review": {
+      "comment": "Self-repair: the review of the change is pending",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İnceleme bekleniyor"
           }
         }
       }

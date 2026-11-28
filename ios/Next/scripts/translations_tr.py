@@ -1742,3 +1742,19 @@ TR.update(
 
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+
+TR.update(
+    {
+        "Settings › Self-repair": "Ayarlar › Kendini onarma",
+        "Stop the night?": "Gece durdurulsun mu?",
+        "Overview": "Genel bakış",
+        "Waiting for the review": "İnceleme bekleniyor",
+        "Waiting for the checks": "Kontroller bekleniyor",
+        "Problems": "Sorunlar",
+        "Nothing in line": "Sırada bir şey yok",
+        "Dot has found nothing going wrong again and again.": "Dot tekrar tekrar ters giden bir şey bulmadı.",
+        "Pull request": "Değişiklik isteği",
+        "Fixed": "Düzeltildi",
+        "Closed": "Kapandı",
+    }
+)

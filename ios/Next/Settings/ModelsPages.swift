@@ -186,25 +186,7 @@ struct ModelsPage: View {
     @ViewBuilder private func repair(_ picture: ModelsPicture) -> some View {
         switch picture.repair {
         case .loaded(let view):
-            let worker: RepairWorker = view.worker
-            GroupedSection(
-                header: String(localized: "Self-repair", comment: "Models section: how Claude Code works when Dot repairs itself"),
-                footer: view.workerLost
-                    ? String(localized: "The kept choice could not be read: the nights stop until one is chosen again.", comment: "Models: self-repair's choice was lost")
-                    : String(localized: "The model of your Claude plan that repairs Dot's own problems at night, from its next session.", comment: "Models: what self-repair's model is")
-            ) {
-                menuRow(String(localized: "Self-repair model", comment: "Models: self-repair's model"), value: RepairChoice.modelTitle(worker.model), choices: RepairChoice.models) { value in
-                    saveWorker(RepairWorker(model: value, effort: worker.effort, fast: worker.fast))
-                }
-                menuRow(String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level"), value: RepairChoice.levelTitle(worker.effort), choices: RepairChoice.efforts) { value in
-                    saveWorker(RepairWorker(model: worker.model, effort: value, fast: worker.fast))
-                }
-                ToggleRow(
-                    systemImage: nil, title: String(localized: "Fast mode", comment: "Chat settings row: the model's fast mode"),
-                    description: String(localized: "Billed to your plan as extra usage; without it the session runs at the standard speed.", comment: "Models: self-repair's fast mode"),
-                    isOn: Binding(get: { worker.fast }, set: { saveWorker(RepairWorker(model: worker.model, effort: worker.effort, fast: $0)) }))
-                    .accessibilityIdentifier("models.repairFast")
-            }
+            RepairWorkerControls(worker: view.worker, lost: view.workerLost, save: saveWorker)
         case .failed(let failure):
             FailureBanner(failure: failure, macPlace: macPlace, retry: { Task { await load() } })
         case .loading:
@@ -259,16 +241,6 @@ struct ModelsPage: View {
         }
         .buttonStyle(RowPressStyle())
         .accessibilityIdentifier("models.row")
-    }
-
-    /// A choice among a few named values (self-repair's model and effort): the system's menu.
-    private func menuRow(_ title: String, value: String, choices: [(String, String)], choose: @escaping (String) -> Void) -> some View {
-        Menu {
-            ForEach(choices, id: \.0) { choice in Button(choice.1) { choose(choice.0) } }
-        } label: {
-            ListRow(systemImage: nil, title: title, description: nil, accessory: .detailAndChevron(value))
-        }
-        .buttonStyle(RowPressStyle())
     }
 
     /// The code review's model and its reasoning; a model chosen leaves the fallbacks, where it may not stand twice.

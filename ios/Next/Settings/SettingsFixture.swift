@@ -166,6 +166,10 @@
             client?.urlProtocolDidFinishLoading(self)
         }
 
+        private func repair(running: Bool) -> String {
+            #"{"repo":"Dot","worker":{"model":"opus","effort":"high","fast":false},"worker_lost":false,"running":\#(running),"live":null,"problems":[{"id":"p1","title":"A browser stopped responding","evidence":["Browser did not answer."],"count":2,"note":"","status":"open","pr_url":""}]}"#
+        }
+
         private func answer(method: String, path: String, behaviour: FixtureBehaviour) -> (Int, String) {
             if path == "/api/health" { return (200, #"{"ok":true,"version":"0.2.0","notifications":"ok","awake":"holding"}"#) }
             if path == "/api/proof" {
@@ -195,8 +199,9 @@
                 return (200, #"{"proposer":"","composer":"claude_code:opus","selector":"","experience":"","review":"claude_code:opus"}"#)
             case ("GET", "/api/initiative"), ("PUT", "/api/initiative/look-model"):
                 return (200, #"{"enabled":true,"look_model":"","items":[]}"#)
-            case ("GET", "/api/repair"), ("PUT", "/api/repair/worker"):
-                return (200, #"{"worker":{"model":"opus","effort":"high","fast":false},"worker_lost":false}"#)
+            case ("GET", "/api/repair"), ("POST", "/api/repair/settle"), ("POST", "/api/repair/stop"), ("PUT", "/api/repair/worker"):
+                return (200, repair(running: false))
+            case ("POST", "/api/repair/now"): return (200, repair(running: true))
             case ("GET", "/api/code-review"):
                 return (
                     200,
