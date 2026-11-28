@@ -199,6 +199,14 @@ async def _until(condition: Callable[[], bool | Awaitable[bool]], what: str) -> 
     raise AssertionError(f"not in {_WAIT_S:g} s: {what}")
 
 
+async def _end_runs(manager: RunManager) -> None:
+    """Stop every run still at work and wait for its end, so that a test that failed while its run worked leaves no run
+    to ask the scripted model, once it is cleared, for a turn it no longer has, nor to end in a later test."""
+    for run_id in manager.active_run_ids():
+        manager.cancel(run_id)
+        await manager.wait(run_id)
+
+
 def _code_sent(osascript: Osascript) -> str:
     return "".join(char for char in osascript.sent[-1][1].split("code is ")[1][:7] if char.isdigit())
 
@@ -958,8 +966,11 @@ async def test_a_run_that_works_longer_than_a_moment_tells_what_it_does_while_it
 ) -> None:
     """Item 618 on a real run, with the limits made short (half a second to the first message and between two): the
     model thinks, runs a command and looks into a folder, then waits for the gate; the message of progress comes from
-    the timer, with no event after the half second; the answer follows when the model goes on, and nothing after it."""
+    the timer, with no event after the half second; the answer follows when the model goes on, and nothing after it.
+    A slow machine may take longer than the half second over the two steps: the first message then tells what was
+    done by then, and the next, half a second later, the rest; together they tell each thing once."""
     replies.clear()
+    await _until(lambda: not manager.active_run_ids(), "the runs of the tests before ended")
     configured: Runtime = dataclasses.replace(
         runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True, progress="steps")})
     )
@@ -995,29 +1006,46 @@ async def test_a_run_that_works_longer_than_a_moment_tells_what_it_does_while_it
         messages.message(own, "greet me and look around", at=time.time())
         await _until(lambda: len(osascript.sent) == 1, "the message of progress")
         waited: float = time.monotonic() - started
-        handle, told = osascript.sent[0]
-        lines: list[str] = told.removeprefix(MARKER).splitlines()
-        assert handle == PHONE and told.startswith(MARKER)
-        assert lines[0].startswith("Working for ") and lines[0].endswith(" s:")
-        assert lines[1:] == ["ran a command", "looked in a folder", "Thought: I should greet first."]
-        assert waited >= 0.4
+        await _until(lambda: replies.asked == 3, "the run waits at the gate after its two steps")
+        expected: list[str] = ["ran a command", "looked in a folder", "Thought: I should greet first."]
+        await _until(lambda: len(_progress_lines(osascript)) == len(expected), "every step told")
         await asyncio.sleep(0.8)
-        assert len(osascript.sent) == 1
+        progress: int = len(osascript.sent)
+        for handle, told in osascript.sent:
+            assert handle == PHONE and told.startswith(MARKER)
+            first: str = told.removeprefix(MARKER).splitlines()[0]
+            assert first.startswith("Working for ") and first.endswith(" s:")
+        told_lines: list[str] = _progress_lines(osascript)
+        assert [line for line in told_lines if not line.startswith("Thought: ")] == expected[:2]
+        assert [line for line in told_lines if line.startswith("Thought: ")] == expected[2:]
+        assert waited >= 0.4
         assert replies.gate is not None
         replies.gate.set()
-        await _until(lambda: len(osascript.sent) == 2, "the answer")
-        assert osascript.sent[1] == (PHONE, f"{MARKER}Greeted.")
+        await _until(lambda: len(osascript.sent) == progress + 1, "the answer")
+        assert osascript.sent[-1] == (PHONE, f"{MARKER}Greeted.")
         await asyncio.sleep(0.8)
-        assert len(osascript.sent) == 2
+        assert len(osascript.sent) == progress + 1
     finally:
+        await _end_runs(manager)
         replies.clear()
         await channels.stop()
+
+
+def _progress_lines(osascript: Osascript) -> list[str]:
+    """The lines of every message of progress sent so far, each without the line of how long the run has worked."""
+    return [
+        line
+        for _, told in osascript.sent
+        if told.removeprefix(MARKER).startswith("Working for ")
+        for line in told.removeprefix(MARKER).splitlines()[1:]
+    ]
 
 
 async def test_a_run_that_ends_in_a_moment_tells_only_its_answer_whatever_it_did(
     runtime: Runtime, manager: RunManager, messages: MessagesDb, replies: Replies
 ) -> None:
     replies.clear()
+    await _until(lambda: not manager.active_run_ids(), "the runs of the tests before ended")
     configured: Runtime = dataclasses.replace(
         runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True, progress="steps")})
     )
@@ -1048,6 +1076,7 @@ async def test_a_run_that_ends_in_a_moment_tells_only_its_answer_whatever_it_did
         await asyncio.sleep(0.6)
         assert osascript.sent == [(PHONE, f"{MARKER}Quickly done.")]
     finally:
+        await _end_runs(manager)
         await channels.stop()
 
 

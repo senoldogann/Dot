@@ -64,6 +64,11 @@ class Replies:
     def name(self) -> str:
         return PROVIDER
 
+    @property
+    def asked(self) -> int:
+        """How many calls the model has had since the last ``clear``, those waiting at the gate among them."""
+        return self._asked
+
     def push(self, *turns: ScriptedTurn) -> None:
         self._turns.extend(turns)
 
