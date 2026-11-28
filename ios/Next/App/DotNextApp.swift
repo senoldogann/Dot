@@ -120,7 +120,12 @@ struct RootView: View {
                 case .settingsFixture(let fixture):
                     Group {
                         if fixture == .teamEditing {
-                            TeamSheet(id: "team_fixture", close: { })
+                            ZStack {
+                                Color.clear
+                                if model.phase == .ready {
+                                    TeamSheet(id: "team_fixture", close: {})
+                                }
+                            }
                         } else {
                             paired(HomeShell(opensFirstChat: false, settings: fixture.start))
                         }

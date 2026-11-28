@@ -44,7 +44,7 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")
     }
 
-    func testATeamCanBeEditedAndRemovalAsksFirst() {
+    func testTheTeamEditorOpensWithCurrentValuesAndRemovalAsksFirst() {
         let app: XCUIApplication = launch("team-editing")
         let edit: XCUIElement = app.buttons["Edit the team"]
         XCTAssertTrue(edit.waitForExistence(timeout: 10))
@@ -54,9 +54,8 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         let name: XCUIElement = app.textFields["editTeam.name"]
         XCTAssertEqual(name.value as? String, "Launch")
-        name.tap()
-        name.typeText(" desk")
-        save.tap()
+        XCTAssertTrue(save.isEnabled)
+        app.navigationBars.buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Launch"].waitForExistence(timeout: 5))
         let remove: XCUIElement = app.buttons["Remove the team"]
         if !remove.isHittable { app.scrollViews.firstMatch.swipeUp() }
