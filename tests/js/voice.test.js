@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  NOTHING_HEARD,
   QUIET_BAR,
   allowPane,
   allowToast,
@@ -14,6 +15,7 @@ import {
   clockText,
   deafWords,
   dictated,
+  heardOf,
   languageTag,
   listeningWay,
   localVoice,
@@ -25,7 +27,6 @@ import {
   sentenceChunks,
   voicePlace,
   spokenText,
-  transcriptOf,
 } from "../../src/dotagent/server/static/js/voice.js";
 
 /** A result of the engine: its words, and whether it is settled. */
@@ -43,16 +44,54 @@ test("the voice follows the page's language unless one is chosen, a bare languag
   assert.equal(languageTag("tr-TR", "en", "en-US"), "tr-TR");
 });
 
+/** The texts of `heardOf` after each list of results in turn, from nothing heard. */
+function heardAfter(...lists) {
+  let before = NOTHING_HEARD;
+  let texts = { final: "", interim: "" };
+  for (const results of lists) {
+    const now = heardOf(before, results);
+    before = now.heard;
+    texts = { final: now.final, interim: now.interim };
+  }
+  return texts;
+}
+
 test("what the engine heard is two texts: the words it is sure of and those it may still change", () => {
-  assert.deepEqual(transcriptOf([heard("hello there", true), heard(" how are", false)]), {
+  assert.deepEqual(heardAfter([heard("hello there", true), heard(" how are", false)]), {
     final: "hello there",
     interim: "how are",
   });
-  assert.deepEqual(transcriptOf([heard("one", true), heard("  two ", true), heard("", false)]), {
+  assert.deepEqual(heardAfter([heard("one", true), heard("  two ", true), heard("", false)]), {
     final: "one two",
     interim: "",
   });
-  assert.deepEqual(transcriptOf([]), { final: "", interim: "" });
+  assert.deepEqual(heardAfter([]), { final: "", interim: "" });
+});
+
+test("a pause never takes words away: a result list that begins again keeps the words of the one before (item 2048)", () => {
+  // A session that keeps every result: the list grows, nothing is said twice.
+  assert.deepEqual(
+    heardAfter(
+      [heard("I would like", false)],
+      [heard("I would like a table", true)],
+      [heard("I would like a table", true), heard("near the", false)],
+      [heard("I would like a table", true), heard("near the window", true)],
+    ),
+    { final: "I would like a table near the window", interim: "" },
+  );
+  // A browser that hands the words after a pause in a list of their own: the earlier words stay.
+  assert.deepEqual(
+    heardAfter(
+      [heard("Yarın akşam bir masa", false)],
+      [heard("Yarın akşam bir masa ayırtmak istiyorum", true)],
+      [heard("Mümkünse", false)],
+      [heard("Mümkünse pencere kenarı", true)],
+      [heard("Bir de", false)],
+    ),
+    { final: "Yarın akşam bir masa ayırtmak istiyorum Mümkünse pencere kenarı", interim: "Bir de" },
+  );
+  // An empty new list keeps them too.
+  assert.deepEqual(heardAfter([heard("kept", true)], []), { final: "kept", interim: "" });
 });
 
 test("the box holds what it held, then the words heard, and says where the words that may still change begin", () => {

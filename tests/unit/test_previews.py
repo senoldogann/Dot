@@ -4,6 +4,8 @@ shown; a long text cut; and a PDF's pages drawn as pictures at the widths asked,
 
 import io
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import openpyxl
@@ -239,6 +241,45 @@ def test_a_pdf_page_is_drawn_at_the_width_asked_in_its_proportions(tmp_path: Pat
     with pytest.raises(InvalidValueError) as tall:
         page_png(_file(tmp_path / "strip.pdf", strip.getvalue()), 1, 600)
     assert tall.value.message == "the page is too tall to draw"
+
+
+# Eight threads draw pages of one PDF at once in a fresh interpreter, where PyObjC has resolved none of Quartz's names.
+_PAGES_AT_ONCE: str = """
+import sys, threading
+from pathlib import Path
+from dotagent.previews.pdfpages import page_png
+pdf = Path(sys.argv[1])
+start = threading.Barrier(8)
+failures = []
+def draw(n):
+    start.wait()
+    try:
+        page_png(pdf, 1 + n % 2, 600)
+    except Exception as error:
+        failures.append(repr(error))
+threads = [threading.Thread(target=draw, args=(n,)) for n in range(8)]
+for thread in threads:
+    thread.start()
+for thread in threads:
+    thread.join()
+print(failures)
+"""
+
+
+@pytest.mark.macos
+def test_pages_drawn_at_once_on_several_threads_all_draw(tmp_path: Path) -> None:
+    """The panel draws a PDF's pages off the event loop, several at once: PyObjC's lazy names raised ``KeyError`` for
+    one being resolved on another thread (10 of 15 fresh runs, browser run 46072058833) until they were imported under
+    a lock."""
+    out: io.BytesIO = io.BytesIO()
+    first: Image.Image = Image.new("RGB", (612, 792), (255, 255, 255))
+    first.save(out, format="PDF", save_all=True, append_images=[Image.new("RGB", (612, 792))], resolution=72.0)
+    pdf: Path = _file(tmp_path / "two.pdf", out.getvalue())
+    for _ in range(5):
+        ran: subprocess.CompletedProcess[str] = subprocess.run(
+            [sys.executable, "-c", _PAGES_AT_ONCE, str(pdf)], capture_output=True, text=True, timeout=60, check=False
+        )
+        assert (ran.returncode, ran.stdout.strip()) == (0, "[]"), ran.stderr
 
 
 def test_a_workbooks_drawing_is_its_sheets_and_any_other_drawing_its_page() -> None:

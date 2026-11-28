@@ -29,8 +29,9 @@ choose the script:
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
-holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop, and an active campaign with a progress note (Settings › Campaigns). With
-``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
+holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop,
+an active campaign with a progress note (Settings › Campaigns), and a finished run for the notification link.
+With ``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
 failed), the decisions made for the owner in them, drafts that wait (one whose send failed), a thing a run put on Dot's
 own list, and two versions of Dot's habits proposed by its learning (one written from a page others can write);
 ``e2e_activity.sh`` marks "while you were away" read from before them. With ``--seed-work`` it holds an agent,
@@ -63,8 +64,10 @@ from urllib.parse import SplitResult, parse_qs, urlsplit
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from dotagent.agent.manager import RunManager
+from dotagent.agent.review import PlaybookDraft
+from dotagent.agent.skill_proposals import SkillProposal, save_proposal
 from dotagent.config import load_config
-from dotagent.core.paths import ensure_layout
+from dotagent.core.paths import ensure_layout, playbooks_dir
 from dotagent.llm.types import (
     ChatRequest,
     DeltaSink,
@@ -485,6 +488,25 @@ async def seed(runtime: Runtime) -> None:
         campaign.id, None, "progress", "Two failing tests fixed.", {"tests_fixed": 2}
     )
 
+    notification_chat: ThreadRecord = await runtime.store.create_thread("E2E Notified Chat", "ui")
+    notification_run: RunRecord = await runtime.store.create_run(
+        notification_chat.id,
+        "Check the notification link.",
+        "task",
+        MODEL,
+        None,
+        "ui",
+        "medium",
+        "standard",
+        None,
+        "supervised",
+        False,
+        None,
+        None,
+        None,
+    )
+    await runtime.store.finish_run(notification_run.id, "done", "The notification link was checked.")
+
 
 async def seed_work(runtime: Runtime) -> None:
     """An agent, Scribe, with an objective, two work orders (one handed out and due in three hours, one accepted)
@@ -660,6 +682,27 @@ async def seed_activity(runtime: Runtime) -> None:
         "- Read a repository's README before the first edit.",
         "",
         json.dumps({"tainted": True, "tainted_by": ["a web page"]}),
+    )
+    # A skill proposal (item 2062) whose skills this home does not have: it waits, says it cannot be used now, and Drop
+    # takes it away.
+    save_proposal(
+        playbooks_dir(),
+        SkillProposal(
+            id="skp_e2e_a1b2c3",
+            kind="merge",
+            names=("find flights", "book trains"),
+            draft=PlaybookDraft(
+                kind="plan a trip",
+                description="Plans a trip end to end",
+                when="a trip to plan",
+                steps=["Find the flights", "Book the trains"],
+            ),
+            reason="Both plan one trip",
+            words=None,
+            bases={"find flights": 1, "book trains": 1},
+            tainted=False,
+            created_at=time.time(),
+        ),
     )
     await store.add_todo(
         "Tidy the Downloads folder",

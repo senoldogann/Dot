@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import DesktopError
-from dotagent.policy.sandbox import UNSANDBOXED, SwitchedSandbox
+from dotagent.policy.sandbox import NO_SEAL, UNSANDBOXED, SwitchedSandbox
 from dotagent.tools.apple import MAX_SCRIPT_TIMEOUT_S, AppleScriptArgs, build_apple_tool, script_timeout_s
 from dotagent.tools.context import ToolContext
 
@@ -33,7 +33,7 @@ def _ctx() -> ToolContext:
                 shell_env={"PATH": "/usr/bin:/bin"},
                 protected=(),
                 dot_paths=(),
-                sandbox=SwitchedSandbox(UNSANDBOXED, False, False),
+                sandbox=SwitchedSandbox(UNSANDBOXED, NO_SEAL, False, False),
             ),
             workspace=Path("/nonexistent-workspace"),
             approvals="yolo",

@@ -62,14 +62,19 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
     }
 }
 
-/// The capsule's link line (item 1931): a real state of the transport only (R-f §3): no link is Offline, a broken one
-/// Can't reach the Mac; `nil` for a link that is up or opening (bringing a chat up to date is no problem to tell, the
-/// owner's report of 2026-11-27), and for a refused key or an old Dot, which the chat's notice says. The screen shows it
-/// only once it lasted `linkLineDelay`. Pure.
-func linkLine(transport: Transport, mac: String) -> LinkLine? {
+@MainActor
+func listStatus(_ model: AppModel) -> String? {
+    switch model.transport {
+    case .offline, .reconnecting: model.visibleLink?.words
+    case .up, .connecting, .keyRefused, .daemonTooOld:
+        freshnessLine(freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
+    }
+}
+
+/// The same transport status for the capsule and the chat list.
+func linkLine(transport: Transport, lastContact: Double?) -> LinkLine? {
     switch transport {
-    case .offline: .offline
-    case .reconnecting: .unreachable(mac: mac)
+    case .offline, .reconnecting: LinkLine(lastContact: lastContact)
     case .keyRefused, .daemonTooOld, .connecting, .up: nil
     }
 }
@@ -291,6 +296,7 @@ struct ChatListView: View {
             }
             if let line = listLine {
                 Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).listRowBackground(Tone.ground)
+                    .accessibilityIdentifier("chats.link")
             }
             ForEach(model.pendingChats) { pending in
                 VStack(alignment: .leading, spacing: Space.xxs) {
@@ -407,8 +413,7 @@ struct ChatListView: View {
 
     /// The list's own line when it is not live (transport apart from freshness).
     private var listLine: String? {
-        freshnessLine(
-            freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
+        listStatus(model)
     }
 
     @ViewBuilder private func section(_ title: String, _ rows: [ThreadRow]) -> some View {
@@ -579,7 +584,7 @@ struct BotNewChat: View {
 
     private var chip: ModelChoice? {
         guard let ref = effectiveModel(settings.choices, defaultRef: model.chatDefaults?.model) else { return nil }
-        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: settings.choices.effort)
+        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: settings.choices.effort, fast: settings.choices.speed == "fast")
     }
 
     var body: some View {

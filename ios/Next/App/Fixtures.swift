@@ -24,8 +24,9 @@
         case failed = "n2-failed"
         /// The phone offline with nothing saved of the chat.
         case offline = "n2-offline"
-        /// No link, with the chat's copy saved on the phone (item 1931: the pill says Offline over it).
+        /// No link, with a cached chat and a known last contact.
         case offlineSaved = "n2-offline-saved"
+        case offlineList = "n2-offline-list"
         /// A chat deleted on the Mac while open.
         case deleted = "n2-deleted"
         /// The agents sheet (§19's one-line titles).
@@ -40,11 +41,13 @@
         /// A run that wrote its answer and finished with it in slightly other words (item 1996): the answer stands once.
         case restated = "n2-restated"
         /// The main run has stopped and only waits for a helper it delegated to (its newest step's one open call is a
-        /// delegate): the capsule says "Waiting on 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
+        /// delegate): the capsule says "Waiting for 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
         /// beside its helper and says "Working".
         case helpersWait = "n2-helpers"
         /// The first run a schedule fired (owner 2026-11-27): its message is the routine's compact row, not a bubble.
         case routine = "n2-routine"
+        /// A chat with several tasks (item 2013): the capsule's "N tasks" and the tasks sheet.
+        case tasks = "n2-tasks"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -55,6 +58,7 @@
             case .agents: .agents
             case .inspector: .inspector
             case .model: .model
+            case .tasks: .tasks
             default: nil
             }
         }
@@ -62,10 +66,15 @@
         /// The snapshot the scene draws.
         func snapshot(now: Double) -> EngineSnapshot {
             var snapshot: EngineSnapshot = .empty
-            let linked: Bool = self != .offline && self != .offlineSaved
+            let linked: Bool = self != .offline && self != .offlineSaved && self != .offlineList
             snapshot.transport = linked ? .up : .offline
             snapshot.online = linked
-            if self == .offlineSaved { snapshot.savedAt[Self.thread] = now - 240 }
+            if self == .offlineSaved || self == .offlineList {
+                snapshot.savedAt[Self.thread] = now - 240
+                snapshot.lastContact = Calendar.current.date(
+                    bySettingHour: 14, minute: 5, second: 0, of: Date(timeIntervalSince1970: now)
+                )?.timeIntervalSince1970
+            }
             let freshness: Freshness = self == .deleted ? .deleted : self == .offline ? .empty : self == .offlineSaved ? .cached : .live
             if self != .offline {
                 let view: ThreadView = decode(viewJSON(now: now))
@@ -146,6 +155,10 @@
                 self == .routine
                 ? #"[{"schedule":{"record":{"id":"sch_1","name":"Site build check","goal":"Find out why the site's build fails on CI and fix it"}},"loop":false}]"#
                 : "[]"
+            let tasks: String =
+                self == .tasks
+                ? #"{"chat_id":"thr_fixture","chat_title":"Dentist and the website","cap":5,"tasks":[{"thread_id":"thr_fixture","title":"Dentist and the website","run_id":"run_b","status":"running","state":"working","own":true},{"thread_id":"thr_lane1","title":"Improve my x.com account","run_id":"run_l1","status":"running","state":"working","own":false},{"thread_id":"thr_lane2","title":"Fill in the Gistsmith form","run_id":"run_l2","status":"done","state":"waits","own":false},{"thread_id":"thr_lane3","title":"Book the garage","run_id":"run_l3","status":"cancelled","state":"ended","own":false}]}"#
+                : #"{"chat_id":"thr_fixture","chat_title":"Dentist and the website","cap":5,"tasks":[]}"#
             return """
                 {"revision":7,
                  "thread":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"agent_id":null},
@@ -164,7 +177,8 @@
                  "background":[],
                  "reactions":[{"run_id":"run_a","message":"answer","reaction":"good"}],
                  "drafts":[],
-                 "schedules":\(schedules)}
+                 "schedules":\(schedules),
+                 "tasks":\(tasks)}
                 """
         }
 
@@ -181,6 +195,7 @@
                 #"{"id":7,"run_id":"run_a","ts":\#(a + 63),"kind":"tool_call","data":{"call_id":"a4","tool":"shell","args":{"command":"npm test"}}}"#,
                 #"{"id":8,"run_id":"run_a","ts":\#(a + 134),"kind":"tool_result","data":{"call_id":"a4","ok":true,"text":"42 passed"}}"#,
                 ###"{"id":9,"run_id":"run_a","ts":\###(a + 134),"kind":"run_finished","data":{"status":"done","result":"## Fixed\nThe build failed because **Node 18** was pinned on CI while the lock file needs Node 22.\n\n| Agent | Job |\n|---|---|\n| Invention Scout | Checks a lost invention against two independent sources and lists the Commons images with their licences → `research/<date>-<slug>.md` |\n| Story Scripter | Writes 9 scenes of 130–145 words in English to `script.json` (the hook in the first 3 s, an ironic close) |\n| Channel Analyst | Measures the weekly views |\n\n```yaml\n- uses: actions/setup-node@v4\n  with:\n    node-version: 22\n```\n\nhttps://github.com/example/site/pull/1012 merged, see [Node's release notes](https://nodejs.org/en/blog) for 22. The notes are in `~/Desktop/ci-notes.md`."}}"###,
+                #"{"id":19,"run_id":"run_b","ts":\#(b + 1),"kind":"first_words","data":{"text":"Looking at next week's calendar first.","model":"fast"}}"#,
                 #"{"id":20,"run_id":"run_b","ts":\#(b + 2),"kind":"plan","data":{"steps":[{"text":"Read next week's calendar","status":"done"},{"text":"Find free afternoon slots at the dentist","status":"in_progress"},{"text":"Book the slot you choose","status":"pending"}]}}"#,
                 #"{"id":21,"run_id":"run_b","ts":\#(b + 3),"kind":"tool_call","data":{"call_id":"b1","tool":"delegate","args":{"goal":"Check the dentist's free slots"}}}"#,
                 #"{"id":22,"run_id":"run_b","ts":\#(b + 4),"kind":"tool_result","data":{"call_id":"b1","ok":true,"text":"started"}}"#,

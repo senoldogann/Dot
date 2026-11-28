@@ -351,8 +351,8 @@ def _flag_or_none() -> RestartFlag | None:
 
 # What ``dotx service status`` says of the daemon's hold on the Mac's idle sleep while Dot works (item 1671).
 _AWAKE_LINES: dict[AwakeState, str] = {
-    "holding": "keeps the Mac from idle sleep now: Dot works, or its last work ended less than a minute ago",
-    "idle": "keeps the Mac from idle sleep while Dot works; nothing works now",
+    "holding": "keeps the Mac from idle sleep now: work is active, due soon, or recently ended",
+    "idle": "keeps the Mac from idle sleep for active or upcoming work; nothing needs it now",
     "off": "the Mac sleeps as it would while Dot works ([daemon] keep_awake = false)",
 }
 

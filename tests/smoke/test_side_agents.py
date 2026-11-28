@@ -264,15 +264,14 @@ async def test_the_side_menu_shows_every_agent_of_a_run_on_the_chats_row(
             for width, scheme in _SHOTS:
                 page: Page = await _open_sidebar(browser, address, width, scheme)
                 section: Locator = page.locator("#sidebar [data-section=working]")
-                # Working holds the run's chat (item 202), with the count of every run it delegated (items 507, 1327):
-                # three, the one at work among them, and nothing under the row.
+                # Working holds the run's chat (item 202); while its run waits on the one helper still at work the
+                # row says so in place of the count of every run it delegated (item 2010), and nothing hangs under it.
                 await expect(section.locator(".side-chat")).to_have_count(1)
                 row: Locator = section.locator(".side-chat > .side-run")
-                helpers = row.locator(".side-chat-helpers .side-helpers")
-                await expect(helpers).to_have_text(str(len(_SHELVES)))
-                await expect(helpers).to_have_attribute("data-working", "1")
+                await expect(row.locator(".side-chat-live")).to_have_text("Waiting for 1 helper…")
+                await expect(row.locator(".side-helpers")).to_have_count(0)
                 await expect(section.locator(".side-children")).to_have_count(0)
-                assert "3 helpers" in (await row.get_attribute("aria-label") or "")
+                assert "Waiting for 1 helper…" in (await row.get_attribute("aria-label") or "")
                 await page.screenshot(path=str(tmp_path / f"agents-{width}-{scheme}.png"))
                 await page.close()
         finally:

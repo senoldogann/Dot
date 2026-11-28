@@ -1,4 +1,9 @@
 {
+  "OpenAI Chat Completions": "a protocol's own name",
+  "OpenAI Responses": "a protocol's own name",
+  "Anthropic Messages": "a protocol's own name",
+  "groq": "an example of a provider's name, typed as it is",
+  "X-Title: Dot": "an example header, typed as it is",
   "${dot > 0 ? name.slice(0, dot) : name}.jpg": "a file name",
   "${uid}-colour": "a catalogue key or an id, not shown as it is",
   "${uid}-expression": "a catalogue key or an id, not shown as it is",
@@ -105,7 +110,7 @@
   "country": "a field's name for the program",
   "cron ${cron}": "an address or a schedule as the program writes it",
   "danger solid": "a class name or a selector, for the program",
-  "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart": "a selector",
+  "details.steps, details.thought, .note, .approval, .agent-handoff, .shown-page, details.restart, .say-first": "a selector",
   "dot ${address}": "the key of a QR code in the page's own cache",
   "dot daemon proof": "a command or a wire value the program uses, never shown as a sentence",
   "dotx browser attach": "a command or a wire value the program uses, never shown as a sentence",

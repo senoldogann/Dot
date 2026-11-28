@@ -21,7 +21,7 @@ from dotagent.agent.peers import Peers
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.browser.types import ActOutcome, PageView, Step, TextView
 from dotagent.config import PaceConfig, load_default_config
-from dotagent.core.errors import ToolInputError
+from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.events import EventBus
 from dotagent.llm.types import ToolCall
 from dotagent.policy.engine import checked_when_tainted, decide
@@ -288,6 +288,28 @@ async def test_an_upload_of_a_file_outside_the_workspace_carries_what_the_file_i
     )
     assert (secret.action.risk, secret.action.flags) == ("high", ("secret_access", "upload"))
     assert decide(secret.action, "task", False, "aggressive", [], None).verdict == "deny"
+
+
+async def test_an_upload_gives_the_page_the_file_it_was_allowed_for_never_one_a_link_leads_to_since(
+    run: tuple[Store, EventBus, RunRecord], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The security review of item 2026: the upload resolved its paths again as it ran, so a link a run's command put in
+    place of a checked file after the check had Dot copy what the link led to, a file the seal of a run nobody started
+    closes among them. The call is classified again as it runs and refused when what it reads changed (``reads`` is
+    part of the action), and it copies the paths it was allowed for, opened with no link followed."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
+    sealed: Path = tmp_path / "sealed.txt"
+    await asyncio.to_thread(sealed.write_text, "sealed\n", encoding="utf-8")
+    checked: Path = tmp_path / "notes.txt"
+    await asyncio.to_thread(checked.write_text, "notes\n", encoding="utf-8")
+    context: ToolContext = _context(run, tmp_path, _gate(run))
+    call: PreparedCall = await _tool("browser_upload").prepare(UPLOAD, context)
+    assert call.action.reads == (str(await asyncio.to_thread(checked.resolve)),)
+    # A command of the run puts a link in the checked file's place before the call runs.
+    await asyncio.to_thread(checked.unlink)
+    await asyncio.to_thread(checked.symlink_to, sealed)
+    with pytest.raises(ToolExecutionError, match=r"changed while it waited|no longer the file that was checked"):
+        await call.run(context)
 
 
 async def _prepare_act(

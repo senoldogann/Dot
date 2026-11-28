@@ -1,9 +1,8 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
-# A new chat's first send opens the one chat screen (item 2025).
-TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
-# The question card like another coding agent's (item 2001).
+# Rules on the phone (item 2055).
+# MS1: the last confirmed contact with the Mac.
 # Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
@@ -11,6 +10,35 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # Activity's skill and plugin proposals (item 2062).
+    "Install a plugin the review rates risky?": "İncelemenin riskli bulduğu eklenti kurulsun mu?",
+    "Use a skill written from outside content?": "Dış içerikten yazılmış beceri kullanılsın mı?",
+    "Use writes this as %@ and puts the others to rest.": "Kullan bunu %@ olarak yazar ve diğerlerini dinlendirir.",
+    "When: %@": "Ne zaman: %@",
+    "A step may come from content others can write. Read it before you use it.": "Bir adım başkalarının yazabildiği içerikten gelmiş olabilir. Kullanmadan önce oku.",
+    "Anthropic or its maker": "Anthropic ya da yapımcısı",
+    "By %@ · %@": "Yayıncı: %1$@ · %2$@",
+    "Community": "Topluluk",
+    "Dot proposes; nothing changes until you choose.": "Dot önerir; sen seçene kadar hiçbir şey değişmez.",
+    "Dropped.": "Bırakıldı.",
+    "In use: the skill's new version is written.": "Kullanımda: becerinin yeni sürümü yazıldı.",
+    "Install": "Kur",
+    "Installed: the tasks that start from now on are offered its skills.": "Kuruldu: bundan sonra başlayan görevlere becerileri sunulur.",
+    "It cannot be used now: %@": "Şu an kullanılamaz: %@",
+    "Merge %@": "Birleştir: %@",
+    "Plugin proposal": "Eklenti önerisi",
+    "Plugin: %@": "Eklenti: %@",
+    "Rewrite %@": "Yeniden yaz: %@",
+    "Settings › Skills and Settings › Plugins": "Ayarlar › Beceriler ve Ayarlar › Eklentiler",
+    "Skill proposal": "Beceri önerisi",
+    "Skills and plugins": "Beceriler ve eklentiler",
+    "Skipped: the scout will not propose it again.": "Atlandı: keşifçi bunu bir daha önermeyecek.",
+    "The review rates its risk high. Read it before you install it.": "İnceleme riskini yüksek buldu. Kurmadan önce oku.",
+    "The review rates its risk medium. Read it before you install it.": "İnceleme riskini orta buldu. Kurmadan önce oku.",
+    "Update: %@": "Güncelleme: %@",
+    "What it does": "Ne yapar",
+    "What it needs": "Neye ihtiyaç duyar",
+    "Why it fits": "Neden uygun",
     # A tool row of Dot's own: cards shown in the chat (item 1967).
     "Show cards": "Kart göster",
     "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",
@@ -279,7 +307,6 @@ TR: dict[str, str] = {
     "Stop %@": "%@ durdur",
     "Stopped": "Durduruldu",
     "Stopping…": "Durduruluyor…",
-    "Subagent": "Alt ajan",
     "The Mac's screen": "Mac'in ekranı",
     "The live screen comes in a later version.": "Canlı ekran sonraki bir sürümde gelecek.",
     "%@, failed": "%@, başarısız",
@@ -964,14 +991,12 @@ TR: dict[str, str] = {
     "Plan %lld/%lld": "Plan %lld/%lld",
     "Plan, %lld of %lld steps done": "Plan, %lld / %lld adım bitti",
     "Waiting for a helper": "Bir yardımcıyı bekliyor",
-    "Waiting on %lld helpers": "%lld yardımcıyı bekliyor",
     "Helpers, %lld of %lld done": "Yardımcılar, %lld / %lld bitti",
     "Browsed dentist.example/booking": "dentist.example/booking sayfasına bakıldı",
     # C2 (items 1768-1769): Dot's own tools' phrases (the web's tr.js), the live work line, Appearance's code and terminal.
     'Finish': 'Bitir',
     'Turn on more actions': 'Daha fazla eylemi aç',
     'Work orders': 'İş emirleri',
-    'Delegate': 'Görev devret',
     'Message agent': 'Ajana mesaj',
     'Ask a helper': 'Yardımcıya sor',
     'Make agent': 'Ajan oluştur',
@@ -1003,7 +1028,6 @@ TR: dict[str, str] = {
     'Wait': 'Bekle',
     'Waiting to start': 'Başlamayı bekliyor',
     'Typing': 'Yazıyor',
-    'Handing a part to a subagent': 'Bir kısmı alt ajana veriyor',
     'Waiting for %@': '%@ bekleniyor',
     'Waiting for you': 'Seni bekliyor',
     'Stopping': 'Durduruluyor',
@@ -1027,9 +1051,6 @@ TR: dict[str, str] = {
     'On: a long line wraps. Off: it scrolls sideways.': 'Açık: uzun satır alta kayar. Kapalı: yana kaydırılır.',
     'Custom font size': 'Özel yazı boyutu',
     'Ran %lld commands': '%lld komut çalıştırdı',
-    'Delegating “%@”': '“%@” devrediliyor',
-    'Delegated task “%@” finished': '“%@” görevi devredildi ve bitti',
-    'Delegated task “%@” failed': '“%@” görevi devredildi, başarısız oldu',
     # G2: Connect apps (items 1861-1862)
     'Connect apps': 'Uygulamaları bağla',
     '%lld connected': '%lld bağlı',
@@ -1195,16 +1216,31 @@ TR: dict[str, str] = {
     # D2: the link in the chat's pill (item 1931).
     "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
     "Syncing messages…": "Mesajlar eşitleniyor…",
-    "your Mac": "Mac",
+    # A chat's tasks (item 2013): the capsule's segment, the sheet, a task's own line, the toast of a routed message.
+    "%lld tasks": "%lld görev",
+    "Tasks": "Görevler",
+    "Waits for you": "Seni bekliyor",
+    "task.stopped": "Durdu",
+    "task.open": "Aç",
+    "A task of %@": "%@ sohbetinin görevi",
+    "Back to the chat": "Sohbete dön",
+    "Started a new task: %@": "Yeni görev başladı: %@",
+    "Sent to %@": "%@ görevine gönderildi",
+    "Stopped every task": "Tüm görevler durduruldu",
+    "Stopped %@": "%@ durduruldu",
+    "Move": "Taşı",
+    "Move to": "Şuraya taşı",
+    "New task": "Yeni görev",
+    "Not moved: %@": "Taşınamadı: %@",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
 EN_PLURALS: dict[str, tuple[str, str]] = {
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
+    "%lld tasks": ("%lld task", "%lld tasks"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),
     "Back, %lld bots unread": ("Back, %lld bot unread", "Back, %lld bots unread"),
-    "Waiting on %lld helpers": ("Waiting on %lld helper", "Waiting on %lld helpers"),
     "Delete %lld chats with everything they hold?": ("Delete %lld chat with everything it holds?", "Delete %lld chats with everything they hold?"),
     "Folded, %lld models": ("Folded, %lld model", "Folded, %lld models"),
     "ran %lld commands": ("ran %lld command", "ran %lld commands"),
@@ -1223,13 +1259,36 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "Goes ahead without asking": "Sormadan ilerler",
+        "Goes ahead, whatever it has read": "Ne okumuş olursa olsun ilerler",
+        "Ask me first": "Önce bana sor",
+        "Leave it to me": "Bana bırak",
+        "No rules yet": "Henüz kural yok",
+        "Never used": "Hiç kullanılmadı",
+        "Add rule": "Kural ekle",
+        "Tool": "Araç",
+        "Pattern": "Desen",
+        "None: it fits every time.": "Yok: her seferinde uyar.",
+        "Used lately": "Son zamanlarda kullanıldı",
+        "Steps decided": "Karar verdiği adımlar",
+        "Only the newest steps were checked.": "Yalnızca en yeni adımlar kontrol edildi.",
+        "When Dot wants to": "Dot şunu yapmak istediğinde",
+        "Describe what Dot wants to do": "Dot'un yapmak istediği şeyi yaz",
+        "Would have matched %lld of %lld steps.": "%2$lld adımın %1$lld tanesiyle eşleşirdi.",
+        "It would decide %lld of them.": "Bunların %lld tanesine karar verirdi.",
+        "Add it": "Ekle",
+        "Change the words": "Sözleri değiştir",
+        "When Dot wants to %@, it should ask me first.": "Dot %@ istediğinde, önce bana sor.",
+        "When Dot wants to %@, it should stop and let me do it.": "Dot %@ istediğinde, dur ve benim yapmama izin ver.",
+        "Dot read your words differently from your choice.": "Dot sözlerinizi seçiminizden farklı okudu.",
+        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
+        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
         "User input needed": "Senden bir cevap bekleniyor",
         "%lld / %lld": "%lld / %lld",
         "Submit answers": "Yanıtları gönder",
         "Default (%@)": "Varsayılan (%@)",
         "Favourite": "Favori",
-        "Can't reach %@": "%@ cihazına ulaşılamıyor",
-        "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
+            "A forgotten note waits %lld days here, then it is deleted for good.": "Unutulan bir not burada %lld gün bekler, sonra kalıcı olarak silinir.",
         "A forgotten note waits here for a while, and can be brought back.": "Unutulan bir not burada bir süre bekler ve geri getirilebilir.",
         "A note you forget waits here, and can be brought back.": "Unuttuğun bir not burada bekler ve geri getirilebilir.",
         "Deleted for good %@.": "Kalıcı olarak silinecek: %@.",
@@ -1628,9 +1687,12 @@ TR.update(
     {
         "%lld min": "%lld dk",
         "%lld s": "%lld sn",
+        "Looking into it…": "Bakıyorum…",
     }
 )
 
+# The expanded composer chip (item 1991)
+TR.update({"Fast": "Hızlı"})
 # A bot's Work group: work orders, objectives and hand-offs, and Pause in the profile's menu.
 TR.update(
     {
@@ -1716,6 +1778,18 @@ TR.update(
 )
 EN_PLURALS.update({"New · %lld lines": ("New · %lld line", "New · %lld lines")})
 EN_PLURALS.update({"%lld days": ("%lld day", "%lld days")})
+# Delegation in plain words (item 2002): never "delegate", "child" or "subagent".
+TR.update(
+    {
+        "Handed to a helper": "Bir yardımcıya verildi",
+        "Handed to a helper: %@": "Bir yardımcıya verildi: %@",
+        "A helper finished: %@": "Bir yardımcı bitirdi: %@",
+        "A helper failed: %@": "Bir yardımcı başarısız oldu: %@",
+        "Helper": "Yardımcı",
+        "Waiting for %lld helpers": "%lld yardımcı bekleniyor",
+    }
+)
+EN_PLURALS.update({"Waiting for %lld helpers": ("Waiting for %lld helper", "Waiting for %lld helpers")})
 # Chat settings as inset groups, the capsule without a spinner (the owner's report of 2026-11-27).
 
 # HS1 (2026-11-27): empty states in the app's own type.
@@ -1746,3 +1820,23 @@ TR.update(
         "stopped": "durduruldu",
     }
 )
+
+# A new chat's first send opens the one chat screen (item 2025).
+TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+# A bot's Model page (item 2074).
+TR.update({"For chats that have no model of their own": "Kendi modeli olmayan sohbetler için"})
+
+# PN1: remote task alerts and the Live Activity.
+TR.update({
+    "A task is done": "Bir görev bitti",
+    "A task failed": "Bir görev başarısız oldu",
+    "A task is blocked": "Bir görev ilerleyemedi",
+    "Dot asks for approval": "Dot onay istiyor",
+    "Dot has a question": "Dot'un bir sorusu var",
+    "Dot needs your help": "Dot'un yardımınıza ihtiyacı var",
+    "Open Dot to see it.": "Görmek için Dot'u açın.",
+    "Dot is working": "Dot çalışıyor",
+    "Starting…": "Başlıyor…",
+    "Your Mac remembers which task notifications to send to this phone.": "Mac’iniz bu telefona hangi görev bildirimlerini göndereceğini hatırlar.",
+    "Done, failed or blocked": "Bitti, başarısız oldu veya ilerleyemedi",
+})

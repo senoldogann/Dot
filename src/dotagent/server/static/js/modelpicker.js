@@ -552,7 +552,8 @@ export function modelPicker({ onPick, onMakeDefault }) {
  * The models as a phone's chat settings show them (item 1202, after another assistant's thread settings): the blank
  * row of the daemon's default first, with Change, then the favourites, then a section per provider that opens and
  * folds, each row with a tick on the one chosen and a star; a search at the sheet's foot narrows them to one list,
- * closest first. `build({ groups, chosen, fallback, blank })` takes what `modelPicker`'s does and returns
+ * closest first. `build({ groups, chosen, fallback, blank, blankHint })` takes what `modelPicker`'s does, and the line
+ * under the blank row (`blankHint`, null for none), and returns
  * `{ list, search }`: the element of the sections, painted again as the search changes, and the search's field for the
  * foot. `onPick(ref)` runs when a row is picked ("" for the blank one). Change turns the list to choosing the daemon's
  * default, as `modelPicker`'s does (item 209): a row picked then goes to `onMakeDefault(ref)`, which resolves to whether
@@ -608,7 +609,7 @@ export function modelSections({ onPick, onMakeDefault }) {
     paintBuilt();
   });
 
-  function build({ groups, chosen, fallback, blank }) {
+  function build({ groups, chosen, fallback, blank, blankHint }) {
     if (root === null || !root.isConnected) {
       query = "";
       folded = new Map();
@@ -711,7 +712,7 @@ export function modelSections({ onPick, onMakeDefault }) {
         el(
           "button",
           { class: "sheet-row model-sheet-option", type: "button", role: "option", "aria-selected": String(chosen === ""), onclick: () => onPick("") },
-          el("span", { class: "sheet-row-text" }, el("span", null, blank)),
+          el("span", { class: "sheet-row-text" }, el("span", null, blank), blankHint === null ? null : el("span", { class: "sheet-row-hint" }, blankHint)),
           icon("check"),
         ),
         fallback === null

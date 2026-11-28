@@ -444,7 +444,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
 
   function modelArgs() {
     const fallback = defaultRefOf(getSnapshot());
-    return { groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) };
+    return { groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback), blankHint: null };
   }
 
   // On a phone the model's pill opens the chat's settings instead (item 1202, the owner's ask after another
@@ -493,10 +493,14 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     );
     const plan = isChat
       ? null
-      : sheetSwitch({ label: t("options.planFirst"), hint: t("choices.planFirstNext"), on: frame.picks.planFirst(), onToggle: () => {
+      : sheetSwitch({
+          label: t("options.planFirst"),
+          hint: t("choices.planFirstNext"),
+          on: frame.picks.planFirst(),
+          // The sheet is painted again so that its switch says the new state, as Fast mode's is (pickSpeed).
+          onToggle: () => {
             frame.picks.setPlanFirst(!frame.picks.planFirst());
-            // The picks tell the composer, not this sheet: it is drawn again so the switch says what was picked.
-            modelMenu.repaint();
+            repaintSettings();
           },
         });
     const models = sections.build(modelArgs());

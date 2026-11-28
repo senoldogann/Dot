@@ -50,6 +50,29 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// The round "↓" beside the bottom capsule (item 1991): it is absent while the chat stands at its end, comes once the owner
+    /// scrolls up, and a tap on it scrolls to the end, follows again and hides it.
+    @MainActor
+    func testTheJumpButtonComesWhenTheOwnerScrollsUpAndLeavesWithATap() {
+        let app: XCUIApplication = launch("n2-failed", defaults: [])
+        let jump: XCUIElement = app.buttons["chat.scrollToBottom"]
+        let message: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 10))
+        XCTAssertFalse(jump.exists, "at the end there is no button")
+        let scroll: XCUIElement = app.scrollViews.firstMatch
+        for _ in 0..<3 { scroll.swipeDown(velocity: .fast) }
+        XCTAssertTrue(jump.waitForExistence(timeout: 5), "scrolled up, the button comes")
+        XCTAssertGreaterThanOrEqual(jump.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(jump.frame.height, 44)
+        let attachment: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "jump-button"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        jump.tap()
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: jump)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "at the end again, the button leaves")
+    }
+
     /// The swipe to quote beats the navigation's pull-back (item 2030): iOS 26 pulls a pushed chat back from a swipe to the
     /// right anywhere in it, which a swipe on a message is. On a message of the owner's and of Dot's, from the middle of the
     /// screen, the message is quoted and the chat stays open; a swipe from the screen's edge still goes back.
@@ -75,7 +98,8 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(answer.waitForExistence(timeout: 10))
         drag(answer, by: 200)
         XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on Dot's message quotes it")
-        XCTAssertTrue(chip.label.contains("merged"), chip.label)
+        // The whole message is quoted and the chip shows its first line, the answer's "## Fixed" heading.
+        XCTAssertTrue(chip.label.contains("Fixed"), chip.label)
         XCTAssertFalse(home.exists, "the chat is still open")
         app.buttons["composer.quote.remove"].tap()
 
@@ -129,12 +153,12 @@ final class ChatUITests: XCTestCase {
         XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
     }
 
-    /// The owner's report of 2026-11-27: the capsule says "Waiting on N helpers" only while the main run has stopped for
+    /// The owner's report of 2026-11-27: the capsule says "Waiting for N helpers" only while the main run has stopped for
     /// them (`n2-helpers`: its step's one open call is a delegate); while it works beside its helper (`n2-chat`) it says
     /// "Working". No spinner on either, and the status takes only its words' width, so that Stop, the plan and the helpers
     /// keep their room.
     func testTheCapsuleSaysWaitingOnlyWhileTheRunWaitsAndSpinsNothing() {
-        for (scene, words) in [("n2-helpers", "Waiting on 1 helper"), ("n2-chat", "Working, ")] {
+        for (scene, words) in [("n2-helpers", "Waiting for 1 helper"), ("n2-chat", "Working, ")] {
             let app: XCUIApplication = launch(scene)
             let status: XCUIElement = app.buttons["capsule.status"]
             XCTAssertTrue(status.waitForExistence(timeout: 10), scene)
@@ -657,6 +681,20 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// Item 2018: Dot's first words stand under the owner's message as one of its short messages, with the steps shown and
+    /// with Show steps off.
+    func testTheFirstWordsStandUnderTheOwnersMessageWithAndWithoutTheSteps() {
+        for defaults in [["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", "{}"], ["-showSteps", "NO", "-stepsOverrides", "{}"]] {
+            let app: XCUIApplication = launch("n2-chat", defaults: defaults)
+            let words: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Looking at next week's calendar first.")).firstMatch
+            // The chat opens at its newest words; the first words stand near the run's start, above them.
+            for _ in 0..<6 where !words.waitForExistence(timeout: 2) { app.swipeDown() }
+            for _ in 0..<6 where !words.exists { app.swipeUp() }
+            XCTAssertTrue(words.waitForExistence(timeout: 15), "\(defaults): the first words")
+            app.terminate()
+        }
+    }
+
     /// Item 1932: the asks scene settles: once it stood still for a few seconds, the screen is not drawn again (its
     /// scroll followed the lazy stack's own height estimates in a loop, at 100 % CPU).
     func testTheAsksSceneSettles() {
@@ -671,14 +709,13 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
-    /// Item 1931 and the owner's report of 2026-11-27: with no link, the capsule says Offline in the status's place once
-    /// it lasted a few seconds, and offers no Stop; the header keeps the bot's face and name, no link words.
-    func testThePillSaysOfflineWithoutALink() {
+    /// A lasting outage shows the last contact in the capsule without adding link text to the header.
+    func testThePillShowsTheLastContactWithoutALink() {
         let app: XCUIApplication = launch("n2-offline-saved")
         let link: XCUIElement = app.buttons["capsule.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
-        XCTAssertEqual(link.label, "Offline")
-        for words in ["Syncing", "Reconnecting", "Offline ·"] {
+        XCTAssertEqual(link.label, "Mac asleep or unreachable since 14:05")
+        for words in ["Syncing", "Reconnecting", "Mac asleep or unreachable"] {
             XCTAssertFalse(
                 app.navigationBars.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", words)).firstMatch.exists, "no link words in the header: \(words)")
         }
@@ -687,6 +724,12 @@ final class ChatUITests: XCTestCase {
         shot.name = "pill-offline"
         shot.lifetime = .keepAlways
         add(shot)
+
+        app.terminate()
+        let list: XCUIApplication = launch("n2-offline-list")
+        let listLink: XCUIElement = list.staticTexts["chats.link"]
+        XCTAssertTrue(listLink.waitForExistence(timeout: 15))
+        XCTAssertEqual(listLink.label, "Mac asleep or unreachable since 14:05")
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {

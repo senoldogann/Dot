@@ -136,12 +136,13 @@ final class ChatWordsTests: XCTestCase {
     /// Item 1931 and the owner's report of 2026-11-27: only a lasting problem is told, never a reconnection that mends or
     /// a chat being brought up to date.
     func testTheCapsulesLinkLineIsALastingProblemOnly() {
-        XCTAssertEqual(linkLine(transport: .offline, mac: "MacBook Air"), .offline)
-        XCTAssertEqual(linkLine(transport: .reconnecting(attempt: 2), mac: "MacBook Air"), .unreachable(mac: "MacBook Air"))
-        XCTAssertNil(linkLine(transport: .up, mac: "MacBook Air"), "a healthy stream says nothing, whatever the chat's sync")
-        XCTAssertNil(linkLine(transport: .connecting, mac: "MacBook Air"), "the first connection says nothing")
-        XCTAssertNil(linkLine(transport: .keyRefused, mac: "MacBook Air"), "a refused key is the chat's notice")
-        XCTAssertTrue(LinkLine.unreachable(mac: "MacBook Air").words.contains("MacBook Air"), "the paired Mac by its name, in the phone's language")
+        let known: LinkLine = LinkLine(lastContact: 1_700_000_000)
+        XCTAssertEqual(linkLine(transport: .offline, lastContact: known.lastContact), known)
+        XCTAssertEqual(linkLine(transport: .reconnecting(attempt: 2), lastContact: known.lastContact), known)
+        XCTAssertNil(linkLine(transport: .up, lastContact: known.lastContact))
+        XCTAssertNil(linkLine(transport: .connecting, lastContact: known.lastContact))
+        XCTAssertNil(linkLine(transport: .keyRefused, lastContact: known.lastContact))
+        XCTAssertEqual(linkLine(transport: .offline, lastContact: nil), LinkLine(lastContact: nil))
         XCTAssertEqual(linkLineDelay, .seconds(5), "a problem shows once it lasted a few seconds")
     }
 
@@ -154,6 +155,25 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(toolLine(captionEntry(call)), toolLine(row))
         XCTAssertEqual(toolSymbol(captionEntry(call).kind), toolSymbol(row.kind))
         XCTAssertEqual(toolSymbol(captionEntry(HelperStep(tool: "desktop_act", target: "", line: "", at: 0)).kind), "cursorarrow.click")
+    }
+
+    /// Item 2002: work handed to a helper is said in plain words with the helper's title, in the phone's language;
+    /// never "delegate", "child" or "subagent".
+    func testHandedWorkIsSaidInPlainWords() {
+        let banned: [String] = ["delegat", "subagent", "child", "alt ajan", "devret"]
+        let goal: String = "Check the dentist's free slots. Then say which suit."
+        let line: String = callPhrase(HelperStep(tool: "delegate", target: goal, line: "", at: 0))
+        XCTAssertTrue(line.contains("Check the dentist's free slots"), line)
+        XCTAssertFalse(line.contains("Then say"), "the helper's short title, not its whole goal: \(line)")
+        let rows: [String] = [
+            toolLine(ToolEntry(id: "d", tool: "delegate", kind: .helper, target: goal, args: "", output: "", state: .running, images: [], startedAt: 0, endedAt: 1)),
+            toolLine(ToolEntry(id: "d", tool: "delegate", kind: .helper, target: goal, args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1)),
+            toolLine(ToolEntry(id: "d", tool: "delegate", kind: .helper, target: goal, args: "", output: "", state: .failed, images: [], startedAt: 0, endedAt: 1)),
+        ]
+        for words in [line, callPhrase(HelperStep(tool: "delegate", target: "", line: "", at: 0)), dotToolWords("delegate") ?? ""] + rows {
+            for word in banned { XCTAssertFalse(words.lowercased().contains(word), "\(word) in \(words)") }
+        }
+        XCTAssertFalse(BackgroundKind.subagent.word.lowercased().contains("subagent"))
     }
 
     /// Item 2025: a new chat's outbox key is never opened as a stream (the daemon would answer 404 and the chat read as

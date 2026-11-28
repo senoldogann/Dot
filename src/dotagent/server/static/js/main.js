@@ -17,7 +17,7 @@ import { wireConversationCopy } from "./clipboard.js";
 import { el, OPEN_FILE_EVENT } from "./dom.js";
 import { listenForHolds } from "./messagesheet.js";
 import { explain } from "./errors.js";
-import { t } from "./i18n.js";
+import { t, uiLanguage } from "./i18n.js";
 import { fileDialog } from "./filepanel.js";
 import { icon, wordmark } from "./icons.js";
 import { buildShell } from "./shell.js";
@@ -303,7 +303,7 @@ function renderSignIn(message, keyFailed = false, refused = false) {
   // A key that Dot refused is said in the line's own words, with the way to pair again (item 1524): the code's field. The
   // line is a phone's, and the style shows it on a touch screen alone (shell.css): a touch screen can reach the page
   // after its first frames, when this is drawn, as the phone browser tests saw (item 966).
-  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: true, now: Date.now() }) : null;
+  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, lastContact: null, refused: true, now: Date.now() }) : null;
   const refusedLine =
     said === null
       ? null
@@ -890,7 +890,7 @@ followBarColour();
 // The service worker keeps the shell files for when the Mac is out of reach and shows the pushes of the daemon; a
 // browser that has none (or an insecure address) simply has neither.
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch((error) => console.warn("the service worker could not be registered", error));
+  navigator.serviceWorker.register(`sw.js?lang=${uiLanguage()}`).catch((error) => console.warn("the service worker could not be registered", error));
   // A tap on a notification brings this window to the front and tells it the route to open (sw.js, item 1070): the
   // chat that asks, or the page the notification is about. Only Dot's own worker, of this origin, says so.
   navigator.serviceWorker.addEventListener("message", (event) => {

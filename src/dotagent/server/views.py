@@ -8,6 +8,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 from dotagent.agent.account import RunAccount
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
 from dotagent.agent.authorization import StepDecision
+from dotagent.agent.chat_choices import MessageChoices
 from dotagent.agent.lanes import RoutedMessage
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import Disliked, RunLessons
@@ -20,10 +21,14 @@ from dotagent.agent.welcome import LANGUAGE_CHARS
 from dotagent.browser.look import PageLook
 from dotagent.browser.profiles import ProfileKind, ProfileView
 from dotagent.config import (
+    CUSTOM_MODELS_MAX,
     SHOWN_NAME,
     AfterRun,
     BrowserProfileName,
     BudgetConfig,
+    CustomModel,
+    CustomProtocol,
+    CustomProviderConfig,
     DebugPort,
     JudgeProvider,
     ModelReference,
@@ -446,7 +451,8 @@ MessageKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{16,64}$")]
 
 
 class StartRunRequest(FrozenModel):
-    """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones; ``speed``
+    """Start a run. ``mode``, ``model``, ``effort``, ``speed``, ``approvals`` and ``goal_mode`` left out take the chat's
+    for a message to a chat (``thread_id``, item 2071), else the configured ones; ``speed``
     is ``fast`` for fast mode, on a model that has it (item 223); ``once`` is a choice for this message only (item 251):
     ``ultrathink`` asks the model for its Max level, ``ultracode`` for its Extra high level and tells the run to split
     its independent parts across delegated runs, while the chat keeps ``effort``. ``plugins``, ``skills`` and
@@ -544,7 +550,7 @@ class SteerRequest(FrozenModel):
 
 class QueueMessageRequest(FrozenModel):
     """Put a message in a chat's queue (item 148), with the choices of the run it starts; those left out take the
-    configured ones then, as for ``StartRunRequest``."""
+    chat's (item 2071), as for ``StartRunRequest`` with a ``thread_id``."""
 
     text: str = Field(min_length=1, max_length=_GOAL_CHARS)
     mode: ChatMode = "task"
@@ -561,6 +567,18 @@ class QueueMessageRequest(FrozenModel):
     accounts: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_ACCOUNTS)
     plan_first: bool = False
     key: MessageKey | None = None
+
+
+def sent_choices(request: StartRunRequest | QueueMessageRequest) -> MessageChoices:
+    """The choices a message's request names, as :func:`dotagent.agent.chat_choices.message_choices` takes them."""
+    return MessageChoices(
+        mode=request.mode,
+        model=request.model,
+        effort=request.effort,
+        speed=request.speed,
+        approvals=request.approvals,
+        goal_mode=request.goal_mode,
+    )
 
 
 def picks_of(plugins: Sequence[str], skills: Sequence[str], accounts: Sequence[str], plan_first: bool) -> RunPicks:
@@ -619,6 +637,32 @@ class QueueView(FrozenModel):
     beside_thread_id: str | None = None
     # Where a message sent to a chat with several tasks went (item 2012); none for any other message.
     routed: RoutedMessage | None = None
+
+
+TaskState = Literal["working", "waits", "ended"]
+
+
+class ChatTaskView(FrozenModel):
+    """A task of a chat with several (item 2013), as the pages and the phone list it: its thread (the chat's own, or
+    a lane), its title, its newest run and that run's status, whether it works, waits for the owner or ended, and
+    whether it is the chat's own."""
+
+    thread_id: str
+    title: str
+    run_id: str
+    status: RunStatus
+    state: TaskState
+    own: bool
+
+
+class TasksView(FrozenModel):
+    """The tasks of a chat (item 2013): the chat, its title, how many tasks may work at once (``[agent]
+    chat_tasks``: 1 means a message never starts a task of its own), and its tasks, none while it has no lane."""
+
+    chat_id: str
+    chat_title: str
+    cap: int
+    tasks: list[ChatTaskView]
 
 
 class MoveRequest(FrozenModel):
@@ -2248,6 +2292,47 @@ class KeysView(FrozenModel):
 
     env_file: str
     keys: list[KeyView]
+
+
+class CustomProviderView(FrozenModel):
+    """A custom provider as Settings shows it (item 1949): its table of ``[providers.custom]`` and whether its
+    key is set (``key_set``; ``False`` when it takes none). The key itself never leaves the daemon."""
+
+    name: str
+    config: CustomProviderConfig
+    key_set: bool
+
+
+class CustomProvidersView(FrozenModel):
+    providers: list[CustomProviderView]
+
+
+class CustomProviderRequest(FrozenModel):
+    """A custom provider to add or change (item 1949): ``config`` as its table will be, but for its key's name,
+    which the daemon gives (``needs_key``: whether it takes a key at all)."""
+
+    base_url: str = Field(min_length=1, max_length=2000)
+    protocol: CustomProtocol
+    needs_key: StrictBool
+    headers: dict[str, str] = Field(max_length=20)
+    models: list[CustomModel] = Field(max_length=CUSTOM_MODELS_MAX)
+    list_models: StrictBool
+
+
+class CustomTestRequest(FrozenModel):
+    """One small real call to a provider as the form holds it (item 1949): ``key`` typed in the form and not yet
+    saved, or ``None`` for the one saved for ``name``; ``model`` the model to ask, ``""`` for its list of models."""
+
+    name: str = Field(min_length=1, max_length=32)
+    provider: CustomProviderRequest
+    key: str | None = Field(min_length=1, max_length=_KEY_CHARS, pattern=r"^[!-~]+$")
+    model: str = Field(max_length=200)
+
+
+class DocsRequest(FrozenModel):
+    """The address of a provider's documentation page, to propose its fields from (item 1949)."""
+
+    url: str = Field(min_length=1, max_length=2000, pattern=r"^https?://")
 
 
 class RestartPending(FrozenModel):

@@ -52,9 +52,9 @@ hook_hosts = []
 keep_awake = false
 
 [daemon]
-# Whether the daemon keeps the Mac from idle sleep while Dot works (caffeinate -i, item 1671): from the first run,
-# schedule run or meeting at work until keep_awake_after_s seconds after the last one ended, on power and on battery.
-# The display still sleeps, and a closed lid still puts a MacBook to sleep. `dotx service status` says when it holds.
+# Prevent idle sleep (caffeinate -i) while Dot works and shortly before a routine or watcher is due, on power and on
+# battery. The hold lasts keep_awake_after_s seconds after it is last needed. The display can still sleep.
+# `dotx service status` says when the hold is active.
 keep_awake = true
 keep_awake_after_s = 60
 
@@ -239,6 +239,17 @@ read_timeout_s = 600.0
 attempts = 6
 max_concurrent = 4
 
+[providers.custom]
+# Providers you add (docs/models.md, Settings › AI services › Add provider): a server that speaks OpenAI's Chat
+# Completions ("chat"), OpenAI's Responses ("responses") or Anthropic's Messages ("messages"). The table's name is the
+# prefix of its models: "groq:llama-4-scout" for example.
+# [providers.custom.groq]
+# base_url = "https://api.groq.com/openai/v1"   # https, or http://localhost for a server on this Mac
+# protocol = "chat"
+# api_key_env = "DOT_CUSTOM_GROQ_API_KEY"       # "" for a server that takes no key
+# models = [{ id = "llama-4-scout", tools = true, vision = true, context = 131072, max_output = 8192 }]
+# list_models = false                           # true: also the models its GET /models lists
+
 [judge]
 # The typed judge answers two questions where code has no answer of its own, each with the probability of yes. Does a
 # click on a browser control whose label no pattern of the policy knows publish, send, pay or delete? At or above
@@ -377,11 +388,17 @@ checkpoint_steps = 40
 # that is part of the work under way, or that cannot be told, waits in the chat's queue as before (item 915, after
 # DeepSeek Harness's Super-agent design: a new request never waits for the work under way). false: every message waits.
 busy_parallel = true
+# A task you start in a chat says its first words at once ("Looking into it…"), then a line of the fast model ([models]
+# fast) of what it looks at first, written from your message alone while the task gets ready and takes its first step,
+# unless the task has spoken by then (item 2018). The line costs one short call of the fast model a task and nothing of
+# the task's own steps; a schedule's, a helper's or a review's task has none. false: no first words.
+first_words = true
 # How many tasks work at once in one chat, the chat's own run included (item 1984). Above 1, a request of its own
 # (busy_parallel) starts in a lane of the chat, a thread of its own the chat list does not show, rather than in a chat
 # of its own, given what the chat said so far; the answer to a question card goes to the task that asked even when
 # another run works on its thread then; and POST /api/threads/{id}/stop stops every task of the chat. 1 keeps one run
-# at a time. The pages do not show lanes yet (item 1982's slice 3), so 1 is the default.
+# at a time, the default: the owner switches several on in their own config.toml (5, their word of 2026-11-27); the
+# pages and the phone list a chat's tasks (item 2013).
 chat_tasks = 1
 # A reply without a tool call is nudged towards finish; the finish_nudges + 1st such reply in a row ends a task run with
 # that reply as its result (a step with tool calls starts the count again). A reply the model service cut short (its

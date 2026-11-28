@@ -62,6 +62,7 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | Harness | `harness.js` | Self-improvement around the model: the harness and what it changes. |
 | Self-repair | `repair.js` | The problems Dot found in its own record and the Claude Code sessions that fixed them. |
 | Providers | `keys.js` | The model providers and the judge's service. |
+| Providers | `customProvider.js` | The form that adds or changes a custom provider (item 1949). |
 | Channels | `channels.js` | The owner's messaging apps as ways to reach Dot. |
 | Hooks | `hooks.js` | Addresses a service calls, signed, to start a scheduled task or a bot ([Hooks](hooks.md)). |
 | Phone | `phone.js` | Dot on a phone through Tailscale, a step at a time. |
@@ -134,11 +135,10 @@ newest 400 and says that some steps are not shown (`views/run.js`, `afterTheGap`
 `js/sseframes.js` (item 1522: a connection that answers nothing in 8 s and a stream that says nothing in 35 s are dropped
 and made again, after 0.5, 1, 2, 4, 8 and 15 s, from the last event, with `Last-Event-ID`). What is done with no link is
 kept by `js/outbox.js` (the rules are `js/outboxrules.js`) and shown under the chat by `js/outboxrows.js`: a message as
-*Waiting to send* with Retry now and Edit, sent once with its key when the link is back (item 1523). The line under the
-bar (`js/connectionline.js`, in the bar's own header, a row of its own for *Offline* and a refused key, floating over the room
-under the bar for *Can't reach Dot* so that nothing read moves; the words are `js/linewords.js`) says *Offline: showing saved chats,
-last updated 3 min ago*, *Offline: 2 waiting to send*, *Can't reach Dot* or *This phone's key was refused* (item 1524), and a
-failed request shows no toast over the chat while it does. See [On a bad link: the web app](phone.md).
+*Waiting to send* with Retry now and Edit, sent once with its key when the link is back (item 1523). Desktop and phone
+browsers show *Mac asleep or unreachable since HH:MM* under the bar during a lasting daemon outage. The line floats
+without moving the conversation. On phones, *Offline* and a refused key
+take their own row in the bar. See [On a bad link: the web app](phone.md).
 
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)
 
@@ -150,7 +150,7 @@ quiet line each. The modules of the conversation and the panel, and what each ho
 | Module | What it draws |
 |---|---|
 | `timeline.js` | The turn by turn flow; a group of helpers is one card (`buildFlock`): faces, "2 helpers", "2 working" in blue, the time, and a row each (`childScope`): the job, what it does now (`callPhrase` of `workstatus.js`), its state in a word beside the time. |
-| `capsule.js` | The bar over the composer, whose status says "Waiting on 2 helpers" only while the run has stopped for them (`waitsOnHelpers` in `waitcounts.js`) and no spinner, and above it the line of what the first helper does now with Details and Stop; once the run was released from its wait (a message of yours, item 1351) the line says "2 helpers keep working in the background" (`waitcounts.js` counts which). A pane in the dock on the bar's own ground (item 1347). A window wider than a phone's (721 px up) draws it; a phone's chat draws `dockbar.js` instead. |
+| `capsule.js` | The bar over the composer, whose status says "Waiting for 2 helpers" only while the run has stopped for them (`waitsOnHelpers` in `waitcounts.js`) and no spinner, and above it the line of what the first helper does now with Details and Stop; once the run was released from its wait (a message of yours, item 1351) the line says "2 helpers keep working in the background" (`waitcounts.js` counts which). A pane in the dock on the bar's own ground (item 1347). A window wider than a phone's (721 px up) draws it; a phone's chat draws `dockbar.js` instead. |
 | `dockbar.js`, `dockwords.js` | A phone's one row over the composer (item 1383): a capsule of glass whose segments are the run's status with its Stop, the plan, helpers, loops, the queue and the commands at work, each there only while it has something to say, with the round way down beside it. `dockwords.js` says which segments there are and their words from what the page knows (pure, `tests/js/dockwords.test.js`); `dockbar.js` draws them and says fewer words, step by step, until the row fits (never a scroll). |
 | `docksheet.js` | The one sheet of a phone's chat: a segment of the capsule opens its detail from the foot of the screen, one at a time, closed by a tap outside, Escape, its handle or a swipe down. The queue, the loops and the commands at work stand in it as the very panes (`queue.js`, `loops.js`, `background.js`) that stay over the composer on a computer; the helpers and the plan are drawn from their words. |
 | `inspector.js` | The side panel, closed by default: one rounded card in two parts, a head that stays (the tabs as a segmented switch, and on a phone the grabber and Close) and a body that scrolls (`.inspector-body`), whose sections each have a small sticky head (`.panel-section-head`: title, count, buttons on one line) over tight rows on the 8 px scale. A sheet from the foot on a phone. |

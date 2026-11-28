@@ -25,13 +25,15 @@ test("each Turkish sentence fills the places its English one fills, and none is 
   }
 });
 
-test("a helper is a yardımcı in every Turkish line, never an alt ajan: the owner's plain word, as the iPhone app says it (item 2011)", () => {
-  const named = Object.entries(EN).filter(([, english]) => /\bhelpers?\b/i.test(english));
-  assert.ok(named.length >= 8, "the lines that name a helper are found");
+test("work handed on is a helper's in plain words, never a subagent, a child or a delegate (item 2002)", () => {
   for (const [key, english] of Object.entries(EN)) {
-    assert.doesNotMatch(english, /subagent/i, key);
-    assert.doesNotMatch(TR[key], /alt ajan/i, key);
+    assert.doesNotMatch(english, /subagent|child task|child run|(?<!\{)\bdelegat/i, key);
+    assert.doesNotMatch(TR[key], /alt ajan|alt görev|devret/i, key);
   }
+  assert.equal(EN["capsule.waitMany"], "Waiting for {count} helpers");
+  assert.equal(TR["capsule.waitMany"], "{count} yardımcı bekleniyor");
+  assert.equal(EN["tools.delegate"], "Handed to a helper");
+  assert.equal(TR["tools.delegate"], "Bir yardımcıya verildi");
 });
 
 test("a page that chose no language reads English, its dates as Dot's English writes them", () => {

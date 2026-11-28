@@ -41,6 +41,8 @@ here points at a test that no longer exists.
 - `tests/smoke/test_work_orders_page.py::test_a_next_step_written_after_outside_content_is_marked` — the Agents page and the
   phone's bot profile showed an objective's next step with no outside-words mark: the step has its own flag, which the mark
   left out (item 2009's review).
+- `tests/unit/test_first_words.py::test_a_fault_of_the_first_words_is_logged_not_lost` — the first words are a task
+  nothing awaits, so a fault that was no error of Dot's was dropped with no line in the log (item 2018's review).
 - `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
   on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
   chat deleted (item 1962's review).
@@ -59,6 +61,7 @@ here points at a test that no longer exists.
 - `tests/unit/test_css_tokens.py::test_the_daemon_page_tells_the_conversation_once_and_with_no_bubble_on_a_phone` — a
   rebase left `docs/daemon.md` with two copies of the conversation paragraph, one from before the new look (an 18 px
   corner, a quiet ring) and one that still said Dot's words sit in a soft bubble on a phone (item 1335's review).
+- `tests/smoke/test_work_awake.py::test_a_work_check_that_keeps_failing_lets_a_hold_run_out` — a work check that raised kept the Mac awake with no end, and logged a traceback every tick
 - `tests/unit/test_css_tokens.py::test_every_comment_of_a_sheet_closes_where_it_opens` — a merge left a line of a comment under one that had closed it, so the browser read the words as a selector and dropped the rule after it (item 1335).
 - `tests/smoke/test_panel_automations.py::test_the_task_tab_lists_the_chats_schedules_and_loops_and_switches_and_runs_them` — the
   pencil of a chat's Automations linked to `#/settings/schedules/<id>`, which no route matches, so a press dropped the
@@ -223,6 +226,14 @@ here points at a test that no longer exists.
 - `tests/unit/test_freedom_contract.py::test_the_owner_is_asked_in_the_places_the_contract_names_and_no_others` — a tool that
   calls the approval broker itself asks the owner whatever the gate waives, in yolo and free mode too: a new place is a
   new ask (item 1561).
+
+- `tests/unit/test_custom_providers.py::test_a_custom_model_stands_in_the_standby_and_helper_roster_by_its_own_key` — a
+  custom provider's model in `[models] standby` or `helpers` raised "unknown provider" in the roster (item 1949).
+- `tests/smoke/test_custom_providers.py::test_the_api_refuses_a_header_that_carries_a_key_and_a_built_in_name` — a
+  table that stopped taking a key and took it again at a new address sent the key saved for the old one there, through
+  Save and Test (item 1949's security review), and a key under that name in the environment was attached to an address
+  by Save (its second pre-push review), and a Keychain item under that name, uncovered once Dot's copy was dropped,
+  would have been sent to the new address (its third).
 
 ## Evidence and format
 

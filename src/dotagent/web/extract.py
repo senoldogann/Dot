@@ -150,12 +150,13 @@ async def extract(
     fast_model: str,
     timeout_s: float,
     session_key: str,
-    run_id: str,
+    run_id: str | None,
     source: str,
     text: str,
     fields: Sequence[FieldSpec],
 ) -> Extraction:
-    """Ask ``fast_model`` for ``fields`` of ``text`` and check its answer. A model that does not call the tool, or
+    """Ask ``fast_model`` for ``fields`` of ``text`` and check its answer, for the run ``run_id`` (``None`` outside
+    any run). A model that does not call the tool, or
     calls it with arguments that are not valid JSON, is a protocol error; one that does not answer in time a
     transport error."""
     ref: ModelRef = parse_model_ref(fast_model)

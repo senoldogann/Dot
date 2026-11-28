@@ -14,6 +14,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
+from link_state import until_broken, until_live
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -271,14 +272,14 @@ async def test_a_page_open_while_the_daemon_restarts_comes_back_by_itself_and_re
 
             # The daemon stops; while it is down a chat is made, and it starts again at the same address.
             await daemon.stop()
-            await expect(page.locator(".live-dot.reconnecting")).to_be_visible()
+            await until_broken(page, 5_000)
             await page.screenshot(path=str(tmp_path / "restart-reconnecting-1280-light.png"), animations="disabled")
             await _chat(runtime, "Name the folders.")
             await asyncio.sleep(_RESTART_S)
             await daemon.start()
 
             # The page is live again by itself, shows the chat made meanwhile, and was not loaded again.
-            await expect(page.locator(".live-dot.live")).to_be_attached(timeout=_BACK_WAIT_MS)
+            await until_live(page, _BACK_WAIT_MS)
             await expect(_chat_row(page, "Name the folders.")).to_be_visible()
             assert await page.evaluate("() => window.dotStayed === true")
             assert errors == []
@@ -301,7 +302,7 @@ async def test_a_page_loaded_while_the_daemon_is_down_tries_again_by_itself(
 
             # Loaded while the daemon is down, the page says that it cannot reach it and when it tries again.
             await daemon.stop()
-            await expect(page.locator(".live-dot.reconnecting")).to_be_visible()
+            await until_broken(page, 5_000)
             await page.reload()
             await expect(page.get_by_text("Could not reach Dot")).to_be_visible()
             await expect(page.get_by_text("this page tries again by itself")).to_be_visible()
@@ -328,20 +329,20 @@ async def test_a_page_back_in_view_or_back_on_the_network_tries_at_once(runtime:
 
             # The daemon is down long enough for the stream's pause between tries to grow to its longest.
             await daemon.stop()
-            await expect(page.locator(".live-dot.reconnecting")).to_be_visible()
+            await until_broken(page, 5_000)
             await asyncio.sleep(_LONGEST_PAUSE_AFTER_S)
             await _chat(runtime, "Book the rooms.")
             await daemon.start()
 
             # Back in view, as after the Mac woke, the page tries at once and reads what changed.
             await page.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
-            await expect(page.locator(".live-dot.live")).to_be_attached(timeout=_AT_ONCE_MS)
+            await until_live(page, _AT_ONCE_MS)
             await expect(_chat_row(page, "Book the rooms.")).to_be_visible()
 
             # Loaded while the daemon is down, the page waits longer each time it finds it down; back on the network,
             # it tries at once.
             await daemon.stop()
-            await expect(page.locator(".live-dot.reconnecting")).to_be_visible(timeout=_TOLD_AFTER_RETURN_MS)
+            await until_broken(page, _TOLD_AFTER_RETURN_MS)
             await page.reload()
             await expect(page.get_by_text(re.compile(r"Trying again in [78] s\."))).to_be_visible(timeout=_BACK_WAIT_MS)
             await _chat(runtime, "Pack the bags.")
@@ -365,7 +366,7 @@ async def test_a_stream_gone_silent_is_cut_and_followed_again(runtime: Runtime) 
         try:
             page, errors = await _page(browser, proxy.port, 1280, "dark")
             await expect(_chat_row(page, "Count the files.")).to_be_visible()
-            await expect(page.locator(".live-dot.live")).to_be_attached()
+            await until_live(page, 5_000)
             assert proxy.streams == 1
 
             # The stream's connection stays open and passes nothing; a chat is made meanwhile.
@@ -375,7 +376,7 @@ async def test_a_stream_gone_silent_is_cut_and_followed_again(runtime: Runtime) 
             # The page cuts the silent stream, makes it again, and reads what changed.
             await expect(_chat_row(page, "Merge the lists.")).to_be_visible(timeout=_STALL_WAIT_MS)
             assert proxy.streams >= 2
-            await expect(page.locator(".live-dot.live")).to_be_attached()
+            await until_live(page, 5_000)
             assert errors == []
         finally:
             await browser.close()
@@ -408,7 +409,7 @@ async def test_a_phone_back_from_the_background_follows_again_at_once_and_quietl
                 await page.goto(ui_url("127.0.0.1", proxy.port, TOKEN))
                 await _open_side_menu(page, 390)
                 await expect(_chat_row(page, f"Water the plants in {engine}.")).to_be_visible()
-                await expect(page.locator(".live-dot.live")).to_be_attached()
+                await until_live(page, 5_000)
                 assert proxy.streams == 1
 
                 # Put away: the stream stays open and passes nothing, and a chat is made meanwhile.
@@ -422,8 +423,7 @@ async def test_a_phone_back_from_the_background_follows_again_at_once_and_quietl
                 await page.evaluate(_SIGHT, "visible")
                 await expect(_chat_row(page, f"Call the plumber in {engine}.")).to_be_visible(timeout=_AT_ONCE_MS)
                 assert proxy.streams == 2, engine
-                await expect(page.locator(".live-dot.live")).to_be_attached()
-                await expect(page.locator(".pill:has(.live-dot)")).to_be_hidden()
+                await until_live(page, 5_000)
                 assert errors == [], engine
             finally:
                 await browser.close()

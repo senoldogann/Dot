@@ -35,6 +35,7 @@ from dotagent.llm.types import Effort, Speed
 from dotagent.plugins import scout_service
 from dotagent.plugins.scout_types import ScoutState
 from dotagent.policy.types import ActionInfo, ApprovalMode
+from dotagent.proactive.watchers import WatcherRecord, WatcherRequest, add_watcher, remove_watcher, update_state
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
 from dotagent.scheduler import runner as scheduler_runner
@@ -63,6 +64,7 @@ from dotagent.scheduler.runner import (
     missed_status,
 )
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
+from dotagent.server.daemon import _dot_needs_awake
 from dotagent.store.db import Store
 from dotagent.store.models import (
     NO_PICKS,
@@ -474,6 +476,47 @@ async def test_a_schedule_switched_off_while_the_tick_fires_another_does_not_fir
     )
     await Scheduler(runtime, manager).tick(max(_planned(record) for record in schedules) + 5)
     assert len(manager.started) == 1
+
+
+async def test_upcoming_routines_and_watchers_keep_the_mac_awake(runtime: Runtime) -> None:
+    manager: RunManager = RunManager(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    assert not await _dot_needs_awake(manager, runtime, scheduler)
+
+    far: ScheduleRecord = await _schedule(runtime, _once(runtime, "Later routine", 600))
+    early: ScheduleRecord = await create_schedule_off(
+        runtime.store,
+        runtime.config.scheduler,
+        runtime.schedule_zone,
+        _once(runtime, "Disabled routine", 90),
+        time.time(),
+    )
+    assert not await _dot_needs_awake(manager, runtime, scheduler)
+    assert far.enabled and not early.enabled
+    near: ScheduleRecord = await _schedule(runtime, _once(runtime, "Soon routine", 90))
+    assert await _dot_needs_awake(manager, runtime, scheduler)
+    await runtime.store.delete_schedule(near.id)
+
+    now: float = time.time()
+    watcher: WatcherRecord = await add_watcher(
+        runtime.store, WatcherRequest(name="Upcoming check", kind="github", minutes=5), now
+    )
+    try:
+        await update_state(
+            runtime.store, watcher.id, lambda state: state.model_copy(update={"next_look_at": now + 600})
+        )
+        assert not await _dot_needs_awake(manager, runtime, scheduler)
+        await update_state(runtime.store, watcher.id, lambda state: state.model_copy(update={"next_look_at": now + 90}))
+        assert await _dot_needs_awake(manager, runtime, scheduler)
+
+        stop: Path = failsafe_path()
+        await asyncio.to_thread(stop.touch)
+        try:
+            assert not await _dot_needs_awake(manager, runtime, scheduler)
+        finally:
+            await asyncio.to_thread(stop.unlink)
+    finally:
+        await remove_watcher(runtime.store, watcher.id)
 
 
 async def test_while_the_emergency_stop_is_engaged_a_due_schedule_is_skipped_to_its_next_time(

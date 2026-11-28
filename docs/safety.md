@@ -336,16 +336,19 @@ currency, so list sites that bill in one currency. Empty by default.
    ask you. Its words are the goal of the schedule, which a run of the chat may have written
    (`schedule_create`); the rule of lawful and harmless holds whatever it says, and a run that read outside content is
    checked before it makes a schedule (item 525). Such a run you resume after a restart is taken as yours, there to
-   answer: its message waits for your yes. The try a schedule starts on its own of a task a restart, a passing model
-   error or a stall ended (item 1206) is no resume: it is a new run of the schedule's own source, so the review model
-   judges its message as a firing's; it is never started for a task that already sent a message or mail, posted,
-   uploaded, paid, released or handed work on, nor twice (see [Schedules](memory-and-schedules.md)). No rule
-   of yours answers for you. A chat a schedule, a watcher, a notice, the reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
+   answer: its message waits for your yes. One Dot resumes on its own (the daemon as it starts, or a helper whose run
+   ended while it worked) is not your word, and is marked as the run it resumes: the firing's review model judges its
+   message, and in a chat of Dot's own a message, a post and a release ask you (item 2027). The try a schedule starts on
+   its own of a task a restart, a passing model error or a stall ended (item 1206) is no resume: it is a new run of the
+   schedule's own source, so the review model judges its message as a firing's; it is never started for a task that
+   already sent a message or mail, posted, uploaded, paid, released or handed work on, nor twice (see
+   [Schedules](memory-and-schedules.md)). No rule of yours answers for you. A chat a schedule, a watcher, a notice, the
+   reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
    Scheduled tasks page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
-   (commands, MCP tools, files, the web, a release) runs in `yolo` without a question. In a
-   chat Dot opened on its own initiative (item 850): a message, a post and a `release` there wait for your own yes in
-   every mode, `yolo`'s and `auto`'s too, never the review model's, and no rule of yours that allows them answers for
-   you; [Proactive](proactive.md) says how.
+   (commands, MCP tools, files, the web, a release) runs in `yolo` without a question. In a chat Dot opened on its own
+   initiative (item 850): a message, a post and a `release` there wait for your own yes in every mode, `yolo`'s and
+   `auto`'s too, never the review model's, and no rule of yours that allows them answers for you;
+   [Proactive](proactive.md) says how.
    - `release` is a project's change put live. The guard reads it from these command names:
      - `wrangler deploy`, `wrangler pages deploy`, `wrangler versions deploy` and their `publish`;
      - `vercel` with `--prod` (or `--target production`) and `vercel promote`;
@@ -803,9 +806,12 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
     as the screen does, and they read Chrome's values of a plain field, a code there, or a password a page shows as
     plain text ("show password").
   - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
-    going back can bring the filled page back whole. Once a script of the run ran in a tab of the chat, no tab of it
-    gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
-    page, in a tab it opened, or in a page Chrome brings back from its cache.
+    going back can bring the filled page back whole. A page opened there (`browser_open`) opens in a new tab in its
+    place and the filled tab closes, as a run would close it itself: the sign-in holds, and scripts run again once
+    no other tab a login was filled into is open. An address the rules refuse leaves the filled tab as it was. Once a
+    script of the run ran in a tab of the chat, no tab of it gets a login until all of them are closed: the script
+    could have left a listener that copies what is typed, in its page, in a tab it opened, or in a page Chrome brings
+    back from its cache.
   - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
     (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
@@ -1200,11 +1206,16 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   the run that tells a schedule's command in the background ended keeps the sandbox in your own chat too (`/loop`). A
   run you started (a message in the app, on a phone, by iMessage, `dotx run`) runs as before, also in a chat a schedule
   opened; Resume on a schedule's run goes on as that run, in the sandbox, and so do the sessions of a campaign after its
-  first, which its schedule starts. What it does not cover: Dot's own file tools (`write_file`, `edit_file`)
-  run in the daemon's process, not in the sandbox, so in `yolo` they still change Dot's files unasked; Apple Events and a
-  hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from the daemon itself, in a checkout
-  of its own, not through a run's tools, and is not changed by it. `false` has those runs follow `[shell] sandbox` and
-  `yolo` as yours do.
+  first, which its schedule starts. Dot's own tools, which read and write in the daemon's process and not in
+  the sandbox, keep the same seal for such a run (item 2026): a step of `read_file`, `write_file`, `edit_file`, the
+  search tools, `generate_image`, `watch_video`, a page shown from a file, a pipeline record, a browser upload or a file
+  a web tool reads is refused, in every mode, when the file is one the sandbox seals for that run (read or written: Dot's
+  own files and `[policy] sealed_paths`; written: what Dot loads and runs, and Dot's home and logs but the workspace).
+  The gate refuses it before the policy weighs it, so nothing asks; its policy event says `seal`. What it does not cover:
+  a tool that changes Dot's files through its own interface and names no path (the memory tools, `skill_save`, a
+  schedule), Apple Events and a hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from
+  the daemon itself, in a checkout of its own, not through a run's tools, and is not changed by it. `false` has those
+  runs follow `[shell] sandbox` and `yolo` as yours do.
 - **Code mode** (items 1500 to 1507, [Code mode](code-mode.md)): the code of a `code_run` is text a model wrote, which a page
   may have shaped, so it does not run in the sandbox above, which allows everything but Dot's files. It runs under
   `sandbox-exec` with `(deny default)`: it reads its interpreter's installation and its `tools` folder, reads and writes its
