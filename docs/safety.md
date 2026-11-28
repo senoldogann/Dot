@@ -804,9 +804,11 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
     plain text ("show password").
   - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
     going back can bring the filled page back whole. A page opened there (`browser_open`) opens in a new tab in its
-    place, and that tab closes, as a run would close it itself: the sign-in holds, and scripts run again. Once a script of the run ran in a tab of the chat, no tab of it
-    gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
-    page, in a tab it opened, or in a page Chrome brings back from its cache.
+    place and the filled tab closes, as a run would close it itself: the sign-in holds, and scripts run again once
+    no other tab a login was filled into is open. An address the rules refuse leaves the filled tab as it was. Once a
+    script of the run ran in a tab of the chat, no tab of it gets a login until all of them are closed: the script
+    could have left a listener that copies what is typed, in its page, in a tab it opened, or in a page Chrome brings
+    back from its cache.
   - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
     (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
