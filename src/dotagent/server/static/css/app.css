@@ -4744,25 +4744,55 @@ dialog.modal.versions-dialog {
 
 /* The plan over the composer (item 644): the capsule's plan part opens it, a bubble a little wider than the composer's
    menus, its head saying how far the plan has come, its steps as the Plan tab draws them, and the way to that tab. */
-.composer-popover:has(.plan-popover-head) {
+.composer-popover:has(.plan-head) {
   width: 380px;
   max-height: min(480px, var(--room, 480px));
   gap: var(--space-2);
   padding: var(--space-3);
 }
 
-.plan-popover-head {
+/* The plan's head (the owner's report of 2026-11-28): "2 of 6 done", where the run stands, and a thin bar of how far it
+   came, red once the run failed. */
+.plan-head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  font-weight: var(--weight-label);
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
 }
 
-.plan-popover-count {
-  color: var(--muted);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-text);
+.plan-head-count {
+  font-size: var(--text-md);
+  font-weight: var(--weight-label);
   font-variant-numeric: tabular-nums;
+}
+
+.plan-head-state {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.plan-head[data-end="failed"] .plan-head-state {
+  color: var(--bad);
+}
+
+.plan-bar {
+  display: block;
+  height: 6px;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.plan-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text);
+}
+
+.plan-head[data-end="failed"] .plan-bar-fill {
+  background: var(--bad);
 }
 
 .plan-popover-open {
@@ -5431,16 +5461,58 @@ dialog.modal.versions-dialog {
   place-items: center;
 }
 
-.plan-step.in_progress .mark {
-  border-color: var(--accent);
-  animation: pulse var(--motion-pulse) ease-out infinite;
-  animation-play-state: var(--endless);
+/* The step at work: a filled ring in ink, no pulse (the owner's report of 2026-11-28: nothing spins or throbs); its
+   words in ink and weight, later steps dimmed, done ones quiet. */
+.plan-step.in_progress .mark,
+.plan-step.stopped .mark {
+  border-color: var(--text);
+  background: radial-gradient(circle, var(--text) 0 3px, transparent 3.5px);
+}
+
+.plan-step.stopped .mark {
+  background: var(--text);
+  color: var(--surface);
+}
+
+.plan-step.stopped .mark .icon {
+  width: 7px;
+  height: 7px;
+}
+
+.plan-step:is(.in_progress, .stopped) .text {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.plan-step.pending .text {
+  color: var(--muted);
+}
+
+/* The steps on a vertical line that joins their marks. */
+.plan-timeline > .plan-step {
+  position: relative;
+  padding: 0 0 var(--space-3);
+}
+
+.plan-timeline > .plan-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 22px;
+  bottom: 2px;
+  left: 6px;
+  width: 2px;
+  border-radius: var(--radius-joined);
+  background: var(--border);
+}
+
+.plan-timeline > .plan-step.done:not(:last-child)::before {
+  background: var(--border-strong);
 }
 
 .plan-step.done .mark {
-  background: var(--fine);
-  border-color: var(--fine);
-  color: var(--on-fine);
+  background: var(--text-2);
+  border-color: var(--text-2);
+  color: var(--surface);
 }
 
 .plan-step.done .mark .icon {
@@ -5451,7 +5523,6 @@ dialog.modal.versions-dialog {
 
 .plan-step.done .text {
   color: var(--muted);
-  text-decoration: line-through;
 }
 
 .plan-step .body {

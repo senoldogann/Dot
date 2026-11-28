@@ -174,7 +174,6 @@ TR: dict[str, str] = {
     "Paste image": "Görseli yapıştır",
     "Pin: Dot keeps a note of it": "İğnele: Dot bunu not eder",
     "Plan": "Plan",
-    "Plan · %lld of %lld done": "Plan · %lld / %lld bitti",
     "Previous ask": "Önceki soru",
     "Queue a message": "Mesajı sıraya al",
     "Queue: starts after this run": "Sıraya al: bu çalışmadan sonra başlar",
@@ -1855,6 +1854,18 @@ TR.update(
         "Routine: %@": "Rutin: %@",
         "Hides the message": "Mesajı gizler",
         "Shows the whole message": "Mesajın tamamını gösterir",
+    }
+)
+# The plan sheet (the owner's report of 2026-11-28).
+TR.update(
+    {
+        "%lld of %lld done": "%lld / %lld tamamlandı",
+        "The run is done": "Çalışma tamamlandı",
+        "Failed at step %lld": "%lld. adımda başarısız oldu",
+        "Stopped at step %lld": "%lld. adımda durduruldu",
+        "Finishing": "Bitiriliyor",
+        "Working on step %lld": "%lld. adım üzerinde çalışıyor",
+        "stopped": "durduruldu",
     }
 )
 
