@@ -297,10 +297,12 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     reviews: set[asyncio.Task[None]] = set()
 
     def review_view(state: TeamReviewState) -> TeamReviewView:
-        # Off: none is due; on and never tried: at the scheduler's next tick, now.
+        # Off: none is due; on and never tried, or due already (a try that failed counts as the period's): now, at
+        # the scheduler's next tick.
         due: float | None = None
         if state.every != "off":
-            due = time.time() if state.last_at is None else state.last_at + REVIEW_PERIODS[state.every]
+            now: float = time.time()
+            due = now if state.last_at is None else max(now, state.last_at + REVIEW_PERIODS[state.every])
         return TeamReviewView(
             manager=state.manager,
             every=state.every,

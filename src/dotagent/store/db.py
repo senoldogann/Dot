@@ -8698,7 +8698,7 @@ class Store:
             "  sum(created_at >= ? AND created_at < ?) AS prior_runs,"
             "  sum(created_at >= ? AND created_at < ? AND status = 'done') AS prior_done"
             "  FROM counted GROUP BY aid),"
-            " newest AS (SELECT aid, max(created_at) AS last_run_at FROM every_run GROUP BY aid),"
+            " newest AS (SELECT aid, max(created_at) AS last_run_at FROM counted GROUP BY aid),"
             f" open_orders AS (SELECT agent_id AS aid, count(*) AS n FROM work_orders WHERE status IN ({held})"
             "  GROUP BY agent_id),"
             " routines AS (SELECT coalesce(agent_id, ?) AS aid, sum(enabled) AS active, count(*) AS n FROM schedules"

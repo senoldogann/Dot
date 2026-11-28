@@ -101,10 +101,11 @@ struct TeamReviewPage: View {
         .task { await load() }
         .refreshable { await load() }
         .task(id: running) {
-            // While a review is under way, it is read again every two seconds until it ends.
-            guard running else { return }
-            try? await Task.sleep(for: .seconds(2))
-            await load()
+            // While a review is under way, it is read again every two seconds until it ends (or the page goes).
+            while running && !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                await load()
+            }
         }
     }
 

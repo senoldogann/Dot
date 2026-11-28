@@ -147,6 +147,8 @@ async def test_the_store_counts_what_each_bot_carries(store: Store) -> None:
     await store._db.execute("DELETE FROM runs WHERE id = ?", (gone,))
     await _run(store, None, "ui", "done", day, 8)
     await _run(store, None, "review", "failed", day, 50)
+    # A bot whose only run is a code review ran nothing of its own.
+    await _run(store, idle.id, "review", "done", day, 5)
     await store._db.commit()
 
     now: float = time.time()
