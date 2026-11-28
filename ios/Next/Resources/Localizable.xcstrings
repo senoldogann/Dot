@@ -7742,6 +7742,17 @@
         }
       }
     },
+    "Model used": {
+      "comment": "Inspector row: the model the newest run worked on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanılan model"
+          }
+        }
+      }
+    },
     "Model: %@": {
       "comment": "VoiceOver: the composer's model button; the argument is the model and effort",
       "localizations": {

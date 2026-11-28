@@ -8,6 +8,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 from dotagent.agent.account import RunAccount
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
 from dotagent.agent.authorization import StepDecision
+from dotagent.agent.chat_choices import MessageChoices
 from dotagent.agent.lanes import RoutedMessage
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import Disliked, RunLessons
@@ -450,7 +451,8 @@ MessageKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{16,64}$")]
 
 
 class StartRunRequest(FrozenModel):
-    """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones; ``speed``
+    """Start a run. ``mode``, ``model``, ``effort``, ``speed``, ``approvals`` and ``goal_mode`` left out take the chat's
+    for a message to a chat (``thread_id``, item 2071), else the configured ones; ``speed``
     is ``fast`` for fast mode, on a model that has it (item 223); ``once`` is a choice for this message only (item 251):
     ``ultrathink`` asks the model for its Max level, ``ultracode`` for its Extra high level and tells the run to split
     its independent parts across delegated runs, while the chat keeps ``effort``. ``plugins``, ``skills`` and
@@ -548,7 +550,7 @@ class SteerRequest(FrozenModel):
 
 class QueueMessageRequest(FrozenModel):
     """Put a message in a chat's queue (item 148), with the choices of the run it starts; those left out take the
-    configured ones then, as for ``StartRunRequest``."""
+    chat's (item 2071), as for ``StartRunRequest`` with a ``thread_id``."""
 
     text: str = Field(min_length=1, max_length=_GOAL_CHARS)
     mode: ChatMode = "task"
@@ -565,6 +567,18 @@ class QueueMessageRequest(FrozenModel):
     accounts: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_ACCOUNTS)
     plan_first: bool = False
     key: MessageKey | None = None
+
+
+def sent_choices(request: StartRunRequest | QueueMessageRequest) -> MessageChoices:
+    """The choices a message's request names, as :func:`dotagent.agent.chat_choices.message_choices` takes them."""
+    return MessageChoices(
+        mode=request.mode,
+        model=request.model,
+        effort=request.effort,
+        speed=request.speed,
+        approvals=request.approvals,
+        goal_mode=request.goal_mode,
+    )
 
 
 def picks_of(plugins: Sequence[str], skills: Sequence[str], accounts: Sequence[str], plan_first: bool) -> RunPicks:

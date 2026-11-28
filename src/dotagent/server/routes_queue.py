@@ -9,6 +9,7 @@ from contextlib import suppress
 from fastapi import APIRouter
 
 from dotagent.agent.attachments import StoredAttachment, load_attachment, load_attachments
+from dotagent.agent.chat_choices import MessageChoices
 from dotagent.agent.lanes import RoutedMessage
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.core.errors import NotFoundError
@@ -26,6 +27,7 @@ from dotagent.server.views import (
     QueueOrderRequest,
     QueueView,
     picks_of,
+    sent_choices,
 )
 from dotagent.store.db import Store
 from dotagent.store.models import QueuedMessage, RunRecord
@@ -77,9 +79,14 @@ def queue_router(ctx: ServerContext) -> APIRouter:
         return await view(thread_id)
 
     @router.post("/threads/{thread_id}/queue", status_code=201)
-    async def queue_message(thread_id: str, request: QueueMessageRequest) -> QueueView:
+    async def queue_message(thread_id: str, sent: QueueMessageRequest) -> QueueView:
         """Put a message at the end of the chat's queue; with no run at work there it starts at once, unless the queue
-        is held. The message sent again with its ``key`` is not queued twice (:func:`send_once`)."""
+        is held. A choice the message leaves out is the chat's (item 2071: the iPhone sends none). The message sent
+        again with its ``key`` is not queued twice (:func:`send_once`)."""
+        chosen: MessageChoices = await ctx.manager.chat_message_choices(
+            thread_id, sent_choices(sent), sent.model_fields_set
+        )
+        request: QueueMessageRequest = sent.model_copy(update=chosen.model_dump())
         if request.model is not None:
             parse_model_ref(request.model)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
