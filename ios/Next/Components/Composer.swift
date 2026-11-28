@@ -23,7 +23,9 @@ struct ModelChoice: Hashable, Identifiable {
     let ref: String
     let label: String
     let effort: String?
-    var id: String { ref + "|" + (effort ?? "") }
+    /// Fast mode is on for the next message.
+    let fast: Bool
+    var id: String { ref + "|" + (effort ?? "") + (fast ? "|fast" : "") }
 }
 
 /// The composer's button: an ink disc of 30 pt in a 44 pt target. Its glyph says what a press does (send, queue,
@@ -265,7 +267,7 @@ struct ComposerView: View {
                         .padding(.horizontal, compact ? 0 : Space.m - Space.xxs)
                         .padding(.top, compact ? 0 : Space.m)
                     if compact {
-                        modelChip
+                        modelChip(.markOnly)
                         micButton
                         ComposerButton(buttons: buttons, perform: perform).disabled(blocksSending)
                     }
@@ -274,7 +276,7 @@ struct ComposerView: View {
                     HStack(spacing: 0) {
                         if buttons.primary != .confirmEdit { plusMenu }
                         Spacer(minLength: 0)
-                        modelChip
+                        modelChip(.named)
                         micButton
                         ComposerButton(buttons: buttons, perform: perform).disabled(blocksSending)
                     }
@@ -403,14 +405,34 @@ extension ComposerView {
         .accessibilityLabel(String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"))
     }
 
-    /// The model chip: the provider's mark and a chevron (the name is in the picker, and in VoiceOver's label). At the
-    /// accessibility sizes it is the mark alone.
-    @ViewBuilder fileprivate var modelChip: some View {
+    /// How much of the model the chip says: the one-line capsule has the provider's mark and a chevron alone; the
+    /// expanded one, which has the room, adds the model's name and, in grey, its level and fast mode (the name stays
+    /// without the provider, whose mark is there).
+    enum ChipStyle {
+        case markOnly
+        case named
+    }
+
+    /// The model chip. VoiceOver reads the model, its level and fast mode in both styles. At the accessibility sizes
+    /// the name may truncate and the level and the chevron give way; the mark stays.
+    @ViewBuilder fileprivate func modelChip(_ style: ChipStyle) -> some View {
         if let model, let openSettings {
+            let provider: String = providerOfModel(model.ref, in: app.models)
+            let detail: String? = chipDetail(effort: model.effort, fast: model.fast)
+            let accessible: Bool = dynamicTypeSize.isAccessibilitySize
             Button(action: openSettings) {
-                HStack(spacing: Space.xxs) {
+                HStack(spacing: Space.xs) {
                     modelMarkImage(model)
-                    if !dynamicTypeSize.isAccessibilitySize { Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph) }
+                    if style == .named {
+                        Text(modelNameWithoutProvider(model.label, provider: provider)).textRole(.body).fontWeight(.medium)
+                            .foregroundStyle(Tone.text).lineLimit(1).truncationMode(.tail)
+                            .accessibilityIdentifier("composer.model.name")
+                        if let detail, !accessible {
+                            Text(detail).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1).layoutPriority(-1)
+                                .accessibilityIdentifier("composer.model.detail")
+                        }
+                    }
+                    if !accessible { Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph) }
                 }
                 .padding(.horizontal, Space.xs)
                 .frame(minWidth: Metric.hit, minHeight: Metric.hit)
@@ -433,7 +455,7 @@ extension ComposerView {
     }
 
     private func chipWords(_ choice: ModelChoice) -> String {
-        [choice.label, choice.effort.map(effortTitle)].compactMap { $0 }.joined(separator: " · ")
+        [choice.label, chipDetail(effort: choice.effort, fast: choice.fast)].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// The microphone: the pill becomes the recorder; ✓ adds the words after what was typed.
@@ -627,10 +649,12 @@ struct WorkingSummary: Equatable, Sendable {
     /// How the link to the Mac stands while it is not live, in the status's place (item 1931); `nil` while the chat is
     /// live.
     let link: LinkLine?
+    /// The chat's tasks that work or wait on the owner (item 2013); 0 hides the segment.
+    let tasks: Int
 
     /// The pill opens with the link's words or the status.
     var leads: Bool { status != nil || link != nil }
-    var isEmpty: Bool { !leads && queued == 0 && helpersTotal == 0 && plan == nil }
+    var isEmpty: Bool { !leads && queued == 0 && helpersTotal == 0 && plan == nil && tasks == 0 }
 }
 
 /// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
@@ -647,6 +671,7 @@ struct FloatingWorkingControl: View {
     let openPlan: () -> Void
     let openQueue: () -> Void
     let openHelpers: () -> Void
+    let openTasks: () -> Void
     let scrollToBottom: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
@@ -675,6 +700,7 @@ struct FloatingWorkingControl: View {
                     .buttonStyle(.plain)
                     .interactiveGlass(in: Circle())
                     .accessibilityLabel(String(localized: "Scroll to the newest message", comment: "VoiceOver: the round button over the composer"))
+                    .accessibilityIdentifier("chat.scrollToBottom")
                 }
             }
         }
@@ -771,6 +797,19 @@ struct FloatingWorkingControl: View {
                         .textRole(.label).fontWeight(.medium).tabularNumbers().foregroundStyle(Tone.secondary)
                 }
                 .accessibilityIdentifier("capsule.helpers")
+            }
+            if summary.tasks > 0 {
+                if summary.leads || summary.canStop || summary.plan != nil || summary.queued > 0 || summary.helpersTotal > 0 { divider }
+                let words: String = String(localized: "\(summary.tasks) tasks", comment: "The capsule segment of the chat's tasks at work or waiting on the owner; the argument is their count")
+                segment(action: openTasks, label: words, inset: inset) {
+                    Label {
+                        Text(verbatim: glyphs ? "\(summary.tasks)" : words).lineLimit(1).fixedSize()
+                    } icon: {
+                        Image(systemName: "square.stack")
+                    }
+                    .textRole(.label).fontWeight(.medium).tabularNumbers().foregroundStyle(Tone.secondary)
+                }
+                .accessibilityIdentifier("capsule.tasks")
             }
         }
         .padding(.horizontal, Space.xxs)

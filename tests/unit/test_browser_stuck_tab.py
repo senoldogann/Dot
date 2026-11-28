@@ -3,12 +3,17 @@ stopped answering was reported as a document not yet parsed after 30 s, and ever
 again. The page is a stand-in: no browser runs."""
 
 import asyncio
+import time
+from pathlib import Path
 from typing import cast
 
 import pytest
 from playwright.async_api import Page
 
 from dotagent.browser import driver
+from dotagent.browser.pages import Tab
+from dotagent.browser.session import BrowserSession, no_runs_at_work
+from dotagent.config import BrowserConfig, load_default_config
 from dotagent.core.errors import BrowserError, TabSilentError
 
 
@@ -55,3 +60,17 @@ async def test_a_page_busy_for_a_while_still_has_the_whole_time_to_answer() -> N
             return True
 
     await driver.wait_dom_quiet(cast(Page, _Busy()), 60, 500, 2_000)
+
+
+async def test_a_stuck_tab_with_a_navigation_under_way_is_said_after_one_bound(tmp_path: Path) -> None:
+    """Item 2079: a tab whose page answers nothing while a navigation is under way waited a bound for the commit and
+    another for the page to answer, so ``browser_snapshot`` was cut by its own 45 s with no word of what was wrong."""
+    config = load_default_config()
+    browser: BrowserConfig = config.browser.model_copy(update={"navigation_timeout_s": 1.0})
+    session = BrowserSession(browser, config.server, tmp_path / "profile", tmp_path / "downloads", no_runs_at_work)
+    tab = Tab(page=cast(Page, _Stuck()))
+    tab.nav_idle.clear()
+    started: float = time.monotonic()
+    with pytest.raises(TabSilentError, match=r"the tab did not answer within 1 s"):
+        await session._settle(tab)
+    assert time.monotonic() - started < 1.6

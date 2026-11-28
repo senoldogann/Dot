@@ -220,14 +220,18 @@ function pushed(event) {
   }
 }
 
+const pushInTurkish = new URL(worker.location.href).searchParams.get("lang") === "tr";
+
 worker.addEventListener("push", (event) => {
   const message = pushed(event);
   if (message === null) {
     return;
   }
+  const title = pushInTurkish && typeof message.title_tr === "string" ? message.title_tr : message.title;
+  const body = pushInTurkish && typeof message.body_tr === "string" ? message.body_tr : message.body;
   event.waitUntil(
-    worker.registration.showNotification(message.title || "Dot has news", {
-      body: message.body,
+    worker.registration.showNotification(title || "Dot has news", {
+      body,
       icon: "icons/icon-192.png",
       badge: "icons/icon-192.png",
       tag: message.route,

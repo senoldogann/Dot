@@ -51,6 +51,15 @@ final class AppModel {
     private(set) var heard: Int = 0
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
+    @ObservationIgnored private var push: PhonePush?
+    var requestedRun: String?
+    @ObservationIgnored private(set) var visiblePushThread: String?
+
+    func bind(push: PhonePush) {
+        self.push = push
+        push.bind(to: self)
+    }
+
     @ObservationIgnored private var watching: Task<Void, Never>?
     @ObservationIgnored private let keys: PhoneKeyStore = PhoneKeyStore()
     @ObservationIgnored private let hosts: HostStore = HostStore()
@@ -90,7 +99,10 @@ final class AppModel {
         if next.list != list || next.chats != chats { PerfCounters.shared.published() }
         // Every screen reads the list with the deletes on their way hidden (item 1964), and drops a chat that went (item 1965).
         let shown: ListProjection = next.shownList
-        if shown != list { list = shown }
+        if shown != list {
+            list = shown
+            push?.show(shown)
+        }
         let gone: Set<String> = next.goneChats
         if gone != goneChats { goneChats = gone }
         // A chat the Mac says went may have been a bot's home chat: the agents are read again for the one that follows it.
@@ -212,6 +224,9 @@ final class AppModel {
     /// The new chats this phone started in this session, by their outbox key: their first words (item 1849). Only these show
     /// as a starting chat (item 2025); a key left in the outbox from an earlier launch is not one of them.
     var startingChats: [String: String] = [:]
+    /// Where the messages this phone sent to a chat with several tasks went (item 2013), for that chat's screen to say;
+    /// each is taken once said (`routedSaid`).
+    var routedSends: [RoutedSend] = []
 
     /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
     /// is read (item 1849).
@@ -293,6 +308,7 @@ final class AppModel {
         self.engine = engine
         self.host = host
         phase = .ready
+        push?.connect(to: api)
         watching = Task { [weak self] in
             for await next in await engine.store.updates() {
                 guard let self else { return }
@@ -300,6 +316,14 @@ final class AppModel {
                 // At most 15 pictures a second: the store's stream keeps only the newest, so the words that came
                 // meanwhile are drawn together, never dropped (item 1848); the answer's reveal paces them on screen.
                 try? await Task.sleep(for: .milliseconds(66))
+            }
+        }
+        Task { [weak self] in
+            for await outcome in await engine.outbox.outcomes() {
+                guard let self else { return }
+                if case .delivered(let item, let queue) = outcome, let thread = item.thread, let routed = queue.routed {
+                    await self.heard(routed, from: thread)
+                }
             }
         }
         Task { await engine.supervisor.start() }
@@ -311,8 +335,12 @@ final class AppModel {
     /// A pairing the owner opened from a `dotnext://pair` link or a scanned code, waiting for their one tap.
     var pairingStartWaiting: PairingStart?
 
-    /// Takes a link the system opened in the app: a pair link waits for the owner's tap; anything else is ignored.
+    /// A run link opens its chat. A pair link waits for the owner's tap.
     func open(url: URL) {
+        if let run = PhoneRunLink.run(inURL: url) {
+            requestedRun = run
+            return
+        }
         guard let start: PairingStart = pairingStart(url.absoluteString) else {
             logger.warning("an unknown link was ignored scheme=\(url.scheme ?? "", privacy: .public) host=\(url.host() ?? "", privacy: .public)")
             return
@@ -353,6 +381,9 @@ final class AppModel {
     /// Forgets the key, the address, the outbox and the cache (Settings › This phone's key).
     func forget() async {
         guard let engine else { return }
+        await push?.disconnect()
+        requestedRun = nil
+        visiblePushThread = nil
         await engine.supervisor.stop()
         await engine.outbox.clear()
         await engine.store.clear()
@@ -374,6 +405,8 @@ final class AppModel {
         guard let engine else { return }
         switch phase {
         case .active:
+            push?.foreground()
+            push?.show(list)
             PhaseMeter.resume()
             perf.appeared()
             Task {
@@ -393,11 +426,13 @@ final class AppModel {
 
     func open(_ thread: String) {
         guard let engine else { return }
+        visiblePushThread = thread
         Task { await engine.supervisor.openChat(thread) }
     }
 
     func close(_ thread: String) {
         guard let engine else { return }
+        if visiblePushThread == thread { visiblePushThread = nil }
         Task { await engine.supervisor.closeChat(thread) }
     }
 

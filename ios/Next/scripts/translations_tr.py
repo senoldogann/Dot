@@ -1,6 +1,7 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# MS1: the last confirmed contact with the Mac.
 # Memory: a new note, the trash and Restore (G1b).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
@@ -1186,12 +1187,29 @@ TR: dict[str, str] = {
     # D2: the link in the chat's pill (item 1931).
     "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
     "Syncing messages…": "Mesajlar eşitleniyor…",
+    # A chat's tasks (item 2013): the capsule's segment, the sheet, a task's own line, the toast of a routed message.
+    "%lld tasks": "%lld görev",
+    "Tasks": "Görevler",
+    "Waits for you": "Seni bekliyor",
+    "task.stopped": "Durdu",
+    "task.open": "Aç",
+    "A task of %@": "%@ sohbetinin görevi",
+    "Back to the chat": "Sohbete dön",
+    "Started a new task: %@": "Yeni görev başladı: %@",
+    "Sent to %@": "%@ görevine gönderildi",
+    "Stopped every task": "Tüm görevler durduruldu",
+    "Stopped %@": "%@ durduruldu",
+    "Move": "Taşı",
+    "Move to": "Şuraya taşı",
+    "New task": "Yeni görev",
+    "Not moved: %@": "Taşınamadı: %@",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
 EN_PLURALS: dict[str, tuple[str, str]] = {
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
+    "%lld tasks": ("%lld task", "%lld tasks"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),
     "Back, %lld bots unread": ("Back, %lld bot unread", "Back, %lld bots unread"),
     "Delete %lld chats with everything they hold?": ("Delete %lld chat with everything it holds?", "Delete %lld chats with everything they hold?"),
@@ -1212,6 +1230,8 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
+        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
+        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
         "User input needed": "Senden bir cevap bekleniyor",
         "%lld / %lld": "%lld / %lld",
         "Submit answers": "Yanıtları gönder",
@@ -1620,6 +1640,8 @@ TR.update(
     }
 )
 
+# The expanded composer chip (item 1991)
+TR.update({"Fast": "Hızlı"})
 # A bot's Work group: work orders, objectives and hand-offs, and Pause in the profile's menu.
 TR.update(
     {
@@ -1736,13 +1758,20 @@ TR.update(
     }
 )
 
-# MS1: the last confirmed contact with the Mac.
-TR.update(
-    {
-        "Mac asleep or unreachable": "Mac uykuda veya ulaşılamıyor",
-        "Mac asleep or unreachable since %@": "Mac uykuda veya ulaşılamıyor · son bağlantı %@",
-    }
-)
-
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+
+# PN1: remote task alerts and the Live Activity.
+TR.update({
+    "A task is done": "Bir görev bitti",
+    "A task failed": "Bir görev başarısız oldu",
+    "A task is blocked": "Bir görev ilerleyemedi",
+    "Dot asks for approval": "Dot onay istiyor",
+    "Dot has a question": "Dot'un bir sorusu var",
+    "Dot needs your help": "Dot'un yardımınıza ihtiyacı var",
+    "Open Dot to see it.": "Görmek için Dot'u açın.",
+    "Dot is working": "Dot çalışıyor",
+    "Starting…": "Başlıyor…",
+    "Your Mac remembers which task notifications to send to this phone.": "Mac’iniz bu telefona hangi görev bildirimlerini göndereceğini hatırlar.",
+    "Done, failed or blocked": "Bitti, başarısız oldu veya ilerleyemedi",
+})

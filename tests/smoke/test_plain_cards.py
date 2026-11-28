@@ -139,16 +139,16 @@ async def test_an_approval_card_says_why_it_asks_in_one_plain_sentence(
                 await page.goto(f"{address}/#/runs/{run.id}")
                 card: Locator = page.locator(".approval").first
                 await expect(card).to_be_visible(timeout=WAIT_S * 1000)
-                # One plain sentence says why Dot asks; the policy's own words are not on the card but under Details.
+                # One plain sentence says why Dot asks; the policy's own words are not in it but under Details.
                 await expect(card.locator(".approval-why")).to_contain_text(why)
+                await expect(card.locator(".approval-why")).not_to_contain_text("aggressive preset")
                 await expect(card.locator(".badge")).to_have_count(0)
-                text: str = await card.inner_text()
-                assert "aggressive preset" not in text
                 fold: Locator = card.locator("details.approval-fold")
                 await expect(fold).to_have_count(1)
-                assert await fold.get_attribute("open") is None
                 await expect(fold.locator("summary")).to_have_text(details)
-                await fold.locator("summary").click()
+                # Administrator rights are a high-risk step: its fold stands open, so that its risk is read before
+                # Approve (item 1979's review), and holds the policy's words.
+                await expect(fold).to_have_attribute("open", "")
                 await expect(fold).to_contain_text("aggressive preset still asks for: privilege")
             finally:
                 await browser.close()

@@ -12,6 +12,17 @@
         }
       }
     },
+    "%@ + listed": {
+      "comment": "Models: a custom provider also lists the models it offers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ + listelenenler"
+          }
+        }
+      }
+    },
     "%@ MB": {
       "comment": "Maintenance › Performance: megabytes",
       "localizations": {
@@ -589,6 +600,17 @@
         }
       }
     },
+    "%lld models": {
+      "comment": "Models: how many models a custom provider names",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld model"
+          }
+        }
+      }
+    },
     "%lld notes": {
       "comment": "Memory: the number of notes\nMemory: the number of search hits",
       "localizations": {
@@ -815,6 +837,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld durduruluyor"
+          }
+        }
+      }
+    },
+    "%lld tasks": {
+      "comment": "The capsule segment of the chat's tasks at work or waiting on the owner; the argument is their count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld task"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld tasks"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld görev"
           }
         }
       }
@@ -1185,17 +1236,6 @@
         }
       }
     },
-    "A message Dot wrote for you to send": {
-      "comment": "Push kind description",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un senin göndermen için yazdığı bir mesaj"
-          }
-        }
-      }
-    },
     "A message written while Dot works waits here and starts after the run.": {
       "comment": "Queue sheet empty state detail",
       "localizations": {
@@ -1291,6 +1331,53 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir kampanyanın oturumu"
+          }
+        }
+      }
+    },
+    "A task failed": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev başarısız oldu"
+          }
+        }
+      }
+    },
+    "A task is blocked": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev ilerleyemedi"
+          }
+        }
+      }
+    },
+    "A task is done": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev bitti"
+          }
+        }
+      }
+    },
+    "A task of %@": {
+      "comment": "Under a task's title: the chat it is a task of; the argument is the chat's title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ sohbetinin görevi"
           }
         }
       }
@@ -1456,6 +1543,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yapılacak ekle"
+          }
+        }
+      }
+    },
+    "Added and changed in the Mac's Settings › AI services. Their models are in every model list.": {
+      "comment": "Models: where custom providers are added",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'teki Ayarlar › Yapay zekâ hizmetleri'nde eklenir ve değiştirilir. Modelleri her model listesinde yer alır."
           }
         }
       }
@@ -2160,6 +2258,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mesajından öncesine dönüldü. Bazı dosyalar o zamandan beri değiştiği için oldukları gibi bırakıldı."
+          }
+        }
+      }
+    },
+    "Back to the chat": {
+      "comment": "Under a task's title: opens the chat it is a task of",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbete dön"
           }
         }
       }
@@ -4115,13 +4224,13 @@
         }
       }
     },
-    "Done or failed": {
+    "Done, failed or blocked": {
       "comment": "Push kind: a task ended",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bitti ya da başarısız oldu"
+            "value": "Bitti, başarısız oldu veya ilerleyemedi"
           }
         }
       }
@@ -4144,17 +4253,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot"
-          }
-        }
-      }
-    },
-    "Dot Next gets notifications once it replaces the old Dot app on this iPhone; until then the old app keeps them. These switches are kept on your Mac for this phone.": {
-      "comment": "Notifications footer: no push before the swap (owner's decision)",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot Next bildirimleri bu iPhone'daki eski Dot uygulamasının yerini aldığında alır; o zamana kadar bildirimler eski uygulamada kalır. Bu anahtarlar Mac'inde bu telefon için saklanır."
           }
         }
       }
@@ -4280,6 +4378,18 @@
         }
       }
     },
+    "Dot asks for approval": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot onay istiyor"
+          }
+        }
+      }
+    },
     "Dot asks only before a payment, a message or mail sent for you, or a public post": {
       "comment": "Approval mode yolo, its hint",
       "localizations": {
@@ -4335,6 +4445,18 @@
         }
       }
     },
+    "Dot has a question": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un bir sorusu var"
+          }
+        }
+      }
+    },
     "Dot is asking you": {
       "comment": "Ask dock title: a question",
       "localizations": {
@@ -4364,6 +4486,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot bir Mac ile eşleşmemiş. Ayarlar › Ses'te Bu cihaz'ı seç."
+          }
+        }
+      }
+    },
+    "Dot is working": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot çalışıyor"
           }
         }
       }
@@ -4419,6 +4553,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot bu adımı senin yapmanı istiyor"
+          }
+        }
+      }
+    },
+    "Dot needs your help": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un yardımınıza ihtiyacı var"
           }
         }
       }
@@ -4728,17 +4874,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mesaj taslağı"
-          }
-        }
-      }
-    },
-    "Drafts ready": {
-      "comment": "Push kind: a draft waits to be sent",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taslaklar hazır"
           }
         }
       }
@@ -5289,6 +5424,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yedekler"
+          }
+        }
+      }
+    },
+    "Fast": {
+      "comment": "The composer's model chip: fast mode is on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hızlı"
           }
         }
       }
@@ -7574,6 +7720,17 @@
         }
       }
     },
+    "Move": {
+      "comment": "Toast of a routed message: sends it to another task",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taşı"
+          }
+        }
+      }
+    },
     "Move down": {
       "comment": "VoiceOver action: moves a queued message one place later",
       "localizations": {
@@ -7581,6 +7738,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aşağı taşı"
+          }
+        }
+      }
+    },
+    "Move to": {
+      "comment": "Title of the picker of where Move sends a routed message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şuraya taşı"
           }
         }
       }
@@ -7735,6 +7903,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni zamanlanmış görev"
+          }
+        }
+      }
+    },
+    "New task": {
+      "comment": "Move to: a task of its own",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni görev"
           }
         }
       }
@@ -8259,6 +8438,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ölçülmedi"
+          }
+        }
+      }
+    },
+    "Not moved: %@": {
+      "comment": "Toast: Move failed; the argument is the Mac's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taşınamadı: %@"
           }
         }
       }
@@ -9007,6 +9197,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Açık"
+          }
+        }
+      }
+    },
+    "Open Dot to see it.": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görmek için Dot'u açın."
           }
         }
       }
@@ -9844,6 +10046,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlayıcı programları"
+          }
+        }
+      }
+    },
+    "Providers you added": {
+      "comment": "Models section: the custom providers added on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklediğin sağlayıcılar"
           }
         }
       }
@@ -11531,6 +11744,17 @@
         }
       }
     },
+    "Sent to %@": {
+      "comment": "Toast: the message went to another task of the chat; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ görevine gönderildi"
+          }
+        }
+      }
+    },
     "Sent to others": {
       "comment": "Hand-offs: messages the bot sent to other bots",
       "localizations": {
@@ -12264,6 +12488,17 @@
         }
       }
     },
+    "Started a new task: %@": {
+      "comment": "Toast: the message started a task of its own; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni görev başladı: %@"
+          }
+        }
+      }
+    },
     "Starting": {
       "comment": "Status word: a run is starting",
       "localizations": {
@@ -12282,6 +12517,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbet başlatılıyor…"
+          }
+        }
+      }
+    },
+    "Starting…": {
+      "comment": "Live Activity: waiting for the first task update",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başlıyor…"
           }
         }
       }
@@ -12458,6 +12705,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Durduruldu"
+          }
+        }
+      }
+    },
+    "Stopped %@": {
+      "comment": "Toast: the message was a stop of one task; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ durduruldu"
+          }
+        }
+      }
+    },
+    "Stopped every task": {
+      "comment": "Toast: the message was a stop and stopped every task of the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm görevler durduruldu"
           }
         }
       }
@@ -12789,6 +13058,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Görev"
+          }
+        }
+      }
+    },
+    "Tasks": {
+      "comment": "Title of the sheet of a chat's tasks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görevler"
           }
         }
       }
@@ -14879,6 +15159,17 @@
         }
       }
     },
+    "Waits for you": {
+      "comment": "Tasks sheet: the task's run ended asking the owner something",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seni bekliyor"
+          }
+        }
+      }
+    },
     "Waits for your answer": {
       "comment": "Activity: a question a task waits for",
       "localizations": {
@@ -15847,6 +16138,17 @@
         }
       }
     },
+    "Your Mac remembers which task notifications to send to this phone.": {
+      "comment": "Notifications footer: these preferences belong to this phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac’iniz bu telefona hangi görev bildirimlerini göndereceğini hatırlar."
+          }
+        }
+      }
+    },
     "Your Mac's Dot lists no app to connect. Update Dot on the Mac.": {
       "comment": "Connect apps: the empty state's line",
       "localizations": {
@@ -16552,6 +16854,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld yardımcı başlattı"
+          }
+        }
+      }
+    },
+    "task.open": {
+      "comment": "Toast of a routed message: opens the task it went to",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Open"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aç"
+          }
+        }
+      }
+    },
+    "task.stopped": {
+      "comment": "Tasks sheet: the task's run was stopped",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Stopped"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durdu"
           }
         }
       }

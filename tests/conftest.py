@@ -63,7 +63,11 @@ def _key_variables() -> tuple[str, ...]:
     """The variables the providers' keys are looked for in, as the defaults name them."""
     config = load_default_config()
     providers = config.providers
-    return (*providers_by_key(config), providers.openai.organization_env, providers.openai.project_env)
+    return (
+        *providers_by_key(config, config.providers.custom),
+        providers.openai.organization_env,
+        providers.openai.project_env,
+    )
 
 
 # The marks of the tests that run on the owner's own Mac, with their own Dot (item 1315).

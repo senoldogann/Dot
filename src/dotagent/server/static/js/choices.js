@@ -493,7 +493,16 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     );
     const plan = isChat
       ? null
-      : sheetSwitch({ label: t("options.planFirst"), hint: t("choices.planFirstNext"), on: frame.picks.planFirst(), onToggle: () => frame.picks.setPlanFirst(!frame.picks.planFirst()) });
+      : sheetSwitch({
+          label: t("options.planFirst"),
+          hint: t("choices.planFirstNext"),
+          on: frame.picks.planFirst(),
+          // The sheet is painted again so that its switch says the new state, as Fast mode's is (pickSpeed).
+          onToggle: () => {
+            frame.picks.setPlanFirst(!frame.picks.planFirst());
+            repaintSettings();
+          },
+        });
     const models = sections.build(modelArgs());
     return {
       body: [

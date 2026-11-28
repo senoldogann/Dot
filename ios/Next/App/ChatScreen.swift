@@ -78,6 +78,8 @@ struct ChatScreen: View {
     /// The owner's finger moves the transcript, or it glides on after it.
     @State private var ownerScrolls: Bool = false
     @State private var showsJump: Bool = false
+    /// Whether the transcript is at its end now, as the scroll last said.
+    @State private var atEnd: Bool = true
     @State private var reading: ReadingMark = ReadingMark()
     /// How many times the screen was drawn, for the debug render meter (item 1932).
     @State private var renders: RenderMeter = RenderMeter()
@@ -87,6 +89,15 @@ struct ChatScreen: View {
     @State private var stepsShown: Bool = false
     /// The helper whose chat a row of the stream opened (item 1909).
     @State private var openedHelper: HelperChatRef?
+    /// The task the tasks sheet or a toast opened (item 2013).
+    @State private var openedTask: String?
+    /// Where the owner's last message went, when it went to another task than this screen's (item 2013).
+    @State private var routeToast: RoutedSend?
+    /// The routed message whose "Move to" picker is open.
+    @State private var moving: RoutedSend?
+    /// The chat whose screen pushed this one, for "Back to the chat".
+    @Environment(\.pushedFrom) private var pushedFrom: String?
+    @Environment(\.dismiss) private var dismiss: DismissAction
     /// The answer of a side question (`/btw`), shown in an alert.
     @State private var aside: SideAnswer?
     /// This chat's changed files, for the `#` picker.
@@ -169,6 +180,9 @@ struct ChatScreen: View {
             .navigationSubtitle(botChat == nil ? subtitle : "")
             .navigationBarTitleDisplayMode(.inline)
             .modifier(HelperChats(thread: thread, helpers: helpers.map(\.threadId), opened: $openedHelper))
+            .navigationDestination(item: $openedTask) { taskThread in
+                ChatScreen(thread: taskThread, initialPanel: nil, editsFirstQueued: false).environment(\.pushedFrom, thread)
+            }
             .overlay(alignment: .topLeading) {
                 if RenderMeter.shown {
                     Text(verbatim: "\(drawings)").font(.system(size: 1)).opacity(0.01).accessibilityIdentifier("debug.renders")
@@ -179,6 +193,7 @@ struct ChatScreen: View {
             .liveFollow(thread: thread)
             .sheet(item: $panel) { panel in sheet(panel) }
             .toastHost($toast, seconds: 4) { _ in }
+            .modifier(RouteToastHost(thread: thread, routeToast: $routeToast, moving: $moving, open: { openTask($0) }, tell: { toast = $0 }))
             .onAppear {
                 PhaseMeter.enter("chat")
                 // A chat the daemon has not named yet has no stream (item 2025): its outbox key is not opened, which the
@@ -319,13 +334,22 @@ struct ChatScreen: View {
         // A row opened or closed by the owner stays where it is: the follow stops (see `disclosureToggled`).
         .environment(\.disclosureToggled, { pinned = false })
         .scrollDismissesKeyboard(.interactively)
-        .onScrollPhaseChange { _, now in ownerScrolls = now == .interacting || now == .decelerating }
+        .onScrollPhaseChange { _, now, context in
+            ownerScrolls = now == .interacting || now == .decelerating
+            // Whether the end is away is read from the geometry as the scroll begins (item 1991): the value kept from the
+            // last change may be older than the chat (one opened at a remembered place never changed it), and a stale "at the
+            // end" would make the owner's first scroll start the follow.
+            let geometry: ScrollGeometry = context.geometry
+            atEnd = isAtEnd(distanceFromEnd: Double(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.contentOffset.y - geometry.containerSize.height))
+            pinned = followsAfterScroll(following: pinned, atEnd: atEnd, ownerScrolls: ownerScrolls)
+        }
         // Follow new words only while the owner is at the end (plan §13 S5, item 1848): their own scroll away stops it,
         // their scroll back to the end starts it again; words that grow the transcript never stop it.
         .onScrollGeometryChange(for: Bool.self) { geometry in
             isAtEnd(distanceFromEnd: Double(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.contentOffset.y - geometry.containerSize.height))
-        } action: { _, atEnd in
-            if atEnd { pinned = true } else if ownerScrolls { pinned = false }
+        } action: { _, now in
+            atEnd = now
+            pinned = followsAfterScroll(following: pinned, atEnd: now, ownerScrolls: ownerScrolls)
         }
         // New words are followed when the transcript's end changes, never when its height does (item 1932): a lazy
         // stack estimates the rows out of sight, so its height moves as rows come into sight, and following each move
@@ -354,22 +378,28 @@ struct ChatScreen: View {
         }
         .safeAreaInset(edge: .bottom) { bottom(items) }
         .safeAreaInset(edge: .top) {
-            if let finding {
-                let found: [String] = findMatches(items, words: finding)
-                FindBar(
-                    words: Binding(get: { self.finding ?? "" }, set: { self.finding = $0; findIndex = 0 }), index: findIndex, count: found.count,
-                    step: { delta in
-                        guard !found.isEmpty else { return }
-                        findIndex = (findIndex + delta + found.count) % found.count
-                        pinned = false
-                        position.scrollTo(id: found[findIndex], anchor: .center)
-                    },
-                    close: { self.finding = nil }
-                )
-                .onChange(of: found.first) { _, first in
-                    if let first {
-                        pinned = false
-                        position.scrollTo(id: first, anchor: .center)
+            VStack(spacing: 0) {
+                // A task's own screen says whose task it is, and goes back to its chat (item 2013).
+                if view?.thread.laneOf != nil, let tasks = view?.tasks {
+                    LaneLine(chatTitle: tasks.chatTitle, back: { openTask(tasks.chatId) })
+                }
+                if let finding {
+                    let found: [String] = findMatches(items, words: finding)
+                    FindBar(
+                        words: Binding(get: { self.finding ?? "" }, set: { self.finding = $0; findIndex = 0 }), index: findIndex, count: found.count,
+                        step: { delta in
+                            guard !found.isEmpty else { return }
+                            findIndex = (findIndex + delta + found.count) % found.count
+                            pinned = false
+                            position.scrollTo(id: found[findIndex], anchor: .center)
+                        },
+                        close: { self.finding = nil }
+                    )
+                    .onChange(of: found.first) { _, first in
+                        if let first {
+                            pinned = false
+                            position.scrollTo(id: first, anchor: .center)
+                        }
                     }
                 }
             }
@@ -479,10 +509,10 @@ struct ChatScreen: View {
                     queued: view?.queue.messages.count ?? 0,
                     helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
                     plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping && model.visibleLink == nil,
-                    link: model.visibleLink),
+                    link: model.visibleLink, tasks: openTaskCount(view?.tasks)),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
                 stop: { stop() },
-                openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
+                openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents }, openTasks: { panel = .tasks },
                 scrollToBottom: {
                     pinned = true
                     withAnimation { position.scrollTo(edge: .bottom) }
@@ -641,10 +671,28 @@ struct ChatScreen: View {
             files: (changedFiles?.files ?? []).map { PickerItem(kind: .file, token: "#" + $0.path, name: $0.path, detail: "+\($0.added) −\($0.removed)") })
     }
 
+    /// Stops the run at work; while the chat has tasks, every task of it (the owner's decision, item 2013: each row of
+    /// the tasks sheet stops one).
     private func stop() {
+        if let tasks = view?.tasks, hasTasks(tasks) {
+            stopping = activeRun != nil
+            model.perform(.stopChat(thread: tasks.chatId))
+            return
+        }
         guard let run = activeRun else { return }
         stopping = true
         model.perform(.stop(run: run.id, thread: thread))
+    }
+
+    /// Opens a task's thread: nothing for this screen's own, back for the chat that pushed it, else pushed.
+    private func openTask(_ task: String) {
+        panel = nil
+        if task == thread { return }
+        if task == pushedFrom {
+            dismiss()
+            return
+        }
+        openedTask = task
     }
 
     private func react(_ reaction: ReactionKind, target: (run: String, message: String)) {
@@ -699,7 +747,7 @@ struct ChatScreen: View {
     private var currentModel: ModelChoice? {
         let choices: ChatChoices = chatChoices
         guard let ref = effectiveModel(choices, defaultRef: model.chatDefaults?.model) else { return nil }
-        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: choices.effort)
+        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: choices.effort, fast: choices.speed == "fast")
     }
 
     /// The chat's choices as its next follow-up starts with them: those kept for it, else what its last run ran on.
@@ -801,6 +849,8 @@ struct ChatScreen: View {
                 items: (view?.background ?? []).map { work in
                     BackgroundWork(id: work.id, title: work.title, kind: work.kind == "command" ? .command : work.kind == "loop" ? .loop : .subagent)
                 }, close: { self.panel = nil })
+        case .tasks:
+            TasksSheet(thread: thread, open: { openTask($0) }, close: { self.panel = nil })
         case .queue:
             QueueSheet(thread: thread, edit: { beginEdit($0) }, close: { self.panel = nil })
         case .inspector, .files, .screen:

@@ -39,7 +39,9 @@ _TOKEN: str = "closed-helper-rows-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _GOAL: str = "Read the library's three shelves"
 _STEPS: int = 200
-_TOOL: str = "list_dir"
+# A tool whose step the row says in words that name its file ("Reading shelf-200"); one with no phrase of its own is
+# said as "Working" (item 2019).
+_TOOL: str = "read_file"
 # Each helper's part, how its run ended (None: it is at work) and its answer.
 _HELPERS: tuple[tuple[str, RunStatus | None, str], ...] = (
     ("Read the first shelf", "done", "The first shelf holds forty books, all in order."),

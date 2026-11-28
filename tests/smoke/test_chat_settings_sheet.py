@@ -1,9 +1,9 @@
 """The chat's settings as the phone draws them (the owner's report of 2026-11-27), in the web: on a phone's width the
 model's pill opens "Chat settings", whose Options are one card in the phone's order and words: Reasoning (the chosen
-model's own levels in full words), Fast mode only for a model that has it, Approvals and Plan first; on a desk the
-Reasoning pill's menu holds the same levels in full words and Fast mode as a switch, only for a model that has it. At
-1440x900 and 390x844, light and dark; the shots go to ``DOT_SHOTS`` when it is set (for the pull request), else to the
-test's own folder. No network and no model service is used.
+model's own levels in full words), Fast mode only for a model that has it, Approvals and Plan first; a desk's model
+pill opens the same sheet (item 2015), with the same levels in full words and Fast mode as a switch, only for a model
+that has it. At 1440x900 and 390x844, light and dark; the shots go to ``DOT_SHOTS`` when it is set (for the pull
+request), else to the test's own folder. No network and no model service is used.
 """
 
 import asyncio
@@ -126,8 +126,15 @@ async def address(runtime: Runtime) -> AsyncIterator[str]:
 
 async def _open(browser: Browser, address: str, width: int, height: int, scheme: Literal["light", "dark"]) -> Page:
     phone: bool = width <= 720
+    # No service worker: once Dot's controls the page, WebKit sends the page's requests past its route, and the list of
+    # models came without the two added here (the phone's sheet had no Thinker on GitHub's runners). test_voice.py
+    # blocks it for the same reason.
     page: Page = await browser.new_page(
-        viewport={"width": width, "height": height}, color_scheme=scheme, has_touch=phone, is_mobile=phone
+        viewport={"width": width, "height": height},
+        color_scheme=scheme,
+        has_touch=phone,
+        is_mobile=phone,
+        service_workers="block",
     )
     await page.route("**/api/models", _with_two_models)
     port: int = int(address.rpartition(":")[2])
@@ -182,7 +189,7 @@ async def test_the_phone_sheet_has_the_phones_options_in_its_order_and_words(add
             await browser.close()
 
 
-async def test_the_desk_reasoning_menu_has_full_words_and_fast_mode_only_where_it_is(
+async def test_the_desk_sheet_has_the_same_options_in_full_words_and_fast_mode_only_where_it_is(
     address: str, tmp_path: Path
 ) -> None:
     shots: Path = _shots(tmp_path)
@@ -191,29 +198,31 @@ async def test_the_desk_reasoning_menu_has_full_words_and_fast_mode_only_where_i
         try:
             for scheme in ("light", "dark"):
                 page: Page = await _open(browser, address, 1440, 900, scheme)
+                # No reasoning pill on a desk either: the model's pill opens the chat's settings (item 2015).
+                await expect(page.locator(".composer-pill[data-pill='reasoning']")).to_be_hidden()
                 model_pill: Locator = page.locator(".composer-pill[data-pill='model']")
                 await model_pill.click()
-                popover: Locator = page.locator(".composer .composer-popover[aria-label='Model']")
-                await popover.get_by_role("option", name="Thinker").click()
-                reasoning_pill: Locator = page.locator(".composer-pill[data-pill='reasoning']")
-                await reasoning_pill.click()
-                menu: Locator = page.locator(".composer .composer-popover[aria-label='Reasoning']")
-                levels: Locator = menu.get_by_role("listbox", name="Reasoning").get_by_role("option")
+                sheet: Locator = page.get_by_role("dialog", name="Chat settings")
+                await expect(sheet).to_be_visible()
+                await sheet.get_by_role("option", name="Thinker").click()
+                options: Locator = sheet.locator(".sheet-options")
+                rows: Locator = options.locator(
+                    "summary > .sheet-row-text, .sheet-switch .sheet-row-text > span:first-child"
+                )
+                await expect(rows).to_have_text(["Reasoning", "Fast mode", "Approvals", "Plan first"])
+                await options.locator("summary", has_text="Reasoning").click()
+                levels: Locator = options.get_by_role("listbox", name="Reasoning").get_by_role("option")
                 await expect(levels.locator(".pop-option-text > span:first-child")).to_have_text(
                     ["Default (Medium)", *_WORDS]
                 )
                 await page.screenshot(path=str(shots / f"web-reasoning-1440-{scheme}.png"))
-                fast: Locator = menu.get_by_role("switch", name="Fast mode")
-                await expect(fast).to_be_visible()
+                fast: Locator = options.get_by_role("switch", name="Fast mode")
+                await expect(fast).to_have_attribute("aria-checked", "false")
                 await fast.click()
                 await expect(fast).to_have_attribute("aria-checked", "true")
-                await expect(reasoning_pill).to_contain_text("Fast")
-                await page.keyboard.press("Escape")
-                await model_pill.click()
-                await popover.get_by_role("option", name="Plain").click()
-                await reasoning_pill.click()
-                await expect(menu.get_by_role("listbox", name="Reasoning").get_by_role("option")).to_have_count(4)
-                await expect(menu.get_by_role("switch", name="Fast mode")).to_have_count(0)
+                await sheet.get_by_role("option", name="Plain").click()
+                await expect(rows).to_have_text(["Reasoning", "Approvals", "Plan first"])
+                await expect(options.get_by_role("switch", name="Fast mode")).to_have_count(0)
                 await page.close()
         finally:
             await browser.close()

@@ -386,17 +386,21 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
                     # Its row says Waiting at its right, though the run that kept the steps ended (item 1327).
                     await expect(waiting.locator(".side-waiting")).to_have_count(1)
                     await expect(waiting).to_have_attribute("aria-label", re.compile(r"Write .*; Run: \./report\.sh"))
+                # The two asks page in one panel (item 2001): the next one is the question kept for the owner.
+                await page.get_by_role("region", name="Dot asked you").get_by_role("button", name="Next ask").click()
                 question = page.locator(".approval:not(.handoff)", has_text="Kept for you")
                 await expect(question).to_contain_text("Choose Allow once to carry the work on in this conversation")
                 await expect(question.get_by_role("button", name="Allow once")).to_be_visible()
                 await expect(question.get_by_role("button", name="Skip", exact=True)).to_be_visible()
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-                await card.scroll_into_view_if_needed()
+                await question.scroll_into_view_if_needed()
                 await page.mouse.move(0, 0)
                 await page.screenshot(path=str(tmp_path / f"kept-{width}-{scheme}.png"), animations="disabled")
                 if index == len(schemes) - 1:
                     await question.get_by_role("button", name="Skip", exact=True).click()
                     await expect(question).to_have_count(0)
+                    # The one ask left is the step kept for the owner.
+                    await expect(card).to_be_visible()
                     await card.get_by_role("button", name="I did it").click()
                     await expect(card).to_have_count(0)
                 await page.close()

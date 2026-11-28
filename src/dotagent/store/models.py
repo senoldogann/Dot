@@ -274,6 +274,22 @@ class RunRecord(FrozenModel):
     hops: int = 0
 
 
+class DeletedRunRecord(FrozenModel):
+    """What the run ledger of item 1323 keeps of a run deleted with its chat, as the recall tool reads it back (item
+    2077): where it came from, its model, how it ended, when, and the ids of its parent run and of its chat's schedule;
+    no words of it."""
+
+    id: str
+    source: str
+    model: str
+    status: RunStatus
+    created_at: float
+    finished_at: float | None
+    deleted_at: float
+    parent_run_id: str | None
+    schedule_id: str | None
+
+
 class RewindCut(FrozenModel):
     """What a rewind of a chat to before one of its runs took out of it (item 282): ``rewound`` is that run and the
     chat's later runs, oldest first, and ``back_to`` the run the chat ends with now (``None`` when none is left)."""

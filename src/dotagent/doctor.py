@@ -29,6 +29,7 @@ from dotagent.codemode.sandbox import Probe, code_mode_ready
 from dotagent.config import (
     AntigravityConfig,
     AppConfig,
+    CustomProviderConfig,
     DesktopConfig,
     JudgeConfig,
     LessonsMode,
@@ -57,6 +58,7 @@ from dotagent.desktop.types import Permissions
 from dotagent.dot_app import LAUNCHER_ENV, has_kept_launcher
 from dotagent.help.apps import APP_ROOTS
 from dotagent.llm.calls import log_model_call
+from dotagent.llm.custom import CallCheck, check_call
 from dotagent.llm.ollama import RETIRED, OllamaProvider, Retirement
 from dotagent.llm.opencode_go import GoUsage, OpenCodeGoProvider
 from dotagent.llm.openrouter import KeyStatus, OpenRouterProvider, listed_id
@@ -274,7 +276,7 @@ async def _models_row(
     if not models:
         return _result(name, True, False, f"none ({setting} is empty)")
     try:
-        roster: Roster = roster_for(models, await keyed_providers(providers, models), {})
+        roster: Roster = roster_for(models, await keyed_providers(providers, providers.custom, models), {})
     except ConfigError as exc:
         return _result(name, False, False, f"{exc.message}: {', '.join(models)}")
     checks: dict[str, CheckResult] = {
@@ -481,14 +483,21 @@ def _judge_row(config: JudgeConfig, present: bool) -> CheckResult:
     return _result("judge", True, True, f"{config.provider}:{config.model}; {items}")
 
 
-async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
+async def check_provider_key(
+    config: AppConfig, provider: str, custom: Mapping[str, CustomProviderConfig]
+) -> CheckResult:
     """Ask ``provider`` whether it takes the key in use now, through connectors made for this check alone. The calls
     for OpenAI, OpenCode Go, Anthropic, OpenRouter and Google cost nothing; Ollama's key is for its hosted web search,
-    so it is checked with one search, and TypeSafe's, the typed judge's, with one small judgment."""
+    so it is checked with one search, and TypeSafe's, the typed judge's, with one small judgment. A provider of
+    ``custom`` (the ones in use, item 1949) is asked for its list of models when it lists them, else one word of
+    its first model, a call of a few tokens."""
     if provider == "ollama":
         return await _check_ollama_search(config)
     if provider == "typesafe":
         return await _check_typesafe_key(config.judge)
+    own: CustomProviderConfig | None = custom.get(provider)
+    if own is not None:
+        return await _check_custom_key(provider, own)
     router: ModelRouter = ModelRouter(config, log_model_call, os.environ)
     try:
         match provider:
@@ -506,6 +515,29 @@ async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
                 raise ConfigError("no key check exists for this provider", {"provider": provider})
     finally:
         await router.aclose()
+
+
+async def _check_custom_key(name: str, config: CustomProviderConfig) -> CheckResult:
+    """One small call to the custom provider ``name`` with the key in use (:func:`dotagent.llm.custom.check_call`)."""
+    key: str | None = None if config.api_key_env == "" else await asyncio.to_thread(resolve_secret, config.api_key_env)
+    if config.api_key_env != "" and key is None:
+        return _result(f"{name} api", False, True, f"{config.api_key_env} is missing")
+    model: str = "" if config.list_models else config.models[0].id
+    checked: CallCheck = await check_call(name, config, key, model)
+    return _result(f"{name} api", checked.ok, True, checked.detail)
+
+
+def _custom_row(name: str, config: CustomProviderConfig, listing: Served | None, required: bool) -> CheckResult:
+    """A custom provider (item 1949): its list of models where it lists them (``listing``, a free call), else
+    what the configuration names, unasked: Settings' Check asks it with one word."""
+    row: str = f"{name} api"
+    if listing is None:
+        return _result(
+            row, True, required, f"{len(config.models)} models at {config.base_url} ({config.protocol}), not called"
+        )
+    if listing.problem:
+        return _result(row, False, required, listing.problem)
+    return _result(row, True, required, f"{len(listing.names)} models at {config.base_url} ({config.protocol})")
 
 
 def model_is_installed(installed: tuple[str, ...], wanted: str) -> bool:
@@ -1040,6 +1072,13 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
             results.append(await _check_openrouter_api(router, "openrouter" in used))
         if google_present:
             results.append(_openai_api_row(served["google"], "google" in used, "google api"))
+        for name, custom in config.providers.custom.items():
+            present: bool = custom.api_key_env == "" or await asyncio.to_thread(_has_secret, custom.api_key_env)
+            if custom.api_key_env != "":
+                results.append(_check_key(name, custom.api_key_env, present, name in used))
+            if present and custom.list_models:
+                served[name] = await _served(router, name)
+            results.append(_custom_row(name, custom, served.get(name), name in used))
         results.append(_antigravity_login_row(config.providers.antigravity, "antigravity" in used))
         results.append(await _claude_code_row(config, "claude_code" in used))
         results.append(await _check_memory(router, config, down))

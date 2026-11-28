@@ -1,6 +1,7 @@
 """Provider-neutral chat types and the provider interface."""
 
 import math
+import re
 from collections.abc import Awaitable, Callable
 from typing import Literal, Protocol
 
@@ -74,11 +75,32 @@ def runs_dots_tools(provider: str) -> bool:
     return provider not in WHOLE_RUN_AGENTS or provider == "claude_code"
 
 
+# The name of a custom provider (``[providers.custom.<name>]``, docs/models.md): the prefix of its model references, in
+# lower case, from a letter, up to 32 letters, digits, ``_`` and ``-``; never a built-in provider's name nor
+# :data:`RESERVED_PROVIDER_NAMES`.
+CUSTOM_PROVIDER_NAME: re.Pattern[str] = re.compile(r"[a-z][a-z0-9_-]{0,31}")
+# Names a custom provider cannot take beside the built-in ones: the typed judge's service, whose key is listed with the
+# providers' (``config.JUDGE_SERVICE``).
+RESERVED_PROVIDER_NAMES: frozenset[str] = frozenset({"typesafe"})
+
+
+def custom_provider_name(name: str) -> bool:
+    """Whether ``name`` can name a custom provider: the shape of :data:`CUSTOM_PROVIDER_NAME`, and neither a built-in
+    provider's name nor a reserved one."""
+    return (
+        CUSTOM_PROVIDER_NAME.fullmatch(name) is not None
+        and name not in KNOWN_PROVIDERS
+        and name not in RESERVED_PROVIDER_NAMES
+    )
+
+
 def split_model_ref(text: str) -> tuple[str, str] | None:
     """The provider and the model of ``<provider>:<model>``, split at the first colon (model names may contain colons,
-    e.g. ``qwen3:8b``), or ``None`` when ``text`` is not one or names a provider Dot does not know."""
+    e.g. ``qwen3:8b``), or ``None`` when ``text`` is not one or names neither a built-in provider nor a name a custom
+    provider can take (:func:`custom_provider_name`). Whether such a custom provider is configured is for the
+    configuration (``AppConfig``) and the router to say."""
     provider, separator, model = text.strip().partition(":")
-    if separator == "" or model == "" or provider not in KNOWN_PROVIDERS:
+    if separator == "" or model == "" or (provider not in KNOWN_PROVIDERS and not custom_provider_name(provider)):
         return None
     return provider, model
 

@@ -3,6 +3,7 @@ than a fixed title and a chat's short title), and the watch that sends them, wit
 
 import base64
 import json
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from dotagent.config import ApnsConfig, AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import DRAFT_CREATED_EVENT
+from dotagent.evals import EVAL_SOURCE
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID
 from dotagent.notify.apns import (
     ALERT_BODY,
@@ -61,6 +63,7 @@ from dotagent.notify.live_now import LiveNow, tool_now
 from dotagent.notify.live_start import keep_live_start_token, live_start_token_of
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.notify.settings import PushSettings, keep_push_settings
+from dotagent.proactive import UNWATCHED_SOURCES
 from dotagent.runtime import _guarded_files
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_RUN_ENDED_EVENT, SCHEDULE_STOPPED_EVENT
 from dotagent.scheduler.notices import tells
@@ -959,5 +962,57 @@ async def test_a_start_token_that_apns_calls_gone_is_forgotten_and_a_push_that_f
         for later in (3 * START_EVERY_S, 4 * START_EVERY_S):
             await failing.flush(_NOW + later)
         assert down.posts == 3
+    finally:
+        await store.close()
+
+
+def test_dotnext_explicitly_excludes_the_daemons_unwatched_live_activity_sources() -> None:
+    path: Path = Path(__file__).resolve().parents[2] / "ios/Next/Push/PhonePush.swift"
+    declaration: str = next(line for line in path.read_text().splitlines() if "let unwatchedSources:" in line)
+    assert set(re.findall(r'"([^"]+)"', declaration)) == {*UNWATCHED_SOURCES, EVAL_SOURCE}
+
+
+async def test_dotnext_sends_only_task_alerts_and_ends_its_card_with_the_last_run(tmp_path: Path) -> None:
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        config: ApnsConfig = _CONFIG.model_copy(update={"topic": "dev.dotagent.phone.next"})
+        watch = ApnsWatch(store, ApnsSender(config, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await keep_live_start_token(store, "p1", _START)
+        run: RunRecord = await _run(store, BACKGROUND_SOURCE, None)
+        await watch.on_event(_event(run.id, "run_started", {}), _NOW)
+        [start] = _starts(apple)
+        aps: object = start[2]["aps"]
+        assert isinstance(aps, dict)
+        assert aps["alert"] == {"title": {"loc-key": START_TITLE}, "body": {"loc-key": ALERT_BODY}}
+        assert "sound" not in aps
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        await watch.on_event(_registered(), _NOW)
+        await watch.on_event(_event(run.id, "tool_call", {"tool": "shell"}), _NOW + PROGRESS_EVERY_S)
+        await watch.on_event(
+            _event(run.id, "approval_requested", {"severity": "low", "approval_id": "apr_1", "summary": "private"}),
+            _NOW + 5,
+        )
+        await watch.on_event(_event(run.id, "goal_check", {"decision": "blocked", "final": True}), _NOW + 6)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "failed", "goal_blocked": True}), _NOW + 7)
+        await watch.on_event(_event(SYSTEM_RUN_ID, LEARNING_STALLED_EVENT, {"reason": "not a task alert"}), _NOW + 8)
+        alerts: list[JsonObject] = [body for _, headers, body in apple.posted if headers["apns-topic"] == config.topic]
+        assert alerts == [
+            {
+                "aps": {"alert": {"title-loc-key": title, "loc-key": ALERT_BODY}, "sound": "default"},
+                "route": f"#/runs/{run.id}",
+            }
+            for title in ("Dot asks for approval", "A task is blocked")
+        ]
+        activity_pushes: list[JsonObject] = [
+            body
+            for _, headers, body in apple.posted
+            if headers["apns-topic"] == f"{config.topic}.push-type.liveactivity"
+        ]
+        assert "Running a command" in json.dumps(activity_pushes)
+        ended: object = activity_pushes[-1]["aps"]
+        assert isinstance(ended, dict) and ended["event"] == "end" and ended["dismissal-date"] == int(_NOW + 7)
+        assert await store.live_activities_of(FLEET_ID) == []
     finally:
         await store.close()

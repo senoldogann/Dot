@@ -913,7 +913,7 @@
 }
 
 @media (max-width: 720px) {
-  .dock > :is(.wait-line, .status-bar, .queue, .chat-loops, .background-work) {
+  .dock > :is(.wait-line, .status-bar, .queue, .chat-tasks, .chat-loops, .background-work) {
     display: none;
   }
 
@@ -1195,7 +1195,7 @@
 
 /* A pane of the dock in its sheet is a plain section: no tuck under the composer, no frame, no head (the sheet has the
    title), and its list shows whole, the sheet being what scrolls. */
-.dock-sheet-body > :is(.queue, .chat-loops, .background-work) {
+.dock-sheet-body > :is(.queue, .chat-tasks, .chat-loops, .background-work) {
   position: static;
   margin: 0;
   padding: 0;
@@ -1339,6 +1339,21 @@
 .dock-sheet-body .loop-row > .btn {
   grid-area: stop;
   justify-self: start;
+}
+
+/* A task of the chat (item 2013): its title over how it stands, its Stop and Open at the row's end. */
+.dock-sheet-body .task-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "dot text actions";
+  align-items: center;
+}
+
+.dock-sheet-body .task-row > .status-dot {
+  margin-top: 0;
+}
+
+.dock-sheet-body .task-row > .task-actions {
+  grid-area: actions;
 }
 
 /* A command at work: its words wrapped whole, then how long it has run and its Stop on a line of their own. */
@@ -4532,6 +4547,20 @@ dialog.computer-full::backdrop {
     clip-path: inset(50%);
     white-space: nowrap;
   }
+}
+
+/* While the microphone listens the box keeps its line, and the recorder takes the whole line under it, where the "+",
+   the model, the microphone and the send were (items 605 and 833), in either shape and on every width: the one row
+   above has no cell for it, and it fell into the "+"'s. After the rules above, which it must outweigh. */
+.composer .composer-bar.has-mic.recording {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "field"
+    "recorder";
+}
+
+.composer-bar.recording > .mic-recorder {
+  grid-area: recorder;
 }
 
 /* The chat's settings over a window wider than a phone's (item 2015): the phone's sheet, as wide as a reading column,

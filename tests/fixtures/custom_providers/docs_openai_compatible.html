@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><title>OpenAI Compatibility - Example Cloud Docs</title></head>
+<body>
+<nav><a href="/docs">Docs</a> <a href="https://github.com/example/sdk">SDK on GitHub</a></nav>
+<main>
+<h1>OpenAI Compatibility</h1>
+<p>Example Cloud's API is OpenAI-compatible: point any OpenAI client at our base URL and use your Example Cloud API key.</p>
+<h2>Configuring OpenAI to use Example Cloud's API</h2>
+<p>Set the base URL to <code>https://api.example-cloud.dev/openai/v1</code> and the key to <code>EXAMPLE_API_KEY</code>.</p>
+<pre><code>import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ.get("EXAMPLE_API_KEY"),
+    base_url="https://api.example-cloud.dev/openai/v1",
+)
+response = client.chat.completions.create(
+    model="llama-4-scout-17b",
+    messages=[{"role": "user", "content": "Hello"}],
+)</code></pre>
+<pre><code>curl https://api.example-cloud.dev/openai/v1/chat/completions \
+  -H "Authorization: Bearer $EXAMPLE_API_KEY" \
+  -d '{"model": "qwen3-32b", "messages": [{"role": "user", "content": "Hi"}]}'</code></pre>
+<p>List the models your key can use with <code>GET https://api.example-cloud.dev/openai/v1/models</code>.</p>
+</main>
+</body></html>

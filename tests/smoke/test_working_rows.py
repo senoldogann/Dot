@@ -179,11 +179,11 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
             for index, (width, scheme) in enumerate(_SHOTS):
                 page: Page = await _open_sidebar(browser, address, width, scheme)
                 sidebar: Locator = page.locator("#sidebar")
-                # The Working section: the chat at work (item 202) with its time, wearing the face of the run it
-                # delegated (item 507) rather than a row of its own.
+                # The Working section: the chat at work (item 202) with its time, saying it waits on the run it
+                # delegated (item 2010) rather than giving it a row of its own.
                 section: Locator = sidebar.locator("[data-section=working]")
                 await expect(section.locator("a.side-run .side-working")).to_have_count(1)
-                await expect(section.locator(".side-chat-helpers .side-helpers")).to_have_text("1")
+                await expect(section.locator(".side-chat-live")).to_have_text("Waiting on 1 helper…")
                 await expect(section.locator(".side-children")).to_have_count(0)
                 for slot in await section.locator(".side-working").all():
                     await expect(slot).to_have_text(_WORKING)

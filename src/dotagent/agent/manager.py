@@ -2980,6 +2980,14 @@ class RunManager:
             chat_id, chosen, text, files, mode, model, effort, speed, approvals, goal_mode, source
         )
 
+    async def tasks_of_chat(self, thread_id: str) -> list[ChatTask]:
+        """The tasks of the chat of ``thread_id`` (itself, or the chat it is a lane of), as the pages show them (item
+        2013); none while the chat has no lane."""
+        chat_id: str = await self._chat_of(thread_id)
+        if not await self._runtime.store.lanes_of(chat_id):
+            return []
+        return await self._chat_tasks_of(chat_id)
+
     async def _chat_tasks_of(self, chat_id: str) -> list[ChatTask]:
         """The tasks of the chat ``chat_id`` (item 2012): the chat's own and each lane's, each with its newest run of
         the owner's, whether it works, the question it waits on (a card left unanswered, or a reply ending with a
@@ -3005,6 +3013,7 @@ class RunManager:
                 ChatTask(
                     thread_id=thread_id,
                     newest_run_id=newest.id,
+                    status=newest.status,
                     goal="" if owners is None else owners.goal,
                     at_work=at_work,
                     asked=asked,
@@ -3067,11 +3076,13 @@ class RunManager:
             chat_id, task_thread, text, files, mode, model, effort, speed, approvals, goal_mode, source
         )
         started: RunHandle | None = self._active_on(task_thread)
+        # A free task took the message at once and it left the queue: only its run can be moved, never its message.
+        waiting: bool = any(queued.id == message.id for queued in await self._runtime.store.list_queued(task_thread))
         return RoutedMessage(
             kind="queued",
             thread_id=task_thread,
             run_id=None if started is None else started.run_id,
-            message_id=message.id,
+            message_id=message.id if waiting else None,
         )
 
     async def _start_routed(
@@ -5290,6 +5301,7 @@ class RunManager:
         error: JsonObject | None = None
         lessons: LessonCase | None = None
         restated: tuple[int, ...] = ()
+        goal_blocked: bool = False
         first_words: asyncio.Task[None] | None = None
         try:
             async with self._place_for(run):
@@ -5313,6 +5325,7 @@ class RunManager:
                 status, result, needs = outcome.status, outcome.result, outcome.needs
                 lessons = ended.lessons
                 restated = outcome.restated
+                goal_blocked = outcome.goal_blocked
         except RunHoldLapsed as exc:
             status, result = "cancelled", exc.message
         except (RunCancelled, asyncio.CancelledError):
@@ -5350,7 +5363,9 @@ class RunManager:
                 # comes meanwhile is dropped (:func:`_to_its_end`): the end below must still be recorded. The daemon's
                 # own stop cuts them too, but keeps them: the next start resumes them (item 1668).
                 await _to_its_end(self._wait_detached_of(run.id) if self._stopping else self._stop_detached_of(run.id))
-            recorded: bool = await self._close(run, status, result, needs, error, inbox, finished, restated)
+            recorded: bool = await self._close(
+                run, status, result, needs, error, inbox, finished, restated, goal_blocked
+            )
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         learns: bool = recorded and not self._stopping and not self._learning_dropped
         if learns and lessons is None and parse_model_ref(run.model).provider in WHOLE_RUN_AGENTS:
@@ -5417,7 +5432,8 @@ class RunManager:
         error: JsonObject | None,
         inbox: RunInbox,
         finished: asyncio.Event,
-        restated: tuple[int, ...] = (),
+        restated: tuple[int, ...],
+        goal_blocked: bool,
     ) -> bool:
         """Record the end of the run (:meth:`_record_end`), then release its handle and set ``finished`` whatever
         happens; returns whether the end was recorded. A stop that comes meanwhile waits for the record and stops
@@ -5425,7 +5441,9 @@ class RunManager:
         failure to record it is logged here with its traceback; an end the store refused is stored later
         (:meth:`store_left_ends`), and the run stays as the store has it until then."""
         try:
-            recorded: bool = await _to_its_end(self._record_end(run, status, result, needs, error, inbox, restated))
+            recorded: bool = await _to_its_end(
+                self._record_end(run, status, result, needs, error, inbox, restated, goal_blocked)
+            )
             # The orders a Stop ends are ended under the same shield: a second stop meanwhile cuts nothing short (the
             # pre-push review of item 907). An end not stored, as the run had ended already, follows nothing twice.
             if recorded:
@@ -5462,7 +5480,8 @@ class RunManager:
         needs: str,
         error: JsonObject | None,
         inbox: RunInbox,
-        restated: tuple[int, ...] = (),
+        restated: tuple[int, ...],
+        goal_blocked: bool,
     ) -> bool:
         """Store how the run ended and tell about it: its waiters are released, the answers that reached its inbox
         (shut by :meth:`_drive`) too late are kept, the status and result are stored with the scores of the notes it
@@ -5476,6 +5495,8 @@ class RunManager:
         clean: str = truncate_tail(redact_known(result, held), _RESULT_CHARS)
         needed: str = redact_known(needs, held)
         data: JsonObject = {"status": status, "result": clean, "needs": needed}
+        if goal_blocked:
+            data["goal_blocked"] = True
         if error is not None:
             data["error"] = redact_json(error, held)
         if restated:

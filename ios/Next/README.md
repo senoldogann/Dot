@@ -3,7 +3,8 @@
 The native app that replaces `ios/Dot` wave by wave (the plan lives in the owner's workspace,
 `ios-rewrite-2026-11-24/PLAN.md`). It installs beside the old app: bundle id `dev.dotagent.phone.next`, app group
 `group.dev.dotagent.phone.next`, its own Keychain access group, URL scheme `dotnext://`, display name "Dot Next". iOS 26
-and later, iPhone and iPad. No push and no Live Activity until the swap (owner's decision): the old app keeps them.
+and later, iPhone and iPad. DotNext has its own APNs topic and Live Activity extension (item 2042).
+[Phone setup](../../docs/phone.md#dotnext-push-and-live-activities) describes signing and selecting that topic.
 
 Wave N0 gave the design system, the components and the gallery; wave N1-client the engine (`ios/DotEngine`, below)
 and the screens wired to it: pairing, the chat list, a chat, the helpers and background sheets, settings. Wave N2 made
@@ -66,7 +67,7 @@ names, the language, the clock, Queue or Steer, the confirmation of deleting a c
 (light, dark or system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their
 own and word break, the tool calls in chat, response streaming, the reading width), Chat (haptics, reactions'
 follow-ups), Models (the main and fast models from the daemon's list, and the code review's model with its reasoning,
-changed from the phone too: item 1770, a §24 picker sheet), Usage limits and caps (the plan's windows, today's tokens,
+changed from the phone too: item 1770, a §24 picker sheet; the providers added on the Mac, read only, item 1949), Usage limits and caps (the plan's windows, today's tokens,
 the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
 switch on each row; edit, run now, delete; + makes a new one, item 1911, and a schedule's History lists its runs,
 each opening its chat), Rules (the approval mode tasks start in and what asks in it; free mode,

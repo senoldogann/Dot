@@ -227,6 +227,14 @@ here points at a test that no longer exists.
   calls the approval broker itself asks the owner whatever the gate waives, in yolo and free mode too: a new place is a
   new ask (item 1561).
 
+- `tests/unit/test_custom_providers.py::test_a_custom_model_stands_in_the_standby_and_helper_roster_by_its_own_key` — a
+  custom provider's model in `[models] standby` or `helpers` raised "unknown provider" in the roster (item 1949).
+- `tests/smoke/test_custom_providers.py::test_the_api_refuses_a_header_that_carries_a_key_and_a_built_in_name` — a
+  table that stopped taking a key and took it again at a new address sent the key saved for the old one there, through
+  Save and Test (item 1949's security review), and a key under that name in the environment was attached to an address
+  by Save (its second pre-push review), and a Keychain item under that name, uncovered once Dot's copy was dropped,
+  would have been sent to the new address (its third).
+
 ## Evidence and format
 
 - Cite file and line for every finding; read the code instead of guessing from names

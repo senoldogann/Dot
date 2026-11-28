@@ -728,15 +728,11 @@ async def page_title(page: Page) -> str:
 
 
 class _PageSilent(PlaywrightTimeoutError):
-    """The page answered nothing within the bound (:func:`_wait_quiet`), told as :class:`TabSilentError`."""
+    """The page answered nothing within the bound (:func:`_answer`), told as :class:`TabSilentError`."""
 
 
-async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
-    """The document parsed, then quiet for ``quiet_ms`` (at most ``max_ms``). A tab whose page answers nothing at all
-    within ``timeout_ms`` is told apart from one still parsing (item 753): a page stuck in a script, or a Chrome that
-    stopped answering, was reported as a document not yet parsed. A page busy for a while (a heavy app starting on a
-    loaded Mac) has the whole ``timeout_ms`` to answer, as before; the parse has what is left of it."""
-    started: float = time.monotonic()
+async def _answer(page: Page, timeout_ms: int) -> None:
+    """The page answers a call within ``timeout_ms``, or :class:`_PageSilent` says it is stuck."""
     try:
         async with asyncio.timeout(timeout_ms / 1000):
             await page.evaluate("1")
@@ -745,6 +741,22 @@ async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -
             f"the tab did not answer within {timeout_ms / 1000:g} s: its page is stuck, or Chrome is overloaded. Close "
             "this tab (browser_close_tab) and open the page in a new one"
         ) from error
+
+
+def _told_silent(error: BrowserError) -> BrowserError:
+    """``error`` as :class:`TabSilentError` when the page answered nothing (:class:`_PageSilent`), else as it is."""
+    if isinstance(error.__cause__, _PageSilent):
+        return TabSilentError(error.message, error.context)
+    return error
+
+
+async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
+    """The document parsed, then quiet for ``quiet_ms`` (at most ``max_ms``). A tab whose page answers nothing at all
+    within ``timeout_ms`` is told apart from one still parsing (item 753): a page stuck in a script, or a Chrome that
+    stopped answering, was reported as a document not yet parsed. A page busy for a while (a heavy app starting on a
+    loaded Mac) has the whole ``timeout_ms`` to answer, as before; the parse has what is left of it."""
+    started: float = time.monotonic()
+    await _answer(page, timeout_ms)
     try:
         async with asyncio.timeout(max(timeout_ms / 1000 - (time.monotonic() - started), 0.001)):
             await page.evaluate(_PARSED_SCRIPT)
@@ -771,9 +783,17 @@ async def wait_dom_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int
             lambda: _wait_quiet(page, quiet_ms, max_ms, timeout_ms),
         )
     except BrowserError as error:
-        if isinstance(error.__cause__, _PageSilent):
-            raise TabSilentError(error.message, error.context) from error.__cause__
-        raise
+        raise _told_silent(error) from error.__cause__
+
+
+async def tab_answers(page: Page, timeout_ms: int) -> None:
+    """The page of a tab answers a call within ``timeout_ms`` (a document replaced under the call is asked again), or
+    :class:`TabSilentError` says it is stuck (item 2079): asked before a wait for a navigation to commit, so that a tab
+    that answers nothing is said after one bound rather than after that wait and another."""
+    try:
+        await _again_after_navigation(page, "asking the tab failed", lambda: _answer(page, timeout_ms))
+    except BrowserError as error:
+        raise _told_silent(error) from error.__cause__
 
 
 # What a step that should change the page did to it (item 739): how many changes the page's documents have had since
