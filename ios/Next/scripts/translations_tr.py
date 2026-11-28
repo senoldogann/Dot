@@ -1774,6 +1774,8 @@ TR.update(
 
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+# A bot's Model page (item 2074).
+TR.update({"For chats that have no model of their own": "Kendi modeli olmayan sohbetler için"})
 
 # PN1: remote task alerts and the Live Activity.
 TR.update({

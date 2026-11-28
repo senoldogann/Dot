@@ -2292,6 +2292,7 @@ export const EN_VIEWS = {
   "views.agents.defaultModelname": "Default ({modelName})",
   "views.agents.mainModel": "Main model",
   "views.agents.mainModelname": "Main model ({modelName})",
+  "views.agents.mainModelHint": "For chats that have no model of their own",
   "views.agents.defaultLevellabel": "Default ({levelLabel})",
   "views.agents.partPicked": "{part} picked",
   "views.agents.teamsLength": "Teams ({length})",

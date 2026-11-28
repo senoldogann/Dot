@@ -482,7 +482,8 @@ export function agentForm({ record, onSaved, onCancel }) {
   const notOffered = el("p", { class: "hint", hidden: true });
   const model = el("div", { class: "agent-model-picker", role: "group", "aria-label": t("views.agents.model") });
   function paintModels() {
-    const built = modelList.build({ groups: modelGroups, chosen: modelValue, fallback: null, blank: mainWords });
+    // The main model is only what a chat with no model of its own takes: a chat's chosen model wins (MS2's finding).
+    const built = modelList.build({ groups: modelGroups, chosen: modelValue, fallback: null, blank: mainWords, blankHint: t("views.agents.mainModelHint") });
     const known = modelGroups.some((group) => group.models.some((candidate) => candidate.ref === modelValue));
     notOffered.hidden = modelValue === "" || known || modelGroups.length === 0;
     notOffered.textContent = t("views.agents.chosenNotOfferedNow", { chosen: modelValue });

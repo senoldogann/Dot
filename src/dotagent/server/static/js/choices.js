@@ -444,7 +444,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
 
   function modelArgs() {
     const fallback = defaultRefOf(getSnapshot());
-    return { groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback) };
+    return { groups: toolGroups(providers), chosen: chosenRef, fallback, blank: defaultRowText(fallback), blankHint: null };
   }
 
   // On a phone the model's pill opens the chat's settings instead (item 1202, the owner's ask after another

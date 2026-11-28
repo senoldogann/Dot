@@ -5820,6 +5820,17 @@
         }
       }
     },
+    "For chats that have no model of their own": {
+      "comment": "Bot profile's Model page: what the main model row is for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendi modeli olmayan sohbetler için"
+          }
+        }
+      }
+    },
     "For the objective": {
       "comment": "Work order: the objective it serves",
       "localizations": {
