@@ -741,6 +741,7 @@ when the gallery installs one or Remove plugin takes one out (item 542); skills 
 MCP servers of a plugin that came while Dot runs start when Dot starts again.
 
 `dotx skills list` shows every plugin and skill found, and anything left out and why; `dotx doctor` has a row for each.
+`dotx skills lint` says what each skill lacks to be followed and checked ([Harness](harness.md#the-lint-of-a-skill)).
 A copy of a skill (the same name, description and instructions in its `SKILL.md` in another folder, as a sync of the
 same skills leaves in `~/.claude/skills`; the folders' other files are not compared, and the first one's are used)
 counts once and is not listed, in Dot's skills and under Found on this Mac (item 707). A skill another one has the name

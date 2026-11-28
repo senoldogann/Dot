@@ -108,6 +108,7 @@ from dotagent.skills.catalog import (
     playbook_root,
     read_playbook,
 )
+from dotagent.skills.lint import lint_skill
 from dotagent.skills.parse import parse_skill, split_frontmatter
 from dotagent.skills.types import SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.models import EventRecord, ResultStep, RunRecord, RunStatus
@@ -1552,9 +1553,23 @@ async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) 
         said: str = f"The skill could not be written: {shorten_reason(message)}"
         await runtime.bus.emit(run.id, PLAYBOOK_FAILED, {"host": host, "error": said}, True)
         return failed_with(said)
-    log.info("playbook_written", run_id=run.id, name=name, host=host, path=str(file), updated=updated, tainted=tainted)
+    # The lint of what was written (docs/harness.md, "The lint of a skill"): recorded, never a reason to refuse it.
+    lint: list[JsonValue] = [problem.said for problem in lint_skill(await asyncio.to_thread(file.read_text, "utf-8"))]
+    log.info(
+        "playbook_written",
+        run_id=run.id,
+        name=name,
+        host=host,
+        path=str(file),
+        updated=updated,
+        tainted=tainted,
+        lint=len(lint),
+    )
     await runtime.bus.emit(
-        run.id, PLAYBOOK_WRITTEN, {"name": name, "host": host, "path": str(file), "updated": updated}, True
+        run.id,
+        PLAYBOOK_WRITTEN,
+        {"name": name, "host": host, "path": str(file), "updated": updated, "lint": lint},
+        True,
     )
     return LEARNED
 
