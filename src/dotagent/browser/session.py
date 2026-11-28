@@ -74,6 +74,7 @@ from dotagent.browser.driver import (
     run_step,
     screenshot_jpeg,
     scroll_page,
+    tab_answers,
     text_in_frames,
     text_shown,
     upload_files,
@@ -2259,10 +2260,15 @@ class BrowserSession:
             add_note(tab, _STILL_LOADING)
 
     async def _settle(self, tab: Tab) -> None:
-        """Let a navigation that is under way commit, then wait for a quiet DOM."""
+        """Let a navigation that is under way commit, then wait for a quiet DOM. While one is under way the page is
+        asked first whether it answers at all (item 2079): the wait for the commit and the one for the page to answer
+        took a bound each, so a stuck tab was said only after twice ``navigation_timeout_s``, past the limit of the
+        tool that waited (``browser_snapshot``'s 45 s), which then cut it with no word of what was wrong."""
         if tab.page.is_closed():
             return
         config: BrowserConfig = self._config
+        if not tab.nav_idle.is_set():
+            await tab_answers(tab.page, _ms(config.navigation_timeout_s))
         await self._let_commit(tab)
         await wait_dom_quiet(tab.page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
 
