@@ -269,9 +269,9 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
 
 
 def message_group(kind: str, message: PushMessage) -> PushGroup | None:
-    """The kind of push ``message``, made of an event of ``kind``, is told as: the end of a run that is blocked or waits on the
-    owner (item 2070; its state ``waiting``) with what waits on them, so that the switch of that kind decides it; any other
-    as :func:`push_group` says."""
+    """The kind of push ``message``, made of an event of ``kind``, is told as: the end of a run that is blocked or
+    waits on the owner (item 2070; its state ``waiting``) with what waits on them, so that the switch of that kind
+    decides it; any other as :func:`push_group` says."""
     if kind == "run_finished" and message.state == "waiting":
         return "needs_you"
     return push_group(kind)
