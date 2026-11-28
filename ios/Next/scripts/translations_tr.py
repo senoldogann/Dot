@@ -1187,12 +1187,29 @@ TR: dict[str, str] = {
     # D2: the link in the chat's pill (item 1931).
     "Reconnecting to %@…": "%@ cihazına yeniden bağlanılıyor…",
     "Syncing messages…": "Mesajlar eşitleniyor…",
+    # A chat's tasks (item 2013): the capsule's segment, the sheet, a task's own line, the toast of a routed message.
+    "%lld tasks": "%lld görev",
+    "Tasks": "Görevler",
+    "Waits for you": "Seni bekliyor",
+    "task.stopped": "Durdu",
+    "task.open": "Aç",
+    "A task of %@": "%@ sohbetinin görevi",
+    "Back to the chat": "Sohbete dön",
+    "Started a new task: %@": "Yeni görev başladı: %@",
+    "Sent to %@": "%@ görevine gönderildi",
+    "Stopped every task": "Tüm görevler durduruldu",
+    "Stopped %@": "%@ durduruldu",
+    "Move": "Taşı",
+    "Move to": "Şuraya taşı",
+    "New task": "Yeni görev",
+    "Not moved: %@": "Taşınamadı: %@",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
 EN_PLURALS: dict[str, tuple[str, str]] = {
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
+    "%lld tasks": ("%lld task", "%lld tasks"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),
     "Back, %lld bots unread": ("Back, %lld bot unread", "Back, %lld bots unread"),
     "Delete %lld chats with everything they hold?": ("Delete %lld chat with everything it holds?", "Delete %lld chats with everything they hold?"),

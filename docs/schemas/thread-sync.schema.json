@@ -523,6 +523,60 @@
       "title": "ChatChoices",
       "type": "object"
     },
+    "ChatTaskView": {
+      "additionalProperties": false,
+      "description": "A task of a chat with several (item 2013), as the pages and the phone list it: its thread (the chat's own, or\na lane), its title, its newest run and that run's status, whether it works, waits for the owner or ended, and\nwhether it is the chat's own.",
+      "properties": {
+        "own": {
+          "title": "Own",
+          "type": "boolean"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "working",
+            "waits",
+            "ended"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "done",
+            "blocked",
+            "failed",
+            "cancelled",
+            "ending"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "title",
+        "run_id",
+        "status",
+        "state",
+        "own"
+      ],
+      "title": "ChatTaskView",
+      "type": "object"
+    },
     "ChatTeam": {
       "additionalProperties": false,
       "description": "The team a chat is with (item 610), as the chat's row and page name it: ``id`` (the chat's ``actor_id``), the\nteam's name and the ids of its agents in order, whose faces the chat wears.",
@@ -2509,6 +2563,39 @@
       "title": "Synchronized",
       "type": "object"
     },
+    "TasksView": {
+      "additionalProperties": false,
+      "description": "The tasks of a chat (item 2013): the chat, its title, how many tasks may work at once (``[agent]\nchat_tasks``: 1 means a message never starts a task of its own), and its tasks, none while it has no lane.",
+      "properties": {
+        "cap": {
+          "title": "Cap",
+          "type": "integer"
+        },
+        "chat_id": {
+          "title": "Chat Id",
+          "type": "string"
+        },
+        "chat_title": {
+          "title": "Chat Title",
+          "type": "string"
+        },
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/ChatTaskView"
+          },
+          "title": "Tasks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "chat_id",
+        "chat_title",
+        "cap",
+        "tasks"
+      ],
+      "title": "TasksView",
+      "type": "object"
+    },
     "TerminalView": {
       "additionalProperties": false,
       "description": "A terminal session of a chat (item 229), as the line over the composer shows it: its command, whether it runs in\nthe background (its end is told to the chat), when it started (seconds since the epoch), whether its program has\nended, and its exit status once it ended by itself.",
@@ -2967,6 +3054,9 @@
             }
           ]
         },
+        "tasks": {
+          "$ref": "#/$defs/TasksView"
+        },
         "terminals": {
           "items": {
             "$ref": "#/$defs/TerminalView"
@@ -2994,7 +3084,8 @@
         "schedules",
         "reactions",
         "drafts",
-        "terminals"
+        "terminals",
+        "tasks"
       ],
       "title": "ThreadView",
       "type": "object"
