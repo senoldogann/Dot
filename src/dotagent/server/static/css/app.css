@@ -5391,7 +5391,7 @@ dialog.modal.versions-dialog {
   bottom: 2px;
   left: 6px;
   width: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-joined);
   background: var(--border);
 }
 
