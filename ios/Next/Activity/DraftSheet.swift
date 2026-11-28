@@ -191,7 +191,7 @@ struct ProposalSheet: View {
             String(localized: "Use a version written from outside content?", comment: "Self-improvement: asks before using a version from outside content"),
             isPresented: $askingUse, titleVisibility: .visible
         ) {
-            Button(String(localized: "Use it", comment: "Self-improvement: confirms using a version")) { Task { await use() } }
+            Button(String(localized: "Use it", comment: "Self-improvement and skill proposals: confirms using a version or a skill")) { Task { await use() } }
         } message: {
             Text(String(localized: "The tasks that start from now on follow it.", comment: "Self-improvement: what using a version does"))
         }

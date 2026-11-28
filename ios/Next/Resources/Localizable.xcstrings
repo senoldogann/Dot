@@ -15274,7 +15274,7 @@
       }
     },
     "Use it": {
-      "comment": "Self-improvement: confirms using a version",
+      "comment": "Self-improvement and skill proposals: confirms using a version or a skill",
       "localizations": {
         "tr": {
           "stringUnit": {
