@@ -35,6 +35,7 @@ from dotagent.server.links import ui_url
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.phone import render_status
+from dotagent.tools.phone_app import PHONE_APP_TOOLS
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -198,6 +199,11 @@ def _home(config: AppConfig) -> Iterator[tuple[Path, AppConfig]]:
         yield home, eval_config(config)
 
 
+def _wda_tool(name: str) -> bool:
+    """A tool of the WebDriverAgent link (``[phone]``), not one of the Dot Next app's (item 2051)."""
+    return name.startswith("phone_") and name not in PHONE_APP_TOOLS
+
+
 async def _tell_nobody(title: str, text: str) -> None:
     return None
 
@@ -213,7 +219,8 @@ async def test_a_run_asks_the_phone_status_through_the_real_registry_and_sends_o
     with _home(_config(load_default_config(), standin)) as (_, config):
         runtime: Runtime = await open_runtime(config, login_env)
         try:
-            assert [name for name in runtime.registry.tools if name.startswith("phone_")] == ["phone_status"]
+            # The Dot Next app's tools (item 2051) are always registered and withheld from a run with no phone paired.
+            assert [name for name in runtime.registry.tools if _wda_tool(name)] == ["phone_status"]
             await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, turns))
             manager: RunManager = RunManager(runtime)
             try:
@@ -252,7 +259,7 @@ async def test_the_tool_is_registered_only_while_the_phone_is_on(login_env: dict
         runtime: Runtime = await open_runtime(config, login_env)
         try:
             assert runtime.phone is None
-            assert not [name for name in runtime.registry.tools if name.startswith("phone_")]
+            assert not [name for name in runtime.registry.tools if _wda_tool(name)]
         finally:
             await close_runtime(runtime)
 

@@ -28,6 +28,7 @@ from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.groups import ACCOUNTS_GROUP, group_of
 from dotagent.tools.meta import FINISH_TOOL, USE_TOOLS_TOOL
+from dotagent.tools.phone_app import PHONE_APP_TOOLS
 from dotagent.tools.registry import build_registry, specs_for_mode
 from dotagent.tools.schedule import build_schedule_tools
 from dotagent.tools.shell import read_login_env
@@ -337,14 +338,14 @@ async def test_a_run_that_offers_every_tool_has_no_groups_and_answers_use_tools_
     assert played.groups == ()
     # Every tool of the mode at every step, as before there were groups (consult is left out, as no helper model is set
     # up, and so are the campaign tools, which only a session of a campaign has, the mail and calendar tools, as no
-    # account is signed in, item 424, and the tools of the vaults that hold nothing: 1Password's logins, which is not
-    # connected, item 493, and Dot's own vault, which is empty, item 621; skill stays, for the skills that come with
-    # Dot, item 196; message_agent stays although the owner made no agent, since the run may make one with
-    # create_agent, item 99).
+    # account is signed in, item 424, the Dot Next app's phone tools, as no phone is paired, item 2051, and the tools
+    # of the vaults that hold nothing: 1Password's logins, which is not connected, item 493, and Dot's own vault,
+    # which is empty, item 621; skill stays, for the skills that come with Dot, item 196; message_agent stays although
+    # the owner made no agent, since the run may make one with create_agent, item 99).
     every: list[str] = [
         spec.name
         for spec in specs_for_mode(build_registry(_tool_groups(config, False)), "task")
-        if spec.name not in {USE_TOOLS_TOOL, CONSULT_TOOL, *CAMPAIGN_TOOLS, *VAULT_TOOLS}
+        if spec.name not in {USE_TOOLS_TOOL, CONSULT_TOOL, *CAMPAIGN_TOOLS, *VAULT_TOOLS, *PHONE_APP_TOOLS}
         and group_of(spec.name) != ACCOUNTS_GROUP
     ]
     assert all(_names(step) == every for step in played.steps)
