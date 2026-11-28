@@ -377,6 +377,27 @@ async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: R
     _unseen(*(record.model_dump_json() for record in records))
 
 
+async def test_a_page_opened_from_the_filled_tab_opens_in_a_new_tab_where_scripts_run(
+    runtime: Runtime, site: _Site
+) -> None:
+    """A page opened in the tab a login was filled into opens in a new tab in its place (item 2076): the filled page is
+    in no tab's history, so a script runs at once, with no tab to close first."""
+    ctx, gate = await _context(runtime, "yolo")
+    refs: dict[str, str] = await _form(ctx, gate, site)
+    await _call(ctx, gate, "browser_fill_login", {"login": "i1", "username": refs["user"], "password": refs["pass"]})
+    await _call(ctx, gate, "browser_new_tab", {"url": f"http://127.0.0.1:{site.port}/home"})
+    await _call(ctx, gate, "browser_switch_tab", {"index": 1})
+    with pytest.raises(BrowserError, match="scripts stay off"):
+        await _call(ctx, gate, "browser_eval", {"script": "document.title"})
+    opened: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/home"})
+    assert "in a new tab in its place" in opened.text, opened.text
+    # The new tab took the filled one's number, and the chat has the same two tabs.
+    assert "Tab 1 of 2" in opened.text and "[1]*" in opened.text, opened.text
+    read: ToolResult = await _call(ctx, gate, "browser_eval", {"script": "history.length"})
+    assert re.search(r"\b1\b", read.text), read.text
+    assert PASSWORD in runtime.browser.vault_values(ctx.thread_id)
+
+
 async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_get_nothing(
     runtime: Runtime, site: _Site
 ) -> None:

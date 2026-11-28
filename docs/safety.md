@@ -803,7 +803,8 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
     as the screen does, and they read Chrome's values of a plain field, a code there, or a password a page shows as
     plain text ("show password").
   - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
-    going back can bring the filled page back whole. Once a script of the run ran in a tab of the chat, no tab of it
+    going back can bring the filled page back whole. A page opened there (`browser_open`) opens in a new tab in its
+    place, and that tab closes, as a run would close it itself: the sign-in holds, and scripts run again. Once a script of the run ran in a tab of the chat, no tab of it
     gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
     page, in a tab it opened, or in a page Chrome brings back from its cache.
   - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names

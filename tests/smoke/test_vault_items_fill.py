@@ -856,9 +856,11 @@ async def test_requests_a_page_of_another_origin_sends_are_judged_by_nothing_tha
     # A frame of another origin inside the page the password was typed into.
     widget: Frame = await _widget(shop)
     assert (await widget.evaluate("(list) => search(list)", dictionary))["found"] is None
-    # The same tab, gone on to a page of another origin.
+    # A page of another origin opened from the filled tab, which opens in a new tab in its place (item 2076).
     await _call(ctx, gate, "browser_open", {"url": f"https://localhost:{sites.provider.port}/attacker"})
-    assert (await shop.evaluate("(list) => search(list)", dictionary))["found"] is None
+    gone_on: Page = _page(runtime, ctx.thread_id)
+    assert shop.is_closed() and gone_on is not shop
+    assert (await gone_on.evaluate("(list) => search(list)", dictionary))["found"] is None
 
 
 # The words a run tries in a script of its own (``browser_eval``): 1,640, the password among them.
