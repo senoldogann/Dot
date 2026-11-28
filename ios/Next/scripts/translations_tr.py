@@ -755,16 +755,13 @@ TR: dict[str, str] = {
     'Own work model': 'Kendi iş modeli',
     'Proposer': 'Önerici',
     'Remove %@': '%@ kaldır',
-    'Review model': 'İnceleme modeli',
     'Security research model': 'Güvenlik araştırması modeli',
     'Selector': 'Seçici',
-    'Self-repair': 'Kendini onarma',
     'Self-repair model': 'Kendini onarma modeli',
     'The kept choice could not be read: the nights stop until one is chosen again.': 'Kayıtlı seçim okunamadı: yeniden seçilene kadar gece çalışmaları durur.',
     "The level a task asks of its model when none is chosen for it. It is set in the Mac's config.": "Bir görev için düzey seçilmediğinde modelinden istenen düzey. Mac'teki yapılandırmada ayarlanır.",
     "The model of your Claude plan that repairs Dot's own problems at night, from its next session.": "Claude planındaki, Dot'un kendi sorunlarını gece onaran model; bir sonraki oturumdan itibaren.",
     "The night's learning": 'Gece öğrenmesi',
-    'Vision model': 'Görme modeli',
     "When a task's model cannot answer (its allowance is used up, it is too busy, its key was refused, its safety filter stopped the reply), the task goes on with the first of these that can, each once at most.": "Bir görevin modeli yanıt veremediğinde (kotası dolduğunda, çok yoğun olduğunda, anahtarı reddedildiğinde, güvenlik filtresi yanıtı durdurduğunda) görev bunlardan yanıt verebilen ilkiyle, her biri en fazla bir kez olmak üzere sürer.",
     # Helper L1 (items 1800-1802): the chat list's select mode, the chat's settings, voice typing, Settings › Voice.
     'Dictation stopped: nothing more was heard. What was heard is in the box.': 'Dikte durdu: başka bir şey duyulmadı. Duyulanlar kutuda.',
@@ -847,7 +844,6 @@ TR: dict[str, str] = {
     'Wired': 'Kablolu',
     'Writing it down…': 'Yazıya dökülüyor…',
     'You approve every change: files, commands, clicks, messages': 'Her değişikliği sen onaylarsın: dosyalar, komutlar, tıklamalar, mesajlar',
-    'Your Mac': "Mac'in",
     'Your Mac could not write it down: %@': "Mac'in yazıya dökemedi: %@",
     'voice dictation microphone transcribe speech': 'ses dikte mikrofon yazıya dökme konuşma',
     # Helper S3 (items 1790-1791): Maintenance, and Settings' footnote.
@@ -956,8 +952,6 @@ TR: dict[str, str] = {
     'All chats': 'Tüm sohbetler',
     'the Agents page': 'Ajanlar sayfası',
     'What should it do?': 'Ne yapmalı?',
-    'You': 'Sen',
-    'Your Mac': "Mac'in",
     # D2: the plan chip beside the working capsule (item 1880).
     "Plan %lld/%lld": "Plan %lld/%lld",
     "Plan, %lld of %lld steps done": "Plan, %lld / %lld adım bitti",
@@ -1023,7 +1017,6 @@ TR: dict[str, str] = {
     'Custom font size': 'Özel yazı boyutu',
     'Ran %lld commands': '%lld komut çalıştırdı',
     # G2: Connect apps (items 1861-1862)
-    'Connect apps': 'Uygulamaları bağla',
     '%lld connected': '%lld bağlı',
     'Lists the connected apps alone': 'Yalnızca bağlı uygulamaları listeler',
     'Search apps and skills': 'Uygulamalarda ve becerilerde ara',
@@ -1114,7 +1107,6 @@ TR: dict[str, str] = {
     "Its Terminal command was told to end while this task worked.": "Bu görev çalışırken Terminal komutuna bitmesi söylendi.",
     "Keep the file changes": "Dosya değişikliklerini koru",
     "Message draft": "Mesaj taslağı",
-    "Model": "Model",
     "New · %@": "Yeni · %@",
     "No recap yet.": "Henüz özet yok.",
     "Not sent": "Gönderilmedi",
@@ -1179,7 +1171,6 @@ TR: dict[str, str] = {
     "Each chat's This chat sheet can show or hide them for that chat alone.": "Her sohbetin Bu sohbet sayfası bunları yalnızca o sohbet için gösterebilir ya da gizleyebilir.",
     "Off: only the messages, and one line that says what Dot is doing. A finished run's steps open from its Worked for line.": "Kapalı: yalnızca mesajlar ve Dot'un ne yaptığını söyleyen tek bir satır. Biten bir işin adımları süresini söyleyen satırdan açılır.",
     "For this chat; Settings › Chat sets it for every chat.": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar.",
-    "Messages": "Mesajlar",
 
     # D2: an owner's message not yet taken by the Mac (item 1927).
     "Pending": "Bekliyor",

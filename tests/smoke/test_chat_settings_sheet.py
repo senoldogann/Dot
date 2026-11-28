@@ -16,6 +16,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from chat_settings import open_row, open_settings
 from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -182,7 +183,7 @@ async def test_the_phone_sheet_has_the_phones_options_in_its_order_and_words(add
             await browser.close()
 
 
-async def test_the_desk_reasoning_menu_has_full_words_and_fast_mode_only_where_it_is(
+async def test_the_desk_reasoning_row_has_full_words_and_fast_mode_only_where_it_is(
     address: str, tmp_path: Path
 ) -> None:
     shots: Path = _shots(tmp_path)
@@ -191,29 +192,24 @@ async def test_the_desk_reasoning_menu_has_full_words_and_fast_mode_only_where_i
         try:
             for scheme in ("light", "dark"):
                 page: Page = await _open(browser, address, 1440, 900, scheme)
-                model_pill: Locator = page.locator(".composer-pill[data-pill='model']")
-                await model_pill.click()
-                popover: Locator = page.locator(".composer .composer-popover[aria-label='Model']")
-                await popover.get_by_role("option", name="Thinker").click()
-                reasoning_pill: Locator = page.locator(".composer-pill[data-pill='reasoning']")
-                await reasoning_pill.click()
-                menu: Locator = page.locator(".composer .composer-popover[aria-label='Reasoning']")
-                levels: Locator = menu.get_by_role("listbox", name="Reasoning").get_by_role("option")
+                sheet: Locator = await open_settings(page, page)
+                await sheet.get_by_role("option", name="Thinker").click()
+                levels_body: Locator = await open_row(sheet, "Reasoning")
+                levels: Locator = levels_body.get_by_role("listbox", name="Reasoning").get_by_role("option")
                 await expect(levels.locator(".pop-option-text > span:first-child")).to_have_text(
                     ["Default (Medium)", *_WORDS]
                 )
                 await page.screenshot(path=str(shots / f"web-reasoning-1440-{scheme}.png"))
-                fast: Locator = menu.get_by_role("switch", name="Fast mode")
+                fast: Locator = sheet.locator(".sheet-options").get_by_role("switch", name="Fast mode")
                 await expect(fast).to_be_visible()
                 await fast.click()
                 await expect(fast).to_have_attribute("aria-checked", "true")
-                await expect(reasoning_pill).to_contain_text("Fast")
-                await page.keyboard.press("Escape")
-                await model_pill.click()
-                await popover.get_by_role("option", name="Plain").click()
-                await reasoning_pill.click()
-                await expect(menu.get_by_role("listbox", name="Reasoning").get_by_role("option")).to_have_count(4)
-                await expect(menu.get_by_role("switch", name="Fast mode")).to_have_count(0)
+                await sheet.get_by_role("option", name="Plain").click()
+                levels_body = await open_row(sheet, "Reasoning")
+                await expect(levels_body.get_by_role("listbox", name="Reasoning").get_by_role("option")).to_have_count(
+                    4
+                )
+                await expect(sheet.get_by_role("switch", name="Fast mode")).to_have_count(0)
                 await page.close()
         finally:
             await browser.close()
