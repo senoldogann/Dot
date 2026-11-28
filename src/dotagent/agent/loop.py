@@ -627,6 +627,7 @@ class RunOutcome(FrozenModel):
     # The steps of the text replies the answer restates (item 620), which the run's page leaves out; the manager writes
     # them into the run's ``run_finished`` event once the run's inbox is shut.
     restated: tuple[int, ...] = ()
+    goal_blocked: bool = False
 
 
 class RunEnd(FrozenModel):
@@ -1595,7 +1596,7 @@ def owner_wait_end(reason: str, ended: RunOutcome) -> RunOutcome:
     1952): done, not failed, with the check's words under the answer and what the run needs from them kept, so that the
     owner is asked once, by the end's notice, and the schedule's row does not count a failure the owner has to clear."""
     marked: str = _with_check_note(ended.result, f"{OWNER_WAIT_NOTE}{reason}")
-    return ended.model_copy(update={"status": "done", "result": marked})
+    return ended.model_copy(update={"status": "done", "result": marked, "goal_blocked": True})
 
 
 async def _owner_blocked_end(
@@ -1625,6 +1626,7 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
             status="failed",
             result=_with_check_note(ended.result, f"the goal cannot be reached from here. {reason}"),
             needs=ended.needs,
+            goal_blocked=True,
         )
     if verdict.decision == "improve":
         # The goal is reached: a run whose rounds ran out on making it better is done (K3-04 of the code review of
@@ -1656,6 +1658,7 @@ def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
             status="failed",
             result=_with_check_note(ended.result, f"the goal cannot be reached from here. {reason}"),
             needs=ended.needs,
+            goal_blocked=True,
         )
     return RunOutcome(
         status="failed",

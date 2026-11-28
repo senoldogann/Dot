@@ -40,9 +40,9 @@ final class SettingsLiveUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key."].waitForExistence(timeout: 15))
         back(app)
 
-        // Notifications: Done or failed off.
+        // Notifications: Done, failed or blocked off.
         open(app, "Notifications")
-        let done: XCUIElement = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Done or failed")).firstMatch
+        let done: XCUIElement = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Done, failed or blocked")).firstMatch
         XCTAssertTrue(done.waitForExistence(timeout: 10))
         done.tap()
         sleep(2)

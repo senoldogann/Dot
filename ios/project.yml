@@ -199,7 +199,7 @@ targets:
           - group.dev.dotagent.phone
 
   # The rewrite (plan 2026-11-24, ios/Next/README.md): its own bundle id, app group, Keychain group and URL scheme so
-  # it installs beside the old app; iOS 26, iPhone and iPad; no push or Live Activity until the swap (owner's call).
+  # it installs beside the old app; iOS 26, iPhone and iPad.
   DotNext:
     type: application
     platform: iOS
@@ -211,6 +211,8 @@ targets:
           - "UITests/**"
           - "scripts/**"
           - "README.md"
+      - path: Shared/DotFleetAttributes.swift
+      - path: Shared/DotDeepLink.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.next
@@ -233,6 +235,9 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
+        DotApsEnvironment: $(APS_ENVIRONMENT)
+        NSSupportsLiveActivities: true
+        NSSupportsFrequentLiveActivityUpdates: true
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSceneManifest:
@@ -260,9 +265,11 @@ targets:
               - dotnext
     dependencies:
       - package: DotEngine
+      - target: DotNextLiveActivity
     entitlements:
       path: Next/DotNext.entitlements
       properties:
+        aps-environment: $(APS_ENVIRONMENT)
         keychain-access-groups:
           - $(AppIdentifierPrefix)dev.dotagent.phone.next
         com.apple.security.application-groups:
@@ -272,6 +279,34 @@ targets:
         - DotNextTests
         - DotNextUITests
         - package: DotEngine/DotEngineTests
+
+  DotNextLiveActivity:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: NextLiveActivity
+      - path: Shared/DotFleetAttributes.swift
+      - path: Shared/DotDeepLink.swift
+      - path: Next/Resources/Localizable.xcstrings
+        buildPhase: resources
+    dependencies:
+      - package: DotEngine
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.next.liveactivity
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+    info:
+      path: NextLiveActivity/Info.plist
+      properties:
+        CFBundleDisplayName: Dot Next
+        CFBundleDevelopmentRegion: en
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
   # The chat's UI tests (wave N2): the ask dock and the queue's edit on the debug build's fixtures.
   DotNextUITests:
