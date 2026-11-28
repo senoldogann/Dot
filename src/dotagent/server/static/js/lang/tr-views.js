@@ -2293,6 +2293,7 @@ export const TR_VIEWS = {
   "views.agents.defaultModelname": "Varsayılan ({modelName})",
   "views.agents.mainModel": "Ana model",
   "views.agents.mainModelname": "Ana model ({modelName})",
+  "views.agents.mainModelHint": "Kendi modeli olmayan sohbetler için",
   "views.agents.defaultLevellabel": "Varsayılan ({levelLabel})",
   "views.agents.partPicked": "{part} seçildi",
   "views.agents.teamsLength": "Ekipler ({length})",
