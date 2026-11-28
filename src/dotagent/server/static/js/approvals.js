@@ -172,8 +172,8 @@ function takeoverOffer(runId, onUseHere) {
 }
 
 // What the policy asks the owner about in every mode that asks, whatever their rules say (item 429): a rule offered for
-// it would never apply. A yolo run asks nothing else (item 443) but a payment, a message and a post in a chat the owner
-// opened (item 860) and those of item 850.
+// it would never apply. A yolo run asks nothing else (item 443) but a payment, in a chat the owner opened or one of Dot's
+// own initiative (item 2069).
 // A login filled from the password manager (item 493) is asked as a message is, in every mode but yolo, and a change of
 // Dot's own files (`self_change`, item 398) before any rule is read (`own_files` in policy/engine.py, item 559).
 const GUARDED_FLAGS = new Set([
@@ -185,8 +185,8 @@ const GUARDED_FLAGS = new Set([
   "self_change",
 ]);
 // The words of the question a chat Dot opened on its own initiative asks of a message, a post or a release (item 850,
-// `_INITIATIVE_REASON` in policy/engine.py, which the card's summary ends with): the owner's in every mode, whatever
-// their rules say, so no rule is offered for it; the same step elsewhere keeps its offer.
+// `_INITIATIVE_REASON` in policy/engine.py, which the card's summary ends with): the owner's in every mode but yolo,
+// whatever their rules say, so no rule is offered for it; the same step elsewhere keeps its offer.
 const INITIATIVE_WORDS = "On its own initiative, Dot asks before";
 // The line under a card that no rule answers, which says why Dot asks.
 const INITIATIVE_LINE = t("approvals.inAChatDotOpened");
@@ -203,12 +203,12 @@ function guarded(approval) {
 // credential or a password manager's fill, Dot's own files. Such a card shows no box.
 const NEVER_REMEMBERED = new Set(["financial", "credential", "vault_fill", "self_change"]);
 
-// The words of the question a yolo run of a chat the owner opened asks of a payment, a message or a post (item 860,
-// `OWNERS_REASON` in policy/engine.py).
+// The words of the question a yolo run asks of a payment, in a chat the owner opened or one of Dot's own initiative
+// (item 2069, `PAYMENT_REASON` in policy/engine.py).
 const OWNERS_WORDS = "In yolo too, Dot asks you before";
 
 /** Whether `approval` is the question of a chat Dot opened on its own initiative (item 850), asked in every
- * approval mode. */
+ * approval mode but yolo. */
 function initiativeAsked(approval) {
   return typeof approval.summary === "string" && approval.summary.includes(INITIATIVE_WORDS);
 }
@@ -226,7 +226,7 @@ function rememberable(approval, plain) {
   return !(Array.isArray(flags) && flags.some((flag) => typeof flag === "string" && NEVER_REMEMBERED.has(flag)));
 }
 
-/** Whether `approval` is the question a yolo run of a chat the owner opened asks (item 860). */
+/** Whether `approval` is the question a yolo run asks of a payment (item 2069). */
 function ownersAsked(approval) {
   return typeof approval.summary === "string" && approval.summary.includes(OWNERS_WORDS);
 }

@@ -76,7 +76,7 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   `delegate_day_tokens` none); 0 is no cap. They count what the Usage page counts (input and output, cached input
   included) and a run counts on the day it began. Before the calls of a step run, a run past one waits and asks you:
   **Continue** lets as many tokens again go past that cap (for the run, or for the day), **Stop** ends the run as the
-  Stop button does, and no answer within `approval_timeout_s` stops it. It asks in every mode, Pay or send (yolo) and
+  Stop button does, and no answer within `approval_timeout_s` stops it. It asks in every mode, Pay (yolo) and
   free mode included: your own word ([Freedom](freedom.md)). Two runs past the same day's cap get one card, and its
   answer holds for both. What you let past a cap is kept until the daemon restarts; then the next step past it asks
   again. A step that only finishes or closes its plan is not held, a step at work when a cap passes goes on, and a

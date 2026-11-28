@@ -9,6 +9,11 @@ let runsWithoutOwnersWords: Set<String> = ["resume", "welcome", "background", "w
 
 /// How a run whose model declined its task ended (`RunRecord.end_reason`, web `restartline.js` `MODEL_REFUSED`).
 let modelRefused: String = "model_refused"
+/// How a run ended that is done as far as it can go and waits on the owner (`RunRecord.end_reason`, item 2070).
+let ownerWait: String = "owner_wait"
+/// The status of the end card of a run that waits on the owner (item 2070, and item 1061's failed run that said what it
+/// needs): "Waiting for you", not "The run failed".
+public let waitingEnd: String = "waiting"
 
 /// The run an owner's message of the transcript belongs to: `u:<run>` (its goal); `nil` for a message still on its way
 /// (`p:`) or a steer into a run (`s:`), which no rewind reaches.

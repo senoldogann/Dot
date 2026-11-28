@@ -482,12 +482,12 @@ that wrote to the sender last in 60 days and starts a run there, which reads the
 work (an application, an offer, a client's thread) rather than the schedule's chat answering it with no knowledge of
 it. That run's source is
 `reply`: nobody watches it, its goal is Dot's words, it starts untrusted (what it was handed comes of a mail a third
-party wrote), and in your chat the review model judges what it would send, as for a schedule's run there (item 860); it
-takes the chat's model and approval mode. The same sender is handed once in 12 hours; one no other chat wrote to, and a
+party wrote), and in yolo the review model checks what it would send, as after any page (item 525); it takes the
+chat's model and approval mode. The same sender is handed once in 12 hours; one no other chat wrote to, and a
 reply to the finder's own chat, stay with the finder; while a run works in that chat it is handed later. Only a run of
 a schedule or a watcher of yours hands a reply on, refused by the code for any other run: what the reply's run sends
-in your chat is judged as that chat's, so a run of Dot's own initiative, whose messages ask you in every mode (item
-850), keeps its replies.
+in your chat is judged as that chat's, so a run of Dot's own initiative, whose messages ask you in every mode but
+yolo (item 850), keeps its replies.
 The reply's run is told, when the work keeps a record of its clients ([Continuing work](proactive.md#objectives)), to
 read it first, keep the reply there as a dated outcome with its sender, and begin an answer there before it sends it, so
 that a reply handed twice, or a run that broke off, sends nothing twice (item 1227). There is no watcher of the inbox:
@@ -545,8 +545,8 @@ the window's width, and **Back** in the bar leads to the list.
 **Run now** (a button of a schedule's row and at the head of its editor, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
 once, switched on or off, due or not; the row's button says, where the pointer rests on it, that it does real work, as at its time, with the approvals its run
 takes, and the run's page opens, where Stop is. The run goes as a firing goes: unattended, with the schedule's own
-choices (a yolo schedule's run asks nothing in a chat of its own; in one of your chats, with "the same chat", the review
-model judges its messages and posts and a payment is handed to you, item 860), the digest of its earlier runs, in a
+choices (a yolo schedule's run asks nothing in a chat of its own; in one of your chats, with "the same chat", a
+payment is handed to you and nothing else asks, item 2069), the digest of its earlier runs, in a
 chat of its own titled `<name> · <time> · by hand` (or in the schedule's chat, with "the same chat"), and its first
 message says it was started by hand.
 Nothing of when the schedule fires next nor of whether it is switched on changes: a one-time schedule is still due at

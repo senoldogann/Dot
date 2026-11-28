@@ -201,7 +201,7 @@ final class ChatSettingsUITests: XCTestCase {
         any(app, "chatSettings.approval.yolo").firstMatch.tap()
         app.navigationBars["Approvals"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(approvals.waitForExistence(timeout: 3))
-        XCTAssertTrue(approvals.label.contains("Ask only to pay or send"), approvals.label)
+        XCTAssertTrue(approvals.label.contains("Ask only to pay"), approvals.label)
         XCTAssertTrue(app.buttons["chatSettings.done"].isEnabled)
     }
 

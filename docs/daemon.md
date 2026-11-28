@@ -266,8 +266,8 @@ the providers; then the Options as rows that say their value and open in place: 
 browser per model, the choices for one message, and fast mode where the model has it), **Mode** and **Approvals**; and
 **How Dot works** with its switches (Keep going, goal mode, Plan first). A pick keeps the sheet open; Done, Close,
 Escape, a tap on the dim or a drag of a phone's sheet head down puts it away. The mode, the reasoning and the approvals
-have no pill in the bar; the open lock of **Ask only to pay or send** alone stays there, since the run then asks next
-to nothing (item 860: a payment, a message or a post) and the box must say so. The agent's pill (its face and name,
+have no pill in the bar; the open lock of **Ask only to pay** alone stays there, since the run then asks next
+to nothing (item 2069: a payment) and the box must say so. The agent's pill (its face and name,
 once an agent exists) stays at the left of the model, with its menu of the agents and their roles.
 
 A message is on **Auto** (item 495), which names no mode: its words settle its mode, research, which only reads, when

@@ -128,7 +128,7 @@ function levelBars(level, levels) {
 export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
   // What the model's pill adds after the name on a phone (item 1121), where it alone stands for the choices: the mode
-  // when one is named and the reasoning level. The approval mode is not among them: the owner read "Pay or send" as a
+  // when one is named and the reasoning level. The approval mode is not among them: the owner read "Pay" as a
   // part of the model's name. Painted once the pills exist.
   let reasoningShort = "";
   let paintPhonePill = () => undefined;
@@ -165,7 +165,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     const badge = shown === null ? null : approvalBadge(shown);
     optionsPill.setValue(badge === null ? "" : badge.short, "");
     optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
-    // In the least-asking mode the run asks only to pay or send: the box says so even while its choices are away (item
+    // In the least-asking mode the run asks only to pay: the box says so even while its choices are away (item
     // 833).
     optionsPill.element.toggleAttribute("data-yolo", shown === "yolo");
     setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);

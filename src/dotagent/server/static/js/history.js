@@ -483,16 +483,21 @@ function turn(past, editFromHereOf, known, signal, reactions) {
     }
     const finished = events.find((event) => event.kind === "run_finished");
     const needs = typeof finished?.data.needs === "string" ? finished.data.needs.trim() : "";
-    const waits = outcomeOf(past.status, needs) !== past.status;
+    const waiting = finished?.data.waiting === true;
+    const waits = outcomeOf(past.status, needs, waiting) !== past.status;
     const sources = sourcesRow(events);
     if (!waits && sources === null) {
       return;
     }
     keepPlace(answer, () => {
       if (waits) {
-        const waiting = answerAs(outcomeOf(past.status, needs));
-        answer.replaceWith(waiting, needsAside(needs));
-        answer = waiting;
+        const waitingAnswer = answerAs(outcomeOf(past.status, needs, waiting));
+        if (needs === "") {
+          answer.replaceWith(waitingAnswer);
+        } else {
+          answer.replaceWith(waitingAnswer, needsAside(needs));
+        }
+        answer = waitingAnswer;
       }
       if (sources !== null) {
         answer.querySelector(":scope > .answer-foot")?.before(sources);

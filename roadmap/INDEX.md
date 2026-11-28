@@ -18,6 +18,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2074](2074.md) | done | 2026-11-28 | A bot's Model page is the model picker: Main model on top, the providers as groups that fold, a search |
 | [2073](2073.md) | done | 2026-11-28 | A run is told that the mail and calendar tools take no address but the accounts signed in |
 | [2071](2071.md) | built | 2026-11-28 | A message that leaves its choices out starts on the chat's: the chosen model is the one that runs |
+| [2070](2070.md) | built | 2026-11-28 | A run that ends waiting on the owner says "Waiting for you", not "The run failed" |
+| [2069](2069.md) | built | 2026-11-28 | In yolo, Dot asks only before a payment |
 | [2068](2068.md) | done | 2026-11-28 | A manager reviews the team: stuck orders, idle, overloaded and failing bots, objectives behind, and a card per change it proposes |
 | [2067](2067.md) | done | 2026-11-28 | A bot that carries too much says so: the team's load measured, a quiet "Overloaded" mark on its row and profile |
 | [2066](2066.md) | done | 2026-11-28 | A code_run that cannot open a file is told that its code opens only its scratch folder |

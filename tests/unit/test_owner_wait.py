@@ -1,7 +1,8 @@
 """A schedule that waits on the owner (item 1952): a firing whose goal check found the goal cannot be reached, and
 whose own finish said what it needs from the owner, ends done with that need shown, not failed; the firings after it
 start with a note that the part is on hold until the owner answers, and are read from the schedule's runs, so an answer
-of the owner's (or a week) ends the wait."""
+of the owner's (or a week) ends the wait. A run at the top of any chat that waits on the owner so, or that left them a
+card still open, ends the same way, as "waiting for the owner" (item 2070)."""
 
 import time
 from dataclasses import dataclass
@@ -51,19 +52,31 @@ def _message(content: str) -> Message:
 
 
 @dataclass(frozen=True)
+class _Runtime:
+    """The part of the runtime the owner-wait end reads: the store, for the cards a run left."""
+
+    store: Store
+
+
+@dataclass(frozen=True)
 class _Firing:
-    """The part of a run's agent the owner-wait end reads: a run of a schedule, whose source tells it is a firing."""
+    """The part of a run's agent the owner-wait end reads: its run, whose source tells a firing, whose parent a helper
+    and whose campaign a session."""
 
     run: RunRecord
-    runtime: object
+    runtime: _Runtime
 
 
-async def _firing(store: Store, thread: ThreadRecord, source: str) -> _Firing:
+async def _firing(
+    store: Store, thread: ThreadRecord, source: str, parent: str | None = None, campaign: str | None = None
+) -> _Firing:
     run: RunRecord = await store.create_run(
-        thread.id, "Check Fiverr.", "task", "ollama:a", None, source, "medium", "standard", None, "ask", True,
+        thread.id, "Check Fiverr.", "task", "ollama:a", parent, source, "medium", "standard", None, "ask", True,
         None, None, None,
     )  # fmt: skip
-    return _Firing(run=run, runtime=object())
+    if campaign is not None:
+        run = run.model_copy(update={"campaign_id": campaign})
+    return _Firing(run=run, runtime=_Runtime(store=store))
 
 
 async def test_a_blocked_firing_that_asked_the_owner_ends_done_with_its_need_kept(tmp_path: Path) -> None:
@@ -76,12 +89,12 @@ async def test_a_blocked_firing_that_asked_the_owner_ends_done_with_its_need_kep
         ended: RunOutcome = await _owner_blocked_end(agent, _verdict("blocked"), _message("goal"), settled, ENDED)
         assert (ended.status, ended.needs) == ("done", NEEDS)
         assert f"{GOAL_CHECK_MARK}{OWNER_WAIT_NOTE}the login wall stands" in ended.result
-        assert classify_ending(ended.status, ended.result) == "finished"
+        assert classify_ending(ended.status, ended.result) == "owner_wait"
     finally:
         await store.close()
 
 
-async def test_only_a_schedules_blocked_firing_that_has_an_owner_to_ask_ends_done(tmp_path: Path) -> None:
+async def test_only_a_blocked_run_that_has_an_owner_to_ask_ends_done(tmp_path: Path) -> None:
     store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
     try:
         thread: ThreadRecord = await store.create_thread("Chat", "ui")
@@ -90,8 +103,8 @@ async def test_only_a_schedules_blocked_firing_that_has_an_owner_to_ask_ends_don
         failed: RunOutcome = owner_wait_end("r", ENDED).model_copy(update={"status": "failed"})
         silent: RunOutcome = ENDED.model_copy(update={"needs": ""})
         goal: Message = _message("goal")
-        # A chat of the owner's that cannot reach its goal failed, as before.
-        assert await _owner_blocked_end(chat, _verdict("blocked"), goal, failed, ENDED) is failed
+        # A chat of the owner's that cannot reach its goal and asked nothing of them failed, as before.
+        assert await _owner_blocked_end(chat, _verdict("blocked"), goal, failed, silent) is failed
         # A goal that is not reached yet is sent back to work, not waited on.
         assert await _owner_blocked_end(firing, _verdict("continue"), goal, failed, ENDED) is failed
         # A firing that asked nothing of the owner, and began under no note, failed.
@@ -207,3 +220,50 @@ async def test_the_owners_answer_ends_the_wait_for_good_not_for_one_firing(tmp_p
         assert await owner_wait_of(store, schedule.id, (blocked.finished_at or blocked.created_at) + 3600.0) is None
     finally:
         await store.close()
+
+
+async def test_a_run_of_the_owners_chat_that_waits_on_them_ends_waiting_not_failed(tmp_path: Path) -> None:
+    """Item 2070, the run of 2026-11-27 (``run_mwzkfimb_635142``): four forms filled, a card left for the press that
+    sends one, the need said in its finish, and the goal check's "blocked". It ended failed; it is the owner's wait."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        thread: ThreadRecord = await store.create_thread("Apply", "ui")
+        chat: _Firing = await _firing(store, thread, "ui")
+        failed: RunOutcome = RunOutcome(status="failed", result="x", needs="")
+        goal: Message = _message("goal")
+        said: RunOutcome = await _owner_blocked_end(chat, _verdict("blocked"), goal, failed, ENDED)
+        assert (said.status, said.needs) == ("done", NEEDS)
+        assert classify_ending(said.status, said.result) == "owner_wait"
+        # A card it left for the owner, still open, is the wait too, with no need said.
+        silent: RunOutcome = ENDED.model_copy(update={"needs": ""})
+        # A question the owner already answered is no wait.
+        answered = await store.create_approval(chat.run.id, "ask_user", "Which?", "question", {"kind": "meta"})
+        await store.decide_approval(answered.id, "approved", "ui", "the first")
+        assert await _owner_blocked_end(chat, _verdict("blocked"), goal, failed, silent) is failed
+        card = await store.create_left_approval(
+            chat.run.id, "browser_act", "press Enter", "high", {"kind": "browser_key"}
+        )
+        left: RunOutcome = await _owner_blocked_end(chat, _verdict("blocked"), goal, failed, silent)
+        assert left.status == "done" and classify_ending(left.status, left.result) == "owner_wait"
+        # The owner answered it: nothing is left open, and the run that cannot reach its goal failed.
+        await store.decide_approval(card.id, "denied", "ui", "")
+        assert await _owner_blocked_end(chat, _verdict("blocked"), goal, failed, silent) is failed
+        # A helper's need is the run's that asked it, and a campaign's session is its campaign's to follow.
+        helper: _Firing = await _firing(store, thread, "ui", parent=chat.run.id)
+        assert await _owner_blocked_end(helper, _verdict("blocked"), goal, failed, ENDED) is failed
+        session: _Firing = await _firing(store, thread, "ui", campaign="cmp_x")
+        assert await _owner_blocked_end(session, _verdict("blocked"), goal, failed, ENDED) is failed
+    finally:
+        await store.close()
+
+
+def test_a_done_run_whose_last_check_note_is_the_owners_wait_ends_waiting() -> None:
+    """The ending is read from the last note under the mark: a note quoted in the answer above it is no wait."""
+    waiting: str = f"Filled.{GOAL_CHECK_MARK}{OWNER_WAIT_NOTE}press Submit"
+    assert classify_ending("done", waiting) == "owner_wait"
+    assert classify_ending("done", "Filled.") == "finished"
+    quoted: str = f"{waiting}{GOAL_CHECK_MARK}the goal is reached"
+    assert classify_ending("done", quoted) == "finished"
+    assert (
+        classify_ending("failed", f"x{GOAL_CHECK_MARK}the goal cannot be reached from here. y") == "goal_check_refused"
+    )

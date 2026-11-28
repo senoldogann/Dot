@@ -764,12 +764,12 @@ async def _phone_box_has_its_line(browser: Browser, host: str, port: int) -> Non
     await menu.locator("summary", has_text="Mode").click()
     await expect(menu.get_by_role("listbox", name="Mode", exact=True)).to_be_visible()
     await menu.locator("summary", has_text="Approvals").click()
-    # The approval mode is no part of the model's name (the owner read "Pay or send" as one).
+    # The approval mode is no part of the model's name (the owner read "Pay" as one).
     await menu.locator(".pop-option[data-mode='yolo']").click()
     await expect(menu.locator(".pop-option[data-mode='yolo']")).to_have_attribute("aria-selected", "true")
-    await expect(model).not_to_contain_text("Pay or send")
+    await expect(model).not_to_contain_text(re.compile(r"\bPay\b"))
     # The row says the mode chosen as it is chosen.
-    await expect(menu.locator("summary", has_text="Approvals")).to_contain_text("Ask only to pay or send")
+    await expect(menu.locator("summary", has_text="Approvals")).to_contain_text("Ask only to pay")
     # A pick repaints the sheet: the row stays open, and the sheet stays within the screen.
     await menu.locator(".pop-option[data-mode='ask']").click()
     await expect(menu.locator(".pop-option[data-mode='ask']")).to_have_attribute("aria-selected", "true")
@@ -847,11 +847,11 @@ async def test_the_words_have_their_own_line_and_the_runs_choices_stand_in_the_b
                 await approvals.locator(".pop-option[data-mode='yolo']").click()
                 await close_settings(page)
                 await expect(options).to_be_visible()
-                await expect(options).to_contain_text("Pay or send")
+                await expect(options).to_contain_text("Pay")
                 await expect(options).not_to_have_attribute("data-tone", "warn")
                 # On a line of 440 px or less (the bar's own width, which its container query reads) its open lock
                 # alone, so that the model keeps its room; its name still says the mode.
-                await expect(options).to_have_accessible_name(re.compile(r"\bPay or send\b"))
+                await expect(options).to_have_accessible_name(re.compile(r"\bPay\b"))
                 pill = await options.bounding_box()
                 assert pill is not None
                 line: float = await composer.locator(".composer-bar").evaluate(

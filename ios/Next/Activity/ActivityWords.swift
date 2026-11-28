@@ -43,7 +43,7 @@ enum RunOutcome: Equatable, Sendable {
 /// Who made the decisions and how many said no: "2 without asking, 1 by the reviewer; 1 denied".
 func decidedByWords(yolo: Int, reviewer: Int, denied: Int) -> String {
     var who: [String] = []
-    if yolo > 0 { who.append(String(localized: "\(yolo) without asking", comment: "Away card: decisions the mode that asks only to pay or send let through")) }
+    if yolo > 0 { who.append(String(localized: "\(yolo) without asking", comment: "Away card: decisions the mode that asks only to pay let through")) }
     if reviewer > 0 { who.append(String(localized: "\(reviewer) by the reviewer", comment: "Away card: decisions the review model made")) }
     let joined: String = who.joined(separator: ", ")
     guard denied > 0 else { return joined }

@@ -1154,7 +1154,7 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         actorId: scope.actorId,
         // A run that stopped for what only the owner gives waits on them, and says so (item 1061).
         // A helper's needs go to the run that asked it, not to the owner: only the root run waits on them.
-        status: isRoot ? outcomeOf(status, needs) : status,
+        status: isRoot ? outcomeOf(status, needs, record.data.waiting === true) : status,
         text: result,
         endedAt: record.ts,
         startedAt: scope.began,
@@ -1175,7 +1175,7 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       if (isRoot) {
         // The answer is drawn whole, its foot with it (item 366 typed a finished answer in again over two seconds; the
         // words were all there, so the copy and the foot waited on a show).
-        onAnswer(answer, { status: outcomeOf(status, needs), needs });
+        onAnswer(answer, { status: outcomeOf(status, needs, record.data.waiting === true), needs });
         onRunStatus({ status, model: null, endedAt: record.ts });
         return;
       }
