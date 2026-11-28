@@ -3,107 +3,13 @@
 // unified diff; a file without a diff says why. The side panel's Changes tab holds them and counts the files.
 
 import { api } from "./api.js";
-import { changeFormat, changeLayout, highlightLines, prettyJSON } from "./diffview.js";
+import { codeView, fileLines } from "./codeview.js";
+import { changeFormat, changeLayout, prettyJSON } from "./diffview.js";
 import { el, requestFile } from "./dom.js";
 import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { panelSection, segmented } from "./panels.js";
 import { prose } from "./prose.js";
-
-/** How many rows a code view draws at a time (item 2017): a new file of thousands of lines draws its first rows
- * at once and the next as the reader scrolls to them. */
-const ROWS_AT_A_TIME = 400;
-
-/**
- * A line of a code view: its kind (a line added, removed or kept, a hunk's head, a line of a file), its numbers (the
- * old and the new for a diff, the one for a file) and its text.
- * @typedef {{ kind: "hunk" | "added" | "removed" | "context" | "file", numbers: (number | null)[], text: string }} CodeLine
- */
-
-/** The coloured pieces of a line. */
-function tokenNodes(tokens) {
-  return tokens.map((token) => (token.kind === "plain" ? token.text : el("span", { class: `tok-${token.kind}` }, token.text)));
-}
-
-/** One row of a code view: its numbers, a sign for a line added or removed, its coloured text; a hunk's head as a quiet
- * band that names where the next lines stand. */
-function codeRow(line, tokens, signed) {
-  if (line.kind === "hunk") {
-    return el("div", { class: "code-row code-hunk", role: "separator" }, el("span", { class: "code-hunk-text" }, line.text === "" ? "⋯" : `⋯ ${line.text}`));
-  }
-  const sign = line.kind === "added" ? "+" : line.kind === "removed" ? "−" : " ";
-  // A file's line is `code-file`: `.code-line` is a box of its own elsewhere (app.css).
-  return el(
-    "div",
-    { class: `code-row code-${line.kind}` },
-    el("span", { class: "code-nums", "aria-hidden": "true" }, ...line.numbers.map((number) => el("span", { class: "code-num" }, number === null ? "" : String(number)))),
-    signed ? el("span", { class: "code-sign", "aria-hidden": "true" }, sign) : null,
-    el("span", { class: "code-text" }, ...tokenNodes(tokens)),
-  );
-}
-
-/** The tokens of each line, coloured in `language` (none: plain), each hunk read on its own. */
-function lineTokens(lines, language) {
-  if (language === null) {
-    return lines.map((line) => [{ kind: "plain", text: line.text }]);
-  }
-  const tokens = [];
-  let start = 0;
-  for (let index = 0; index <= lines.length; index += 1) {
-    if (index === lines.length || lines[index].kind === "hunk") {
-      tokens.push(...highlightLines(lines.slice(start, index).map((line) => line.text), language));
-      if (index < lines.length) {
-        tokens.push([]);
-      }
-      start = index + 1;
-    }
-  }
-  return tokens;
-}
-
-/** A view of code: no line wraps, it scrolls sideways, the numbers stand at its left; the rows are drawn
- * `ROWS_AT_A_TIME` at a time as the reader scrolls (item 2017). `signed` gives each row its + or −. */
-function codeView(lines, language, signed) {
-  const tokens = lineTokens(lines, language);
-  const widest = Math.max(1, ...lines.flatMap((line) => line.numbers.map((number) => String(number ?? "").length)));
-  const rows = el("div", { class: "code-lines" });
-  const view = el("div", { class: "code-view", tabindex: "0", dataset: { signed: String(signed) } }, rows);
-  // The numbers' column is as wide as the longest number (CSSOM: the page's policy refuses a style attribute).
-  view.style.setProperty("--num-width", `${widest}ch`);
-  let drawn = 0;
-  const sentinel = el("div", { class: "code-more", "aria-hidden": "true" });
-  const more = () => {
-    const next = Math.min(lines.length, drawn + ROWS_AT_A_TIME);
-    const nodes = [];
-    for (let index = drawn; index < next; index += 1) {
-      nodes.push(codeRow(lines[index], tokens[index], signed));
-    }
-    drawn = next;
-    sentinel.remove();
-    rows.append(...nodes);
-    if (drawn < lines.length) {
-      rows.append(sentinel);
-    }
-  };
-  more();
-  if (drawn < lines.length) {
-    const watch = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        more();
-        if (drawn >= lines.length) {
-          watch.disconnect();
-        }
-      }
-    }, { root: view, rootMargin: "400px" });
-    watch.observe(sentinel);
-  }
-  return view;
-}
-
-/** The lines of a file's text, numbered from 1. */
-function fileLines(text) {
-  return text.split("\n").map((line, index) => ({ kind: "file", numbers: [index + 1], text: line }));
-}
 
 /** A new Markdown file: formatted as an answer is, its source a press away. */
 function markdownView(text) {

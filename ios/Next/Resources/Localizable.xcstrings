@@ -12852,6 +12852,35 @@
         }
       }
     },
+    "Show all %lld rows": {
+      "comment": "File preview: opens a long table whole; the argument is its row count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show the %lld row"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show all %lld rows"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld satırın tümünü göster"
+          }
+        }
+      }
+    },
     "Show all apps": {
       "comment": "Connect apps: leaves the connected list",
       "localizations": {
@@ -13712,6 +13741,17 @@
         }
       }
     },
+    "Table": {
+      "comment": "File preview: the title of a long table opened whole",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tablo"
+          }
+        }
+      }
+    },
     "Tags": {
       "comment": "Memory: a note's tags",
       "localizations": {
@@ -14549,7 +14589,7 @@
       }
     },
     "The phone shows this kind of file by its facts; open it on the Mac to read it.": {
-      "comment": "File preview: a table or an Office file",
+      "comment": "File preview: an Office file",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14687,6 +14727,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yan soru sorulamadı: %@"
+          }
+        }
+      }
+    },
+    "The table stops at row %lld here; open it on the Mac for the rest.": {
+      "comment": "File preview: a table too large was read only to a row; the argument is that row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tablo burada %lld. satırda bitiyor; geri kalanı için Mac'te açın."
           }
         }
       }

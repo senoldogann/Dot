@@ -28,7 +28,7 @@ struct AnswerView: View {
         let blocks: [MarkdownBlock] = markdownBlocks(visible)
         VStack(alignment: .leading, spacing: Space.s) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                view(of: block, fading: index == blocks.count - 1 ? tail : 0)
+                MarkdownBlockView(block: block, fading: index == blocks.count - 1 ? tail : 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -58,8 +58,16 @@ struct AnswerView: View {
             }
         }
     }
+}
 
-    @ViewBuilder private func view(of block: MarkdownBlock, fading: Int) -> some View {
+/// One block of markdown as an answer draws it: a heading, a paragraph, a list's item, a code block, a table that
+/// scrolls sideways, a quote or a rule; the newest `fading` characters of its words fading in. The chat's answers and
+/// a Markdown file's preview draw their blocks with it.
+struct MarkdownBlockView: View {
+    let block: MarkdownBlock
+    let fading: Int
+
+    var body: some View {
         switch block {
         case .heading(let level, let text):
             ReferenceText(text: fadedTail(inline(text), characters: fading), role: level <= 1 ? .title : level == 2 ? .headline : .body).fontWeight(.semibold)

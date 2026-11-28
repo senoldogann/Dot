@@ -46,6 +46,9 @@
         case helpersWait = "n2-helpers"
         /// The first run a schedule fired (owner 2026-11-27): its message is the routine's compact row, not a bubble.
         case routine = "n2-routine"
+        /// The chat with a file's preview open over it (the owner's shot of 2026-11-28): the file `-DotNextFile <name>`
+        /// names, from the fixture daemon (`FileFixture`).
+        case file = "n2-file"
         /// A chat with several tasks (item 2013): the capsule's "N tasks" and the tasks sheet.
         case tasks = "n2-tasks"
 

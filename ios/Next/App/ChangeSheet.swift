@@ -15,6 +15,8 @@ struct ChangeSheet: View {
     /// thousands of lines is not parsed again on each draw.
     @State private var layout: ChangeLayout
     @State private var lines: [CodeLine]?
+    /// A new Markdown file's blocks, read once off the main thread.
+    @State private var blocks: [MarkdownBlock]?
     @State private var showsSource: Bool = false
 
     init(file: FileChange, close: @escaping () -> Void) {
@@ -52,20 +54,24 @@ struct ChangeSheet: View {
         .task(id: file) {
             let built: ChangeLayout = layout
             let format: ChangeFormat = changeFormat(path: file.path)
+            // A new Markdown file opens formatted: its blocks are read first, its lines for Source after.
+            if case .newFile(let text, .markdown) = built {
+                blocks = await Task.detached(priority: .userInitiated) { markdownBlocks(text) }.value
+            }
             lines = await Task.detached(priority: .userInitiated) { () -> [CodeLine] in buildLines(built, format: format) }.value
         }
     }
 
     @ViewBuilder private var content: some View {
         switch layout {
-        case .newFile(let text, .markdown) where !showsSource:
-            ScrollView {
-                AnswerView(markdown: text, writing: false)
+        case .newFile(_, .markdown) where !showsSource:
+            if let blocks {
+                MarkdownDocument(blocks: blocks)
                     .textSelection(.enabled)
-                    .padding(Space.gutter)
-                    .readableColumn()
+                    .accessibilityIdentifier("change.markdown")
+            } else {
+                ProgressView().accessibilityLabel(String(localized: "Loading the change", comment: "VoiceOver: a change's lines are being laid out"))
             }
-            .accessibilityIdentifier("change.markdown")
         case .note(let why):
             EmptyState(
                 title: String(localized: "No diff to show", comment: "Change sheet: the daemon has no diff of the file"), systemImage: "doc.questionmark",

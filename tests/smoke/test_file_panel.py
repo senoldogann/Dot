@@ -65,8 +65,9 @@ ANSWER: str = (
 # A source file, which the panel shows as code: its lines numbered and its words coloured by kind (item 624).
 SCRIPT: str = 'def total(rows):\n    # The sum of the amounts.\n    return sum(row["amount"] for row in rows) // 1\n'
 
-# Markup in a text file, which the panel shows as it is written.
-TODO: str = "# To do\n\nPay the <b>rent</b> first.\n"
+# Markup in a text file, which the panel shows as it is written, and a table, which it draws as one (the owner's report
+# of 2026-11-28: a report's table showed its pipes).
+TODO: str = "# To do\n\nPay the <b>rent</b> first.\n\n| Item | Amount |\n|---|---:|\n| Rent | 1200 |\n"
 # What each run writes in the workspace before it answers.
 SUMMARY: str = "# Summary\n\nAll paid.\n"
 # A long text pasted into a conversation's box (item 269).
@@ -167,7 +168,9 @@ def _user_home(root: Path) -> Path:
     home: Path = root / "user"
     (home / "Documents").mkdir(parents=True)
     (home / ".private").mkdir()
-    (home / "Documents" / "rows.csv").write_text("Item;Amount\nRent;1200,50\nFood;300\n", encoding="utf-8")
+    # More rows than a grid draws at first (200, item 2099), so the rest are drawn as the panel scrolls to them.
+    filler: str = "".join(f"Row {number};{number}\n" for number in range(1, 251))
+    (home / "Documents" / "rows.csv").write_text("Item;Amount\nRent;1200,50\nFood;300\n" + filler, encoding="utf-8")
     (home / "Documents" / "todo.md").write_text(TODO, encoding="utf-8")
     (home / "Documents" / "chart.png").write_bytes(_picture())
     (home / "Documents" / "total.py").write_text(SCRIPT, encoding="utf-8")
@@ -341,7 +344,16 @@ async def _one_size(
     rows: Locator = paths.filter(has_text="rows.csv")
     await rows.click()
     await expect(view).to_have_attribute("data-kind", "table")
-    await expect(view.locator(".file-grid td")).to_have_text(["Item", "Amount", "Rent", "1200,50", "Food", "300"])
+    await expect(view.locator(".file-grid tbody tr:nth-child(-n+3) td")).to_have_text(
+        ["Item", "Amount", "Rent", "1200,50", "Food", "300"]
+    )
+    # The rows past the first page are drawn as the panel scrolls to its end.
+    await expect(view.locator(".file-grid tbody tr:not(.lazy-more)")).to_have_count(200)
+    for _ in range(3):
+        await view.locator(".file-body").evaluate("(body) => { body.scrollTop = body.scrollHeight; }")
+        await page.wait_for_timeout(200)
+    await expect(view.locator(".file-grid tbody tr:not(.lazy-more)")).to_have_count(253)
+    await expect(view.locator(".file-grid tbody tr").last.locator("td").first).to_have_text("Row 250")
     await expect(view.get_by_role("button", name="Copy the text")).to_be_hidden()
     await view.get_by_role("button", name="Open on the Mac").click()
     await expect(page.locator(".toast.ok")).to_have_text("Opened rows.csv on the Mac")
@@ -356,8 +368,11 @@ async def _one_size(
     await expect(view.locator(".file-markdown").get_by_role("heading", name="To do")).to_be_visible()
     await expect(view.locator(".file-markdown p")).to_have_text("Pay the <b>rent</b> first.")
     await expect(view.locator("b")).to_have_count(0)
+    await expect(view.locator(".file-markdown .prose-table-scroll th")).to_have_text(["Item", "Amount"])
+    await expect(view.locator(".file-markdown .prose-table-scroll td")).to_have_text(["Rent", "1200"])
     await view.get_by_role("button", name="Source").click()
-    await expect(view.locator("pre.file-text")).to_have_text(TODO)
+    # The source in the change view's code view (item 2017): numbered, as it is written.
+    await expect(view.locator(".code-view .code-text")).to_have_text(TODO.split("\n"))
     # The text of the file is a press away (item 403); a picture has none.
     await expect(view.get_by_role("button", name="Copy the text")).to_be_visible()
     await _close(page, view, todo)
@@ -414,21 +429,21 @@ async def _one_size(
     await expect(viewer).to_have_count(0)
     await _close(page, view, chart)
 
-    # A source file as code (item 624): its language and path over it, its lines numbered, its words coloured by kind,
-    # and the text whole a press away.
+    # A source file as code (item 624) in the change view's code view (item 2017): its language and path over it, its
+    # lines numbered, its words coloured by kind, and the text whole a press away.
     script: Locator = paths.filter(has_text="total.py")
     await script.click()
     await expect(view).to_have_attribute("data-kind", "text")
-    editor: Locator = view.locator("pre.file-code-editor")
+    editor: Locator = view.locator(".code-view")
     await expect(editor).to_be_visible()
     await expect(view.locator(".file-code-language")).to_have_text("python")
     await expect(view.locator(".file-code-breadcrumb")).to_contain_text("total.py")
-    await expect(editor.locator(".file-code-gutter")).to_have_text(["1", "2", "3", "4"])
-    await expect(editor.locator(".file-code-keyword").first).to_have_text("def")
+    await expect(editor.locator(".code-num")).to_have_text(["1", "2", "3", "4"])
+    await expect(editor.locator(".tok-keyword").first).to_have_text("def")
     # Python's "//" is division, not a comment (the review of item 624).
-    await expect(editor.locator(".file-code-comment")).to_have_count(1)
-    await expect(editor.locator(".file-code-comment")).to_have_text("# The sum of the amounts.")
-    await expect(editor.locator(".file-code-string")).to_have_text('"amount"')
+    await expect(editor.locator(".tok-comment")).to_have_count(1)
+    await expect(editor.locator(".tok-comment")).to_have_text("# The sum of the amounts.")
+    await expect(editor.locator(".tok-string")).to_have_text('"amount"')
     await expect(view.get_by_role("button", name="Copy the text")).to_be_visible()
     await _close(page, view, script)
 

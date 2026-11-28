@@ -237,7 +237,7 @@ async def _previews(page: Page, section: Locator, shot: Path) -> None:
     await expect(view.frame_locator("iframe.file-look").locator("#line")).to_have_text("as written")
     await page.screenshot(path=str(shot))
     await view.get_by_role("button", name="Source").click()
-    await expect(view.locator(".file-code-editor")).to_contain_text("<h1>Report</h1>")
+    await expect(view.locator(".code-view")).to_contain_text("<h1>Report</h1>")
     await expect(pages).not_to_have_attribute("open", "")
     await view.get_by_role("button", name="Close the file").click()
     await expect(view).to_have_count(0)

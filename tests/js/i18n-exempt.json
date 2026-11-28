@@ -91,7 +91,6 @@
   "additions removals": "the value of an ARIA attribute",
   "address": "a field's name for the program",
   "address2": "a field's name for the program",
-  "and as assert async await break case catch class const continue def del elif else except export extends finally for from function global if import in interface is let match new nonlocal not or pass raise return static struct switch throw try type var while with yield pub fn impl use mod where enum trait self this True False None null undefined true false": "the keywords a highlighter looks for",
   "auto-decision denied": "a list of class names, not words",
   "avc1.${[avcc[1], avcc[2], avcc[3]].map((byte) => byte.toString(16).padStart(2, \"0\")).join(\"\")}": "a video codec string",
   "b-muted": "a class name or a selector, for the program",
