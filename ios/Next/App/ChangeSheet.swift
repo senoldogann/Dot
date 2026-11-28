@@ -54,10 +54,11 @@ struct ChangeSheet: View {
         .task(id: file) {
             let built: ChangeLayout = layout
             let format: ChangeFormat = changeFormat(path: file.path)
-            lines = await Task.detached(priority: .userInitiated) { () -> [CodeLine] in buildLines(built, format: format) }.value
+            // A new Markdown file opens formatted: its blocks are read first, its lines for Source after.
             if case .newFile(let text, .markdown) = built {
                 blocks = await Task.detached(priority: .userInitiated) { markdownBlocks(text) }.value
             }
+            lines = await Task.detached(priority: .userInitiated) { () -> [CodeLine] in buildLines(built, format: format) }.value
         }
     }
 
