@@ -47,19 +47,18 @@ final class ConversationTests: XCTestCase {
             + [result(13, 11), step(20, "", ["web_search"])] + call(21, "web_search", ["query": .string("gistsmith contact")]) + [result(23, 21)]
     }
 
-    func testAWorkingRunShowsItsWordsAndTheLinesItsWordsDidNotTellAndNoSteps() {
+    /// Owner 2026-11-27: a call is never a line of the conversation ("Code run", "Running a command" stacked); the one
+    /// live line says what the run does.
+    func testAWorkingRunShowsItsWordsAndNoLineOfACallAndNoSteps() {
         let items: [TranscriptItem] = conversation(of: chat(status: "running", events), pending: [], streaming: true, context: .none)
-        XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10", "n:22"], "the page's line stands beside the words that told it: it is not drawn")
-        guard case .narration(_, let told) = items[2] else { return XCTFail("the search is told") }
-        XCTAssertEqual(told.tool, "web_search")
-        XCTAssertEqual(told.target, "gistsmith contact")
+        XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10"])
     }
 
     func testAFinishedRunKeepsTheConversationAndFoldsItsStepsBeforeTheAnswer() {
         let finished: [EventRecord] = events + [step(30, "", ["finish"]), event(31, "run_finished", ["status": .string("done"), "result": .string("Two fields.")])]
         let items: [TranscriptItem] = conversation(of: chat(status: "done", finished), pending: [], streaming: true, context: .none)
-        XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10", "n:22", "f:t:c11", "r:run_a"])
-        guard case .work(let fold) = items[3] else { return XCTFail("the steps fold before the answer") }
+        XCTAssertEqual(items.map(\.id), ["u:run_a", "a:10", "f:t:c11", "r:run_a"])
+        guard case .work(let fold) = items[2] else { return XCTFail("the steps fold before the answer") }
         XCTAssertEqual(fold.items.map(\.id), ["t:c11", "t:c21"])
     }
 
@@ -97,10 +96,24 @@ final class ConversationTests: XCTestCase {
         XCTAssertEqual(conversation(of: chat(status: "done", said), pending: [], streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"])
     }
 
-    func testNoToolModeDrawsALineOfACall() {
+    /// Dot's first words (item 2018): the words said at once, then the fast model's line in their place, one row before
+    /// the run's own words, in the conversation and in every tool mode, outside a finished run's fold.
+    func testTheFirstWordsAreOneRowFirstInEveryModeAndTheLineTakesThePlaceOfTheWordsSaidAtOnce() {
+        let said: [EventRecord] = [event(2, "first_words", ["text": .string(""), "model": .null])]
+        let atOnce: [TranscriptItem] = conversation(of: chat(status: "running", said + events), pending: [], streaming: true, context: .none)
+        XCTAssertEqual(atOnce.map(\.id), ["u:run_a", "fw:run_a", "a:10"])
+        guard case .firstWords(_, let empty) = atOnce[1] else { return XCTFail("the words said at once are a row") }
+        XCTAssertEqual(empty, "", "the app says them in its language")
+        let lined: [EventRecord] = said + [event(3, "first_words", ["text": .string(" Looking at the site first. "), "model": .string("fast")])] + events
+        let finished: [EventRecord] =
+            lined + [step(30, "", ["finish"]), event(31, "run_finished", ["status": .string("done"), "result": .string("Two fields.")])]
         for mode in ToolCallMode.allCases {
-            let items: [TranscriptItem] = transcript(of: chat(status: "running", events), pending: [], mode: mode, streaming: true, context: .none)
-            XCTAssertFalse(items.contains { if case .narration = $0 { true } else { false } }, "\(mode)")
+            for (status, timeline) in [("running", lined), ("done", finished)] {
+                let items: [TranscriptItem] = transcript(of: chat(status: status, timeline), pending: [], mode: mode, streaming: true, context: .none)
+                let rows: [String] = items.compactMap { if case .firstWords(_, let text) = $0 { text } else { nil } }
+                XCTAssertEqual(rows, ["Looking at the site first."], "\(mode) \(status)")
+                XCTAssertEqual(items[1].id, "fw:run_a", "\(mode) \(status): right under the owner's words")
+            }
         }
     }
 }

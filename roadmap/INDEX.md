@@ -6,15 +6,49 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [2086](2086.md) | done | 2026-11-28 | main's iPhone tests green again: the English of a key that is not its English, and the keyboard's first-use tip |
+| [2085](2085.md) | done | 2026-11-28 | main's smoke gate: a bot file naming unknown actions says "bot", and the capsule test knows the chat's tasks |
+| [2084](2084.md) | done | 2026-11-28 | An agent file the web cannot read is called a bot file, as the test and the page say |
+| [2080](2080.md) | done | 2026-11-28 | The iPhone's question card keeps its arrows in place while paging; main's chat UI tests green again |
+| [2079](2079.md) | done | 2026-11-28 | A stuck tab with a navigation under way is said after one timeout, within browser_snapshot's limit |
+| [2077](2077.md) | done | 2026-11-28 | Recall reads back a run whose chat was deleted, and says a record it cannot find may be deleted |
+| [2076](2076.md) | done | 2026-11-28 | A page opened from the tab a login was filled into opens in a new tab in its place |
+| [2074](2074.md) | done | 2026-11-28 | A bot's Model page is the model picker: Main model on top, the providers as groups that fold, a search |
+| [2073](2073.md) | done | 2026-11-28 | A run is told that the mail and calendar tools take no address but the accounts signed in |
+| [2071](2071.md) | built | 2026-11-28 | A message that leaves its choices out starts on the chat's: the chosen model is the one that runs |
+| [2068](2068.md) | done | 2026-11-28 | A manager reviews the team: stuck orders, idle, overloaded and failing bots, objectives behind, and a card per change it proposes |
+| [2067](2067.md) | done | 2026-11-28 | A bot that carries too much says so: the team's load measured, a quiet "Overloaded" mark on its row and profile |
+| [2066](2066.md) | done | 2026-11-28 | A code_run that cannot open a file is told that its code opens only its scratch folder |
+| [2065](2065.md) | done | 2026-11-28 | A code review whose chat has a run under way starts in a new chat instead of failing |
+| [2062](2062.md) | done | 2026-11-28 | DotNext's Activity answers Dot's skill and plugin proposals |
+| [2055](2055.md) | done | 2026-11-28 | Read rules and add a rule that asks or hands a step back from Dot Next |
 | [2051](2051.md) | done | 2026-11-28 | The iPhone's calendars, reminders and location, from Dot Next |
+| [2050](2050.md) | done | 2026-11-28 | The old iPhone app's dictation loses no word on a pause either |
+| [2048](2048.md) | done | 2026-11-28 | A pause in a dictation loses no word, on the phone and the web |
+| [2046](2046.md) | done | 2026-11-27 | A coding helper hands its pull request checks to the chat's background watcher |
+| [2045](2045.md) | done | 2026-11-27 | Measure the character line against the injection evals |
+| [2044](2044.md) | done | 2026-11-27 | Keep the Mac awake for an upcoming routine or watcher |
+| [2043](2043.md) | done | 2026-11-27 | Show when the Mac was last reachable |
+| [2042](2042.md) | implemented | 2026-11-27 | Show task notifications and Live Activities in DotNext |
+| [2041](2041.md) | implemented | 2026-11-27 | Task notifications use the goal check's outcome and the same words across surfaces |
+| [2035](2035.md) | done | 2026-11-27 | An agent's work lists as the phone's bot profile lists it: a Work section, pages of its own, hand-offs newest first |
+| [2034](2034.md) | done | 2026-11-27 | The web says "routine", as the phone does |
+| [2033](2033.md) | done | 2026-11-27 | The web says "bot", as the phone does |
+| [2030](2030.md) | done | 2026-11-27 | A swipe on a message quotes it and does not pull the chat back |
+| [2027](2027.md) | built | 2026-11-27 | What Dot resumes on its own is marked by the run its chain began with: the asks of items 850 and 860 hold |
+| [2026](2026.md) | built | 2026-11-27 | Dot's own tools keep the seal of a run nobody started: no daemon-side read or write of what its sandbox seals |
+| [2025](2025.md) | done | 2026-11-27 | A new chat's first message opens the one chat screen, on the phone and on the web |
 | [2024](2024.md) | done | 2026-11-27 | The chat header keeps the bot's face and name; only a lasting link problem shows, in the capsule |
 | [2023](2023.md) | done | 2026-11-27 | Chat settings as native inset groups, and a capsule that says "Waiting on N helpers" only while the run waits, with no spinner |
 | [2022](2022.md) | in progress | 2026-11-27 | Empty states in the app's own type, and the profile's Activity is the real page |
 | [2021](2021.md) | in progress | 2026-11-27 | A routine's message is one compact row, not the owner's bubble |
+| [2019](2019.md) | in progress | 2026-11-27 | A helper's chat as the bottom sheet everywhere, with its parent's Show steps and its task as its title; one calm live line |
+| [2018](2018.md) | done | 2026-11-27 | First words in seconds: Dot says it is on it the moment a task starts, then what it looks at first |
 | [2017](2017.md) | done | 2026-11-27 | A change reads by its format, on the phone and the web; This chat's sections start folded |
 | [2016](2016.md) | built | 2026-11-27 | Unattended runs keep the sandbox: a run nobody started seals Dot's own files in yolo and free mode too |
 | [2015](2015.md) | done | 2026-11-27 | The web composer works as DotNext's on every width: one capsule, the model as its mark, its settings in one sheet |
 | [2014](2014.md) | done | 2026-11-27 | The small window's compaction fixture takes the cards tool, and the tool's schema is shorter |
+| [2013](2013.md) | built | 2026-11-27 | Several tasks in one chat, slice 3: the tasks on the pages and the phone |
 | [2012](2012.md) | built | 2026-11-27 | Several tasks in one chat, slice 2: where a message goes |
 | [2011](2011.md) | done | 2026-11-27 | The web says "helper" ("yardımcı") where it said "subagent" ("alt ajan"), as the iPhone app does |
 | [2010](2010.md) | done | 2026-11-27 | A chat's row says when its run waits on its helpers, and what works for it while it rests, as DotNext's rows do |
@@ -23,6 +57,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [2005](2005.md) | done | 2026-11-27 | A step writes only the message it shortened, not the whole history |
 | [2004](2004.md) | done | 2026-11-27 | A run's start no longer reads every skill again, nor waits minutes for an embedding |
 | [2003](2003.md) | done | 2026-11-27 | Where the seconds go: `dotx perf` and Settings › Maintenance › Speed |
+| [2002](2002.md) | done | 2026-11-27 | Work handed to a helper is said in plain words, on the phone and on the web |
+| [2001](2001.md) | done | 2026-11-27 | The question card is one panel on the phone and on the web: "User input needed", a pick per card, one Submit |
 | [2000](2000.md) | done | 2026-11-27 | The capsule's clock says whole seconds, as DotNext's pill does |
 | [1999](1999.md) | done | 2026-11-27 | A message sent in a chat is in it at once, with a quiet "Pending" and "Starting…", as DotNext does it |
 | [1998](1998.md) | in progress | 2026-11-27 | The web chat takes DotNext's decisions: what it already has, what differs, what is missing |
@@ -30,6 +66,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1996](1996.md) | done | 2026-11-27 | DotNext: Show steps off hides every step, an answer the finish says again stands once, the live caption speaks as the work log, no Plan in This chat |
 | [1995](1995.md) | in progress | 2026-11-27 | A bot's work on the phone: its work orders, objectives and hand-offs to read, and Pause and Resume in its profile's menu |
 | [1992](1992.md) | done | 2026-11-27 | DotNext shows the photos, videos and files of a message: tiles in the composer and in the chat, a player on a tap |
+| [1991](1991.md) | done | 2026-11-27 | DotNext: the jump-to-end button comes whenever the owner has scrolled up, and the expanded composer names the model |
 | [1990](1990.md) | done | 2026-11-27 | A terminal session whose program ended leaves room for another |
 | [1988](1988.md) | done | 2026-11-27 | A search pattern ripgrep cannot read is told as the call's own error, with the syntax it reads |
 | [1986](1986.md) | done | 2026-11-27 | A code review whose chat was deleted starts in a new chat instead of failing |
@@ -68,6 +105,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1952](1952.md) | done | 2026-11-26 | A schedule's run that only the owner can unblock ends done and waiting, and its next firings skip that part |
 | [1951](1951.md) | done | 2026-11-26 | A schedule whose chat is busy waits for it, due, instead of skipping the firing |
 | [1950](1950.md) | done | 2026-11-26 | A schedule that goes on in its chat reads what was said there, not every step of its earlier runs |
+| [1949](1949.md) | built | 2026-11-26 | Custom providers: any OpenAI- or Anthropic-compatible API as a provider of its own |
 | [1947](1947.md) | done | 2026-11-26 | The review model reads the owner's instructions whole |
 | [1946](1946.md) | done | 2026-11-26 | A goal that is reached is never ended failed for a better result in reach |
 | [1945](1945.md) | done | 2026-11-26 | The shell guard reads a long line in time that grows with its length |

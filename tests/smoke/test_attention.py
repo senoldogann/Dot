@@ -176,8 +176,9 @@ async def _told(page: Page, count: int) -> list[dict[str, str]]:
     return notes
 
 
+@pytest.mark.parametrize(("width", "height"), [(1440, 900), (390, 844)])
 async def test_a_run_tells_only_when_you_are_not_looking_at_it(
-    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, width: int, height: int
 ) -> None:
     host: str = client.base_url.host
     port: int | None = client.base_url.port
@@ -195,7 +196,7 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            page: Page = await browser.new_page(viewport={"width": width, "height": height})
             await page.add_init_script(_STUB)
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"{base}/#/settings/general")
@@ -219,9 +220,9 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             elsewhere: RunRecord = await _start(manager, "Count to two")
             await _ended(manager, elsewhere)
             notes: list[dict[str, str]] = await _told(page, 1)
-            # Item 151: the end tells the first line of what the run answered.
+            # The words are also shown by DotNext, with the answer kept in the chat.
             assert [(note["title"], note["body"], note["tag"]) for note in notes] == [
-                ("A task is done", "Two.", f"run-{elsewhere.id}")
+                ("A task is done", "Open Dot to see it.", f"run-{elsewhere.id}")
             ]
 
             # The run's page open but the tab hidden: told.
@@ -230,7 +231,7 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             await page.evaluate(_HIDE)
             await _ended(manager, hidden)
             notes = await _told(page, 2)
-            assert [note["body"] for note in notes] == ["Two.", "Three."]
+            assert [note["body"] for note in notes] == ["Open Dot to see it."] * 2
             await page.evaluate(_SHOW)
 
             # "Tell me even when I am looking": the run's page open and visible, told anyway.
@@ -243,7 +244,7 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             await expect(page.locator(".stage-title .avatar")).to_have_attribute("data-state", "working")
             await _ended(manager, watched)
             notes = await _told(page, 3)
-            assert [note["body"] for note in notes] == ["Two.", "Three.", "Four."]
+            assert [note["body"] for note in notes] == ["Open Dot to see it."] * 3
             await page.close()
         finally:
             await browser.close()
@@ -283,8 +284,8 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
             assert [question.status for question in left] == ["left"]
             notes: list[dict[str, str]] = await _told(page, 2)
             assert [(note["title"], note["body"], note["tag"]) for note in notes] == [
-                ("Dot has a question", "Which colour?", f"approval-{left[0].id}"),
-                ("A task is done", "Blue.", f"run-{asking.id}"),
+                ("Dot has a question", "Open Dot to see it.", f"approval-{left[0].id}"),
+                ("A task is done", "Open Dot to see it.", f"run-{asking.id}"),
             ]
 
             stopped: CampaignEnded = CampaignEnded(
@@ -308,7 +309,7 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
                     "campaign-cmp-1",
                 ),
                 (
-                    "A schedule did not run",
+                    "A routine did not run",
                     "Morning digest: skipped: 125 minutes overdue (Dot was off or the Mac slept)",
                     "schedule-sch-1",
                 ),

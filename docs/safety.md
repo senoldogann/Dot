@@ -336,16 +336,19 @@ currency, so list sites that bill in one currency. Empty by default.
    ask you. Its words are the goal of the schedule, which a run of the chat may have written
    (`schedule_create`); the rule of lawful and harmless holds whatever it says, and a run that read outside content is
    checked before it makes a schedule (item 525). Such a run you resume after a restart is taken as yours, there to
-   answer: its message waits for your yes. The try a schedule starts on its own of a task a restart, a passing model
-   error or a stall ended (item 1206) is no resume: it is a new run of the schedule's own source, so the review model
-   judges its message as a firing's; it is never started for a task that already sent a message or mail, posted,
-   uploaded, paid, released or handed work on, nor twice (see [Schedules](memory-and-schedules.md)). No rule
-   of yours answers for you. A chat a schedule, a watcher, a notice, the reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
+   answer: its message waits for your yes. One Dot resumes on its own (the daemon as it starts, or a helper whose run
+   ended while it worked) is not your word, and is marked as the run it resumes: the firing's review model judges its
+   message, and in a chat of Dot's own a message, a post and a release ask you (item 2027). The try a schedule starts on
+   its own of a task a restart, a passing model error or a stall ended (item 1206) is no resume: it is a new run of the
+   schedule's own source, so the review model judges its message as a firing's; it is never started for a task that
+   already sent a message or mail, posted, uploaded, paid, released or handed work on, nor twice (see
+   [Schedules](memory-and-schedules.md)). No rule of yours answers for you. A chat a schedule, a watcher, a notice, the
+   reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
    Scheduled tasks page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
-   (commands, MCP tools, files, the web, a release) runs in `yolo` without a question. In a
-   chat Dot opened on its own initiative (item 850): a message, a post and a `release` there wait for your own yes in
-   every mode, `yolo`'s and `auto`'s too, never the review model's, and no rule of yours that allows them answers for
-   you; [Proactive](proactive.md) says how.
+   (commands, MCP tools, files, the web, a release) runs in `yolo` without a question. In a chat Dot opened on its own
+   initiative (item 850): a message, a post and a `release` there wait for your own yes in every mode, `yolo`'s and
+   `auto`'s too, never the review model's, and no rule of yours that allows them answers for you;
+   [Proactive](proactive.md) says how.
    - `release` is a project's change put live. The guard reads it from these command names:
      - `wrangler deploy`, `wrangler pages deploy`, `wrangler versions deploy` and their `publish`;
      - `vercel` with `--prod` (or `--target production`) and `vercel promote`;
@@ -601,11 +604,11 @@ judged as after a page until you write in its chat. A note starts nothing; a run
 a run marked untrusted, which a note marks too, so that no chain of notes carries a page's words, or a note's, on past
 the rules each run keeps (item 963); none goes to a run whose approval mode asks you less than its sender's; and a run
 of Dot's own initiative, which asks before a message, a post or a release in every mode, sends none to a run that does
-not ask them, but for a run of a chat you opened (an agent's chat among them, item 963), which asks a payment, a
+not ask them, but for a run of a chat you opened (a bot's chat among them, item 963), which asks a payment, a
 message, a mail and a post itself or has the review model judge them (item 860), a release there being checked by the
 review model (item 962) as after a page; in yolo with `[policy] yolo_taint_check = false` nothing would check it, so it
 sends none there then. A `preapproved` rule of yours lets a step through in a run a note marked as it does after a page
-(see [Agents](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
+(see [Bots and campaigns](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
 some. A message you send to the run clears the mark; your answer to a question of a run you watch does not, whether the
 run waited for it or went on (item 508), as it answers what the run asked rather than sending it on its way: the run it
 reaches stays marked, and the run it starts once that run has ended starts as untrusted as that run ended; so does
@@ -614,7 +617,7 @@ as your instruction, not the question the run wrote, which a page it read may ha
 run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off, a run that goes on
 in a chat of recurring work (an agent's one chat, a run of Dot's own initiative in the chat of the same name, a look
 for work's among them, a campaign's sessions', item 952) as that chat's last run ended, whoever sent it, since it reads that run's words: once such a chat read outside content, its runs stay
-marked until you write in it yourself, and an agent's chat keeps that mark when the chat that sent it the work is
+marked until you write in it yourself, and a bot's chat keeps that mark when the chat that sent it the work is
 deleted, whose runs go with it, and the run that
 tells a chat that its command in the background ended as the chat's last run ended: that message is Dot's, not yours,
 and so is the note that tells a run at work of such an end, which clears nothing. The report of a helper the run
@@ -803,9 +806,12 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
     as the screen does, and they read Chrome's values of a plain field, a code there, or a password a page shows as
     plain text ("show password").
   - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
-    going back can bring the filled page back whole. Once a script of the run ran in a tab of the chat, no tab of it
-    gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
-    page, in a tab it opened, or in a page Chrome brings back from its cache.
+    going back can bring the filled page back whole. A page opened there (`browser_open`) opens in a new tab in its
+    place and the filled tab closes, as a run would close it itself: the sign-in holds, and scripts run again once
+    no other tab a login was filled into is open. An address the rules refuse leaves the filled tab as it was. Once a
+    script of the run ran in a tab of the chat, no tab of it gets a login until all of them are closed: the script
+    could have left a listener that copies what is typed, in its page, in a tab it opened, or in a page Chrome brings
+    back from its cache.
   - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
     (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
@@ -1200,11 +1206,16 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   the run that tells a schedule's command in the background ended keeps the sandbox in your own chat too (`/loop`). A
   run you started (a message in the app, on a phone, by iMessage, `dotx run`) runs as before, also in a chat a schedule
   opened; Resume on a schedule's run goes on as that run, in the sandbox, and so do the sessions of a campaign after its
-  first, which its schedule starts. What it does not cover: Dot's own file tools (`write_file`, `edit_file`)
-  run in the daemon's process, not in the sandbox, so in `yolo` they still change Dot's files unasked; Apple Events and a
-  hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from the daemon itself, in a checkout
-  of its own, not through a run's tools, and is not changed by it. `false` has those runs follow `[shell] sandbox` and
-  `yolo` as yours do.
+  first, which its schedule starts. Dot's own tools, which read and write in the daemon's process and not in
+  the sandbox, keep the same seal for such a run (item 2026): a step of `read_file`, `write_file`, `edit_file`, the
+  search tools, `generate_image`, `watch_video`, a page shown from a file, a pipeline record, a browser upload or a file
+  a web tool reads is refused, in every mode, when the file is one the sandbox seals for that run (read or written: Dot's
+  own files and `[policy] sealed_paths`; written: what Dot loads and runs, and Dot's home and logs but the workspace).
+  The gate refuses it before the policy weighs it, so nothing asks; its policy event says `seal`. What it does not cover:
+  a tool that changes Dot's files through its own interface and names no path (the memory tools, `skill_save`, a
+  schedule), Apple Events and a hard link made earlier, as above. Self-repair (items 919 to 921) runs Claude Code from
+  the daemon itself, in a checkout of its own, not through a run's tools, and is not changed by it. `false` has those
+  runs follow `[shell] sandbox` and `yolo` as yours do.
 - **Code mode** (items 1500 to 1507, [Code mode](code-mode.md)): the code of a `code_run` is text a model wrote, which a page
   may have shaped, so it does not run in the sandbox above, which allows everything but Dot's files. It runs under
   `sandbox-exec` with `(deny default)`: it reads its interpreter's installation and its `tools` folder, reads and writes its
@@ -1349,9 +1360,11 @@ own initiative, a message, a post or a release waits for your own yes in every m
 but free mode (below).
 A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer (not in free mode, which asks no run's owner anything: item 1563); one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
-what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
-ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are cards, each with
+what it leads to, and the one Dot recommends is marked: a tap picks an option (one, or several when several may be
+chosen; a second tap lets it go), and what you pick is sent with what you write, as one answer. Several questions page
+in one panel ("1 / 3", on the phone and on the web alike), and its one "Submit answers" sends them all once each has an
+answer or was skipped (item 2001). In the terminal you type an option's number (several, separated by
 commas) or your own words. The run reads which option you chose, and whether it was the one it recommended. A line
 typed in the terminal before a prompt for a decision appears (the next message of a chat, typed while the run worked)
 is set aside and answers nothing, and the prompt says so; at a hand-off only Enter or a yes says that you did the step,

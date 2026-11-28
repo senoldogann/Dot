@@ -92,6 +92,10 @@ that the daemon never sees it. The apps the reader looks at are bundles written 
 of the unit tests is a stand-in that says what the real one says; the one test that runs the real `codesign`
 (`tests/smoke/test_desktop_app_signature.py`) signs throwaway bundles ad hoc, with no identity and no keychain.
 
+A run of a test says no first words in a chat (item 2018) unless the test is marked `first_words`: they ask the fast
+model, which a test's scripted model would answer with a reply meant for its run, and a test on the defaults would send
+to the fast model they name (`tests/conftest.py`). The marker needs nothing; its tests play the fast model themselves.
+
 A test never finds your keys unless it is marked `hosted`, `internet` or `live` (item 558, `tests/conftest.py`): in a
 run where none of those is selected the variables of the providers' keys are out of the environment and the login
 Keychain is never asked, from the first fixture on; in a run that holds some, each of the others goes without them

@@ -56,7 +56,15 @@ from dotagent.server.stream import (
     next_event,
     stored_events,
 )
-from dotagent.server.views import QueueView, RunDetail, TerminalView, ThreadAutomation
+from dotagent.server.views import (
+    ChatTaskView,
+    QueueView,
+    RunDetail,
+    TaskState,
+    TasksView,
+    TerminalView,
+    ThreadAutomation,
+)
 from dotagent.store.db import Store
 from dotagent.store.models import (
     WORKING_STATUSES,
@@ -191,6 +199,8 @@ class ThreadView(FrozenModel):
     reactions: list[ReactionRecord]
     drafts: list[DraftRecord]
     terminals: list[TerminalView]
+    # The tasks of the chat (item 2013): of the chat this thread is, or is a lane of; none while it has no lane.
+    tasks: TasksView
 
 
 class ThreadRow(FrozenModel):
@@ -218,16 +228,20 @@ _TITLE_CHARS: int = 80
 _RECORD_ID: re.Pattern[str] = re.compile(r"\b[a-z]{2,4}_[a-z0-9]{8}_[0-9a-f]{6}\b")
 _BEFORE_MARK: re.Pattern[str] = re.compile(r"\s+([.,;:!?])")
 _SENTENCE_END: re.Pattern[str] = re.compile(r"(?<=[.!?])\s|\n")
+# A one-word label the goal opens with ("Task:", "Görev:"): the title is what follows it.
+_LEADING_LABEL: re.Pattern[str] = re.compile(r"^\s*\w+:\s+(?=\S)")
 # The arguments a step's target is read from, the first that is there.
 _TARGET_KEYS: tuple[str, ...] = ("command", "url", "path", "file", "query", "goal", "name")
 _TARGET_CHARS: int = 80
 
 
 def helper_title(goal: str) -> str:
-    """A helper's title for a list (item 1686): the first sentence of its goal, the ids of Dot's records (``run_...``,
-    ``thr_...``) taken out, at most :data:`_TITLE_CHARS` cut at a word."""
-    first: str = _SENTENCE_END.split(goal.strip(), maxsplit=1)[0]
+    """A helper's title for a list (item 1686): the first sentence of its goal, a label it opens with ("Task: ...")
+    left out and its first letter made capital, the ids of Dot's records (``run_...``, ``thr_...``) taken out, at most
+    :data:`_TITLE_CHARS` cut at a word."""
+    first: str = _SENTENCE_END.split(_LEADING_LABEL.sub("", goal.strip(), count=1), maxsplit=1)[0]
     words: str = _BEFORE_MARK.sub(r"\1", " ".join(_RECORD_ID.sub("", first).split()))
+    words = words[:1].upper() + words[1:]
     if len(words) <= _TITLE_CHARS:
         return words
     return words[: _TITLE_CHARS - 1].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
@@ -324,7 +338,31 @@ async def thread_view(ctx: ServerContext, thread_id: str, tail: int, before: str
         reactions=await store.thread_reactions(thread_id),
         drafts=await store.thread_drafts(thread_id),
         terminals=terminals_of(ctx, thread_id),
+        tasks=await tasks_view(ctx, thread_id),
     )
+
+
+async def tasks_view(ctx: ServerContext, thread_id: str) -> TasksView:
+    """The tasks of the chat of ``thread_id`` (item 2013): the chat's own and its lanes', each working, waiting for
+    the owner or ended; none while the chat has no lane. ``NotFoundError`` for no thread."""
+    store: Store = ctx.runtime.store
+    thread: ThreadRecord = await store.get_thread(thread_id)
+    chat: ThreadRecord = thread if thread.lane_of is None else await store.get_thread(thread.lane_of)
+    tasks: list[ChatTaskView] = []
+    for task in await ctx.manager.tasks_of_chat(chat.id):
+        lane: ThreadRecord = chat if task.thread_id == chat.id else await store.get_thread(task.thread_id)
+        state: TaskState = "working" if task.at_work else "waits" if task.asked is not None else "ended"
+        tasks.append(
+            ChatTaskView(
+                thread_id=task.thread_id,
+                title=lane.title,
+                run_id=task.newest_run_id,
+                status=task.status,
+                state=state,
+                own=task.thread_id == chat.id,
+            )
+        )
+    return TasksView(chat_id=chat.id, chat_title=chat.title, cap=ctx.runtime.config.agent.chat_tasks, tasks=tasks)
 
 
 def _background(

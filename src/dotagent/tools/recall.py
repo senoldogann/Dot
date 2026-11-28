@@ -7,11 +7,14 @@ schedule, an approval, an objective. ``recall`` reads one of them back, and each
 step by step, as the DeepSeek Harness super-agent article's Chain of Recall does, rather than from a summary that lost
 it. What a record holds that a run which read content third parties can author wrote (its answer, a step it asked
 about, a title it put on the list) is fenced and marks the reader untrusted, as reading that run's chat does.
+A run deleted with its chat is read back from the run ledger of item 1323, which keeps its numbers and ids and none of
+its words (item 2077).
 """
 
 import asyncio
 import secrets
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
 from pydantic import Field
 
@@ -20,7 +23,7 @@ from dotagent.core.text import redact_known, truncate_tail, unclosing
 from dotagent.policy.types import ActionInfo
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import ApprovalRecord, RunRecord, ThreadRecord, TodoRecord
+from dotagent.store.models import ApprovalRecord, DeletedRunRecord, RunRecord, ThreadRecord, TodoRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
 
@@ -54,8 +57,28 @@ def _clip(text: str, chars: int) -> str:
     return truncate_tail(" ".join(text.split()), chars)
 
 
+def _day(stamp: float) -> str:
+    return datetime.fromtimestamp(stamp, UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+
+async def _deleted_run(store: Store, record_id: str) -> _Recalled:
+    """A run deleted with its chat, as the ledger of item 1323 keeps it (item 2077): Dot's own numbers and ids, no word
+    of the run's, so nothing in it is fenced."""
+    run: DeletedRunRecord = await store.get_deleted_run(record_id)
+    lines: list[str] = [
+        f"Run {run.id} was deleted with its chat on {_day(run.deleted_at)}: its goal, answer and steps are gone.",
+        f"It was a run of {run.source} on {run.model}, started {_day(run.created_at)}, {run.status}"
+        + ("" if run.parent_run_id is None else f", delegated by run {run.parent_run_id}")
+        + ("" if run.schedule_id is None else f", schedule {run.schedule_id}"),
+    ]
+    return _Recalled(lines, False)
+
+
 async def _run(store: Store, record_id: str) -> _Recalled:
-    run: RunRecord = await store.get_run(record_id)
+    try:
+        run: RunRecord = await store.get_run(record_id)
+    except NotFoundError:
+        return await _deleted_run(store, record_id)
     tainted: bool = await store.run_ever_tainted(run.id)
     lines: list[str] = [
         f"Run {run.id}: {run.status}, a {run.mode} run of {run.source}, chat {run.thread_id}"
@@ -167,7 +190,11 @@ def _recall_tool() -> RegisteredTool:
         try:
             recalled: _Recalled = await reader(ctx.runtime.store, args.id)
         except NotFoundError as error:
-            raise ToolInputError("no record of Dot's has that id", {"id": args.id}) from error
+            # A schedule, a chat, a thing to do or an approval that was deleted leaves no trace, nor did a run deleted
+            # before the ledger of item 1323 was kept: the run is told it may be gone, not only that it is no id.
+            raise ToolInputError(
+                "no record of Dot's has that id: it was deleted, or the id is not one of Dot's", {"id": args.id}
+            ) from error
         held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         text: str = redact_known("\n".join(recalled.lines), held)
         if not recalled.tainted:

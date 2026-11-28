@@ -12,21 +12,22 @@ struct ModelsPicture: Sendable {
     let learning: Loadable<LearningModels>
     let look: Loadable<InitiativeLook>
     let repair: Loadable<RepairWorkerView>
+    let custom: Loadable<CustomProvidersView>
 
     func with(config: ModelsConfig) -> ModelsPicture {
-        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair)
+        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair, custom: custom)
     }
     func with(review: Loadable<CodeReviewConfig>) -> ModelsPicture {
-        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair)
+        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair, custom: custom)
     }
     func with(learning: Loadable<LearningModels>) -> ModelsPicture {
-        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair)
+        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair, custom: custom)
     }
     func with(look: Loadable<InitiativeLook>) -> ModelsPicture {
-        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair)
+        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair, custom: custom)
     }
     func with(repair: Loadable<RepairWorkerView>) -> ModelsPicture {
-        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair)
+        ModelsPicture(config: config, options: options, review: review, learning: learning, look: look, repair: repair, custom: custom)
     }
 }
 
@@ -68,6 +69,7 @@ struct ModelsPage: View {
                 learning(picture)
                 repair(picture)
                 review(picture)
+                customProviders(picture)
             }
         }
         .sheet(item: $picking) { pick in ModelPickerSheet(pick: pick, defaultRef: state.value?.config.main ?? "") }
@@ -233,6 +235,30 @@ struct ModelsPage: View {
         }
     }
 
+    /// The providers the owner added on the Mac (item 1949), read only: adding one, and its key, is done there.
+    @ViewBuilder private func customProviders(_ picture: ModelsPicture) -> some View {
+        switch picture.custom {
+        case .loaded(let view) where !view.providers.isEmpty:
+            GroupedSection(
+                header: String(localized: "Providers you added", comment: "Models section: the custom providers added on the Mac"),
+                footer: String(localized: "Added and changed in the Mac's Settings › AI services. Their models are in every model list.", comment: "Models: where custom providers are added")
+            ) {
+                ForEach(view.providers) { provider in
+                    ListRow(
+                        systemImage: nil, title: provider.name, description: URL(string: provider.config.baseURL)?.host() ?? provider.config.baseURL,
+                        accessory: .detail(CustomProviderWords.models(provider.config)))
+                        .accessibilityIdentifier("models.customProvider")
+                }
+            }
+        case .loaded:
+            EmptyView()
+        case .failed(let failure):
+            FailureBanner(failure: failure, macPlace: macPlace, retry: { Task { await load() } })
+        case .loading:
+            EmptyView()
+        }
+    }
+
     // MARK: Rows
 
     /// A model setting written into the Mac's `[models]`: the answer is its whole config.
@@ -306,10 +332,11 @@ struct ModelsPage: View {
         async let learning: Loadable<LearningModels> = model.read { api throws(DaemonRequestError) in try await api.learningModels() }
         async let look: Loadable<InitiativeLook> = model.read { api throws(DaemonRequestError) in try await api.initiativeLook() }
         async let repair: Loadable<RepairWorkerView> = model.read { api throws(DaemonRequestError) in try await api.repairWorker() }
+        async let custom: Loadable<CustomProvidersView> = model.read { api throws(DaemonRequestError) in try await api.customProviders() }
         state = .loaded(
             ModelsPicture(
                 config: current.models, options: await options.value ?? [], review: await review, learning: await learning, look: await look,
-                repair: await repair))
+                repair: await repair, custom: await custom))
     }
 
     /// Makes one write; on success the page takes the answer, else it says why and keeps what stood.
@@ -339,6 +366,16 @@ extension LearningRole {
         case .selector: String(localized: "Selector", comment: "Models: the night's role that picks among versions")
         case .experience: String(localized: "Experience writer", comment: "Models: the night's role that writes down what was learned")
         }
+    }
+}
+
+/// How a custom provider's models are said in its row (item 1949).
+enum CustomProviderWords {
+    static func models(_ config: CustomProviderConfig) -> String {
+        let named: String = String(localized: "\(config.models.count) models", comment: "Models: how many models a custom provider names")
+        return config.listModels
+            ? String(localized: "\(named) + listed", comment: "Models: a custom provider also lists the models it offers")
+            : named
     }
 }
 

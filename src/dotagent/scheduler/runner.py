@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from dotagent.agent import team_review_service
 from dotagent.agent.helpers import SCHEDULE_EFFORT_EVENT
 from dotagent.agent.learning_health import (
     LEARNED,
@@ -21,6 +22,7 @@ from dotagent.agent.manager import RunManager, agent_bounds, thread_title
 from dotagent.agent.reflection import last_reflection, record_reflection_failure, reflection_due
 from dotagent.agent.reflection_record import REFLECTION_OFF, Reflection, summary_line
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT
+from dotagent.agent.team_review import review_due
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import (
     DotError,
@@ -262,6 +264,8 @@ class Scheduler:
         # The plugin scout's night (item 711), timed like the reflection.
         self._scouted_from: float = time.time()
         self._scouting: asyncio.Task[None] | None = None
+        # The manager review of the team (item 2068), when the owner turned it on.
+        self._team_reviewing: asyncio.Task[None] | None = None
         # The repair night (item 921), timed like the reflection.
         self._repaired_from: float = time.time()
         self._repairing: asyncio.Task[None] | None = None
@@ -332,6 +336,9 @@ class Scheduler:
         repairing: asyncio.Task[None] | None = self._repairing
         if repairing is not None:
             repairing.cancel()
+        team_reviewing: asyncio.Task[None] | None = self._team_reviewing
+        if team_reviewing is not None:
+            team_reviewing.cancel()
         backfilling: asyncio.Task[None] | None = self._backfilling
         if backfilling is not None:
             backfilling.cancel()
@@ -363,6 +370,8 @@ class Scheduler:
             await asyncio.wait({self._scouting})
         if self._repairing is not None:
             await asyncio.wait({self._repairing})
+        if self._team_reviewing is not None:
+            await asyncio.wait({self._team_reviewing})
         if self._backfilling is not None:
             await asyncio.wait({self._backfilling})
         if self._telling_kinds is not None:
@@ -373,6 +382,24 @@ class Scheduler:
     def reflecting(self) -> bool:
         """Whether a reflection is under way."""
         return self._reflecting is not None and not self._reflecting.done()
+
+    async def routine_due_near(self, now: float, window_s: float) -> bool:
+        """Whether a firing is starting, or an enabled routine is due around now.
+
+        A little time after the due time lets the next tick pick it up. A paused or long-overdue routine should not
+        hold an idle Mac awake indefinitely.
+        """
+        if self._starting:
+            return True
+        for record in await self._runtime.store.due_schedules(now + window_s):
+            if (
+                record.next_run_at is not None
+                and record.next_run_at >= now - window_s
+                and await self._paused_agent(record) is None
+                and not await self._waits_after_failure(record, now + window_s)
+            ):
+                return True
+        return False
 
     async def tick(self, now: float) -> None:
         """Fire every switched-on schedule that is due at ``now``, start the next session of every active campaign
@@ -397,6 +424,7 @@ class Scheduler:
             self._reflect_if_due,
             self._step_if_due,
             self._scout_if_due,
+            self._team_review_if_due,
             self._repair_if_due,
             self._check_learning,
             self._tell_restart_waits,
@@ -700,6 +728,33 @@ class Scheduler:
             log.info("scout_night_taken_by_look_now")
             return
         self._scouting = asyncio.create_task(self._scout(now), name="plugin-scout")
+
+    async def _team_review_if_due(self, now: float) -> None:
+        """Start the manager review of the team (item 2068) in a task when the owner turned it on and its period has
+        passed since its last try; the daemon's scheduler alone (its manager's model is asked), never while one is
+        under way, and none while the emergency stop is engaged."""
+        if not self._may_scout or await _emergency_stop_engaged():
+            return
+        if self._team_reviewing is not None and not self._team_reviewing.done():
+            return
+        if team_review_service.running(self._runtime.store):
+            return
+        if not review_due(await team_review_service.load(self._runtime.store), now):
+            return
+        self._team_reviewing = asyncio.create_task(self._team_review(now), name="team-review")
+
+    async def _team_review(self, now: float) -> None:
+        """Task body of a review the scheduler started, and the one place its errors end: logged and stored as the
+        review's error, and the next period tries again."""
+        runtime: Runtime = self._runtime
+        try:
+            await team_review_service.review(
+                runtime, now, lambda manager: team_review_service.reviewer_of(runtime, manager, now)
+            )
+        except DotError as exc:
+            log.error("team_review_failed", error=exc.message, context=exc.context)
+        except Exception:
+            log.exception("team_review_crashed")
 
     async def _scout(self, now: float) -> None:
         """Task body of the scout's night, and the one place its errors end: logged, and the next night tries again."""

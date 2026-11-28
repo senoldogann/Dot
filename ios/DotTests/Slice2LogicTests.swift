@@ -405,6 +405,35 @@ final class DictationRulesTests: XCTestCase {
         XCTAssertEqual(DictationText.merged(base: "Hi", heard: "the invoices"), "Hi the invoices")
     }
 
+    /// Item 2050: the results `SFSpeechRecognizer` gave on macOS 26 for `say` recordings with pauses (on-device, partial
+    /// results): a pause closes the utterance with a non-final result that carries metadata, and the next words start
+    /// from empty, so the words before a pause must stay.
+    func testAPauseKeepsTheWordsSaidBeforeIt() {
+        let feed: ([(String, Bool)]) -> DictationTranscript = { results in
+            results.reduce(DictationTranscript.empty) { $0.taking(words: $1.0, closesUtterance: $1.1) }
+        }
+        let english: DictationTranscript = feed([
+            ("I would like", false), ("I would like to book a table for two people tomorrow evening", false),
+            ("I would like to book a table for two people tomorrow evening", true),
+            ("And", false), ("And please make it near the window if possible", false),
+            ("And please make it near the window if possible", true),
+        ])
+        XCTAssertEqual(english.text, "I would like to book a table for two people tomorrow evening And please make it near the window if possible")
+        let turkish: DictationTranscript = feed([
+            ("Yarın akşam", false), ("Yarın akşam iki kişilik bir masa ayırtmak istiyorum", true),
+            ("Mümkünse", false), ("Mümkünse pencere kenarında olsun", true),
+            ("Bir de", false), ("Bir de doğum günü pastası lazım", true),
+        ])
+        XCTAssertEqual(turkish.closed.count, 3)
+        XCTAssertEqual(turkish.text, "Yarın akşam iki kişilik bir masa ayırtmak istiyorum Mümkünse pencere kenarında olsun Bir de doğum günü pastası lazım")
+        // A pause then Stop: the task's final result has no words, and adds and repeats nothing.
+        XCTAssertEqual(feed([("Hello there", false), ("Hello there", true), ("", true)]).text, "Hello there")
+        // Words said again after a pause are the owner's own: kept twice.
+        XCTAssertEqual(feed([("No", true), ("No", false), ("No", true)]).text, "No No")
+        // A revision replaces only the live utterance; an empty partial keeps it.
+        XCTAssertEqual(feed([("First part", true), ("I scream", false), ("Ice cream", false), ("  ", false)]).text, "First part Ice cream")
+    }
+
     func testTypingWhileItListensStopsItAndIsNeverWrittenOver() {
         // Nothing typed since it began, or since it last wrote: it writes the words heard so far over its own.
         XCTAssertEqual(DictationText.update(current: "Hi", lastWritten: nil, base: "Hi", heard: "the"), "Hi the")

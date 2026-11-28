@@ -365,7 +365,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.wait_for_timeout(_SETTLE_MS)
             await page_ui.locator(".composer-pill[data-pill='agent']").click()
             options: list[str] = await page_ui.locator(
-                ".composer-popover [role=listbox][aria-label='Agent'] .pop-option-text > span:first-child"
+                ".composer-popover [role=listbox][aria-label='Bot'] .pop-option-text > span:first-child"
             ).all_inner_texts()
             assert options == ["Dot", "Scout"], options
             await page_ui.keyboard.press("Escape")
@@ -377,7 +377,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             assert "Find two sources" in rows_text[0] and "No chats yet" not in rows_text[0], rows_text
             # The templates under them say nothing of a tool list that loaded, and no empty part is written as "null".
             templates = page_ui.locator("section[aria-label='Templates']")
-            await expect(templates).to_contain_text("Single agents")
+            await expect(templates).to_contain_text("Single bots")
             await expect(templates).not_to_contain_text("null")
             await page_ui.screenshot(path=str(out / "agents.png"))
             # Left open, the cards' ages keep up with the clock (item 633): they were written once, when read.
@@ -410,7 +410,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await expect(mode_pill).to_be_hidden()
             await expect(message).to_have_value("")
             # The tab names the agent and the bar's name is the page's one heading (item 437).
-            await expect(page_ui).to_have_title("Scout · Agents · Dot")
+            await expect(page_ui).to_have_title("Scout · Bots · Dot")
             await expect(page_ui.get_by_role("heading", level=1)).to_have_text("Scout")
             await expect(page_ui.locator(".stage-title h1.stage-name")).to_have_count(1)
             # The page lists no run (item 1266): its chats' runs are the API's.
@@ -524,9 +524,19 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
             await expect(save).to_be_disabled()
             listed.set()
             await expect(save).to_be_enabled()
+            # The model is the chat settings' list (the owner's report of 2026-11-28): the main model's row on top, the
+            # providers as sections that fold, a search; a model no longer offered is kept and said so.
+            picker: Locator = page.get_by_role("group", name="Model")
+            await expect(picker.locator(".sheet-search-field")).to_be_visible()
+            await expect(picker.locator("details.sheet-section").first).to_be_attached()
+            await expect(picker.get_by_role("option").first).to_contain_text("Main model")
+            await expect(picker.get_by_role("option").first).to_contain_text(
+                "For chats that have no model of their own"
+            )
+            await expect(picker.locator(".hint")).to_contain_text("ollama:gone-model")
             await expect(page.locator(".tool-pick input[value='shell']")).to_be_checked()
             await save.click()
-            await expect(page.get_by_text("Agent saved.")).to_be_visible()
+            await expect(page.get_by_text("Bot saved.")).to_be_visible()
             # A list that failed keeps Save off: the form cannot say which tools the agent keeps.
             await page.unroute("**/api/tools")
             await page.route("**/api/tools", failed)
@@ -570,7 +580,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await every.check()
             assert await boxes.evaluate_all("(all) => all.length > 1 && all.every((box) => box.checked)")
             await page.get_by_role("button", name="Save changes").click()
-            await expect(page.get_by_text("Agent saved.")).to_be_visible()
+            await expect(page.get_by_text("Bot saved.")).to_be_visible()
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []
             # Opened again, the agent with every tool has every box ticked; none ticked is refused, and nothing changes.
             await page.reload()
@@ -588,7 +598,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await expect(every).to_be_checked()
             await expect(page.locator(".tool-picks-count")).to_have_text(f"{len(listed)} of {len(listed)}")
             await page.get_by_role("button", name="Save changes").click()
-            await expect(page.get_by_text("Agent saved.")).to_be_visible()
+            await expect(page.get_by_text("Bot saved.")).to_be_visible()
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == listed
             # Ticked by the owner, All tools gives that agent every tool, any added later too.
             await page.reload()
@@ -597,7 +607,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await every.check()
             await expect(page.locator(".tool-picks-count")).to_have_text("every action, and any added later")
             await page.get_by_role("button", name="Save changes").click()
-            await expect(page.get_by_text("Agent saved.")).to_be_visible()
+            await expect(page.get_by_text("Bot saved.")).to_be_visible()
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []
         finally:
             await browser.close()
@@ -688,9 +698,9 @@ async def test_an_agent_made_on_the_page_opens_its_first_chat_where_it_speaks_fi
             page: Page = await browser.new_page(viewport={"width": 390, "height": 844}, locale="tr-TR")
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/agents")
-            await page.get_by_role("button", name="New agent").first.click()
+            await page.get_by_role("button", name="New bot").first.click()
             await page.get_by_role("textbox", name="Name").fill("Reklamcı")
-            await page.get_by_role("button", name="Create agent").click()
+            await page.get_by_role("button", name="Create bot").click()
             await expect(page).to_have_url(re.compile(r"#/runs/run_"))
             await expect(page.locator(".timeline")).to_contain_text("Merhaba, ben Reklamcı!")
             await expect(page.locator(".bubble.user")).to_have_count(0)

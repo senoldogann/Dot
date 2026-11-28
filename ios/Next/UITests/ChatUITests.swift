@@ -50,6 +50,65 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// The round "↓" beside the bottom capsule (item 1991): it is absent while the chat stands at its end, comes once the owner
+    /// scrolls up, and a tap on it scrolls to the end, follows again and hides it.
+    @MainActor
+    func testTheJumpButtonComesWhenTheOwnerScrollsUpAndLeavesWithATap() {
+        let app: XCUIApplication = launch("n2-failed", defaults: [])
+        let jump: XCUIElement = app.buttons["chat.scrollToBottom"]
+        let message: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 10))
+        XCTAssertFalse(jump.exists, "at the end there is no button")
+        let scroll: XCUIElement = app.scrollViews.firstMatch
+        for _ in 0..<3 { scroll.swipeDown(velocity: .fast) }
+        XCTAssertTrue(jump.waitForExistence(timeout: 5), "scrolled up, the button comes")
+        XCTAssertGreaterThanOrEqual(jump.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(jump.frame.height, 44)
+        let attachment: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "jump-button"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        jump.tap()
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: jump)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "at the end again, the button leaves")
+    }
+
+    /// The swipe to quote beats the navigation's pull-back (item 2030): iOS 26 pulls a pushed chat back from a swipe to the
+    /// right anywhere in it, which a swipe on a message is. On a message of the owner's and of Dot's, from the middle of the
+    /// screen, the message is quoted and the chat stays open; a swipe from the screen's edge still goes back.
+    @MainActor
+    func testASwipeOnAMessageQuotesWhileTheEdgeSwipeStillGoesBack() {
+        let app: XCUIApplication = launch("n2-failed", defaults: ["-DotNextPushed", "YES"])
+        let home: XCUIElement = app.staticTexts["Fixture home"]
+        let chip: XCUIElement = app.descendants(matching: .any)["composer.quote"]
+        let owner: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+        XCTAssertTrue(owner.waitForExistence(timeout: 10))
+        let origin: XCUICoordinate = app.coordinate(withNormalizedOffset: .zero)
+        func drag(_ element: XCUIElement, by dx: CGFloat) {
+            let start: CGVector = CGVector(dx: element.frame.midX - 40, dy: element.frame.midY)
+            origin.withOffset(start).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: start.dx + dx, dy: start.dy)))
+        }
+        drag(owner, by: 200)
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on the owner's message quotes it")
+        XCTAssertTrue(chip.label.contains("Book me the dentist"), chip.label)
+        XCTAssertFalse(home.exists, "the chat is still open")
+        app.buttons["composer.quote.remove"].tap()
+
+        let answer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "merged, see")).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 10))
+        drag(answer, by: 200)
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "a swipe on Dot's message quotes it")
+        // The whole message is quoted and the chip shows its first line, the answer's "## Fixed" heading.
+        XCTAssertTrue(chip.label.contains("Fixed"), chip.label)
+        XCTAssertFalse(home.exists, "the chat is still open")
+        app.buttons["composer.quote.remove"].tap()
+
+        // From the screen's own edge it is still the way back.
+        origin.withOffset(CGVector(dx: 2, dy: 400)).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: 260, dy: 400)))
+        XCTAssertTrue(home.waitForExistence(timeout: 10), "the edge swipe goes back")
+        XCTAssertFalse(chip.exists)
+    }
+
     @MainActor
     func testThePlusMenuAttachesAVideoWithItsDurationAndCanRemoveIt() throws {
         let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))
@@ -94,12 +153,12 @@ final class ChatUITests: XCTestCase {
         XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
     }
 
-    /// The owner's report of 2026-11-27: the capsule says "Waiting on N helpers" only while the main run has stopped for
+    /// The owner's report of 2026-11-27: the capsule says "Waiting for N helpers" only while the main run has stopped for
     /// them (`n2-helpers`: its step's one open call is a delegate); while it works beside its helper (`n2-chat`) it says
     /// "Working". No spinner on either, and the status takes only its words' width, so that Stop, the plan and the helpers
     /// keep their room.
     func testTheCapsuleSaysWaitingOnlyWhileTheRunWaitsAndSpinsNothing() {
-        for (scene, words) in [("n2-helpers", "Waiting on 1 helper"), ("n2-chat", "Working, ")] {
+        for (scene, words) in [("n2-helpers", "Waiting for 1 helper"), ("n2-chat", "Working, ")] {
             let app: XCUIApplication = launch(scene)
             let status: XCUIElement = app.buttons["capsule.status"]
             XCTAssertTrue(status.waitForExistence(timeout: 10), scene)
@@ -326,6 +385,34 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// sheet), with ✕; the helper's chat shows its steps as the chat that started it does unless it chose itself.
+    func testAHelperOfTheStreamOpensAsASheetAndShowsItsStepsAsItsParent() {
+        for parentShows in [false, true] {
+            let overrides: String = "<dict><key>thr_fixture</key><\(parentShows)/></dict>"
+            let app: XCUIApplication = launch("n2-chat", defaults: ["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", overrides])
+            let group: XCUIElement = app.buttons["helpers.group"]
+            XCTAssertTrue(group.waitForExistence(timeout: 10))
+            group.tap()
+            let row: XCUIElement = app.buttons.matching(identifier: "helper.row").matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            row.tap()
+            let close: XCUIElement = app.buttons["helperChat.close"]
+            XCTAssertTrue(close.waitForExistence(timeout: 5), "the helper's chat is a sheet with ✕, not a pushed chat")
+            XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5))
+            let step: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "dentist.example")).firstMatch
+            XCTAssertEqual(step.waitForExistence(timeout: 2), parentShows, "the helper's steps follow its parent's Show steps (\(parentShows))")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "helper-sheet-steps-\(parentShows)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            close.tap()
+            let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: close)
+            XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed, "✕ closes the sheet")
+            app.terminate()
+        }
+    }
+
+    /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
     /// does; a tap shows the steps and a second folds them back.
@@ -559,6 +646,20 @@ final class ChatUITests: XCTestCase {
         }
     }
 
+    /// Item 2018: Dot's first words stand under the owner's message as one of its short messages, with the steps shown and
+    /// with Show steps off.
+    func testTheFirstWordsStandUnderTheOwnersMessageWithAndWithoutTheSteps() {
+        for defaults in [["-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", "{}"], ["-showSteps", "NO", "-stepsOverrides", "{}"]] {
+            let app: XCUIApplication = launch("n2-chat", defaults: defaults)
+            let words: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Looking at next week's calendar first.")).firstMatch
+            // The chat opens at its newest words; the first words stand near the run's start, above them.
+            for _ in 0..<6 where !words.waitForExistence(timeout: 2) { app.swipeDown() }
+            for _ in 0..<6 where !words.exists { app.swipeUp() }
+            XCTAssertTrue(words.waitForExistence(timeout: 15), "\(defaults): the first words")
+            app.terminate()
+        }
+    }
+
     /// Item 1932: the asks scene settles: once it stood still for a few seconds, the screen is not drawn again (its
     /// scroll followed the lazy stack's own height estimates in a loop, at 100 % CPU).
     func testTheAsksSceneSettles() {
@@ -573,14 +674,13 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
-    /// Item 1931 and the owner's report of 2026-11-27: with no link, the capsule says Offline in the status's place once
-    /// it lasted a few seconds, and offers no Stop; the header keeps the bot's face and name, no link words.
-    func testThePillSaysOfflineWithoutALink() {
+    /// A lasting outage shows the last contact in the capsule without adding link text to the header.
+    func testThePillShowsTheLastContactWithoutALink() {
         let app: XCUIApplication = launch("n2-offline-saved")
         let link: XCUIElement = app.buttons["capsule.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
-        XCTAssertEqual(link.label, "Offline")
-        for words in ["Syncing", "Reconnecting", "Offline ·"] {
+        XCTAssertEqual(link.label, "Mac asleep or unreachable since 14:05")
+        for words in ["Syncing", "Reconnecting", "Mac asleep or unreachable"] {
             XCTAssertFalse(
                 app.navigationBars.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", words)).firstMatch.exists, "no link words in the header: \(words)")
         }
@@ -589,36 +689,108 @@ final class ChatUITests: XCTestCase {
         shot.name = "pill-offline"
         shot.lifetime = .keepAlways
         add(shot)
+
+        app.terminate()
+        let list: XCUIApplication = launch("n2-offline-list")
+        let listLink: XCUIElement = list.staticTexts["chats.link"]
+        XCTAssertTrue(listLink.waitForExistence(timeout: 15))
+        XCTAssertEqual(listLink.label, "Mac asleep or unreachable since 14:05")
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
         let app: XCUIApplication = launch("n2-asks")
-        XCTAssertTrue(app.staticTexts["Your answer is needed"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["1 of 2"].exists, "a count for several asks")
+        XCTAssertTrue(app.staticTexts["User input needed"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["1 / 2"].exists, "a count for several asks")
         XCTAssertTrue(app.buttons["Allow once"].exists)
         XCTAssertTrue(app.buttons["Always allow in this chat"].exists)
         XCTAssertFalse(app.textFields["composer.field"].exists, "the dock stands in the composer's place")
         app.buttons["Next ask"].tap()
-        XCTAssertTrue(app.staticTexts["2 of 2"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["2 / 2"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Which day suits you for the dentist?"].exists)
         XCTAssertTrue(app.buttons["Stop"].exists, "Stop stays reachable")
         app.buttons["Fold what Dot asked"].tap()
         XCTAssertTrue(app.textFields["composer.field"].waitForExistence(timeout: 3), "folded, the composer is back")
     }
 
-    func testQuestionsArePickedAndSentWithOneSubmit() {
+    /// Item 2001, after another coding agent's question card: three questions page in one card ("1 / 3", never wrapped);
+    /// a single-select pick rings its card, a multi-select one takes several and lets one go, an own answer is written;
+    /// one "Submit answers" waits until every question has an answer and keeps the picks while paging.
+    func testThreeQuestionsPageInOneCardWithSingleMultiAndWrittenAnswers() {
         let app: XCUIApplication = launch("n2-question")
         XCTAssertTrue(app.staticTexts["Fill in the pending answers"].waitForExistence(timeout: 10))
+        // The fixture's live picture floats over the card's arrows: folded first, so the taps reach them.
+        let hidePicture: XCUIElement = app.buttons["Hide the live picture"]
+        if hidePicture.waitForExistence(timeout: 3) { hidePicture.tap() }
+        let counter: XCUIElement = app.staticTexts["1 / 3"]
+        XCTAssertTrue(counter.exists, "the count")
+        XCTAssertLessThan(counter.frame.height, 30, "the count stays on one line: \(counter.frame)")
         let submit: XCUIElement = app.buttons["ask.submit"]
-        XCTAssertFalse(submit.isEnabled, "nothing picked yet")
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch.tap()
-        XCTAssertTrue(submit.isEnabled)
-        XCTAssertEqual(submit.label, "Submit answer")
+        XCTAssertEqual(submit.label, "Submit answers")
+        XCTAssertFalse(submit.isEnabled, "nothing answered yet")
+        // Single select: the pick is the selected card, a second pick moves it.
+        let close: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch
+        let keep: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Keep them on")).firstMatch
+        keep.tap()
+        close.tap()
+        XCTAssertTrue(close.isSelected)
+        XCTAssertFalse(keep.isSelected, "one answer for a single-select question")
+        XCTAssertFalse(submit.isEnabled, "two questions still wait")
+        // Multi select (the third question): two picks, then one let go; both stay selected until then.
         app.buttons["Next ask"].tap()
-        let tuesday: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Tuesday afternoon (Recommended)")).firstMatch
-        XCTAssertTrue(tuesday.waitForExistence(timeout: 3))
-        tuesday.tap()
-        XCTAssertEqual(submit.label, "Submit 2 answers", "the pick of the first question is kept while paging")
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 3))
+        app.buttons["Next ask"].tap()
+        XCTAssertTrue(app.staticTexts["3 / 3"].waitForExistence(timeout: 3))
+        let memory: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "#1199")).firstMatch
+        let webhook: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "#1188")).firstMatch
+        XCTAssertTrue(memory.waitForExistence(timeout: 3))
+        memory.tap()
+        webhook.tap()
+        XCTAssertTrue(memory.isSelected && webhook.isSelected, "several options at once")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "question-card-multi"
+        shot.lifetime = .keepAlways
+        add(shot)
+        webhook.tap()
+        XCTAssertFalse(webhook.isSelected, "a second tap lets an option go")
+        XCTAssertFalse(submit.isEnabled, "the second question still waits")
+        // Paging back keeps what was picked.
+        app.buttons["Previous ask"].tap()
+        app.buttons["Previous ask"].tap()
+        XCTAssertTrue(app.staticTexts["1 / 3"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch.isSelected)
+        // Free text: the second question is answered in words, the last answer Submit waited for.
+        app.buttons["Next ask"].tap()
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 3))
+        let written: XCUIElement = app.descendants(matching: .any).matching(identifier: "ask.written").firstMatch
+        XCTAssertTrue(written.waitForExistence(timeout: 3))
+        written.tap()
+        written.typeText("Friday at noon")
+        XCTAssertTrue(submit.isEnabled, "every question has an answer")
+    }
+
+    /// Item 2001: at AX3, in Turkish and dark, the card's options grow with their words (nothing cut) and the count
+    /// stays on one line.
+    func testTheQuestionCardGrowsAtAX3InTurkishAndDark() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-question", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-colorScheme", "dark",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
+        ]
+        app.launch()
+        let counter: XCUIElement = app.staticTexts["1 / 3"]
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertLessThan(counter.frame.height, 60, "the count stays on one line at AX3: \(counter.frame)")
+        let options: XCUIElementQuery = app.buttons.matching(identifier: "ask.option")
+        XCTAssertTrue(options.firstMatch.waitForExistence(timeout: 5))
+        for index in 0..<options.count {
+            let option: XCUIElement = options.element(boundBy: index)
+            XCTAssertGreaterThanOrEqual(option.frame.height.rounded(), 44)
+            XCTAssertLessThanOrEqual(option.frame.maxX, app.windows.firstMatch.frame.maxX, "nothing pushed off the edge")
+        }
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "question-card-ax3-tr-dark"
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 
     func testSlashOpensTheCommandsPanelFilteredAsTheOwnerTypes() {

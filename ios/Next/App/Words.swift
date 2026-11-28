@@ -58,10 +58,12 @@ func toolLine(_ entry: ToolEntry) -> String {
             ? String(localized: "Waiting for a condition", comment: "Tool row: a wait_until step at work")
             : String(localized: "Waited for a condition", comment: "Tool row: a wait_until step")
     case .helper where !target.isEmpty:
+        let title: String = shortTitle(target)
         switch entry.state {
-        case .running: return String(localized: "Delegating “\(target)”", comment: "Tool row: a task handed to a helper, at work; the argument is its goal")
-        case .done: return String(localized: "Delegated task “\(target)” finished", comment: "Tool row: a task handed to a helper, ended; the argument is its goal")
-        case .failed: return String(localized: "Delegated task “\(target)” failed", comment: "Tool row: a task handed to a helper that failed; the argument is its goal")
+        // Plain words, the helper's work by its title: never "delegate", "child" or "subagent" (item 2002).
+        case .running: return String(localized: "Handed to a helper: \(title)", comment: "Tool row: work handed to a helper, at work; the argument is its title")
+        case .done: return String(localized: "A helper finished: \(title)", comment: "Tool row: work handed to a helper, ended; the argument is its title")
+        case .failed: return String(localized: "A helper failed: \(title)", comment: "Tool row: work handed to a helper that failed; the argument is its title")
         }
     default: return target.isEmpty ? toolName(entry.tool) : "\(toolName(entry.tool)) · \(target)"
     }
@@ -76,13 +78,24 @@ func stepWords(tool: String, target: String) -> String {
         return String(localized: "Waiting for a helper", comment: "Capsule and helper row: the run's step talks to or waits for a helper")
     }
     switch kind {
-    case .read, .edit, .command, .search, .web, .wait:
+    case .command:
+        // A command's own words are no line for a row (owner 2026-11-27: no raw paths in rows).
+        return String(localized: "Running a command", comment: "Work line: a command")
+    case .read, .edit, .search, .web, .wait:
+        // A file by its name, never its whole path.
+        let shown: String = kind == .read || kind == .edit ? fileName(of: target) : target
         let line: String = toolLine(
-            ToolEntry(id: "", tool: tool, kind: kind, target: target, args: "", output: "", state: .running, images: [], startedAt: 0, endedAt: nil))
+            ToolEntry(id: "", tool: tool, kind: kind, target: shown, args: "", output: "", state: .running, images: [], startedAt: 0, endedAt: nil))
         return line == tool || line.hasPrefix(tool + " · ") ? String(localized: "Working", comment: "Status word: a run is at work") : line
     default:
         return String(localized: "Working", comment: "Status word: a run is at work")
     }
+}
+
+/// The last part of a path ("…/memory-merge/C8.md" → "C8.md"); a text with no slash as it is.
+func fileName(of path: String) -> String {
+    let trimmed: String = path.trimmingCharacters(in: CharacterSet(charactersIn: "/ `\"'"))
+    return trimmed.split(separator: "/").last.map(String.init) ?? trimmed
 }
 
 /// Whether a step starts or talks to a helper: Dot's `delegate` and `message_agent`, a CLI harness's `Task` or `Agent`.
@@ -313,4 +326,23 @@ private func kindPhrase(_ kind: String, _ count: Int, bundle: Bundle, locale: Lo
     case "helper": String(localized: "started \(count) helpers", bundle: bundle, locale: locale, comment: "Work log group: helpers started; the argument is how many")
     default: String(localized: "used \(count) tools", bundle: bundle, locale: locale, comment: "Work log group: other tools; the argument is how many")
     }
+}
+
+/// Why a bot is overloaded (item 2067), one sentence per reason the phone knows, joined as the web joins them; "" when
+/// it is not. The web's words are `views.agents.overload*`.
+func overloadWords(_ load: BotLoad?) -> String {
+    (load?.reasons ?? []).compactMap { reason -> String? in
+        switch reason.kind {
+        case "orders":
+            String(localized: "\(reason.count) open work orders (more than \(reason.limit))", comment: "Bot profile: why a bot is overloaded; its open work orders and the most it should hold")
+        case "routines":
+            String(localized: "\(reason.count) routines on (more than \(reason.limit))", comment: "Bot profile: why a bot is overloaded; its routines switched on and the most it should hold")
+        case "done_share":
+            String(
+                localized: "\(reason.count)% of its runs ended done this week, \(reason.limit)% the week before",
+                comment: "Bot profile: why a bot is overloaded; the share of its runs that ended done this week and the week before")
+        default: nil
+        }
+    }
+    .joined(separator: " · ")
 }

@@ -29,6 +29,9 @@ final class AppModel {
     private(set) var outbox: [OutboxItem] = []
     private(set) var accepted: [String: AcceptedMessage] = [:]
     private(set) var transport: Transport = .connecting
+    private(set) var visibleLink: LinkLine?
+    @ObservationIgnored private var linkDelay: Task<Void, Never>?
+    @ObservationIgnored private var currentLink: LinkLine?
     private(set) var online: Bool = true
     private(set) var savedAt: [String: Double] = [:]
     private(set) var workingAt: [String: Double] = [:]
@@ -50,6 +53,15 @@ final class AppModel {
     @ObservationIgnored private(set) var engine: Engine?
     /// Dot's asks to this phone (item 2051): its calendars, reminders and place, taken while the app is in front.
     @ObservationIgnored private var asks: PhoneAskLoop?
+    @ObservationIgnored private var push: PhonePush?
+    var requestedRun: String?
+    @ObservationIgnored private(set) var visiblePushThread: String?
+
+    func bind(push: PhonePush) {
+        self.push = push
+        push.bind(to: self)
+    }
+
     @ObservationIgnored private var watching: Task<Void, Never>?
     @ObservationIgnored private let keys: PhoneKeyStore = PhoneKeyStore()
     @ObservationIgnored private let hosts: HostStore = HostStore()
@@ -89,7 +101,10 @@ final class AppModel {
         if next.list != list || next.chats != chats { PerfCounters.shared.published() }
         // Every screen reads the list with the deletes on their way hidden (item 1964), and drops a chat that went (item 1965).
         let shown: ListProjection = next.shownList
-        if shown != list { list = shown }
+        if shown != list {
+            list = shown
+            push?.show(shown)
+        }
         let gone: Set<String> = next.goneChats
         if gone != goneChats { goneChats = gone }
         // A chat the Mac says went may have been a bot's home chat: the agents are read again for the one that follows it.
@@ -100,6 +115,7 @@ final class AppModel {
         if next.outbox != outbox { outbox = next.outbox }
         if next.accepted != accepted { accepted = next.accepted }
         if next.transport != transport { transport = next.transport }
+        showLink(linkLine(transport: next.transport, lastContact: next.lastContact))
         if next.online != online { online = next.online }
         if next.savedAt != savedAt { savedAt = next.savedAt }
         if next.workingAt != workingAt { workingAt = next.workingAt }
@@ -108,6 +124,24 @@ final class AppModel {
         if next.reset != reset { reset = next.reset }
         if next.heard != heard { heard = next.heard }
         if let fresh: DaemonReset = next.reset, !fresh.taken, UserDefaults.standard.double(forKey: Self.rescuedKey) != fresh.at { rescue(fresh) }
+    }
+
+    private func showLink(_ line: LinkLine?) {
+        guard currentLink != line else { return }
+        currentLink = line
+        if line == nil {
+            linkDelay?.cancel()
+            linkDelay = nil
+            visibleLink = nil
+        } else if visibleLink != nil {
+            visibleLink = line
+        } else if linkDelay == nil {
+            linkDelay = Task { [weak self] in
+                do { try await Task.sleep(for: linkLineDelay) } catch { return }
+                self?.visibleLink = self?.currentLink
+                self?.linkDelay = nil
+            }
+        }
     }
 
     /// The draft of the new chat's composer, kept like a chat's (a chat's id is the daemon's `thr_…`, never this).
@@ -149,7 +183,10 @@ final class AppModel {
         parts.outbox = outbox
         parts.accepted = accepted
         parts.online = online
-        return parts.pending(in: thread)
+        // A chat this phone started and the daemon has not named yet is shown by its outbox key (item 2025): its first
+        // message is the new chat's own item of the outbox.
+        let starting: [PendingMessage] = startingChats[thread] == nil ? [] : parts.pendingChats.filter { $0.key == thread }
+        return starting + parts.pending(in: thread)
     }
 
     /// New chats not yet in the list, from the outbox and the link.
@@ -186,8 +223,12 @@ final class AppModel {
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
-    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
+    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849). Only these show
+    /// as a starting chat (item 2025); a key left in the outbox from an earlier launch is not one of them.
     var startingChats: [String: String] = [:]
+    /// Where the messages this phone sent to a chat with several tasks went (item 2013), for that chat's screen to say;
+    /// each is taken once said (`routedSaid`).
+    var routedSends: [RoutedSend] = []
 
     /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
     /// is read (item 1849).
@@ -197,6 +238,20 @@ final class AppModel {
     /// "Show steps" of a chat where its This chat sheet set it, over Settings › Chat's (item 1915), kept on the phone.
     var stepsOverrides: [String: Bool] = (UserDefaults.standard.dictionary(forKey: "stepsOverrides") as? [String: Bool]) ?? [:] {
         didSet { UserDefaults.standard.set(stepsOverrides, forKey: "stepsOverrides") }
+    }
+    /// The chat that started each helper's chat this phone has seen listed, by the helper's chat: a helper's chat shows
+    /// its steps as its parent does unless it chose itself (`showsSteps(of:everywhere:)`). Kept in memory: a helper's chat
+    /// is opened from its parent's, which lists it first.
+    private(set) var helperParents: [String: String] = [:]
+
+    /// Notes that `helpers` work for `parent`; a helper already known is not written again (no redraw for nothing).
+    func noteHelpers(_ helpers: [String], of parent: String) {
+        for helper in helpers where helper != parent && helperParents[helper] != parent { helperParents[helper] = parent }
+    }
+
+    /// Whether `thread` shows its steps: its own choice, else its parent chat's, else Settings › Chat's (item 1915).
+    func showsSteps(of thread: String, everywhere: Bool) -> Bool {
+        DotEngine.showsSteps(of: thread, overrides: stepsOverrides, parents: helperParents, everywhere: everywhere)
     }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
@@ -255,6 +310,7 @@ final class AppModel {
         self.engine = engine
         self.host = host
         phase = .ready
+        push?.connect(to: api)
         watching = Task { [weak self] in
             for await next in await engine.store.updates() {
                 guard let self else { return }
@@ -262,6 +318,14 @@ final class AppModel {
                 // At most 15 pictures a second: the store's stream keeps only the newest, so the words that came
                 // meanwhile are drawn together, never dropped (item 1848); the answer's reveal paces them on screen.
                 try? await Task.sleep(for: .milliseconds(66))
+            }
+        }
+        Task { [weak self] in
+            for await outcome in await engine.outbox.outcomes() {
+                guard let self else { return }
+                if case .delivered(let item, let queue) = outcome, let thread = item.thread, let routed = queue.routed {
+                    await self.heard(routed, from: thread)
+                }
             }
         }
         Task { await engine.supervisor.start() }
@@ -276,8 +340,12 @@ final class AppModel {
     /// A pairing the owner opened from a `dotnext://pair` link or a scanned code, waiting for their one tap.
     var pairingStartWaiting: PairingStart?
 
-    /// Takes a link the system opened in the app: a pair link waits for the owner's tap; anything else is ignored.
+    /// A run link opens its chat. A pair link waits for the owner's tap.
     func open(url: URL) {
+        if let run = PhoneRunLink.run(inURL: url) {
+            requestedRun = run
+            return
+        }
         guard let start: PairingStart = pairingStart(url.absoluteString) else {
             logger.warning("an unknown link was ignored scheme=\(url.scheme ?? "", privacy: .public) host=\(url.host() ?? "", privacy: .public)")
             return
@@ -318,6 +386,9 @@ final class AppModel {
     /// Forgets the key, the address, the outbox and the cache (Settings › This phone's key).
     func forget() async {
         guard let engine else { return }
+        await push?.disconnect()
+        requestedRun = nil
+        visiblePushThread = nil
         await engine.supervisor.stop()
         await asks?.stop()
         asks = nil
@@ -341,6 +412,8 @@ final class AppModel {
         guard let engine else { return }
         switch phase {
         case .active:
+            push?.foreground()
+            push?.show(list)
             PhaseMeter.resume()
             perf.appeared()
             Task { await asks?.start() }
@@ -362,11 +435,13 @@ final class AppModel {
 
     func open(_ thread: String) {
         guard let engine else { return }
+        visiblePushThread = thread
         Task { await engine.supervisor.openChat(thread) }
     }
 
     func close(_ thread: String) {
         guard let engine else { return }
+        if visiblePushThread == thread { visiblePushThread = nil }
         Task { await engine.supervisor.closeChat(thread) }
     }
 

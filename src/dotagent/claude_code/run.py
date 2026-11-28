@@ -208,7 +208,7 @@ from dotagent.tools.meta import (
 )
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
 from dotagent.tools.shell import kill_group
-from dotagent.tools.terminal import chatless_specs, tells_no_chat
+from dotagent.tools.terminal import terminal_specs_for_run
 
 log = get_logger(__name__)
 
@@ -444,10 +444,9 @@ def dot_tool(tool: str, door: str) -> str | None:
 
 
 def _offered_specs(run: RunRecord, tools: ToolRegistry) -> tuple[ToolSpec, ...]:
-    """The specs of ``tools`` as ``run`` is offered them: without a command in the background where no chat is told of
-    its end (item 1760)."""
+    """The specs of ``tools`` as ``run`` is offered them, with the background options its chat can use."""
     specs: tuple[ToolSpec, ...] = tuple(tool.spec for tool in tools.tools.values())
-    return chatless_specs(specs) if tells_no_chat(run) else specs
+    return terminal_specs_for_run(specs, run)
 
 
 def door_specs(specs: Iterable[ToolSpec]) -> tuple[ToolSpec, ...]:

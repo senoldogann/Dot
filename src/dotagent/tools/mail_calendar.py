@@ -71,13 +71,16 @@ def account_reads(provider: ProviderId) -> str:
 
 
 def account_lines(accounts: Sequence[Account]) -> tuple[str, ...]:
-    """The line that tells a run which accounts the owner signed in, for the tools here; none without one."""
+    """The line that tells a run which accounts the owner signed in, for the tools here; none without one. It says
+    that these are the only addresses the tools take (item 2073): runs whose notes named another address of the
+    owner's, one they send mail from in a webmail, took it for an account, and every call of it was refused."""
     if not accounts:
         return ()
     named: str = "; ".join(f"{account.address} ({account_reads(account.provider)})" for account in accounts)
     return (
         f"The user's accounts signed in, which {MAIL_SEARCH_TOOL}, {MAIL_READ_TOOL} and {CALENDAR_EVENTS_TOOL} "
-        f"take as account: {named}.",
+        f"take as account: {named}. They take no other address: another address of the user, such as one your notes "
+        "name, is not signed in and is refused.",
     )
 
 

@@ -272,12 +272,13 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     assert session_label.count("a session of the campaign") == 1, session_label
                     await session_row.hover()
                     await expect(session_row.locator(".side-chat-meta")).to_be_visible()
-                    # The chat's row counts the runs it delegated, in its last line (item 507), and nothing hangs
-                    # under it: the row's name says how many the chat delegated.
+                    # The chat's row says its run waits on the helper at work, in its last line and in place of
+                    # the helpers' count (item 2010), and nothing hangs under it: the row's name says it too.
                     working_row = sidebar.locator("[data-section=working] .side-chat > .side-run").filter(
                         has_not_text="Find leads"
                     )
-                    await expect(working_row.locator(".side-chat-helpers .side-helpers")).to_have_text("1")
+                    await expect(working_row.locator(".side-chat-live")).to_have_text("Waiting for 1 helper…")
+                    await expect(working_row.locator(".side-helpers")).to_have_count(0)
                     await expect(sidebar.locator("[data-section=working] .side-children")).to_have_count(0)
                     assert "1 helper" in (await working_row.get_attribute("aria-label") or "")
                     await page.screenshot(path=str(tmp_path / f"sidebar-{width}-{scheme}.png"))

@@ -100,6 +100,8 @@ def test_a_blocked_goal_fails_the_run_and_keeps_its_answer() -> None:
     assert outcome.result.startswith(ENDED.result)
     assert "cannot be reached" in outcome.result
     assert "it needs a sign-in" in outcome.result
+    assert outcome.goal_blocked
+    assert _after_limit_verdict(_verdict("blocked", "it needs a sign-in"), ENDED).goal_blocked
 
 
 def test_a_goal_that_is_not_reached_sends_the_run_back_to_work() -> None:
@@ -445,7 +447,7 @@ def test_the_prompt_says_that_a_run_that_chooses_asks_without_wait_when_it_can_g
 def test_a_delegated_run_is_told_to_end_at_its_open_pull_request_and_not_to_wait_for_its_checks() -> None:
     """Item 1953: coding helpers polled `gh pr checks` and slept inside their runs (382 calls, 9.3 of the 29 hours of
     helpers' shell time in a week, in 37 of 76 helper runs), each poll reading their whole context again."""
-    told: str = "end your run as soon as it is pushed and open"
+    told: str = "Never poll or wait for PR checks in the helper."
     assert told in _asking(DELEGATE_SOURCE, "leave", [])
     assert told not in _asking(UI_SOURCE, "choose", [ASK_USER_TOOL])
     assert told not in _asking(SCHEDULE_SOURCE, "leave", [ASK_USER_TOOL])

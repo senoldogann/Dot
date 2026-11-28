@@ -3,4 +3,4 @@ system-task-yolo: 33347 characters, ~10421 tokens
 system-task-lean: 23879 characters, ~7462 tokens
 system-chat: 31634 characters, ~9886 tokens
 system-research: 29697 characters, ~9280 tokens
-tools: 151989 characters, ~47497 tokens
+tools: 151978 characters, ~47493 tokens

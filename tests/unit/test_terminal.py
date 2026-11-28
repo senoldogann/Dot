@@ -2,9 +2,10 @@
 
 from dotagent.llm.types import ToolSpec
 from dotagent.policy.shell import typed_lines
+from dotagent.store.models import RunRecord
 from dotagent.terminal.session import asks_for_secret, plain_text
 from dotagent.tools.shell import BACKGROUND_HINT, build_shell_tool
-from dotagent.tools.terminal import build_terminal_tools, chatless_specs
+from dotagent.tools.terminal import build_terminal_tools, chatless_specs, terminal_specs_for_run
 
 
 def test_escape_sequences_leave_the_output_and_line_ends_become_newlines() -> None:
@@ -53,3 +54,49 @@ def test_a_run_no_chat_is_told_in_is_offered_no_command_in_the_background() -> N
     assert "terminal_open with background" not in offered["shell"].description
     assert offered["shell"].description.endswith("never with a launchd job of your own.")
     assert offered["terminal_send"] == specs[2]
+
+
+def _run_record(parent_run_id: str | None, campaign_id: str | None) -> RunRecord:
+    return RunRecord(
+        id="run_x",
+        thread_id="thread_x",
+        goal="Check the pull request",
+        mode="task",
+        model="ollama:scripted",
+        status="running",
+        created_at=1.0,
+        finished_at=None,
+        result="",
+        steps=0,
+        input_tokens=0,
+        output_tokens=0,
+        parent_run_id=parent_run_id,
+        source="delegate",
+        effort=None,
+        speed="standard",
+        once=None,
+        approvals="yolo",
+        goal_mode=False,
+        campaign_id=campaign_id,
+        agent_id=None,
+        rewindable=False,
+    )
+
+
+def test_a_helper_is_offered_background_for_a_pr_watch_alone_and_a_campaign_none() -> None:
+    """Item 2046: a helper hands `gh pr checks --watch` to its parent chat; a campaign's session has no chat."""
+    specs: tuple[ToolSpec, ...] = tuple(tool.spec for tool in build_terminal_tools())
+    opened: dict[str, ToolSpec] = {spec.name: spec for spec in specs}
+    helper: dict[str, ToolSpec] = {
+        spec.name: spec for spec in terminal_specs_for_run(specs, _run_record("run_parent", None))
+    }
+    campaign: dict[str, ToolSpec] = {
+        spec.name: spec for spec in terminal_specs_for_run(specs, _run_record(None, "camp_x"))
+    }
+    root: tuple[ToolSpec, ...] = terminal_specs_for_run(specs, _run_record(None, None))
+    assert root == specs
+    assert "background" in str(helper["terminal_open"].parameters)
+    assert "gh pr checks" in helper["terminal_open"].description
+    assert "gh pr checks" not in opened["terminal_open"].description
+    assert "background" not in str(campaign["terminal_open"].parameters)
+    assert "gh pr checks" not in campaign["terminal_open"].description

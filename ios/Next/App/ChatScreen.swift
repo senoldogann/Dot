@@ -36,6 +36,12 @@ struct ChatEnd: Equatable {
     let run: String?
 }
 
+/// Whether a chat has a stream to open: not while it is a new chat's outbox key the daemon has not named yet (item 2025),
+/// which it would answer 404, and the chat would read as deleted. Pure.
+func chatHasStream(_ thread: String, starting: [String: String]) -> Bool {
+    starting[thread] == nil
+}
+
 /// The row of a chat that came into sight last, kept by reference: writing it draws nothing again (item 1848).
 @MainActor
 final class ReadingMark {
@@ -72,6 +78,8 @@ struct ChatScreen: View {
     /// The owner's finger moves the transcript, or it glides on after it.
     @State private var ownerScrolls: Bool = false
     @State private var showsJump: Bool = false
+    /// Whether the transcript is at its end now, as the scroll last said.
+    @State private var atEnd: Bool = true
     @State private var reading: ReadingMark = ReadingMark()
     /// How many times the screen was drawn, for the debug render meter (item 1932).
     @State private var renders: RenderMeter = RenderMeter()
@@ -79,10 +87,17 @@ struct ChatScreen: View {
     @State private var stopping: Bool = false
     /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
     @State private var stepsShown: Bool = false
-    /// The link line the pill shows, once a state lasted a second (item 1931: a blip does not flicker).
-    @State private var shownLink: LinkLine?
     /// The helper whose chat a row of the stream opened (item 1909).
-    @State private var openedHelper: String?
+    @State private var openedHelper: HelperChatRef?
+    /// The task the tasks sheet or a toast opened (item 2013).
+    @State private var openedTask: String?
+    /// Where the owner's last message went, when it went to another task than this screen's (item 2013).
+    @State private var routeToast: RoutedSend?
+    /// The routed message whose "Move to" picker is open.
+    @State private var moving: RoutedSend?
+    /// The chat whose screen pushed this one, for "Back to the chat".
+    @Environment(\.pushedFrom) private var pushedFrom: String?
+    @Environment(\.dismiss) private var dismiss: DismissAction
     /// The answer of a side question (`/btw`), shown in an alert.
     @State private var aside: SideAnswer?
     /// This chat's changed files, for the `#` picker.
@@ -111,8 +126,9 @@ struct ChatScreen: View {
     }
     /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
     private var chosenMode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .hideAll }
-    /// "Show steps" for this chat: its own where its This chat sheet set it, else Settings › Chat's (item 1915).
-    private var showsSteps: Bool { model.stepsOverrides[thread] ?? showStepsEverywhere }
+    /// "Show steps" for this chat: its own where its This chat sheet set it, else the chat that started it (a helper's),
+    /// else Settings › Chat's (item 1915).
+    private var showsSteps: Bool { model.showsSteps(of: thread, everywhere: showStepsEverywhere) }
     /// Whether the steps are hidden, so that the live line says the work (items 1769 and 1915).
     private var linesTheWork: Bool { !showsSteps || chosenMode == .hideAll || chosenMode == .zen }
     private var mode: DotEngine.ToolCallMode { stepsShown && linesTheWork ? .showAll : chosenMode }
@@ -160,34 +176,29 @@ struct ChatScreen: View {
         let items: [TranscriptItem] = builtItems
         return content(items)
             .background(Tone.ground)
-            .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? "")
+            .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? model.startingChats[thread] ?? "")
             .navigationSubtitle(botChat == nil ? subtitle : "")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(item: $openedHelper) { helperThread in
-                ChatScreen(thread: helperThread, initialPanel: nil, editsFirstQueued: false)
+            .modifier(HelperChats(thread: thread, helpers: helpers.map(\.threadId), opened: $openedHelper))
+            .navigationDestination(item: $openedTask) { taskThread in
+                ChatScreen(thread: taskThread, initialPanel: nil, editsFirstQueued: false).environment(\.pushedFrom, thread)
             }
             .overlay(alignment: .topLeading) {
                 if RenderMeter.shown {
                     Text(verbatim: "\(drawings)").font(.system(size: 1)).opacity(0.01).accessibilityIdentifier("debug.renders")
                 }
             }
-            .task(id: linkNow) {
-                // A problem shows once it lasted a few seconds, and goes at once: a reconnection that mends shows nowhere.
-                guard let next = linkNow else {
-                    shownLink = nil
-                    return
-                }
-                do { try await Task.sleep(for: linkLineDelay) } catch { return }
-                shownLink = next
-            }
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
             .toolbar { chrome }
             .liveFollow(thread: thread)
             .sheet(item: $panel) { panel in sheet(panel) }
             .toastHost($toast, seconds: 4) { _ in }
+            .modifier(RouteToastHost(thread: thread, routeToast: $routeToast, moving: $moving, open: { openTask($0) }, tell: { toast = $0 }))
             .onAppear {
                 PhaseMeter.enter("chat")
-                model.open(thread)
+                // A chat the daemon has not named yet has no stream (item 2025): its outbox key is not opened, which the
+                // daemon would answer 404 and the chat would read as deleted; the named thread opens at the swap below.
+                if chatHasStream(thread, starting: model.startingChats) { model.open(thread) }
                 draft = model.draft(of: thread)
                 if let initialPanel { panel = initialPanel }
                 if editsFirstQueued, let first = view?.queue.messages.first {
@@ -197,9 +208,16 @@ struct ChatScreen: View {
             }
             .onDisappear {
                 PhaseMeter.enter("list")
-                model.close(thread)
+                if chatHasStream(thread, starting: model.startingChats) { model.close(thread) }
                 if edit == nil { model.keep(draft: draft, of: thread) }
                 if let topVisible = reading.topVisible { ChatScrollMemory.anchors[thread] = topVisible }
+            }
+            // A new chat keeps this screen when the daemon names it (item 2025): the outbox key's opening is closed and the
+            // named thread opened, so its stream and its answer reach the screen; the words typed meanwhile go with it.
+            .onChange(of: thread) { old, new in
+                if chatHasStream(old, starting: model.startingChats) { model.close(old) }
+                model.open(new)
+                if edit == nil { model.keep(draft: draft, of: new) }
             }
             .onChange(of: draft) { _, words in if edit == nil { model.keep(draft: words, of: thread) } }
             .onChange(of: dock) { _, entries in shownAsks = entries }
@@ -316,13 +334,22 @@ struct ChatScreen: View {
         // A row opened or closed by the owner stays where it is: the follow stops (see `disclosureToggled`).
         .environment(\.disclosureToggled, { pinned = false })
         .scrollDismissesKeyboard(.interactively)
-        .onScrollPhaseChange { _, now in ownerScrolls = now == .interacting || now == .decelerating }
+        .onScrollPhaseChange { _, now, context in
+            ownerScrolls = now == .interacting || now == .decelerating
+            // Whether the end is away is read from the geometry as the scroll begins (item 1991): the value kept from the
+            // last change may be older than the chat (one opened at a remembered place never changed it), and a stale "at the
+            // end" would make the owner's first scroll start the follow.
+            let geometry: ScrollGeometry = context.geometry
+            atEnd = isAtEnd(distanceFromEnd: Double(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.contentOffset.y - geometry.containerSize.height))
+            pinned = followsAfterScroll(following: pinned, atEnd: atEnd, ownerScrolls: ownerScrolls)
+        }
         // Follow new words only while the owner is at the end (plan §13 S5, item 1848): their own scroll away stops it,
         // their scroll back to the end starts it again; words that grow the transcript never stop it.
         .onScrollGeometryChange(for: Bool.self) { geometry in
             isAtEnd(distanceFromEnd: Double(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.contentOffset.y - geometry.containerSize.height))
-        } action: { _, atEnd in
-            if atEnd { pinned = true } else if ownerScrolls { pinned = false }
+        } action: { _, now in
+            atEnd = now
+            pinned = followsAfterScroll(following: pinned, atEnd: now, ownerScrolls: ownerScrolls)
         }
         // New words are followed when the transcript's end changes, never when its height does (item 1932): a lazy
         // stack estimates the rows out of sight, so its height moves as rows come into sight, and following each move
@@ -351,22 +378,28 @@ struct ChatScreen: View {
         }
         .safeAreaInset(edge: .bottom) { bottom(items) }
         .safeAreaInset(edge: .top) {
-            if let finding {
-                let found: [String] = findMatches(items, words: finding)
-                FindBar(
-                    words: Binding(get: { self.finding ?? "" }, set: { self.finding = $0; findIndex = 0 }), index: findIndex, count: found.count,
-                    step: { delta in
-                        guard !found.isEmpty else { return }
-                        findIndex = (findIndex + delta + found.count) % found.count
-                        pinned = false
-                        position.scrollTo(id: found[findIndex], anchor: .center)
-                    },
-                    close: { self.finding = nil }
-                )
-                .onChange(of: found.first) { _, first in
-                    if let first {
-                        pinned = false
-                        position.scrollTo(id: first, anchor: .center)
+            VStack(spacing: 0) {
+                // A task's own screen says whose task it is, and goes back to its chat (item 2013).
+                if view?.thread.laneOf != nil, let tasks = view?.tasks {
+                    LaneLine(chatTitle: tasks.chatTitle, back: { openTask(tasks.chatId) })
+                }
+                if let finding {
+                    let found: [String] = findMatches(items, words: finding)
+                    FindBar(
+                        words: Binding(get: { self.finding ?? "" }, set: { self.finding = $0; findIndex = 0 }), index: findIndex, count: found.count,
+                        step: { delta in
+                            guard !found.isEmpty else { return }
+                            findIndex = (findIndex + delta + found.count) % found.count
+                            pinned = false
+                            position.scrollTo(id: found[findIndex], anchor: .center)
+                        },
+                        close: { self.finding = nil }
+                    )
+                    .onChange(of: found.first) { _, first in
+                        if let first {
+                            pinned = false
+                            position.scrollTo(id: first, anchor: .center)
+                        }
                     }
                 }
             }
@@ -412,15 +445,15 @@ struct ChatScreen: View {
             ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
-        case .narration(_, let step):
-            // One of Dot's short messages, drawn as its words are (item 1976).
-            AnswerBody(markdown: narrationWords(step), writing: false)
+        case .firstWords(_, let text):
+            // Dot's first words as the run begins (item 2018), drawn as its short messages are.
+            AnswerBody(markdown: firstWordsText(text), writing: false)
         case .helpers(_, _, let list):
             // The run's helpers as one row where it started them, a tap away from a card of each (item 1957); the
             // capsule's people segment keeps them a tap away too.
             HelperGroupRow(
                 lines: list.map { HelperEntry(helper: $0, engine: engineLine($0, models: model.models)) },
-                open: { openedHelper = $0 })
+                open: { openedHelper = HelperChatRef(thread: $0) })
         case .plan:
             // The plan is the chip beside the capsule (item 1880), never a card in the stream.
             EmptyView()
@@ -469,17 +502,17 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    status: shownLink == nil ? capsuleStatus : nil, activity: activityWords,
+                    status: model.visibleLink == nil ? capsuleStatus : nil, activity: activityWords,
                     since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil,
                     // The chat's queue on the Mac, which the segment's sheet lists; the phone's own messages still to go
                     // say so under their bubbles ("Pending", "Waiting for the link"), item 1931.
                     queued: view?.queue.messages.count ?? 0,
                     helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
-                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping && shownLink == nil,
-                    link: shownLink),
+                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping && model.visibleLink == nil,
+                    link: model.visibleLink, tasks: openTaskCount(view?.tasks)),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
                 stop: { stop() },
-                openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
+                openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents }, openTasks: { panel = .tasks },
                 scrollToBottom: {
                     pinned = true
                     withAnimation { position.scrollTo(edge: .bottom) }
@@ -502,13 +535,18 @@ struct ChatScreen: View {
                     text: edit == nil ? $draft : Binding(get: { edit?.text ?? "" }, set: { edit?.text = $0 }),
                     attachments: $attachments,
                     quote: $quoted,
-                    placeholder: activeRun == nil
+                    placeholder: model.startingChats[thread] != nil
+                        ? String(localized: "Starting the chat…", comment: "Placeholder of the composer while a new chat waits for the Mac to name it")
+                        : activeRun == nil && startingSince == nil
                         ? botChat.map { askPlaceholder($0.record.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer")
                         : followUp == .queue
                             ? String(localized: "Queue a message", comment: "Placeholder of the composer while a run works and follow-ups queue")
                             : String(localized: "Tell the running task", comment: "Placeholder of the composer while a run works and follow-ups steer"),
                     buttons: composerButtons(
-                        hasContent: !(edit?.text ?? draft).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty,
+                        // A chat the daemon has not named yet takes no message (item 2025): the words wait in the field
+                        // for the second or two it takes, then go.
+                        hasContent: model.startingChats[thread] == nil
+                            && (!(edit?.text ?? draft).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty),
                         runActive: activeRun != nil && !stopping, followUp: followUp, editing: edit != nil),
                     perform: perform,
                     model: currentModel, openSettings: { panel = .model },
@@ -633,10 +671,28 @@ struct ChatScreen: View {
             files: (changedFiles?.files ?? []).map { PickerItem(kind: .file, token: "#" + $0.path, name: $0.path, detail: "+\($0.added) −\($0.removed)") })
     }
 
+    /// Stops the run at work; while the chat has tasks, every task of it (the owner's decision, item 2013: each row of
+    /// the tasks sheet stops one).
     private func stop() {
+        if let tasks = view?.tasks, hasTasks(tasks) {
+            stopping = activeRun != nil
+            model.perform(.stopChat(thread: tasks.chatId))
+            return
+        }
         guard let run = activeRun else { return }
         stopping = true
         model.perform(.stop(run: run.id, thread: thread))
+    }
+
+    /// Opens a task's thread: nothing for this screen's own, back for the chat that pushed it, else pushed.
+    private func openTask(_ task: String) {
+        panel = nil
+        if task == thread { return }
+        if task == pushedFrom {
+            dismiss()
+            return
+        }
+        openedTask = task
     }
 
     private func react(_ reaction: ReactionKind, target: (run: String, message: String)) {
@@ -691,7 +747,7 @@ struct ChatScreen: View {
     private var currentModel: ModelChoice? {
         let choices: ChatChoices = chatChoices
         guard let ref = effectiveModel(choices, defaultRef: model.chatDefaults?.model) else { return nil }
-        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: choices.effort)
+        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: choices.effort, fast: choices.speed == "fast")
     }
 
     /// The chat's choices as its next follow-up starts with them: those kept for it, else what its last run ran on.
@@ -730,11 +786,6 @@ struct ChatScreen: View {
         }
     }
 
-    /// The link line of this moment, before the second's wait (item 1931).
-    private var linkNow: LinkLine? {
-        linkLine(transport: model.transport, mac: model.macName ?? String(localized: "your Mac", comment: "The Mac when its name is not known"))
-    }
-
     /// Whether the subtitle says the link: only a refused key or an old Dot, which no wait mends. Offline and an
     /// unreachable Mac are the capsule's once they last; syncing and reconnecting show nowhere (the owner's report of
     /// 2026-11-27).
@@ -764,7 +815,7 @@ struct ChatScreen: View {
         }
     }
 
-    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting on N helpers" only while
+    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting for N helpers" only while
     /// the main run has stopped and every open call of its step waits on a helper (`waitsOnHelpers`, the owner's report of
     /// 2026-11-27; N the helpers it still waits for); `nil` while it works itself, even with helpers at work beside it,
     /// which the capsule says as "Working" with the turn's clock and the helpers' own segment.
@@ -772,7 +823,7 @@ struct ChatScreen: View {
         guard capsuleStatus == .working, let run = activeRun, let chat, waitsOnHelpers(of: chat, run: run.id) else { return nil }
         let waited: Int = newestRunHelpers.filter { helperState($0.status).isLive && $0.blocking }.count
         guard waited > 0 else { return nil }
-        return String(localized: "Waiting on \(waited) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
+        return String(localized: "Waiting for \(waited) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
     }
 
     /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none. Zen filters the
@@ -798,6 +849,8 @@ struct ChatScreen: View {
                 items: (view?.background ?? []).map { work in
                     BackgroundWork(id: work.id, title: work.title, kind: work.kind == "command" ? .command : work.kind == "loop" ? .loop : .subagent)
                 }, close: { self.panel = nil })
+        case .tasks:
+            TasksSheet(thread: thread, open: { openTask($0) }, close: { self.panel = nil })
         case .queue:
             QueueSheet(thread: thread, edit: { beginEdit($0) }, close: { self.panel = nil })
         case .inspector, .files, .screen:
@@ -876,5 +929,21 @@ private struct ComposerLists: ViewModifier {
             } message: { answer in
                 Text(verbatim: answer.question + "\n\n" + answer.answer)
             }
+    }
+}
+
+/// A chat's helpers (owner 2026-11-27): one opened from the stream shows as the bottom sheet, as from the Agents sheet,
+/// and each is noted as this chat's, so that its chat shows its steps as this one does. A modifier of its own: the
+/// screen's chain of modifiers is at the edge of what the compiler checks in time.
+private struct HelperChats: ViewModifier {
+    let thread: String
+    let helpers: [String]
+    @Binding var opened: HelperChatRef?
+    @Environment(AppModel.self) private var model: AppModel
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $opened) { helper in HelperChatSheet(thread: helper.thread, close: { opened = nil }) }
+            .onChange(of: helpers, initial: true) { _, threads in model.noteHelpers(threads, of: thread) }
     }
 }

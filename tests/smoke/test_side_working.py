@@ -228,20 +228,20 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(row).to_have_count(1)
                 await expect(row.locator(".side-working")).to_have_text(_WORKING)
                 await expect(row.get_by_role("button", name="More for Read the shelves")).to_have_count(1)
-                # The chat shows the runs it delegated as one count (items 507 and 1327): three here, and nothing hangs
-                # under the row; its name for a screen reader says how many there are.
-                await expect(row.locator(".side-chat-helpers .side-helpers")).to_have_text(str(len(_SHELVES)))
-                await expect(row.locator(".side-helpers")).to_have_attribute("data-working", "1")
+                # The chat says its run waits on the one helper still at work, in place of the count of the runs it
+                # delegated (item 2010), and nothing hangs under the row; its name for a screen reader says the same.
+                await expect(row.locator(".side-chat-live")).to_have_text("Waiting for 1 helper…")
+                await expect(row.locator(".side-helpers")).to_have_count(0)
                 await expect(working.locator(".side-children")).to_have_count(0)
-                assert "3 helpers" in (await row.locator("a.side-run").get_attribute("aria-label") or "")
+                assert "Waiting for 1 helper…" in (await row.locator("a.side-run").get_attribute("aria-label") or "")
                 await expect(chats.locator(f"a[href='#/runs/{shelves.id}']")).to_have_count(0)
                 # The pinned chat at work stays among the pinned ones, wearing the face of the run it delegated.
                 await expect(chats.locator(".side-group > .side-label")).to_have_text(["Pinned", "Today"])
                 pinned: Locator = chats.locator(".side-group").first
                 await expect(_titles(pinned)).to_have_text(["Count the boxes"])
                 await expect(pinned.locator(".side-chat .side-working")).to_have_text(_WORKING)
-                await expect(pinned.locator(".side-chat-helpers .side-helpers")).to_have_text("1")
-                assert "1 helper" in (await pinned.locator("a.side-run").get_attribute("aria-label") or "")
+                await expect(pinned.locator(".side-chat-live")).to_have_text("Waiting for 1 helper…")
+                assert "Waiting for 1 helper…" in (await pinned.locator("a.side-run").get_attribute("aria-label") or "")
                 await expect(working.locator(f"a[href='#/runs/{boxes.id}']")).to_have_count(0)
                 # What waits for an answer stands first (item 836): its chat, once, out of its day, its last line
                 # saying what waits in the warning's ink, the dot of a run that waits at its right, its creature

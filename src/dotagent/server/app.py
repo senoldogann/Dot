@@ -80,6 +80,7 @@ from dotagent.server.routes_phone import phone_router
 from dotagent.server.routes_phone_asks import phone_asks_router
 from dotagent.server.routes_phone_metrics import phone_metrics_router
 from dotagent.server.routes_proactive import proactive_router
+from dotagent.server.routes_providers import providers_router
 from dotagent.server.routes_queue import queue_router
 from dotagent.server.routes_reactions import reactions_router
 from dotagent.server.routes_repair import repair_router
@@ -237,6 +238,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(mcp_router(ctx))
     app.include_router(gallery_router(ctx))
     app.include_router(keys_router(ctx))
+    app.include_router(providers_router(ctx))
     app.include_router(websearch_router(ctx))
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))

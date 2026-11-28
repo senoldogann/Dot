@@ -129,7 +129,7 @@ async def _working_row(store: Store, run: RunRecord) -> ActivityRow:
         campaign: CampaignRecord = await store.get_campaign(run.campaign_id)
         return await _run_row(store, run, "working", "campaign", "a session of the campaign", _title(campaign.title))
     if run.parent_run_id is not None:
-        return await _run_row(store, run, "working", "delegated", "delegated by another run", _title(run.goal))
+        return await _run_row(store, run, "working", "delegated", "a helper of another task", _title(run.goal))
     return await _run_row(store, run, "working", "run", "", _title(run.goal))
 
 

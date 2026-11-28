@@ -219,7 +219,7 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await page.route("**/api/palette", slow)
                         await shared.get_by_role("button", name="Share").click()
                         await expect(page.locator(".toast.ok", has_text="is offered to every task")).to_be_visible()
-                        await expect(shared.get_by_role("button", name="Keep to the agent")).to_be_visible(
+                        await expect(shared.get_by_role("button", name="Keep to the bot")).to_be_visible(
                             timeout=_AT_ONCE_MS
                         )
                         await page.unroute("**/api/palette")

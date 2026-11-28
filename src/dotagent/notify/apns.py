@@ -49,6 +49,7 @@ ALERT_BODY: str = "Open Dot to see it."
 START_TITLE: str = "Dot is working"
 # The type of the activity's attributes, as the app declares it (``DotFleetAttributes``).
 ATTRIBUTES_TYPE: str = "DotFleetAttributes"
+DOT_NEXT_TOPIC: str = "dev.dotagent.phone.next"
 # How much of a chat's title a Live Activity shows.
 TITLE_CHARS: int = 40
 # How long a Live Activity of a run whose end never came stays before iOS marks it stale.
@@ -134,6 +135,11 @@ def alert_payload(title: str, route: str) -> JsonObject:
     return {"aps": {"alert": {"title": title, "body": ALERT_BODY}, "sound": "default"}, "route": route}
 
 
+def localized_alert_payload(title: str, route: str) -> JsonObject:
+    """A DotNext alert resolved from the app's string catalogue using the phone's chosen language."""
+    return {"aps": {"alert": {"title-loc-key": title, "loc-key": ALERT_BODY}, "sound": "default"}, "route": route}
+
+
 def badged(payload: JsonObject, count: int) -> JsonObject:
     """``payload``, an alert, with the app's badge set to ``count``: how many things wait on the owner (item 1422), a
     number and nothing of what they are."""
@@ -175,6 +181,14 @@ def live_start_payload(state: FleetState, now: float) -> JsonObject:
     (``POST /api/phone/apns/activity``), and the daemon updates the activity by it from then on. A phone on iOS 17.2
     has no such key to read and starts the activity as before. It carries no sound: a start is not worth waking anyone
     for."""
+    return _live_start(state, now, {"title": START_TITLE, "body": ALERT_BODY})
+
+
+def localized_live_start_payload(state: FleetState, now: float) -> JsonObject:
+    return _live_start(state, now, {"title": {"loc-key": START_TITLE}, "body": {"loc-key": ALERT_BODY}})
+
+
+def _live_start(state: FleetState, now: float, alert: JsonObject) -> JsonObject:
     return {
         "aps": {
             "timestamp": int(now),
@@ -183,7 +197,7 @@ def live_start_payload(state: FleetState, now: float) -> JsonObject:
             "attributes-type": ATTRIBUTES_TYPE,
             "attributes": {"fleetId": FLEET_ID},
             "input-push-token": 1,
-            "alert": {"title": START_TITLE, "body": ALERT_BODY},
+            "alert": alert,
             "stale-date": int(now + STALE_AFTER_S),
         }
     }
@@ -267,6 +281,10 @@ class ApnsSender:
         self._token: str = ""
         self._token_at: float = 0.0
         self._lock: asyncio.Lock = asyncio.Lock()
+
+    @property
+    def topic(self) -> str:
+        return self._config.topic
 
     async def _bearer(self) -> str:
         async with self._lock:

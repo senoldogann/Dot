@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 import pytest
 import pytest_asyncio
+from link_state import until_broken, until_live
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -150,27 +151,22 @@ async def _page(server: _Server, route: str) -> AsyncIterator[Page]:
             await page.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
             await page.goto(ui_url(HOST, server.port, TOKEN))
             await page.goto(f"{server.address}/#/{route}")
-            await expect(_connection(page)).to_have_class("live-dot live")
+            await until_live(page, WAIT_S * 1000)
             yield page
         finally:
             await browser.close()
 
 
-def _connection(page: Page) -> Locator:
-    """The dot of the page's connection to the daemon, whose class says how it stands."""
-    return page.locator(".pill .live-dot")
-
-
 async def _break(page: Page, server: _Server) -> None:
-    """Take the server down until the page sees its connection broken."""
+    """Take the server down until the page sees its connection broken (item 2043: the line under the bar says so)."""
     await server.down()
-    await expect(_connection(page)).to_have_class("live-dot reconnecting")
+    await until_broken(page, WAIT_S * 1000)
 
 
 async def _mend(page: Page, server: _Server) -> None:
     """Bring the server back up until the page's connection is live again."""
     await server.up()
-    await expect(_connection(page)).to_have_class("live-dot live", timeout=WAIT_S * 1000)
+    await until_live(page, WAIT_S * 1000)
 
 
 @pytest.mark.browser

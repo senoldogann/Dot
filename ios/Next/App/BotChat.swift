@@ -137,11 +137,11 @@ struct BotChatScreen: View {
             // A chat being deleted is gone from the moment the delete is under way, not once its own stream says so (item
             // 1985: while twenty chats were deleted, Dot's screen opened the one it held and waited on it, "Syncing…").
             deleted: { model.goneChats.contains($0) || model.chats[$0]?.freshness == .deleted })
-        if let key = shown, model.startingChats[key] != nil {
-            StartingChat(key: key)
-        } else if let thread = shown {
+        if let thread = shown {
+            // A chat this phone started keeps the screen's identity from its first send to the daemon's name for it (item
+            // 2025): the key, then the thread that key was named; nothing is pushed or drawn anew at the swap.
             ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
-                .id(thread)
+                .id(model.startedChats.first { $0.value == thread }?.key ?? thread)
                 .onAppear { if chosen == nil, route.thread == nil, held != thread { held = thread } }
         } else {
             // A bot with no chat yet: the new chat in place; its first message opens the chat, as a pushed one does.
@@ -272,8 +272,8 @@ struct SharedFile: Identifiable {
     var id: String { url.absoluteString }
 }
 
-/// The blocks of a chat whose words hold `words` (Find in chat), in order: the owner's messages, the answers, the notes
-/// and the thoughts, also those a finished run folded into its work (the fold is what a find scrolls to); a tool's output
+/// The blocks of a chat whose words hold `words` (Find in chat), in order: the owner's messages, the answers, the notes,
+/// the thoughts and Dot's first words, also those a finished run folded into its work (the fold is what a find scrolls to); a tool's output
 /// is not searched. Empty words find nothing.
 func findMatches(_ items: [TranscriptItem], words: String) -> [String] {
     let wanted: String = words.trimmingCharacters(in: .whitespaces)
@@ -287,6 +287,8 @@ private func holds(_ item: TranscriptItem, _ wanted: String) -> Bool {
     case .owner(_, let text, _, _), .note(_, let text), .answer(_, let text, _, _), .thought(_, let text, _): text.localizedStandardContains(wanted)
     // A routine's row is found by the title it shows and by its words.
     case .automation(_, let title, let prompt): title.localizedStandardContains(wanted) || prompt.localizedStandardContains(wanted)
+    // Dot's first words (item 2018) are found as the row says them.
+    case .firstWords(_, let text): firstWordsText(text).localizedStandardContains(wanted)
     case .work(let fold): fold.items.contains { holds($0, wanted) }
     default: false
     }

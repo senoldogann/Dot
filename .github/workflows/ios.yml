@@ -138,6 +138,10 @@ jobs:
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid"
+          # A fresh simulator's first keyboard shows iOS's "slide to type" introduction over its lower half, and a swipe
+          # from the screen's edge does not go back while it is up (ChatUITests' edge swipe failed its first try on each
+          # runner, run 46126259073): marked as already shown, it never comes.
+          xcrun simctl spawn "$udid" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
       # A fresh simulator's first launch of an app is slow enough that XCTest's launch timed out once on the runner
       # ("Timed out while launching application via Xcode", run 45578426723): the app is installed and opened once
       # here, before any test, so the tests do not pay for it.
@@ -162,7 +166,7 @@ jobs:
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
           case "$PART" in
-            chat) ONLY="-only-testing:DotNextTests -only-testing:DotNextUITests/ChatUITests -only-testing:DotNextUITests/SettingsUITests" ;;
+            chat) ONLY="-only-testing:DotNextTests -only-testing:DotNextUITests/ChatUITests -only-testing:DotNextUITests/ChatSettingsUITests -only-testing:DotNextUITests/SettingsUITests" ;;
             controls) ONLY="-only-testing:DotNextUITests/SettingsControlsUITests/testEveryControlOfTheNativePagesDoesSomething" ;;
             rows) ONLY="-only-testing:DotNextUITests/SettingsControlsUITests/testEveryRowOfSettingsOpensItsPage" ;;
             *) echo "no tests named for the part $PART" >&2; exit 2 ;;
@@ -227,6 +231,10 @@ jobs:
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid"
+          # A fresh simulator's first keyboard shows iOS's "slide to type" introduction over its lower half, and a swipe
+          # from the screen's edge does not go back while it is up (ChatUITests' edge swipe failed its first try on each
+          # runner, run 46126259073): marked as already shown, it never comes.
+          xcrun simctl spawn "$udid" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
       # The script makes its folders with mktemp, under a TMPDIR of each try's own, so that the logs of a try (the
       # daemon's, xcodebuild's) are kept for the artifact; DOT_HOME and the others point at the runner's temp too, so
       # nothing it starts can reach a default home. It runs once more when the first try failed: on the runner the UI

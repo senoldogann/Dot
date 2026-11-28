@@ -4,7 +4,8 @@ import UIKit
 
 @main
 struct DotNextApp: App {
-    @State private var model: AppModel = AppModel()
+    @UIApplicationDelegateAdaptor(PhonePushDelegate.self) private var delegate: PhonePushDelegate
+    private var model: AppModel { delegate.model }
     @Environment(\.scenePhase) private var scenePhase: ScenePhase
 
     var body: some Scene {
@@ -12,10 +13,6 @@ struct DotNextApp: App {
             RootView(launch: LaunchOptions.read(UserDefaults.standard))
                 .environment(model)
                 .onOpenURL { url in model.open(url: url) }
-                .onAppear {
-                    // A fixture scene draws its own snapshot: no engine starts beneath it to replace it (debug only).
-                    if !LaunchOptions.read(UserDefaults.standard).drawsFixture { model.load() }
-                }
         }
         .onChange(of: scenePhase) { _, phase in model.scene(phase) }
     }
@@ -27,6 +24,8 @@ enum HomeScene: String, CaseIterable, Hashable, Sendable {
     case home
     case chats
     case settings
+    /// Activity standing alone, as Dot's profile opens it (`scripts/e2e_activity.sh`).
+    case activity
 }
 
 /// A scene the screenshot harness can open at launch with `-DotNextScene <name>` (debug builds only; see
@@ -108,14 +107,20 @@ struct RootView: View {
                 case .gallery(let page): NavigationStack { GalleryPageView(page: page) }
                 case .sampleChat(let panel): NavigationStack { SampleChatScreen(chat: Samples.chats[0], initialPanel: panel) }
                 case .chatFixture(let fixture):
-                    NavigationStack {
-                        ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing)
+                    // `-DotNextPushed YES`: the chat is pushed over a root, as in the app, so that going back can be seen.
+                    PushedFixtureChat(pushed: UserDefaults.standard.bool(forKey: "DotNextPushed")) {
+                        if fixture == .offlineList {
+                            ChatListView(scope: .all, selection: .constant(nil))
+                        } else {
+                            ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing)
+                        }
                     }
                     .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }
                 case .settingsFixture(let fixture):
                     paired(HomeShell(opensFirstChat: false, settings: fixture.start))
                         .onAppear { model.showSettingsFixture(fixture) }
             #endif
+            case .home(.activity): paired(ActivityTab())
             case .home(let scene):
                 paired(HomeShell(opensFirstChat: false, settings: scene == .settings ? SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed) : nil))
             case .liveChat: paired(HomeShell(opensFirstChat: true, settings: nil))
@@ -167,7 +172,7 @@ struct RootView: View {
 
 extension RootView {
     /// The shell once a key is held; pairing before; a plain word while the key is read.
-    @ViewBuilder func paired(_ shell: HomeShell) -> some View {
+    @ViewBuilder func paired<Shell: View>(_ shell: Shell) -> some View {
         switch model.phase {
         case .loading: LoadingState(message: String(localized: "Reaching your Mac…", comment: "Chat list while the first list read is under way")).background(Tone.ground)
         case .unpaired: PairingView()
@@ -184,3 +189,23 @@ extension RootView {
 
 /// A class in the app's bundle, so code (and the tests) can find the bundle's resources.
 final class AppBundleAnchor {}
+
+#if DEBUG
+    /// A chat fixture in a navigation stack: alone, or, with `pushed`, pushed over a root that says "Fixture home", so that the
+    /// edge swipe and the swipe on a message can be told apart by whether the chat is still open (debug builds).
+    struct PushedFixtureChat<Content: View>: View {
+        let pushed: Bool
+        @ViewBuilder let content: () -> Content
+        @State private var shown: Bool = true
+
+        var body: some View {
+            if pushed {
+                NavigationStack {
+                    Text(verbatim: "Fixture home").navigationDestination(isPresented: $shown) { content() }
+                }
+            } else {
+                NavigationStack { content() }
+            }
+        }
+    }
+#endif

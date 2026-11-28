@@ -44,6 +44,39 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")
     }
 
+    func testARuleIsPreviewedBeforeItCanBeAdded() {
+        let app: XCUIApplication = launch("settings-rules")
+        let add: XCUIElement = app.buttons["Add rule"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        add.tap()
+        let words: XCUIElement = app.descendants(matching: .any)["rule.words"].firstMatch
+        XCTAssertTrue(words.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Add it"].exists)
+        words.tap()
+        words.typeText("delete a file")
+        app.scrollViews.firstMatch.buttons["Add rule"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Would have matched 3 of 10 steps.")).firstMatch.waitForExistence(timeout: 10))
+        app.buttons["Add it"].tap()
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+    }
+
+    func testARuleWithADifferentAnswerCannotBeAdded() {
+        let app: XCUIApplication = launch("settings-rules")
+        let add: XCUIElement = app.buttons["Add rule"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        add.tap()
+        let handoff: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Leave it to me")).firstMatch
+        XCTAssertTrue(handoff.waitForExistence(timeout: 5))
+        handoff.tap()
+        let words: XCUIElement = app.descendants(matching: .any)["rule.words"].firstMatch
+        words.tap()
+        words.typeText("delete a file")
+        app.scrollViews.firstMatch.buttons["Add rule"].firstMatch.tap()
+        let failure: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Dot read your words differently from your choice.")).firstMatch
+        XCTAssertTrue(failure.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Add it"].exists)
+    }
+
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
     func testTheMacsEmergencyStopIsShownAndReleased() {
         let app: XCUIApplication = launch("settings-stopped")

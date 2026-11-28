@@ -163,7 +163,7 @@ async def test_a_hook_is_made_its_secret_shown_once_rotated_called_switched_and_
         # The page drawn again from the daemon has no secret either.
         await page.reload()
         section: Locator = page.locator(".set-section").filter(has=page.get_by_role("heading", name="Issues"))
-        await expect(section.get_by_text("Agent: Triage")).to_be_visible()
+        await expect(section.get_by_text("Bot: Triage")).to_be_visible()
         assert secret not in await page.content()
         # Rotate: a new secret, shown once; the old one signs nothing.
         await section.get_by_role("button", name="Rotate secret").click()

@@ -385,8 +385,7 @@ async def test_a_session_closed_while_its_program_prints_on_its_way_out_closes_i
 
 
 async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime) -> None:
-    """Item 229: a delegated run opens no command in the background, since no chat of its own would hear of its end;
-    nor does a process whose chats hear of no command's end, as a dotx command's, which ends with its run."""
+    """A helper can hand off a single PR watch. Other background commands need a chat of their own to tell."""
     ctx: ToolContext = await _yolo_context(runtime)
     helper: RunRecord = await runtime.store.create_run(
         ctx.thread_id,
@@ -405,8 +404,11 @@ async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime
         None,
     )
     background: JsonObject = {"command": "sleep 5", "background": True}
-    with pytest.raises(ToolSteer, match="a delegated run or a campaign's session has none"):
-        await _call(dataclasses.replace(ctx, run_id=helper.id), "terminal_open", background)
+    for command in ("sleep 5", "gh pr checks 42 --watch; echo second command"):
+        with pytest.raises(ToolSteer, match="a delegated run or a campaign's session has none"):
+            await _call(
+                dataclasses.replace(ctx, run_id=helper.id), "terminal_open", {"command": command, "background": True}
+            )
     # No run manager watches this runtime's sessions.
     with pytest.raises(ToolInputError, match="tells no chat") as failed:
         await _call(ctx, "terminal_open", background)
@@ -437,6 +439,21 @@ async def test_a_chat_keeps_its_limit_of_sessions_and_an_idle_session_is_closed(
         await asyncio.sleep(2.5)
         with pytest.raises(ToolInputError, match=f"no terminal session {first}"):
             terminals.get("chat", first)
+    finally:
+        await terminals.aclose()
+
+
+async def test_simultaneous_opens_keep_the_chats_session_limit(runtime: Runtime) -> None:
+    """A helper's watch and a parent's command can start in the same chat at the same time."""
+    terminals: Terminals = Terminals(1, 60.0, runtime.shell_env)
+    try:
+        results = await asyncio.gather(
+            terminals.open("chat", "sleep 5", (), workspace_dir(), False, "run_parent"),
+            terminals.open("chat", "sleep 5", (), workspace_dir(), False, "run_helper"),
+            return_exceptions=True,
+        )
+        assert len(terminals.sessions("chat")) == 1
+        assert sum(isinstance(result, ToolInputError) for result in results) == 1
     finally:
         await terminals.aclose()
 

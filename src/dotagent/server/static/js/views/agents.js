@@ -9,6 +9,7 @@
 // agent under the list's "…". A team's own page is views/teams.js.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
+import { agentHandoffs, agentObjectives, agentOrders, orderOpen, overloadLines } from "../botwork.js";
 import { emptyBoxWords } from "../composershape.js";
 import { sendToWork } from "../sendwork.js";
 import { AGENTS_CHANGED_EVENT, api } from "../api.js";
@@ -22,6 +23,7 @@ import { touchFirst, trackHeight } from "../layout.js";
 import { openMenu } from "../menu.js";
 import { readFolds, readPref, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
+import { modelSections } from "../modelpicker.js";
 import { aboutToggle, chatLoading, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
@@ -31,6 +33,7 @@ import { skillRow } from "./skills.js";
 import { getSnapshot, loadModels, onChange, onLifecycle, onStreamBack } from "../state.js";
 import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { teamReviewPart } from "../teamreview.js";
 import { workOrdersPart } from "../workorders.js";
 import { WORKING_STATES } from "../runstates.js";
 import { t, tCount, listAnd } from "../i18n.js";
@@ -54,6 +57,19 @@ function faceOf(record, latest) {
   return record.id === DOT_ID ? dotFace(state) : actorFace(record.id, state, record.look);
 }
 
+/** Why the bot is overloaded (item 2067), one sentence per reason; "" when it is not. */
+function overloadWords(load) {
+  return overloadLines(load)
+    .map(({ key, values }) => t(key, values))
+    .join(" · ");
+}
+
+/** The quiet mark of an overloaded bot on its card, its reasons in the title; null when it is not. */
+function overloadBadge(load) {
+  const words = overloadWords(load);
+  return words === "" ? null : el("span", { class: "badge b-muted agent-overloaded", title: words }, t("views.agents.overloaded"));
+}
+
 function hrefOf(record) {
   return record.id === DOT_ID ? "#/runs" : `#/agents/${record.id}`;
 }
@@ -63,7 +79,7 @@ function hrefOf(record) {
  * them the title of its newest chat with when it began, or that it has none. Dot's names its newest chat of its own
  * (item 633) and opens the chats.
  */
-function agentCard({ record, latest, latest_title: latestTitle }, picking = null) {
+function agentCard({ record, latest, latest_title: latestTitle, load }, picking = null) {
   // The chat's own title, which the owner may have named; a daemon from before it was sent says the run's goal.
   const chat = latest === null ? t("views.agents.noChatsYet") : clip(latestTitle ?? latest.goal, GOAL_CHARS);
   // While the owner picks agents for a team (item 867), a card of theirs is a box to tick, not a way to its page.
@@ -88,6 +104,7 @@ function agentCard({ record, latest, latest_title: latestTitle }, picking = null
         record.made_by === null ? null : el("span", { class: "agent-made" }, t("views.agents.madeByDot")),
         // A paused agent (item 465) says so in the list, as on its page.
         record.paused_at === null ? null : el("span", { class: "badge b-warn", title: t("views.agents.itsSchedulesStartNothingBy") }, t("views.agents.paused")),
+        overloadBadge(load),
       ),
       el("div", { class: "agent-card-role", title: record.role }, record.role === "" ? t("views.agents.noRoleYet") : record.role),
     ),
@@ -362,14 +379,14 @@ async function exportAgent(record) {
 /** An agent made from its file (item 315); the daemon refuses a file that is not one, or that names tools not here. */
 async function importAgent(file) {
   if (file.size > MOST_AGENT_FILE_BYTES) {
-    throw new Error(`${file.name} is larger than an agent file can be.`);
+    throw new Error(`${file.name} is larger than a bot file can be.`);
   }
   const text = await file.text();
   let parsed;
   try {
     parsed = JSON.parse(text);
   } catch (error) {
-    throw new Error(`${file.name} is not an agent file: ${error.message}`);
+    throw new Error(`${file.name} is not a bot file: ${error.message}`);
   }
   const saved = await api.post("/agents/import", parsed);
   rememberLook(saved.id, saved.look);
@@ -460,13 +477,34 @@ export function agentForm({ record, onSaved, onCancel }) {
     placeholder: t("views.agents.workInboundLeadsSendA"),
     "aria-label": t("views.agents.neverDoes"),
   });
-  const model = el(
-    "select",
-    { class: "select", "aria-label": t("views.agents.model") },
-    el("option", { value: "" }, defaults === null ? t("views.agents.defaultModel") : t("views.agents.defaultModelname", { modelName: modelName(defaults.models.main) })),
-    record === null || record.model === "" ? null : el("option", { value: record.model }, record.model),
-  );
-  model.value = record === null ? "" : record.model;
+  // The model, on the chat settings' list of models (the owner's report of 2026-11-28): the main model's row on top,
+  // the favourites, a section per provider that folds (the chosen model's open), a tick on the one chosen and a search;
+  // it writes the agent's own choice only, never which model a run takes.
+  let modelValue = record === null ? "" : record.model;
+  /** @type {{ provider: string, models: { ref: string, tools: boolean }[], why: null }[]} */
+  let modelGroups = [];
+  // "Main model", as the iPhone app's agent page says it, with the model it stands for once it is known.
+  const mainWords = defaults === null ? t("views.agents.mainModel") : t("views.agents.mainModelname", { modelName: modelName(defaults.models.main) });
+  const modelList = modelSections({
+    onPick: (ref) => {
+      modelValue = ref;
+      paintModels();
+      paintEffort();
+    },
+    // The agent's page makes no default: its main model's row has no Change.
+    onMakeDefault: () => false,
+  });
+  const notOffered = el("p", { class: "hint", hidden: true });
+  const model = el("div", { class: "agent-model-picker", role: "group", "aria-label": t("views.agents.model") });
+  function paintModels() {
+    // The main model is only what a chat with no model of its own takes: a chat's chosen model wins (MS2's finding).
+    const built = modelList.build({ groups: modelGroups, chosen: modelValue, fallback: null, blank: mainWords, blankHint: t("views.agents.mainModelHint") });
+    const known = modelGroups.some((group) => group.models.some((candidate) => candidate.ref === modelValue));
+    notOffered.hidden = modelValue === "" || known || modelGroups.length === 0;
+    notOffered.textContent = t("views.agents.chosenNotOfferedNow", { chosen: modelValue });
+    model.replaceChildren(built.search, notOffered, built.list);
+  }
+  paintModels();
   const effort = el("select", { class: "select", "aria-label": t("views.agents.reasoningLevel") }, el("option", { value: "" }, t("views.agents.default")));
   const effortField = field(t("views.agents.reasoning"), effort, "");
   effortField.hidden = true;
@@ -485,7 +523,7 @@ export function agentForm({ record, onSaved, onCancel }) {
   let models = [];
 
   function paintEffort() {
-    const info = models.find((candidate) => candidate.ref === model.value) ?? null;
+    const info = models.find((candidate) => candidate.ref === modelValue) ?? null;
     const keep = effort.value === "" ? (record === null ? "" : record.effort ?? "") : effort.value;
     if (info === null || info.efforts.length < 2) {
       effort.replaceChildren(el("option", { value: "" }, t("views.agents.default")));
@@ -501,18 +539,13 @@ export function agentForm({ record, onSaved, onCancel }) {
     effortField.hidden = false;
   }
 
-  model.addEventListener("change", paintEffort);
   const modelsListed = loadModels()
     .then((providers) => {
       models = allModels(providers).filter((candidate) => candidate.tools);
-      const chosen = model.value;
-      const known = new Set(models.map((candidate) => candidate.ref));
-      model.replaceChildren(
-        model.firstElementChild,
-        ...(chosen !== "" && !known.has(chosen) ? [el("option", { value: chosen }, t("views.agents.chosenNotOfferedNow", { chosen }))] : []),
-        ...models.map((candidate) => el("option", { value: candidate.ref }, modelName(candidate.ref))),
-      );
-      model.value = chosen;
+      modelGroups = providers
+        .map((provider) => ({ provider: provider.provider, models: provider.models.filter((candidate) => candidate.tools), why: null }))
+        .filter((group) => group.models.length > 0);
+      paintModels();
       paintEffort();
     })
     .catch((error) => {
@@ -560,8 +593,8 @@ export function agentForm({ record, onSaved, onCancel }) {
       role: role.value.trim(),
       instructions: instructions.value.trim(),
       refuses: refuses.value.trim(),
-      model: model.value,
-      effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
+      model: modelValue,
+      effort: chosenLevel(models, modelValue, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
       // Every tool, said as null, when the boxes widen the agent (toolPicks): every box ticked, unless they are the tools
       // it names, unchanged, and All tools was not ticked. An empty list keeps the tools an agent has (the code review's
@@ -596,7 +629,7 @@ export function agentForm({ record, onSaved, onCancel }) {
         Object.assign(field(t("views.agents.instructions"), instructions, ""), { className: "field wide" }),
         Object.assign(field(t("views.agents.neverDoes"), refuses, t("views.agents.oneLineEachTheEdges")), { className: "field wide" }),
         lookField,
-        field(t("views.agents.model"), model, ""),
+        Object.assign(field(t("views.agents.model"), model, ""), { className: "field wide" }),
         effortField,
         field(t("views.agents.approvals"), approvals, ""),
         toolsField,
@@ -1033,12 +1066,14 @@ function mountList(root, ctx) {
   });
   // What Dot handed out to the agents and the objectives it keeps (items 907, 908), read only.
   const work = workOrdersPart();
+  // The manager's review of the team (item 2068), above the orders: its cards change nothing until the owner accepts.
+  const review = teamReviewPart();
   // The page in parts (item 1136): the agents the owner has and the ready-made ones first, then the teams, the work
   // orders, one part at a time; the part shown is kept in this browser.
   const parts = [
     { id: "agents", label: t("views.agents.agents"), sections: [yours, templates] },
     { id: "teams", label: t("views.agents.teams"), sections: [yourTeams] },
-    { id: "orders", label: t("views.agents.orders"), sections: [work.element] },
+    { id: "orders", label: t("views.agents.orders"), sections: [review.element, work.element] },
   ];
   const kept = readPref(PART_KEY);
   const tabs = segmented(
@@ -1067,6 +1102,7 @@ function mountList(root, ctx) {
     yours,
     templates,
     yourTeams,
+    review.element,
     work.element,
   );
   showPart(tabs.value());
@@ -1092,6 +1128,7 @@ function mountList(root, ctx) {
   attempt(reloadTeams);
   attempt(loadTemplates);
   attempt(work.reload);
+  attempt(review.reload);
   return () => {
     disposed = true;
     clearInterval(ages);
@@ -1099,6 +1136,7 @@ function mountList(root, ctx) {
     stopBack();
     closeEditor();
     work.dispose();
+    review.dispose();
   };
 }
 
@@ -1281,7 +1319,7 @@ const FACE_PX = 96;
 // Which sections of an agent's page are folded, kept per browser as the home keeps its own.
 const FOLDS_KEY = "dot.agentFolds";
 
-function who(record, face) {
+function who(record, face, overload) {
   return el(
     "div",
     { class: "home-who agent-who" },
@@ -1297,6 +1335,7 @@ function who(record, face) {
           el("span", { class: "badge b-warn" }, t("views.agents.paused")),
           t("views.agents.itsSchedulesStartNothingBy2"),
         ),
+    overload,
   );
 }
 
@@ -1407,6 +1446,46 @@ export function homeSection(key, title, rows, folds, toggle) {
   );
 }
 
+/** The agent's work (item 2035), three rows as the phone's bot profile has them: its open work orders, its active
+ * objectives and today's hand-offs, each counted, each a link to its own page. */
+function workCounts(agentId, orders, objectives, team) {
+  const { received, sent } = agentHandoffs(agentId, team.messages);
+  return {
+    error: null,
+    orders: agentOrders(agentId, orders).filter(orderOpen).length,
+    objectives: agentObjectives(agentId, orders, objectives).filter((objective) => objective.status === "active").length,
+    handoffs: received.length + sent.length,
+  };
+}
+
+/** The Work section; `counts.error` (the lists could not be read) is said in it, with `retry`. */
+function workSection(agentId, counts, retry) {
+  if (counts.error !== null) {
+    return el("div", { class: "home-today-section", "data-section": "work" }, el("h2", { class: "section-label" }, t("views.agentwork.work")), errorPanel(counts.error, retry));
+  }
+  const row = (kind, mark, title, count, words) =>
+    el(
+      "a",
+      { class: "list-row agent-work-row", href: `#/agents/${agentId}/${kind}`, dataset: { work: kind } },
+      icon(mark),
+      el("span", { class: "row-title" }, title),
+      el("span", { class: "row-meta" }, count > 0 ? words : t("views.agentwork.none")),
+      icon("chevron"),
+    );
+  return el(
+    "div",
+    { class: "home-today-section", "data-section": "work" },
+    el("h2", { class: "section-label" }, t("views.agentwork.work")),
+    el(
+      "div",
+      { class: "home-today-list card" },
+      row("orders", "list", t("workorders.workOrders"), counts.orders, t("views.agentwork.openCount", { count: counts.orders })),
+      row("objectives", "target", t("views.agentwork.objectives"), counts.objectives, t("views.agentwork.activeCount", { count: counts.objectives })),
+      row("handoffs", "branch", t("views.team.handoffs"), counts.handoffs, t("views.agentwork.todayCount", { count: counts.handoffs })),
+    ),
+  );
+}
+
 function mountPage(root, ctx, agentId) {
   // The agent's bar is glass from the page's first frame, while the agent is read (item 1123).
   setStageGlass();
@@ -1508,6 +1587,15 @@ function mountPage(root, ctx, agentId) {
     await reload();
   }
 
+  // Why the bot is overloaded (item 2067), under its name: quiet, and hidden while it is not.
+  const overloadLine = el("p", { class: "home-greeting agent-overloaded-line", hidden: true });
+
+  function paintOverload(load) {
+    const words = overloadWords(load);
+    overloadLine.hidden = words === "";
+    overloadLine.replaceChildren(...(words === "" ? [] : [el("span", { class: "badge b-muted" }, t("views.agents.overloaded")), words]));
+  }
+
   function closeForm() {
     delete page.dataset.editing;
     if (form !== null) {
@@ -1525,7 +1613,7 @@ function mountPage(root, ctx, agentId) {
     face?.dispose();
     face = liveFace(record.id, "idle", record.look, FACE_PX);
     paintConversation(record);
-    top.replaceChildren(who(record, face.element), composer.element, conversation);
+    top.replaceChildren(who(record, face.element, overloadLine), composer.element, conversation);
     stageOf(record);
   }
 
@@ -1599,7 +1687,7 @@ function mountPage(root, ctx, agentId) {
   async function load() {
     const mine = ++ticket;
     try {
-      const [detail, schedules, templates] = await Promise.all([
+      const [detail, schedules, templates, work] = await Promise.all([
         api.get(`/agents/${agentId}`),
         api.get("/schedules"),
         // The template of its name, for the schedule it suggests (item 722); a list that cannot be read offers none.
@@ -1607,12 +1695,19 @@ function mountPage(root, ctx, agentId) {
           console.warn("the templates could not be listed", error);
           return [];
         }),
+        // What the agent is handed and passes on (item 2035), counted on its page as the phone's profile counts it; a
+        // list that cannot be read says so in the Work section alone, and the page stands.
+        Promise.all([api.get("/work-orders"), api.get("/objectives"), api.get("/team")]).then(
+          (lists) => ({ lists, error: null }),
+          (error) => ({ lists: null, error }),
+        ),
       ]);
       const own = schedules.filter((view) => view.record.options.agent_id === agentId);
       const name = detail.record.name.trim().toLowerCase();
       const template = templates.find((each) => each.name.toLowerCase() === name && each.cron !== "") ?? null;
       const suggested = template !== null && !own.some((view) => view.record.goal === template.task) ? template : null;
-      return disposed || mine !== ticket ? null : { ...detail, schedules: own, suggested };
+      const counts = work.lists === null ? { error: work.error } : workCounts(agentId, ...work.lists);
+      return disposed || mine !== ticket ? null : { ...detail, schedules: own, suggested, work: counts };
     } catch (error) {
       if (!disposed && mine === ticket) {
         page.replaceChildren(errorPanel(error, () => attempt(reload)));
@@ -1634,6 +1729,7 @@ function mountPage(root, ctx, agentId) {
 
   function paintLists(detail) {
     shownDetail = detail;
+    paintOverload(detail.load);
     const learned = learnedRows(detail.record, detail.learned, {
       forget: (record) => attempt(() => forget(record)),
       skillsChanged: (list) => {
@@ -1643,6 +1739,7 @@ function mountPage(root, ctx, agentId) {
       },
     });
     const parts = [
+      workSection(detail.record.id, detail.work, () => attempt(reload)),
       homeSection(
         "schedules",
         t("views.agents.schedules"),
