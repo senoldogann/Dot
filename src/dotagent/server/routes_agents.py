@@ -9,6 +9,7 @@ from fastapi import APIRouter
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
+from dotagent.agent.team_load import LOAD_WINDOW_S, BotLoad, bot_load
 from dotagent.agent.templates import (
     TEAMS,
     TEMPLATES,
@@ -26,7 +27,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.secrets import known_secrets
-from dotagent.server import CLI_SOURCE, UI_SOURCE
+from dotagent.server import CLI_SOURCE, REVIEW_SOURCE, UI_SOURCE
 from dotagent.server.activity import start_of_today
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_system import learned_skill_view
@@ -53,6 +54,7 @@ from dotagent.store.models import (
     AgentLook,
     AgentRecord,
     AgentToolUse,
+    BotLoadRow,
     MemoryRecord,
     ObjectiveRecord,
     RunRecord,
@@ -247,6 +249,14 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         """The names of the tools an agent may be given, in alphabetical order."""
         return sorted(known())
 
+    async def bot_loads() -> dict[str, BotLoad]:
+        """What every bot carries now, by its id (item 2067)."""
+        now: float = time.time()
+        rows: list[BotLoadRow] = await store.bot_load_rows(
+            now - LOAD_WINDOW_S, now - 2 * LOAD_WINDOW_S, (REVIEW_SOURCE,)
+        )
+        return {row.agent_id: bot_load(row) for row in rows}
+
     @router.get("/agents")
     async def list_agents() -> list[AgentSummary]:
         """Dot first, then the agents the owner made, oldest first, each with its newest run and the title of the chat
@@ -261,11 +271,13 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         titles: dict[str, str] = await store.thread_titles(
             [run.thread_id for run in latest.values()] + ([] if dots is None else [dots.thread_id])
         )
+        loads: dict[str, BotLoad] = await bot_loads()
         dot: AgentSummary = AgentSummary(
             record=await dot_record(store),
             latest=dots,
             latest_title=None if dots is None else titles.get(dots.thread_id),
             home=await store.dot_home_chat(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat),
+            load=loads.get(DOT_AGENT_ID),
         )
         return [dot] + [
             AgentSummary(
@@ -273,6 +285,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 latest=latest.get(agent.id),
                 latest_title=titles.get(latest[agent.id].thread_id) if agent.id in latest else None,
                 home=homes.get(agent.id),
+                load=loads.get(agent.id),
             )
             for agent in await store.list_agents()
         ]
@@ -443,6 +456,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 messages=[],
                 learned=_NOTHING_LEARNED,
                 home=await store.dot_home_chat(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat),
+                load=(await bot_loads()).get(DOT_AGENT_ID),
             )
         record: AgentRecord = await store.get_agent(agent_id)
         return AgentDetail(
@@ -455,6 +469,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             home=(await store.agent_home_chats(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat, agent_id)).get(
                 agent_id
             ),
+            load=(await bot_loads()).get(agent_id),
         )
 
     @router.put("/agents/{agent_id}")

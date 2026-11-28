@@ -666,6 +666,17 @@
         }
       }
     },
+    "%lld open work orders (more than %lld)": {
+      "comment": "Bot profile: why a bot is overloaded; its open work orders and the most it should hold",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld açık iş emri (en çok %lld olmalı)"
+          }
+        }
+      }
+    },
     "%lld pt": {
       "comment": "Appearance: the body text's size in points",
       "localizations": {
@@ -695,6 +706,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld rapor · %@ sn"
+          }
+        }
+      }
+    },
+    "%lld routines on (more than %lld)": {
+      "comment": "Bot profile: why a bot is overloaded; its routines switched on and the most it should hold",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld rutin açık (en çok %lld olmalı)"
           }
         }
       }
@@ -990,6 +1012,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld çalışıyor"
+          }
+        }
+      }
+    },
+    "%lld%% of its runs ended done this week, %lld%% the week before": {
+      "comment": "Bot profile: why a bot is overloaded; the share of its runs that ended done this week and the week before",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta işlerinin %%%lld kadarı bitti, geçen hafta %%%lld"
           }
         }
       }
@@ -9770,6 +9803,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "200 MiB sınırını aşıyor"
+          }
+        }
+      }
+    },
+    "Overloaded": {
+      "comment": "VoiceOver: a bot that carries too much",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aşırı yüklü"
+          }
+        }
+      }
+    },
+    "Overloaded: %@": {
+      "comment": "Bot profile: a bot that carries too much; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aşırı yüklü: %@"
           }
         }
       }

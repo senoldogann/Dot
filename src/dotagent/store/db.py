@@ -51,6 +51,8 @@ from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.failed import failed_result_sql
 from dotagent.store.kinds import KindBy, MemoryKind, rule_kind
 from dotagent.store.models import (
+    BOT_HELD_WORK_ORDERS,
+    DOT_AGENT_ID,
     NO_PICKS,
     OBJECTIVE_MOVES,
     OCCUPIED_STATUSES,
@@ -69,6 +71,7 @@ from dotagent.store.models import (
     AwakeNotes,
     AwayRule,
     Behavior,
+    BotLoadRow,
     BrowserMode,
     BudgetSpent,
     CampaignEntry,
@@ -8667,6 +8670,88 @@ class Store:
             (TEAM_SOURCE, agent_id, agent_id, limit),
         )
         return [_run(row) for row in rows]
+
+    async def bot_load_rows(
+        self, since: float, prior_since: float, skipped_sources: tuple[str, ...]
+    ) -> list[BotLoadRow]:
+        """What each bot carries (item 2067), Dot's row first, then each agent's: its open work orders (not one
+        escalated to the owner, which the bot no longer holds), its routines, the active objectives its open orders
+        serve (Dot's: every active one) and its runs started at or after ``since`` and between ``prior_since`` and
+        ``since`` (a bot's order attempts and the parts its runs hand out are its own; the parts Dot's runs hand out,
+        which carry no bot, are not Dot's runs but parts of them), of the stored runs and of the ledger of those whose
+        chats were deleted (item 1323), the runs of ``skipped_sources`` aside (the pre-push code reviews are not a
+        bot's work). Counts only: nothing a run wrote is read."""
+        marks: str = ",".join("?" for _ in skipped_sources) or "''"
+        held: str = ",".join("?" for _ in BOT_HELD_WORK_ORDERS)
+        rows = await self._all(
+            "WITH bots AS (SELECT ? AS id UNION ALL SELECT id FROM agents),"
+            " every_run AS ("
+            "  SELECT coalesce(agent_id, ?) AS aid, status, steps, created_at, source FROM runs"
+            "  WHERE parent_run_id IS NULL OR agent_id IS NOT NULL"
+            "  UNION ALL SELECT coalesce(agent_id, ?), status, steps, created_at, source FROM run_ledger"
+            "  WHERE (parent_run_id IS NULL OR agent_id IS NOT NULL) AND id NOT IN (SELECT id FROM runs)),"
+            f" counted AS (SELECT * FROM every_run WHERE source NOT IN ({marks})),"
+            " ran AS (SELECT aid,"
+            "  sum(created_at >= ?) AS runs, sum(created_at >= ? AND status = 'done') AS done,"
+            "  sum(created_at >= ? AND status = 'failed') AS failed,"
+            "  sum(CASE WHEN created_at >= ? THEN steps ELSE 0 END) AS steps,"
+            "  sum(created_at >= ? AND created_at < ?) AS prior_runs,"
+            "  sum(created_at >= ? AND created_at < ? AND status = 'done') AS prior_done"
+            "  FROM counted GROUP BY aid),"
+            " newest AS (SELECT aid, max(created_at) AS last_run_at FROM every_run GROUP BY aid),"
+            f" open_orders AS (SELECT agent_id AS aid, count(*) AS n FROM work_orders WHERE status IN ({held})"
+            "  GROUP BY agent_id),"
+            " routines AS (SELECT coalesce(agent_id, ?) AS aid, sum(enabled) AS active, count(*) AS n FROM schedules"
+            "  GROUP BY 1),"
+            " aims AS (SELECT w.agent_id AS aid, count(DISTINCT w.objective_id) AS n FROM work_orders AS w"
+            "  JOIN objectives AS o ON o.id = w.objective_id"
+            f"  WHERE o.status = 'active' AND w.status IN ({held}) GROUP BY w.agent_id)"
+            " SELECT bots.id AS agent_id, coalesce(open_orders.n, 0) AS open_orders,"
+            " coalesce(routines.active, 0) AS active_routines, coalesce(routines.n, 0) AS routines,"
+            " CASE WHEN bots.id = ? THEN (SELECT count(*) FROM objectives WHERE status = 'active')"
+            "  ELSE coalesce(aims.n, 0) END AS objectives,"
+            " coalesce(ran.runs, 0) AS runs, coalesce(ran.done, 0) AS done, coalesce(ran.failed, 0) AS failed,"
+            " coalesce(ran.steps, 0) AS steps, coalesce(ran.prior_runs, 0) AS prior_runs,"
+            " coalesce(ran.prior_done, 0) AS prior_done, newest.last_run_at AS last_run_at"
+            " FROM bots LEFT JOIN ran ON ran.aid = bots.id LEFT JOIN newest ON newest.aid = bots.id"
+            " LEFT JOIN open_orders ON open_orders.aid = bots.id LEFT JOIN routines ON routines.aid = bots.id"
+            " LEFT JOIN aims ON aims.aid = bots.id",
+            (
+                DOT_AGENT_ID,
+                DOT_AGENT_ID,
+                DOT_AGENT_ID,
+                *skipped_sources,
+                since,
+                since,
+                since,
+                since,
+                prior_since,
+                since,
+                prior_since,
+                since,
+                *BOT_HELD_WORK_ORDERS,
+                DOT_AGENT_ID,
+                *BOT_HELD_WORK_ORDERS,
+                DOT_AGENT_ID,
+            ),
+        )
+        return [
+            BotLoadRow(
+                agent_id=str(row["agent_id"]),
+                open_orders=int(row["open_orders"]),
+                active_routines=int(row["active_routines"]),
+                routines=int(row["routines"]),
+                objectives=int(row["objectives"]),
+                runs=int(row["runs"]),
+                done=int(row["done"]),
+                failed=int(row["failed"]),
+                steps=int(row["steps"]),
+                prior_runs=int(row["prior_runs"]),
+                prior_done=int(row["prior_done"]),
+                last_run_at=None if row["last_run_at"] is None else float(row["last_run_at"]),
+            )
+            for row in rows
+        ]
 
     async def latest_agent_runs(self) -> dict[str, RunRecord]:
         """The newest run of every agent that ran, by agent id."""

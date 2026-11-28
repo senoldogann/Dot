@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DOT_ID, agentHandoffs, agentObjectives, agentOrders, orderOpen } from "../../src/dotagent/server/static/js/botwork.js";
+import { DOT_ID, agentHandoffs, agentObjectives, agentOrders, orderOpen, overloadLines } from "../../src/dotagent/server/static/js/botwork.js";
 
 const orders = [
   { order: { id: "o1", agent_id: "scout", objective_id: "goal-a", status: "working" } },
@@ -34,4 +34,21 @@ test("hand-offs: those to the agent and those from it, each newest first", () =>
   assert.deepEqual(received.map((m) => m.ts), [2, 1]);
   assert.deepEqual(sent.map((m) => m.ts), [3]);
   assert.deepEqual(messages.map((m) => m.ts), [1, 3, 2, 4]);
+});
+
+test("an overloaded bot's reasons become catalogue lines; none, an old daemon's and an unknown reason say nothing", () => {
+  const load = {
+    reasons: [
+      { kind: "orders", count: 7, limit: 5 },
+      { kind: "later", count: 1, limit: 0 },
+      { kind: "done_share", count: 60, limit: 90 },
+    ],
+  };
+  assert.deepEqual(overloadLines(load), [
+    { key: "views.agents.overloadOrders", values: { count: 7, limit: 5 } },
+    { key: "views.agents.overloadDoneShare", values: { count: 60, limit: 90 } },
+  ]);
+  assert.deepEqual(overloadLines({ reasons: [] }), []);
+  assert.deepEqual(overloadLines(null), []);
+  assert.deepEqual(overloadLines(undefined), []);
 });

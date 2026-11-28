@@ -234,6 +234,17 @@ ended, and when nothing would go or nothing would be left). The page's fold is g
 `window`, `runs`, `tokens`, `newest`, `calls`, `enough` and `unused`, and the page keeps its routines and what it
 learned.
 
+**What it carries** (item 2067), `load` of `GET /api/agents` and `GET /api/agents/{id}`, is counted with no model
+each time the list is read: its open work orders (one escalated to you aside, which waits for you), its routines on, the
+active objectives its open orders serve (Dot's: every active one), its runs of the last seven days (a bot's order
+attempts and the parts its runs hand out are its own; the pre-push code reviews are not counted), the share of them
+that ended done and their average steps (`open_orders`, `active_routines`, `objectives`, `runs`, `done_share`,
+`steps`). A bot with more than 5 open orders, more than 4 routines on, or a done share 20 points or more below the
+week before's (at least 5 runs in each week) is overloaded: `reasons` says why (`{kind, count, limit}`, `kind` one of
+`orders`, `routines` and `done_share`, the last in whole percent, this week's against the week before's). Its card on
+the Agents page wears a quiet **Overloaded** badge with the reasons in its title, and its page says it under its role
+with the reasons; on the phone its home row wears a gauge beside its name and its profile a notice with the reasons.
+
 **How its work went** (item 1066), `work` of `GET /api/agents/{id}`, reads how the work orders went rather than how much the
 bot wrote: the orders it has (one reassigned is its newest bot's), how many were accepted on their first attempt,
 how many after a return, how many wait for you (escalated: one you drop is cancelled and leaves that count) and how

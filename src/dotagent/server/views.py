@@ -16,6 +16,7 @@ from dotagent.agent.proof import ProofSpec
 from dotagent.agent.resume import CutOff
 from dotagent.agent.skill_history import VersionDetail
 from dotagent.agent.skill_proposals import ProposalView
+from dotagent.agent.team_load import BotLoad
 from dotagent.agent.templates import MOST_TEMPLATE_QUESTIONS, TEMPLATE_ANSWER_CHARS
 from dotagent.agent.welcome import LANGUAGE_CHARS
 from dotagent.browser.look import PageLook
@@ -1099,6 +1100,8 @@ class AgentSummary(FrozenModel):
     latest: RunRecord | None
     latest_title: str | None
     home: ThreadSummary | None = None
+    # What it carries and why it is overloaded, if it is (item 2067).
+    load: BotLoad | None = None
 
 
 class WorkOrderView(FrozenModel):
@@ -1426,6 +1429,7 @@ class AgentDetail(FrozenModel):
     usage: AgentUsage | None = None
     work: AgentWork | None = None
     home: ThreadSummary | None = None
+    load: BotLoad | None = None
 
 
 class CampaignChip(FrozenModel):

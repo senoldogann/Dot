@@ -31,7 +31,7 @@ final class RowStateTests: XCTestCase {
             id: "dot", name: "Dot", role: "", instructions: "", model: "", effort: nil, approvals: nil, tools: [], createdAt: 0, updatedAt: 0,
             look: nil, pausedAt: nil, refuses: nil)
         func state(_ rows: [ThreadRow]) -> RowState {
-            botState(bots(agents: [AgentSummary(record: dot, home: nil)], rows: rows, pinned: [], fallbackDot: dot, gone: [])[0])
+            botState(bots(agents: [AgentSummary(record: dot, home: nil, load: nil)], rows: rows, pinned: [], fallbackDot: dot, gone: [])[0])
         }
         let review: ThreadRow = row("review", status: "running", asks: 0, helpers: 0, background: nil, source: "review", updated: 9)
         let resting: ThreadRow = row("talk", status: "done", asks: 0, helpers: 0, background: nil, source: "ui", updated: 1)
