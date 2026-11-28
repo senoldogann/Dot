@@ -828,6 +828,7 @@ async def test_a_key_is_saved_shown_by_its_end_only_used_at_once_and_removed(
         "source": None,
         "saved": False,
         "tail": "",
+        "check": None,
     }
     # The Anthropic rung of web_search's ladder follows the key from the next search on (item 558): the runtime was
     # built without it, and Settings saving or removing it is all it takes.
@@ -841,6 +842,7 @@ async def test_a_key_is_saved_shown_by_its_end_only_used_at_once_and_removed(
         "source": "env_file",
         "saved": True,
         "tail": FAKE_KEY[-4:],
+        "check": None,
     }
     assert FAKE_KEY not in saved.text
     assert FAKE_KEY not in (await client.get("/api/keys")).text

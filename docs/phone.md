@@ -63,7 +63,9 @@ connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows 
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
 which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Its **Campaigns** (item 1895, under Agents) lists each
 campaign with its state, goal and last progress, and a campaign's page stops it (it asks first), resumes it or marks it
-achieved, as the web's page does; deleting one is done on the Mac. Dot Next's composer records your voice (item 1802): the
+achieved, as the web's page does; deleting one is done on the Mac. Its **AI services** (item 2054, beside Models) lists each model provider with
+the state of its key (connected with its last four characters, none, refused at its last check) and adds, replaces,
+checks and removes a key, write-only: the key goes to the Mac and never comes back ([Models](models.md)). Dot Next's composer records your voice (item 1802): the
 microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written
 down on the iPhone (Apple's Speech, on the device: no audio leaves the phone) or, when you choose it in its Settings ›
 Voice, on your Mac (`/api/voice/streams`, as the web page does). Settings › Voice also orders the microphones voice input
@@ -471,7 +473,13 @@ switch off a rule that asks, delete or switch off an allow rule that a pre-appro
 (an allow rule asks of a run that read outside content where a pre-approved one does not; item 981), or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
 shown or connected on the Mac alone (the eye of the vault, 1Password, a sign-in of Google or Microsoft, the microphone's
 pane of System Settings) answers the installation's token alone, never a phone's key, whatever address a phone's request
-names. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is
+names. A phone's key may save, replace, check and remove the API keys of the AI services (item 2054), never read one: a phone
+that is taken could put a key of someone else's account in place of yours, so every such change is told to you on the
+Mac and your other ways at once, naming the provider and the phone, and is limited to 5 in 10 minutes; remove the phone
+(the tell names it by its id, as Settings › Phone lists it) and put your own key back. The tell reaches the Mac as a
+desktop notification while Dot's window is open, your Messages channel if it is on, and the Mac's list of tells; the
+push goes to the phones too, the one that made the change among them. The keys of the web search services (Settings ›
+Web search) are not among these: a phone saves them untold, as before. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is
 yours to use from the phone as from the Mac: a phone's key can start a run, a chat
 or a campaign in `yolo`, make a schedule, a loop of a chat (`/loop`) or an agent kept in `yolo`, switch one on or let
 one go on, and what such a run does is not held by these limits (it may do whatever your account may). Removing a phone

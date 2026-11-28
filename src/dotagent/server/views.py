@@ -2231,16 +2231,27 @@ class McpSwitch(FrozenModel):
     on: bool
 
 
+class KeyCheck(FrozenModel):
+    """The last check of a provider's key since the daemon started (item 2054): whether the provider took it, its words
+    (the provider's own, as the check's result carries them) and when, in seconds since the epoch."""
+
+    ok: bool
+    detail: str
+    at: float
+
+
 class KeyView(FrozenModel):
     """The API key of one provider as the Settings page shows it; the value never leaves the daemon. ``source`` is where
     the key in use comes from (``None``: it is not set), ``saved`` whether Dot's ``.env`` file holds one (the page saves
-    and removes only that one), ``tail`` the last characters of the key in use ("" when unset or too short)."""
+    and removes only that one), ``tail`` the last characters of the key in use ("" when unset or too short), ``check``
+    the last check of that key (``None``: none since the key changed or the daemon started)."""
 
     provider: str
     name: str
     source: SecretSource | None
     saved: bool
     tail: str
+    check: KeyCheck | None
 
 
 class KeysView(FrozenModel):

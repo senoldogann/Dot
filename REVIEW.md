@@ -31,6 +31,10 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_phone_keys.py::test_changes_a_phone_sends_at_once_are_held_to_its_limit` — changes a phone sent at
+  once each passed the limit before any was counted (item 2054's review).
+- `tests/smoke/test_phone_keys.py::test_a_check_that_began_before_a_change_records_nothing` — a check of the old key that
+  ended after a new key was saved showed its verdict against the new one (item 2054's security review).
 - `tests/smoke/test_chat_routing.py::test_a_routed_message_is_checked_as_a_queued_one_and_move_keeps_what_it_cannot_move` — words the router queued for a task skipped a queued message's checks, and Move took out a message it could not
   move (item 2012's review).
 - `tests/smoke/test_chat_routing.py::test_a_move_that_fails_loses_nothing` — a move that failed after the message was

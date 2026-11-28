@@ -1742,3 +1742,49 @@ TR.update(
 
 # A new chat's first send opens the one chat screen (item 2025).
 TR.update({"Starting the chat…": "Sohbet başlatılıyor…"})
+
+# Settings › AI services: the providers' keys from the phone, write-only (item 2054).
+TR.update(
+    {
+        "%@ refused the key": "%@ anahtarı reddetti",
+        "%@ took the key": "%@ anahtarı kabul etti",
+        "A key goes to your Mac and is never shown again, here or on the Mac: only its last four characters.": "Anahtar Mac'ine gider ve bir daha ne burada ne Mac'te gösterilir: yalnızca son dört karakteri.",
+        "A key has no spaces or line breaks inside.": "Bir anahtarın içinde boşluk ya da satır sonu olmaz.",
+        "A key you save or remove here is told on your Mac, so that a change you did not make is seen.": "Burada kaydettiğin ya da kaldırdığın anahtar Mac'inde bildirilir; böylece senin yapmadığın bir değişiklik görülür.",
+        "AI services": "Yapay zekâ hizmetleri",
+        "API key": "API anahtarı",
+        "Add key": "Anahtar ekle",
+        "Add the %@ key": "%@ anahtarını ekle",
+        "Asking %@…": "%@ soruluyor…",
+        "Check key": "Anahtarı denetle",
+        "Connected · ••••%@": "Bağlı · ••••%@",
+        "Dot deletes the saved key from your Mac. The key itself stays valid at %@ until you cancel it there.": "Dot kayıtlı anahtarı Mac'inden siler. Anahtarın kendisi, sen orada iptal edene kadar %@ adresinde geçerli kalır.",
+        "Dot keeps it on your Mac, in a file only you can read. This phone keeps nothing of it.": "Dot onu Mac'inde, yalnızca senin okuyabildiğin bir dosyada tutar. Bu telefon ondan hiçbir şey saklamaz.",
+        "Dot was started with %@ already set, which comes before a key saved here. Change it on your Mac.": "Dot, %@ zaten ayarlıyken başlatıldı; bu, burada kaydedilen anahtardan önce gelir. Onu Mac'inde değiştir.",
+        "From the Keychain": "Anahtar Zinciri'nden",
+        "Kept": "Nerede",
+        "Last check": "Son denetim",
+        "Make one at %@.": "%@ adresinden bir tane oluştur.",
+        "No key yet": "Henüz anahtar yok",
+        "Not checked since the key changed or Dot started": "Anahtar değiştiğinden ya da Dot başladığından beri denetlenmedi",
+        "Optional": "İsteğe bağlı",
+        "Optional: an extra checker that reads button labels no rule knows and checks what a campaign claims.": "İsteğe bağlı: hiçbir kuralın bilmediği düğme etiketlerini okuyan ve bir kampanyanın iddialarını denetleyen ek bir denetleyici.",
+        "Optional: the online web search, and ollama.com without the Ollama app. The models the app runs need no key.": "İsteğe bağlı: çevrimiçi web araması ve Ollama uygulaması olmadan ollama.com. Uygulamanın çalıştırdığı modeller anahtar gerektirmez.",
+        "Paste the key": "Anahtarı yapıştır",
+        "Refused at the last check · ••••%@": "Son denetimde reddedildi · ••••%@",
+        "Remove key": "Anahtarı kaldır",
+        "Remove the %@ key?": "%@ anahtarı kaldırılsın mı?",
+        "Replace key": "Anahtarı değiştir",
+        "Replace the %@ key": "%@ anahtarını değiştir",
+        "Saved in Dot": "Dot'ta kayıtlı",
+        "Set when Dot was started": "Dot başlatılırken ayarlandı",
+        "Settings › AI services": "Ayarlar › Yapay zekâ hizmetleri",
+        "The Claude models.": "Claude modelleri.",
+        "The GPT models.": "GPT modelleri.",
+        "The Gemini models of a Google AI Studio key, free within their daily limits.": "Bir Google AI Studio anahtarının Gemini modelleri, günlük sınırları içinde ücretsiz.",
+        "The models of many labs, on one key and one balance.": "Birçok laboratuvarın modelleri, tek anahtar ve tek bakiyeyle.",
+        "The open models of an OpenCode Go subscription.": "Bir OpenCode Go aboneliğinin açık modelleri.",
+        "Variable": "Değişken",
+        "keys api key providers token": "anahtarlar api anahtarı sağlayıcılar token anahtar",
+    }
+)

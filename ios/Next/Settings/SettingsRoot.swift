@@ -90,6 +90,7 @@ struct SettingsSheet: View {
             }
             GroupedSection(header: nil, footer: nil) {
                 PageRow(page: .models, systemImage: "cpu", title: String(localized: "Models", comment: "Settings row"), description: nil, detail: nil)
+                PageRow(page: .keys, systemImage: "key", title: String(localized: "AI services", comment: "Settings row: the model providers and their API keys"), description: nil, detail: nil)
                 PageRow(page: .notifications, systemImage: "bell", title: String(localized: "Notifications", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .appearance, systemImage: "paintbrush", title: String(localized: "Appearance", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .chat, systemImage: "bubble.left.and.bubble.right", title: String(localized: "Chat", comment: "Settings row: chat preferences"), description: nil, detail: nil)
@@ -198,6 +199,8 @@ struct SettingsDestination: View {
         case .maintenance: MaintenancePage()
         case .campaigns: CampaignsPage()
         case .campaign(let id): CampaignPage(id: id)
+        case .keys: KeysPage()
+        case .key(let name): KeyPage(name: name)
         case .connectApps: EmptyView()
         }
     }
@@ -297,5 +300,6 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             String(localized: "connectors apps services accounts", comment: "Settings search synonyms of Connect apps (space separated)"), .connectApps),
     ]
     all.append(campaignsIndexEntry())
+    all.append(keysIndexEntry())
     return all
 }

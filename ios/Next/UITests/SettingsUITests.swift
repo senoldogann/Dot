@@ -151,4 +151,52 @@ final class SettingsUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(achieved.frame.height, 44, "a tap target of 44 pt at least")
         XCTAssertLessThanOrEqual(achieved.frame.maxX, app.windows.firstMatch.frame.maxX, "nothing runs off the screen")
     }
+
+    // MARK: AI services (item 2054)
+
+    func testAKeyIsReplacedNeverShownBackAndCheckedThenRemovedAfterItAsks() {
+        let app: XCUIApplication = launch("settings-keys")
+        let row: XCUIElement = app.buttons["keys.provider.openrouter"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        XCTAssertTrue(row.label.contains("Refused at the last check") && row.label.contains("7c38"), "a failing key in the list: \(row.label)")
+        XCTAssertTrue(app.buttons["keys.provider.openai"].label.contains("No key yet"))
+        row.tap()
+        let edit: XCUIElement = app.buttons["key.edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        XCTAssertTrue(edit.label.contains("Replace key"))
+        edit.tap()
+        let field: XCUIElement = app.secureTextFields["key.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "the key goes in a secure field")
+        field.typeText("sk-or-ui-test-0123456789Zq7c")
+        app.buttons["key.save"].tap()
+        // The answer holds the last four characters only, and the provider is asked about the new key at once.
+        XCTAssertTrue(app.staticTexts["OpenRouter took the key"].waitForExistence(timeout: 10), "the check after a save")
+        XCTAssertTrue(app.otherElements["key.state"].label.contains("Zq7c") || app.staticTexts["Connected · ••••Zq7c"].exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "sk-or-ui-test")).firstMatch.exists, "the key is never shown")
+        let remove: XCUIElement = app.buttons["key.remove"]
+        for _ in 0..<6 where !remove.isHittable { app.swipeUp() }
+        remove.tap()
+        XCTAssertTrue(app.staticTexts["Remove the OpenRouter key?"].waitForExistence(timeout: 5), "Remove asks first")
+        let confirm: XCUIElement? = app.buttons.matching(identifier: "Remove").allElementsBoundByIndex.first { $0.isHittable }
+        XCTAssertNotNil(confirm, "the dialog's Remove")
+        confirm?.tap()
+        XCTAssertTrue(app.buttons["key.edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["key.edit"].label.contains("Add key"), "removed: Add key is offered")
+        XCTAssertFalse(app.buttons["key.remove"].exists)
+    }
+
+    func testAKeysPageKeepsItsActionsReachableAtAX3() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "settings-key", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge",
+        ]
+        app.launch()
+        let remove: XCUIElement = app.buttons["key.remove"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 10))
+        for _ in 0..<20 where !remove.isHittable { app.swipeUp() }
+        XCTAssertTrue(remove.isHittable)
+        XCTAssertGreaterThanOrEqual(remove.frame.height, 44, "a tap target of 44 pt at least")
+        XCTAssertLessThanOrEqual(remove.frame.maxX, app.windows.firstMatch.frame.maxX, "nothing runs off the screen")
+    }
 }

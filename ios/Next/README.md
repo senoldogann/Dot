@@ -246,7 +246,7 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
 `settings-general`, `settings-appearance`, `settings-chat`, `settings-voice`, `settings-models`, `settings-caps`, `settings-caps-refused`,
-`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-memory-trash`, `settings-system`, `settings-campaigns`, `settings-campaign`,
+`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-memory-trash`, `settings-system`, `settings-campaigns`, `settings-campaign`, `settings-keys`, `settings-key`,
 `settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`,
 `settings-connect-apps`, `settings-connect-apps-detail`, `settings-connect-apps-offline`, `pairing`, `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
 Settings and every control of each native page and fails on one after which nothing changed.
