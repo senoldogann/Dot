@@ -502,7 +502,14 @@ async def test_a_routed_message_is_checked_as_a_queued_one_and_move_keeps_what_i
             # A message with picks is queued where it was sent and stays there: Move refuses it.
             picked: httpx.Response = await client.post(
                 f"/api/threads/{chat.thread_id}/queue",
-                json={"text": "Plan the trip.", "mode": "task", "model": SCRIPTED_MODEL, "plan_first": True},
+                # Plan first asks before the run acts: the chat keeps its first run's yolo (item 2071), so it asks.
+                json={
+                    "text": "Plan the trip.",
+                    "mode": "task",
+                    "model": SCRIPTED_MODEL,
+                    "plan_first": True,
+                    "approvals": "ask",
+                },
             )
             assert picked.status_code == 201, picked.text
             (waiting,) = await runtime.store.list_queued(chat.thread_id)
