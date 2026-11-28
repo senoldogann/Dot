@@ -224,16 +224,16 @@ def test_every_export_of_the_interface_is_used_somewhere() -> None:
 def test_the_cards_words_of_the_owners_questions_are_the_policys() -> None:
     """The card of a question only the owner answers in yolo tells it by the reason's words (items 850 and 860): the
     words it looks for stand at the head of the reasons the policy gives, or it falls back to the plain note."""
-    from dotagent.policy.engine import _INITIATIVE_REASON, OWNERS_REASON
+    from dotagent.policy.engine import _INITIATIVE_REASON, PAYMENT_REASON
 
     card: str = (JS_DIR / "approvals.js").read_text(encoding="utf-8")
-    for constant, reason in (("INITIATIVE_WORDS", _INITIATIVE_REASON), ("OWNERS_WORDS", OWNERS_REASON)):
+    for constant, reason in (("INITIATIVE_WORDS", _INITIATIVE_REASON), ("OWNERS_WORDS", PAYMENT_REASON)):
         found = re.search(rf'const {constant} = "([^"]+)";', card)
         assert found is not None, constant
         assert reason.startswith(found.group(1)), (constant, found.group(1), reason)
     # The sentences the card's words leave out, as the line under the box says them (item 872), are the policy's own.
     words: str = (JS_DIR / "cardwords.js").read_text(encoding="utf-8")
-    for key, reason in (("initiative", _INITIATIVE_REASON), ("owners", OWNERS_REASON)):
+    for key, reason in (("initiative", _INITIATIVE_REASON), ("owners", PAYMENT_REASON)):
         sentence = re.search(rf'  {key}: "([^"]+)",', words)
         assert sentence is not None and sentence.group(1) == reason, key
     # The daemon's notes on a step nobody answered, which a settled line reads as no answer (item 891).

@@ -307,7 +307,8 @@ sends at most six, so two runs that answer each other's notes stop; a run that m
 does a helper, whose run tells it. A note always marks the run that reads it as outside content does, so that what it
 does after is judged as after a page until you write in its chat; none goes to a run whose approval mode asks you less
 than its sender's (a run in Ask mode sends none to one in `yolo`), and a run of Dot's own initiative sends none to a run
-that does not ask before a message, a post or a release as it does, but for one of a chat of yours (item 963), and a
+that does not ask what it asks (a payment in `yolo`, item 2069; a message, a post or a release in the other modes), but
+for one of a chat of yours (item 963), and a
 run a note or a page marked untrusted sends none on, so that a note is never passed along ([Safety](safety.md)). The secrets Dot holds are
 masked in it.
 

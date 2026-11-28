@@ -322,31 +322,19 @@ currency, so list sites that bill in one currency. Empty by default.
    questions; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you. A login
    filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, except that in `auto` you answer
    it, not the review model, and so is one of Dot's own vault (item 621, below). A `yolo` run asks nothing
-   else and makes the step, its record keeping the reason it would have asked for (item 443), but in a chat you opened a
-   payment, a message or mail sent for you and a public post are yours there too (item 860, your word: "sadece e-posta
-   gönderme ya da ödeme yapma gibi şeyler bana sorsun"), whatever started the run in it, a schedule that a run of the
-   chat made among them. While you are there (a run of yours, or the one that tells the chat its command in the
-   background ended), a payment is handed to you, as in every mode that asks, one within a cap you pre-approved for its
-   site asks your yes, as in `ask`, and a message or a post asks your yes; one you do not answer in time is kept as a card
-   with its draft, for your yes later (item 922). In a run that a schedule, a watcher, a notice or a reply handed on
-   started there, which nobody watches, the review model judges a message or a post against your words, lawful,
-   harmless and called for ("legal ise, tehlike arz etmiyorsa ve bir amaç içinse yollasın; ajanın niyeti önemli"): its
-   yes sends it, its no refuses it, and what it cannot tell comes to you; a payment is still handed to you. Only a run
-   of a schedule or a watcher of yours hands a reply on (item 926), never one of Dot's own initiative, whose messages
-   ask you. Its words are the goal of the schedule, which a run of the chat may have written
-   (`schedule_create`); the rule of lawful and harmless holds whatever it says, and a run that read outside content is
-   checked before it makes a schedule (item 525). Such a run you resume after a restart is taken as yours, there to
-   answer: its message waits for your yes. One Dot resumes on its own (the daemon as it starts, or a helper whose run
-   ended while it worked) is not your word, and is marked as the run it resumes: the firing's review model judges its
-   message, and in a chat of Dot's own a message, a post and a release ask you (item 2027). The try a schedule starts on
-   its own of a task a restart, a passing model error or a stall ended (item 1206) is no resume: it is a new run of the
-   schedule's own source, so the review model judges its message as a firing's; it is never started for a task that
-   already sent a message or mail, posted, uploaded, paid, released or handed work on, nor twice (see
-   [Schedules](memory-and-schedules.md)). No rule of yours answers for you. A chat a schedule, a watcher, a notice, the
-   reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
-   Scheduled tasks page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
-   (commands, MCP tools, files, the web, a release) runs in `yolo` without a question. In a chat Dot opened on its own
-   initiative (item 850): a message, a post and a `release` there wait for your own yes in every mode, `yolo`'s and
+   else and makes the step, its record keeping the reason it would have asked for (item 443), but a payment is yours
+   there too (item 2069, your word of 2026-11-28: "Yolo modda hiçbir şey sormasın, sadece ödeme işlerinde sorsun"), in a
+   chat you opened, whatever started the run in it (a schedule that a run of the chat made among them), and in a chat
+   Dot opened on its own initiative: it is handed to you, as in every mode that asks, and one within a cap you
+   pre-approved for its site asks your yes, as in `ask`; no review model answers it. A message or mail sent for you, a
+   public post and a release go in `yolo` without a question, in those chats too (item 860 asked a message, a mail and a
+   post in your chats, and had the review model judge them in a schedule's run there; item 850 asked a message, a post
+   and a release in a chat of Dot's own initiative). Only a run of a schedule or a watcher of yours hands a reply on
+   (item 926), never one of Dot's own initiative. A chat a schedule, a watcher, a notice, the reflection or an eval
+   opened is not yours: in `yolo` it asks nothing, a payment neither (a schedule you made on the Scheduled tasks page
+   runs in a chat of its own). A delegated run, an agent's too, is its parent's. No rule of yours answers for you.
+   Everything else (commands, MCP tools, files, the web) runs in `yolo` without a question. In a chat Dot opened on its
+   own initiative (item 850): a message, a post and a `release` there wait for your own yes in every mode but `yolo`,
    `auto`'s too, never the review model's, and no rule of yours that allows them answers for you;
    [Proactive](proactive.md) says how.
    - `release` is a project's change put live. The guard reads it from these command names:
@@ -603,11 +591,10 @@ always mark the run that reads them as outside content does, whatever its sender
 judged as after a page until you write in its chat. A note starts nothing; a run that may only read sends none, nor does
 a run marked untrusted, which a note marks too, so that no chain of notes carries a page's words, or a note's, on past
 the rules each run keeps (item 963); none goes to a run whose approval mode asks you less than its sender's; and a run
-of Dot's own initiative, which asks before a message, a post or a release in every mode, sends none to a run that does
-not ask them, but for a run of a chat you opened (a bot's chat among them, item 963), which asks a payment, a
-message, a mail and a post itself or has the review model judge them (item 860), a release there being checked by the
-review model (item 962) as after a page; in yolo with `[policy] yolo_taint_check = false` nothing would check it, so it
-sends none there then. A `preapproved` rule of yours lets a step through in a run a note marked as it does after a page
+of Dot's own initiative, which asks before a payment in yolo (item 2069) and before a message, a post or a release in
+the other modes, sends none to a run that does not ask them, but for a run of a chat you opened (a bot's chat among
+them, item 963), which asks what its mode asks, its steps being checked by the review model (item 962) as after a page;
+in yolo with `[policy] yolo_taint_check = false` nothing would check them, so it sends none there then. A `preapproved` rule of yours lets a step through in a run a note marked as it does after a page
 (see [Bots and campaigns](agents-and-campaigns.md)). A 📌 makes a note marked as read from outside content when the run read
 some. A message you send to the run clears the mark; your answer to a question of a run you watch does not, whether the
 run waited for it or went on (item 508), as it answers what the run asked rather than sending it on its way: the run it
@@ -671,9 +658,9 @@ the tool list whole up to 1,200 characters and has the same author. Nothing is a
 reads them once, when the server connects. `[agent] mcp_purposes = false` keeps every word of a server out of the
 instructions.
 
-**Outside content in yolo** (item 525). A `yolo` run asks nothing but the steps of items 850 and 860 (a payment, a
-message or a post in a chat you opened, and those of a chat of Dot's own initiative), and a run marked untrusted may be
-steered by what a stranger wrote. Two checks hold for such a run, and neither asks you:
+**Outside content in yolo** (item 525). A `yolo` run asks nothing but a payment, in a chat you opened or one of Dot's
+own initiative (item 2069), and a run marked untrusted may be steered by what a stranger wrote. Two checks hold for such
+a run, and neither asks you:
 
 - *The taint check.* Before a yolo run marked untrusted does a step an instruction planted in what it read would be
   after (a message, a post, an upload or data sent out, a deploy (item 962), a payment, a credential, a login filled from your password manager, privilege or system settings, a schedule or a note it saves, an install, a change of Dot's own files, a read
@@ -1352,12 +1339,12 @@ nobody answered are not; and an action whose card shows less than all of it is a
 what it writes or types (a file's text, a field's), and a card that cut its text (`…`, an MCP call's long arguments
 among them), told a text by its length (`(42 chars)`) or masked a secret (`***`), since two actions such a card cannot
 tell apart are not one. This is the default approval mode, `ask`, and `supervised` asks before every change as well; in
-`auto` the questions of the policy are answered for you, and a `yolo` run asks nothing (item 443) but a payment, a
-message or mail sent for you and a public post, in a chat you opened (item 860). In every mode
+`auto` the questions of the policy are answered for you, and a `yolo` run asks nothing (item 443) but a payment, in a
+chat you opened or one Dot opened on its own initiative (item 2069). In every mode
 that asks (item 429), money and credentials are handed to you on a card in the chat, and a message or a post in your
 name waits there for your yes in `supervised` and `ask`, for the review model's in `auto`. In a chat Dot opened on its
-own initiative, a message, a post or a release waits for your own yes in every mode, `yolo` and `auto` too (item 850),
-but free mode (below).
+own initiative, a message, a post or a release waits for your own yes in every mode but `yolo`, `auto` too (item 850),
+and free mode (below).
 A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer (not in free mode, which asks no run's owner anything: item 1563); one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are cards, each with

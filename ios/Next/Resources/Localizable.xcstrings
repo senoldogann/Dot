@@ -1061,7 +1061,7 @@
       }
     },
     "%lld without asking": {
-      "comment": "Away card: decisions the mode that asks only to pay or send let through",
+      "comment": "Away card: decisions the mode that asks only to pay let through",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2240,13 +2240,13 @@
         }
       }
     },
-    "Ask only to pay or send": {
-      "comment": "Approval mode yolo: asks only before a payment, a message or a public post",
+    "Ask only to pay": {
+      "comment": "Approval mode yolo: asks only before a payment",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yalnızca ödeme ve gönderimde sor"
+            "value": "Yalnızca ödemede sor"
           }
         }
       }
@@ -4643,24 +4643,24 @@
         }
       }
     },
-    "Dot asks only before a payment, a message or mail sent for you, or a public post": {
+    "Dot asks only before a payment": {
       "comment": "Approval mode yolo, its hint",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dot yalnızca ödemeden, senin adına gönderilen mesaj ya da e-postadan veya herkese açık paylaşımdan önce sorar"
+            "value": "Dot yalnızca ödemeden önce sorar"
           }
         }
       }
     },
-    "Dot asks only before a payment, a message or mail sent for you, or a public post.": {
+    "Dot asks only before a payment.": {
       "comment": "Rules: what asks in yolo mode",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dot yalnızca bir ödemeden, senin adına gönderilen bir mesaj ya da e-postadan veya herkese açık bir paylaşımdan önce sorar."
+            "value": "Dot yalnızca bir ödemeden önce sorar."
           }
         }
       }
@@ -4739,6 +4739,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot bir Mac ile eşleşmemiş. Ayarlar › Ses'te Bu cihaz'ı seç."
+          }
+        }
+      }
+    },
+    "Dot is waiting for you": {
+      "comment": "Remote notification: fixed words shown by iOS",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot sizi bekliyor"
           }
         }
       }

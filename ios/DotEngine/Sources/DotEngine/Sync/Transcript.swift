@@ -252,7 +252,8 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     case plan(id: String, steps: [PlanStep])
     case decision(AskAnchor)
     case work(WorkFold)
-    /// A run that ended other than done (`failed`, `cancelled`): the cause in one line.
+    /// A run that ended other than done (`failed`, `cancelled`): the cause in one line; or one that waits on the owner
+    /// (`waitingEnd`, item 2070): what it needs from them in one line.
     case ended(id: String, status: String, detail: String)
     /// A run the Claude plan's usage limit stopped; `resetsAt` when the plan said (epoch seconds).
     case limit(id: String, resetsAt: Double?)
@@ -562,12 +563,21 @@ private func runItems(
                 items.append(Built(item: .limit(id: "e:\(run.id)", resetsAt: resets), category: .runEnd, start: event.ts, end: event.ts))
             } else {
                 let message: String = error?["message"]?.string ?? ""
+                let needs: String = (event.data["needs"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                // A run that waits on the owner (item 2070: done as far as it can go, `waiting`; item 1061: failed, having
+                // said what it needs) ends "Waiting for you" with what it needs, its answer standing above, not failed.
+                // A helper's needs go to the run that asked it, not to the owner (as the web's `timeline.js` keeps them).
+                let waits: Bool =
+                    run.parentRunId == nil && (event.data["waiting"]?.bool == true || (status == "failed" && !needs.isEmpty))
                 // A failed run's result is its error's words: they stand once, in the card that says it failed.
-                let resultIsTheError: Bool = status != "done" && (message.isEmpty || result == message.trimmingCharacters(in: .whitespacesAndNewlines))
+                let resultIsTheError: Bool =
+                    !waits && status != "done" && (message.isEmpty || result == message.trimmingCharacters(in: .whitespacesAndNewlines))
                 if !result.isEmpty, !resultIsTheError {
                     items.append(Built(item: .answer(id: "r:\(run.id)", text: result, writing: false, endedAt: nil), category: .answer(final: true), start: event.ts, end: event.ts))
                 }
-                if status != "done" {
+                if waits {
+                    items.append(Built(item: .ended(id: "e:\(run.id)", status: waitingEnd, detail: firstLine(needs)), category: .runEnd, start: event.ts, end: event.ts))
+                } else if status != "done" {
                     let cause: String = firstLine(message.isEmpty ? (status == "failed" ? result : "") : message)
                     items.append(Built(item: .ended(id: "e:\(run.id)", status: status, detail: cause), category: .runEnd, start: event.ts, end: event.ts))
                 }
@@ -582,7 +592,9 @@ private func runItems(
         if !result.isEmpty {
             items.append(Built(item: .answer(id: "r:\(run.id)", text: result, writing: false, endedAt: nil), category: .answer(final: true), start: run.createdAt, end: run.createdAt))
         }
-        if run.status != "done" {
+        if run.endReason == ownerWait {
+            items.append(Built(item: .ended(id: "e:\(run.id)", status: waitingEnd, detail: ""), category: .runEnd, start: run.createdAt, end: run.createdAt))
+        } else if run.status != "done" {
             items.append(Built(item: .ended(id: "e:\(run.id)", status: run.status, detail: ""), category: .runEnd, start: run.createdAt, end: run.createdAt))
         }
     }

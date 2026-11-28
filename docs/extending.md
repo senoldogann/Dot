@@ -658,9 +658,9 @@ inside the fence, and then says where the file is, how long it is and the line t
 stderr of a stdio server goes to `<logs>/mcp-<name>.log`. A tool whose name's first verb
 sends or posts (`send_email`, `slack_post_message`, `reply_to_thread`, `create_post`) is a message for you whatever its
 server declares (`external_send` and `message_send`): it waits for a yes in every mode that asks (yours, the review
-model's in `auto`), and no rule of yours turns that off (item 429). In `yolo` it is yours in a chat you opened (item
-860: the review model judges it in a run of a schedule there) and in a chat Dot opened on its own initiative (item 850);
-a `yolo` run of a chat of a schedule's own sends it, its record keeping the reason (item 443). Any other tool that its
+model's in `auto`), and no rule of yours turns that off (item 429); in a chat Dot opened on its own initiative, yours
+in every mode but `yolo` (item 850). A `yolo` run sends it in every chat, its record keeping the reason (items 443 and
+2069). Any other tool that its
 server declares read-only (`readOnlyHint`) is taken at its word and runs
 as a read, with no flag; any other counts as one that may change things (`destructive`) and send to the world
 (`external_send`), unless its server says it does not.

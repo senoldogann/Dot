@@ -64,6 +64,8 @@ _ASKED_AGAIN: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 _AGAIN_AFTER_S: float = 1.0
 _ASKED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
 _ASKING_TITLE: dict[str, str] = {"question": "Dot has a question", "handoff": "Dot needs your help"}
+# The title of the end of a run that is done as far as it can go and waits on the owner (item 2070).
+WAITING_TITLE: str = "Dot is waiting for you"
 _FINISHED_TITLE: dict[str, str] = {
     "done": "A task is done",
     "failed": "A task failed",
@@ -198,6 +200,7 @@ _TASK_NOTICE_TR: dict[str, str] = {
     "A task is done": "Bir görev bitti",
     "A task failed": "Bir görev başarısız oldu",
     "A task is blocked": "Bir görev ilerleyemedi",
+    WAITING_TITLE: "Dot sizi bekliyor",
 }
 _TASK_NOTICE_BODY: str = "Open Dot to see it."
 _TASK_NOTICE_BODY_TR: str = "Görmek için Dot'u açın."
@@ -222,8 +225,8 @@ def _told_by_its_schedule(run: RunRecord) -> bool:
 
 def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
     """The message an event of a run is worth, or ``None``: an approval or a question asked or left; a draft written
-    for the owner to send (item 314); a successful, failed or blocked end of a run with no parent, apart from a
-    scheduled run, which its schedule tells at its notice level; or the end of a campaign."""
+    for the owner to send (item 314); a successful, failed, blocked or waiting (item 2070) end of a run with no parent,
+    apart from a scheduled run, which its schedule tells at its notice level; or the end of a campaign."""
     if event.kind in _ASKED_KINDS:
         severity: object = event.data.get("severity")
         title: str = _ASKING_TITLE.get(str(severity), "Dot asks for approval")
@@ -238,7 +241,14 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
             state="waiting",
         )
     if event.kind == "run_finished" and run.parent_run_id is None and not _told_by_its_schedule(run):
+        needs: object = event.data.get("needs")
+        needed: str = needs.strip() if isinstance(needs, str) else ""
         status: object = event.data.get("status")
+        if event.data.get("waiting") is True or (status == "failed" and needed != ""):
+            # Done as far as it can go, waiting on the owner (item 2070; such an end carries ``goal_blocked`` too), or
+            # failed having said what it needs from them (item 1061): "waiting for you", not "done", "failed" nor
+            # "blocked", as the web and the phone show it.
+            return task_notice(WAITING_TITLE, run.id, "waiting")
         if event.data.get("goal_blocked") is True or status == "blocked":
             return task_notice("A task is blocked", run.id, "waiting")
         if status == "done":
@@ -256,6 +266,15 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
             state="done" if achieved else "idle",
         )
     return None
+
+
+def message_group(kind: str, message: PushMessage) -> PushGroup | None:
+    """The kind of push ``message``, made of an event of ``kind``, is told as: the end of a run that is blocked or
+    waits on the owner (item 2070; its state ``waiting``) with what waits on them, so that the switch of that kind
+    decides it; any other as :func:`push_group` says."""
+    if kind == "run_finished" and message.state == "waiting":
+        return "needs_you"
+    return push_group(kind)
 
 
 def notice_message(event: EventRecord) -> PushMessage | None:

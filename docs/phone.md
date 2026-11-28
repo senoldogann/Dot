@@ -264,10 +264,10 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    (item 1446): while it is active and shows a chat, an alert about that chat (a run of it or of its helpers, by the run
    its route names) is not drawn, whatever kind it is, since an approval or a question of that chat is its own card; an
    alert about another chat is a banner with its sound, and so is every alert while the app is inactive or shows the list. The app's pushes come in three kinds that each phone switches for itself (item 1421,
-   `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, and Dot's own
+   `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, the end of a run that is blocked or waits on you, and Dot's own
    failures you are to look at: a schedule that did not run or was switched off, learning that stopped, a restart after
    an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run that
-   succeeded, failed or was blocked, or a schedule's run or campaign that ended). All three are on until the phone
+   succeeded or failed without waiting on you, or a schedule's run or campaign that ended). All three are on until the phone
    says otherwise. A kind that is off is not sent to that phone, and a schedule's own level of notices (Settings › Scheduled tasks) still decides whether the end
    of its run is told at all. Once the app sent
    the activity's token every change goes to it, and an activity whose token came before its run started waits a
@@ -485,7 +485,7 @@ switch off a rule that asks, delete or switch off an allow rule that a pre-appro
 (an allow rule asks of a run that read outside content where a pre-approved one does not; item 981), or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
 shown or connected on the Mac alone (the eye of the vault, 1Password, a sign-in of Google or Microsoft, the microphone's
 pane of System Settings) answers the installation's token alone, never a phone's key, whatever address a phone's request
-names. `yolo`, which asks nothing but a payment, a message or mail and a public post in a chat you opened (item 860), is
+names. `yolo`, which asks nothing but a payment, in a chat you opened or one Dot opened on its own initiative (item 2069), is
 yours to use from the phone as from the Mac: a phone's key can start a run, a chat
 or a campaign in `yolo`, make a schedule, a loop of a chat (`/loop`) or an agent kept in `yolo`, switch one on or let
 one go on, and what such a run does is not held by these limits (it may do whatever your account may). Removing a phone
@@ -809,12 +809,12 @@ Which of the three kinds of push the phone is told (item 1421). The switches are
 app through APNs; the Live Activity is not a kind of push and goes as before. A phone that never set them is told all
 three.
 
-- `needs_you`: something waits for your answer: an approval, a question (also one a run left), a secret, a hand-off;
-  and Dot's own failures that you are to look at (a schedule that did not run or was switched off, learning that
+- `needs_you`: something waits for your answer: an approval, a question (also one a run left), a secret, a hand-off,
+  the end of a run that is blocked or waits on you; and Dot's own failures that you are to look at (a schedule that did not run or was switched off, learning that
   stopped, a restart after an unexpected stop), so that switching the ends of tasks off does not silence them.
 - `ready`: something is ready for you to look over: a draft written for you to send, and what Dot tells you on its own
   (the morning brief, what a watcher found).
-- `done`: a run's successful, failed or blocked end, or the notice of a schedule's run or a campaign.
+- `done`: a run's successful or failed end that does not wait on you, or the notice of a schedule's run or a campaign.
   A schedule's level of notices decides, as before, whether its run's end is told; this switch decides whether the
   phone hears what was told.
 
@@ -1345,7 +1345,7 @@ An **alert** (`alert_payload`):
   badge again from `count` whenever the app reads the list, since an answer given on the Mac sends no alert that would
   lower it.
 - `title` is one of: "Dot asks for approval", "Dot has a question", "Dot needs your help" (a hand-off, item 1423), "A task
-  is done", "A task failed", "A task is blocked", "A campaign is achieved", "A campaign stopped", "Dot drafted an email",
+  is done", "A task failed", "A task is blocked", "Dot is waiting for you" (a run that ended waiting on you, item 2070, or failed having said what it needs), "A campaign is achieved", "A campaign stopped", "Dot drafted an email",
   "Dot drafted a message", "A schedule did not run", "A schedule was switched off", "Dot's learning has stopped", "Dot
   restarted after an unexpected stop" and, for a message Dot wrote to you, "Dot has a message for you" (never its own
   words). Schedule notices can also say that a scheduled task stopped or ended. The tap follows `route` to one of
@@ -1365,8 +1365,8 @@ the fixed title "Dot is working" and the fixed line). A change goes at most ever
 priority 5; a start, a wait and an end go at once at priority 10.
 
 **Which pushes a phone is told.** Each event is one of three kinds, switched by `PUT /api/phone/push-settings`: `needs_you`
-(`approval_requested`, `question_left`, a schedule that did not run or was switched off, learning that stopped, a restart
+(`approval_requested`, `question_left`, the end of a run that is blocked or waits on you, a schedule that did not run or was switched off, learning that stopped, a restart
 after an unexpected stop), `ready` (a draft written for you, what Dot tells you on its own) and `done` (a run's
-successful, failed or blocked end, a schedule's run at its notice level, or a campaign's end). A kind that is off is not sent to that phone. While
+successful or failed end that does not wait on you, a schedule's run at its notice level, or a campaign's end). A kind that is off is not sent to that phone. While
 the phone's lease (`POST /api/phone/activity`) holds, the `done` kind's three events are not sent to it as alerts; nothing
 else is held back by it. A phone that is removed is sent nothing.

@@ -1,11 +1,11 @@
-"""In yolo, a chat the owner opened asks them before a payment, a message or mail sent for them and a public post, and
-nothing else (item 860): the owner's word of 2026-10-30, "sadece e-posta gönderme ya da ödeme yapma gibi şeyler … bana
-sorsun". The gate on a real store and bus with no model: those steps ask the owner, never the review model, a rule that
-allows them does not answer for the owner, and the owner's no refuses; a release, a call of an MCP server, a fetch of a
-page and a payment within its pre-approved cap ask nothing; and a run nobody watches asks nothing either. Then real runs
-on a scripted model: the owner's chat waits before mail, a schedule's run does not, and the run that tells the owner's
-chat a command in the background ended waits as that chat does. The mailer is at a path that is
-not there, so the command fails at once and nothing is sent."""
+"""In yolo, a chat the owner opened asks them before a payment and nothing else (item 2069, the owner's word of
+2026-11-28: "Yolo modda hiçbir şey sormasın, sadece ödeme işlerinde sorsun"; item 860 asked a message, a mail and a
+post too). The gate on a real store and bus with no model: a payment is handed to the owner, never to the review model,
+and a rule that allows it does not answer for them; a payment within its pre-approved cap is their question; a mail, a
+post, a release, a call of an MCP server and a fetch of a page go through unasked and are recorded as yolo's, in a
+schedule's run of their chat too, which no review model judges any more; a run nobody watches asks nothing, a payment
+neither. Then real runs on a scripted model: the owner's chat sends mail at once in yolo, as a schedule's run does. The
+mailer is at a path that is not there, so the command fails at once and nothing is sent."""
 
 import asyncio
 from collections.abc import AsyncIterator
@@ -28,7 +28,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.events import EventBus
 from dotagent.llm.router import parse_model_ref
-from dotagent.policy.engine import OWNERS_REASON
+from dotagent.policy.engine import PAYMENT_REASON
 from dotagent.policy.types import ActionInfo, Amount, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -173,47 +173,41 @@ async def _pending(store: Store) -> ApprovalRecord:
             await asyncio.sleep(0.02)
 
 
-@pytest.mark.parametrize("step", [MAIL, POST, PAYMENT], ids=["mail", "post", "payment"])
-async def test_in_yolo_the_owners_chat_asks_before_mail_a_post_or_a_payment(room: Room, step: ActionInfo) -> None:
+async def test_in_yolo_the_owners_chat_hands_a_payment_to_them(room: Room) -> None:
     gate: RunGate = _gate(room, "yolo", owners_chat=True)
-    asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(step))
+    asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(PAYMENT))
     question: ApprovalRecord = await _pending(room.store)
-    assert question.tool == step.tool
-    if step is PAYMENT:
-        # Money is handed to the owner, as in every mode that asks: stricter than a question, it stands.
-        assert question.severity == "handoff", question.severity
-    else:
-        assert OWNERS_REASON in question.summary, question.summary
+    # Money is handed to the owner, as in every mode that asks: stricter than a question, it stands.
+    assert (question.tool, question.severity) == (PAYMENT.tool, "handoff")
     await room.broker.resolve(question.id, True, "test", "")
-    if step is PAYMENT:
-        # The owner's yes to a hand-off is that they paid themselves: the run is told so and does not pay.
-        with pytest.raises(HandedOff):
-            async with asyncio.timeout(WAIT_S):
-                await asked
-        return
-    async with asyncio.timeout(WAIT_S):
-        done: Authorization = await asked
-    assert done.decision.answered_by == "user"
+    # The owner's yes to a hand-off is that they paid themselves: the run is told so and does not pay.
+    with pytest.raises(HandedOff):
+        async with asyncio.timeout(WAIT_S):
+            await asked
 
 
-async def test_a_rule_that_allows_it_does_not_answer_and_the_owners_no_refuses(room: Room) -> None:
-    await room.store.add_rule("allow", "apple_script", ".*", "Let every script through")
+async def test_a_rule_that_allows_a_payment_does_not_answer_and_the_owners_no_refuses(room: Room) -> None:
+    await room.store.add_rule("allow", "browser_act", ".*", "Let every click through")
     gate: RunGate = _gate(room, "yolo", owners_chat=True)
-    asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(MAIL))
+    asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(PAYMENT))
     question: ApprovalRecord = await _pending(room.store)
-    await room.broker.resolve(question.id, False, "test", "not this mail")
+    await room.broker.resolve(question.id, False, "test", "not this one")
     with pytest.raises(ApprovalRejected):
         async with asyncio.timeout(WAIT_S):
             await asked
 
 
-async def test_everything_else_yolo_does_without_asking(room: Room) -> None:
+async def test_everything_else_yolo_does_without_asking_a_mail_and_a_post_too(room: Room) -> None:
+    """Item 2069: a mail and a post of a chat the owner opened go through in yolo, recorded with why the policy would
+    have asked, as every other step of yolo is."""
     gate: RunGate = _gate(room, "yolo", owners_chat=True)
     gate.tainted = True
-    for step in QUIET:
+    for step in (*QUIET, MAIL, POST):
         done: Authorization = await gate.authorize_recorded(step)
         assert done.decision.answered_by in ("yolo", "policy"), step.summary
     assert await room.store.list_approvals("pending", 10) == []
+    recorded: list[ApprovalRecord] = await room.store.list_approvals(None, 20)
+    assert {record.tool for record in recorded if record.decided_by == "yolo"} >= {MAIL.tool, POST.tool}
 
 
 async def test_a_run_nobody_watches_asks_nothing_in_yolo(room: Room) -> None:
@@ -224,43 +218,15 @@ async def test_a_run_nobody_watches_asks_nothing_in_yolo(room: Room) -> None:
     assert await room.store.list_approvals("pending", 10) == []
 
 
-def _reviewing(decision: str, seen: list[ReviewRequest]) -> Reviewer:
-    async def review(request: ReviewRequest) -> ReviewVerdict:
-        seen.append(request)
-        return ReviewVerdict(decision=decision, reason="the replies are what the owner asked for")  # type: ignore[arg-type]
-
-    return review
-
-
-@pytest.mark.parametrize("step", [MAIL, POST], ids=["mail", "post"])
-async def test_a_schedules_run_in_the_owners_chat_has_the_review_model_judge_mail_and_posts(
-    room: Room, step: ActionInfo
-) -> None:
-    """The owner's word of 2026-10-30 for a run nobody watches in their chat: "e-posta … legal ise, tehlike arz
-    etmiyorsa ve bir amaç içinse yollasın; ajanın niyeti önemli". The review model judges it against their words;
-    its yes lets it through, its no refuses it, and the owner is not asked."""
-    seen: list[ReviewRequest] = []
-    gate: RunGate = _gate(room, "yolo", owners_chat=True, owner_there=False, reviewer=_reviewing("approve", seen))
-    done: Authorization = await gate.authorize_recorded(step)
-    assert done.decision.answered_by == "reviewer"
-    assert [request.action.tool for request in seen] == [step.tool]
-    assert seen[0].instructions == ("Every morning, answer the replies to my listings",)
-    refusing: RunGate = _gate(room, "yolo", owners_chat=True, owner_there=False, reviewer=_reviewing("deny", []))
-    with pytest.raises(ApprovalRejected):
-        await refusing.authorize_recorded(step)
+async def test_a_schedules_run_in_the_owners_chat_sends_unjudged_and_hands_a_payment_to_the_owner(room: Room) -> None:
+    """Item 2069 ends item 860's review of a schedule's message or post in the owner's chat: in yolo it goes, and no
+    review model is asked (``_nobody`` fails the test if it is). Money is the owner's even when they are not there: it
+    is handed to them, not judged."""
+    gate: RunGate = _gate(room, "yolo", owners_chat=True, owner_there=False, reviewer=_nobody)
+    for step in (MAIL, POST):
+        done: Authorization = await gate.authorize_recorded(step)
+        assert done.decision.answered_by in ("yolo", "policy"), step.summary
     assert await room.store.list_approvals("pending", 10) == []
-
-
-async def test_what_the_review_model_cannot_tell_and_a_payment_go_to_the_owner(room: Room) -> None:
-    gate: RunGate = _gate(room, "yolo", owners_chat=True, owner_there=False, reviewer=_reviewing("escalate", []))
-    asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(MAIL))
-    question: ApprovalRecord = await _pending(room.store)
-    assert "passed this on to you" in question.summary
-    await room.broker.resolve(question.id, False, "test", "")
-    with pytest.raises(ApprovalRejected):
-        async with asyncio.timeout(WAIT_S):
-            await asked
-    # Money is the owner's even when they are not there: it is handed to them, not judged.
     paying: RunGate = _gate(room, "yolo", owners_chat=True, owner_there=False, reviewer=_nobody)
     paid: asyncio.Task[Authorization] = asyncio.create_task(paying.authorize_recorded(PAYMENT))
     handed: ApprovalRecord = await _pending(room.store)
@@ -294,7 +260,7 @@ async def test_a_payment_within_its_pre_approved_cap_asks_the_owner_as_the_other
     step: ActionInfo = PAYMENT.model_copy(update={"amount": Amount(value=19.9, currency="USD")})
     asked: asyncio.Task[Authorization] = asyncio.create_task(gate.authorize_recorded(step))
     question: ApprovalRecord = await _pending(room.store)
-    assert question.severity != "handoff" and OWNERS_REASON in question.summary, question
+    assert question.severity != "handoff" and PAYMENT_REASON in question.summary, question
     await room.broker.resolve(question.id, True, "test", "")
     async with asyncio.timeout(WAIT_S):
         done: Authorization = await asked
@@ -334,59 +300,38 @@ async def runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncItera
         await close_runtime(built)
 
 
-async def test_the_owners_chat_waits_before_mail_and_a_schedules_run_does_not(runtime: Runtime) -> None:
+async def test_the_owners_chat_sends_mail_at_once_in_yolo_as_a_schedules_run_does(runtime: Runtime) -> None:
+    """Item 2069: a run of the owner's chat in yolo sends mail without asking (the mailer is not there, so nothing is
+    sent), recorded as yolo's with why it would have asked; so do a schedule's run, the run that tells the owner's chat
+    a command in the background ended and a schedule's run in the owner's chat, whose gate still says it is of the
+    owner's chat with nobody there (a payment of it is handed to them)."""
     manager: RunManager = RunManager(runtime)
     try:
         mine: RunRecord = await manager.start(
             "Mail the report", "task", SCRIPTED_MODEL, None, "ui", None, None, "standard", None, "yolo", False, ()
         )
-        question: ApprovalRecord = await _pending(runtime.store)
-        assert (question.run_id, question.tool) == (mine.id, "shell")
-        await runtime.approvals.resolve(question.id, False, "test", "")
+        chat: ThreadRecord = await runtime.store.create_thread("Morning mail", SCHEDULE_SOURCE)
+        runs: list[RunRecord] = [mine]
         async with asyncio.timeout(RUN_WAIT_S):
             await manager.wait(mine.id)
-        # A schedule's run, which nobody watches, does it at once (the mailer is not there, so nothing is sent).
-        chat: ThreadRecord = await runtime.store.create_thread("Morning mail", SCHEDULE_SOURCE)
-        timed: RunRecord = await manager.start(
-            "Mail the report",
-            "task",
-            SCRIPTED_MODEL,
-            chat.id,
-            SCHEDULE_SOURCE,
-            None,
-            None,
-            "standard",
-            None,
-            "yolo",
-            False,
-            (),
-        )
-        async with asyncio.timeout(RUN_WAIT_S):
-            assert (await manager.wait(timed.id)).status in ("done", "failed")
-        # The run that tells the owner's chat its command in the background ended asks as the owner's chat does (the
-        # independent review of item 860: a mail put off until a command ended went out unasked).
-        told: RunRecord = await manager.start(
-            "The build ended.",
-            "task",
-            SCRIPTED_MODEL,
-            mine.thread_id,
-            BACKGROUND_SOURCE,
-            None,
-            None,
-            "standard",
-            None,
-            "yolo",
-            False,
-            (),
-        )
-        later: ApprovalRecord = await _pending(runtime.store)
-        assert (later.run_id, later.tool) == (told.id, "shell")
-        await runtime.approvals.resolve(later.id, False, "test", "")
-        async with asyncio.timeout(RUN_WAIT_S):
-            await manager.wait(told.id)
-        # A schedule's run in the owner's chat (one a run there made: the third pre-push review of item 860) is of the
-        # owner's chat, with nobody there to answer: its gate says so (the gate tests above show the review model
-        # judging such a run's mail).
+        for thread_id, source in ((chat.id, SCHEDULE_SOURCE), (mine.thread_id, BACKGROUND_SOURCE)):
+            started: RunRecord = await manager.start(
+                "Mail the report",
+                "task",
+                SCRIPTED_MODEL,
+                thread_id,
+                source,
+                None,
+                None,
+                "standard",
+                None,
+                "yolo",
+                False,
+                (),
+            )
+            runs.append(started)
+            async with asyncio.timeout(RUN_WAIT_S):
+                await manager.wait(started.id)
         firing: RunRecord = await manager.start(
             "Answer the replies",
             "task",
@@ -405,10 +350,11 @@ async def test_the_owners_chat_waits_before_mail_and_a_schedules_run_does_not(ru
         assert (gate.owners_chat, gate.owner_there) == (True, False)
         async with asyncio.timeout(RUN_WAIT_S):
             await manager.wait(firing.id)
-        # Its step is recorded as yolo's, with what it would have asked: nobody was asked.
-        timed_records: list[ApprovalRecord] = [
-            record for record in await runtime.store.list_approvals(None, 20) if record.run_id == timed.id
-        ]
-        assert timed_records and all(record.decided_by == "yolo" for record in timed_records), timed_records
+        assert await runtime.store.list_approvals("pending", 10) == []
+        recorded: list[ApprovalRecord] = await runtime.store.list_approvals(None, 50)
+        for run in runs:
+            # Its mail is recorded as yolo's, with what it would have asked: nobody was asked.
+            own: list[ApprovalRecord] = [record for record in recorded if record.run_id == run.id]
+            assert own and all(record.decided_by == "yolo" for record in own), (run.source, own)
     finally:
         await manager.shutdown()

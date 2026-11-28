@@ -21,11 +21,13 @@ from dotagent.notify.keys import keys_problem
 from dotagent.notify.push import (
     PUSH_GROUPS,
     PUSH_KINDS,
+    WAITING_TITLE,
     PushError,
     PushKeys,
     PushMessage,
     PushTotals,
     gone,
+    message_group,
     notice_message,
     push_event,
     push_group,
@@ -406,6 +408,13 @@ async def test_a_busy_push_service_is_asked_once_more(tmp_path: Path, monkeypatc
     assert answers == []
 
 
+def test_a_blocked_end_is_told_under_needs_you() -> None:
+    blocked: PushMessage | None = push_message(
+        _event("run_finished", {"status": "failed", "goal_blocked": True, "result": "x"}), _run(None)
+    )
+    assert blocked is not None and message_group("run_finished", blocked) == "needs_you"
+
+
 def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_session_is_told_here() -> None:
     """Item 461: a run a schedule started is told by its schedule, at its level (``schedule_run_ended``); a campaign's
     session carries the same source and keeps the run's own notice."""
@@ -414,6 +423,32 @@ def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_ses
     assert push_message(ended, scheduled) is None
     session: RunRecord = scheduled.model_copy(update={"campaign_id": "cmp-1"})
     assert push_message(ended, session) == task_notice("A task failed", "run-1", "failed")
+
+
+def test_the_end_of_a_run_that_waits_on_the_owner_says_it_waits_not_done() -> None:
+    """Item 2070: a run done as far as it can go, waiting on the owner, is told as a wait, not as "done"; like every
+    task notice it carries fixed words, and what it needs stays in its chat."""
+    waiting: EventRecord = _event(
+        "run_finished",
+        {
+            "status": "done",
+            "result": "Four forms are filled.",
+            "needs": "Press Submit in the four tabs.",
+            "waiting": True,
+            "goal_blocked": True,
+        },
+    )
+    assert push_message(waiting, _run(None)) == task_notice(WAITING_TITLE, "run-1", "waiting")
+    # Told with what waits on the owner, so that a phone's switch of that kind decides it, not the one of what ended.
+    told: PushMessage | None = push_message(waiting, _run(None))
+    assert told is not None and message_group("run_finished", told) == "needs_you"
+    done: PushMessage | None = push_message(_event("run_finished", {"status": "done", "result": "Done."}), _run(None))
+    assert done is not None and message_group("run_finished", done) == "done"
+    # A failed run that said what it needs waits on the owner too (item 1061), as the web and the phone show it.
+    said: EventRecord = _event("run_finished", {"status": "failed", "result": "No code.", "needs": "The bank's code."})
+    assert push_message(said, _run(None)) == task_notice(WAITING_TITLE, "run-1", "waiting")
+    silent: EventRecord = waiting.model_copy(update={"data": {**waiting.data, "needs": ""}})
+    assert push_message(silent, _run(None)) == task_notice(WAITING_TITLE, "run-1", "waiting")
 
 
 @pytest.mark.asyncio

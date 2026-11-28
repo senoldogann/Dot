@@ -2604,18 +2604,21 @@ class RunManager:
                 "note would have it do unasked what this run asks first. Say it in this chat instead",
                 {"run_id": note.from_run_id, "thread_id": thread_id, "approvals": asks, "reader": reader_asks},
             )
-        # A run of a chat the owner opened (an agent's chat among them) asks a payment, a message, a mail and a post
-        # itself, or has the review model judge them (item 860), and a release there is checked by the review model,
-        # since the note marks its reader (items 962 and 963, the owner's choice), unless the owner turned that check
-        # off; and the reader, marked, sends no note on.
+        # A run of a chat the owner opened (a bot's chat among them) asks what its mode asks, and in yolo the review
+        # model checks the steps a note planted, since the note marks its reader (items 962 and 963, the owner's
+        # choice), unless the owner turned that check off; and the reader, marked, sends no note on. A run of Dot's
+        # own initiative asks the owner a payment in yolo (item 2069), and a message, a post or a release in the other
+        # modes (item 850): its note goes to none that would do them unasked (the security review of item 2069: a yolo
+        # sender's note had a schedule's yolo run pay unasked).
         owners_reader: bool = target.gate.owners_chat and (
             target.gate.approval_mode_now() != "yolo" or self._runtime.config.policy.yolo_taint_check
         )
         if sender.gate.owners_word and not (target.gate.owners_word or owners_reader):
             raise PolicyDenied(
-                "a run of Dot's own initiative asks the owner before a message, a post or a release, and the run at "
-                "work in that chat (a schedule's or a watcher's, or one of yours in yolo with [policy] "
-                "yolo_taint_check off) does not: a note would have it do them unasked. Say it in this chat instead",
+                "a run of Dot's own initiative asks the owner before a payment, or a message, a post or a release "
+                "outside yolo, and the run at work in that chat (a schedule's or a watcher's, or one of yours in yolo "
+                "with [policy] yolo_taint_check off) does not: a note would have it do them unasked. Say it in this "
+                "chat instead",
                 {"run_id": note.from_run_id, "thread_id": thread_id},
             )
         tainted: bool = True
@@ -5035,7 +5038,8 @@ class RunManager:
                 else (ended_parent.thread_id, ended_parent.source)
             )
             # A chat Dot opened on its own initiative (item 850): its runs, the ones the owner's answers start there
-            # among them, and their helpers ask the owner before a message, a post or a release, in every mode.
+            # among them, and their helpers ask the owner before a message, a post or a release, in every mode but
+            # yolo, and before a payment in yolo (item 2069).
             opener: str | None = None if marked_by is None else await runtime.store.opened_by(marked_by[0])
             # The source the run's chain began with (item 2016's origin): a resumed run's is the run it resumes, a
             # resumed helper's the run at the top of its delegations.
@@ -5056,17 +5060,17 @@ class RunManager:
                 if marked_by is None
                 else marked_source == INITIATIVE_SOURCE or opener == INITIATIVE_SOURCE
             )
-            # A chat the owner opened (item 860): in yolo its payments, messages and posts are theirs, whatever started
-            # the run there (a schedule a run of the chat made goes on in it: the third pre-push review of item 860). A
-            # chat of a schedule, a watcher or Dot's own is not. A delegated run takes its parent's.
+            # A chat the owner opened (item 860): in yolo its payments are theirs (item 2069), whatever started the run
+            # there (a schedule a run of the chat made goes on in it: the third pre-push review of item 860). A chat of
+            # a schedule, a watcher or Dot's own is not. A delegated run takes its parent's.
             owners_chat: bool = (
                 (parent is not None and parent.gate.owners_chat)
                 if marked_by is None
                 else not owners_word and opener not in _NOBODY_WATCHES
             )
-            # Whether the owner is there to answer (item 860): a run of theirs is; one a schedule, a watcher or a notice
-            # started is not, and the review model judges its messages and posts (the owner's word of 2026-10-30:
-            # "e-posta … legal ise, tehlike arz etmiyorsa ve bir amaç içinse yollasın; ajanın niyeti önemli").
+            # Whether the owner is there to answer: a run of theirs is; one a schedule, a watcher or a notice started is
+            # not, and in a chat of Dot's own initiative it keeps a message, a post or a release for their yes rather
+            # than waits (item 922).
             owner_there: bool = (
                 (parent is not None and parent.gate.owner_there)
                 if marked_by is None
@@ -5114,8 +5118,8 @@ class RunManager:
             # where [policy] unanswered says so (items 482, 483): in its chat, or for a session of a campaign in the
             # campaign's conversation, shared by its sessions (item 484); a delegated run keeps them where the run that
             # delegated it does, so that the answer reaches the run at the top (item 485); never in yolo or an eval.
-            # A yolo run of a chat of Dot's own initiative asks its questions of item 850, and keeps them as a run that
-            # asks does.
+            # A yolo run of a chat of Dot's own initiative asks a payment (item 2069), and keeps it as a run that asks
+            # does.
             kept_mode: ApprovalMode = "ask" if owners_word and approval_mode == "yolo" else approval_mode
             if parent_run_id is not None:
                 gate.keep_for(None if parent is None or kept_mode == "yolo" else parent.gate.parking)
@@ -5555,6 +5559,9 @@ class RunManager:
         clean: str = truncate_tail(redact_known(result, held), _RESULT_CHARS)
         needed: str = redact_known(needs, held)
         data: JsonObject = {"status": status, "result": clean, "needs": needed}
+        if classify_ending(status, clean) == "owner_wait":
+            # Done as far as it can go, waiting on the owner (item 2070): the pages say "Waiting for you", not done.
+            data["waiting"] = True
         if goal_blocked:
             data["goal_blocked"] = True
         if error is not None:

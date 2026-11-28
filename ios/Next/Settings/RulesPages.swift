@@ -9,7 +9,7 @@ func approvalSummary(_ mode: String) -> String {
     case "supervised": String(localized: "You approve every change: files, commands, clicks, messages.", comment: "Rules: what asks in supervised mode")
     case "ask": String(localized: "Edits and everyday work go ahead; Dot asks you about the rest.", comment: "Rules: what asks in ask mode")
     case "auto": String(localized: "A second AI answers for you; you are asked only what it is unsure about.", comment: "Rules: what asks in auto mode")
-    case "yolo": String(localized: "Dot asks only before a payment, a message or mail sent for you, or a public post.", comment: "Rules: what asks in yolo mode")
+    case "yolo": String(localized: "Dot asks only before a payment.", comment: "Rules: what asks in yolo mode")
     default: mode
     }
 }

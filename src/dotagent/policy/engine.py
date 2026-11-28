@@ -148,41 +148,42 @@ def guard(info: ActionInfo) -> Decision | None:
     )
 
 
-# What waits for the owner in a chat Dot opened on its own initiative, in every mode, yolo's too (item 850, the
-# owner's word of 2026-10-30: "yolo yine bir şey sormasın ama … kritik durumlarda", of Dot's initiative alone): a
-# message sent for them, a post in their name, a project's change put live.
+# What waits for the owner in a chat Dot opened on its own initiative, in every mode that asks (item 850, the owner's
+# word of 2026-10-30: "yolo yine bir şey sormasın ama … kritik durumlarda", of Dot's initiative alone): a message sent
+# for them, a post in their name, a project's change put live. Yolo asks none of them since item 2069.
 _INITIATIVE_FLAGS: frozenset[Flag] = frozenset({"message_send", "public_post", "release"})
 _INITIATIVE_REASON: str = (
     "On its own initiative, Dot asks before it sends a message for you, posts in your name or puts a project's change "
-    "live, in every mode"
+    "live, in every mode but yolo"
 )
 
 
 def initiative_guard(info: ActionInfo) -> Decision | None:
     """The owner's question for a step of a chat Dot opened on its own initiative that sends a message for them, posts
-    in their name or puts a project's change live (item 850), whatever the run's approval mode: never waived, never a
-    review model's to answer, and no rule of theirs lets it through; a refusal or a hand-off stands (the gate,
-    :meth:`dotagent.agent.gate.RunGate._decide_spent`). None for any other step."""
+    in their name or puts a project's change live (item 850), in every approval mode but yolo (item 2069), auto's
+    included: never a review model's to answer, and no rule of theirs lets it through; a refusal or a hand-off stands
+    (the gate, :meth:`dotagent.agent.gate.RunGate._decide_spent`). None for any other step."""
     if not _intersect(info, _INITIATIVE_FLAGS):
         return None
     return Decision(verdict="ask", source="initiative", reason=_INITIATIVE_REASON, rule_id=None)
 
 
-# What a yolo run of a chat the owner opened asks them (item 860, the owner's word of 2026-10-30: "sadece e-posta
-# gönderme ya da ödeme yapma gibi şeyler … bana sorsun"): a payment, a message or mail sent for them, a public post.
-_OWNERS_FLAGS: frozenset[Flag] = frozenset({"financial", "message_send", "public_post"})
-OWNERS_REASON: str = "In yolo too, Dot asks you before it pays, sends a message or mail for you or posts in your name"
+# What a yolo run asks the owner, in a chat they opened and in a chat Dot opened on its own initiative (item 2069, the
+# owner's word of 2026-11-28: "Yolo modda hiçbir şey sormasın, sadece ödeme işlerinde sorsun"): a payment. Item 860
+# asked a message, a mail and a post there too, and item 850 a message, a post and a release in Dot's own chats.
+_PAYMENT_FLAGS: frozenset[Flag] = frozenset({"financial"})
+PAYMENT_REASON: str = "In yolo too, Dot asks you before it pays"
 
 
-def owners_guard(info: ActionInfo) -> Decision | None:
-    """The owner's question for a step of a yolo run of a chat they opened that pays, sends a message or mail for them
-    or posts in their name (item 860): never waived, never a review model's to answer, and no rule of theirs lets it
-    through; a refusal or a hand-off stands (the gate). A payment is handed to them by the money stop, as in every mode
-    that asks; one within the caps they pre-approved for its site is a question instead (:mod:`dotagent.policy.spend`),
-    theirs as in ``ask``. None for any other step: yolo asks nothing else (item 443)."""
-    if not _intersect(info, _OWNERS_FLAGS):
+def payment_guard(info: ActionInfo) -> Decision | None:
+    """The owner's question for a step of a yolo run that pays (item 2069), in a chat they opened or one Dot opened on
+    its own initiative: never waived, never a review model's to answer, and no rule of theirs lets it through; a refusal
+    or a hand-off stands (the gate). A payment is handed to them by the money stop, as in every mode that asks; one
+    within the caps they pre-approved for its site is a question instead (:mod:`dotagent.policy.spend`), theirs as in
+    ``ask``. None for any other step: yolo asks nothing else (item 443)."""
+    if not _intersect(info, _PAYMENT_FLAGS):
         return None
-    return Decision(verdict="ask", source="owner_asks", reason=OWNERS_REASON, rule_id=None)
+    return Decision(verdict="ask", source="owner_asks", reason=PAYMENT_REASON, rule_id=None)
 
 
 def vault_guard(info: ActionInfo) -> Decision | None:

@@ -155,7 +155,7 @@ enum ApprovalChoice: String, CaseIterable, Sendable {
         case .supervised: String(localized: "Supervised", comment: "Approval mode: the owner approves every change")
         case .ask: String(localized: "Auto-accept edits", comment: "Approval mode: edits go ahead, the rest is asked")
         case .auto: String(localized: "Auto", comment: "Approval mode: a second AI answers for the owner")
-        case .yolo: String(localized: "Ask only to pay or send", comment: "Approval mode yolo: asks only before a payment, a message or a public post")
+        case .yolo: String(localized: "Ask only to pay", comment: "Approval mode yolo: asks only before a payment")
         }
     }
 
@@ -164,7 +164,7 @@ enum ApprovalChoice: String, CaseIterable, Sendable {
         case .supervised: String(localized: "You approve every change: files, commands, clicks, messages", comment: "Approval mode supervised, its hint")
         case .ask: String(localized: "Edits and everyday work go ahead; Dot asks you about the rest", comment: "Approval mode ask, its hint")
         case .auto: String(localized: "A second AI answers for you; you are asked only what it is unsure about", comment: "Approval mode auto, its hint")
-        case .yolo: String(localized: "Dot asks only before a payment, a message or mail sent for you, or a public post", comment: "Approval mode yolo, its hint")
+        case .yolo: String(localized: "Dot asks only before a payment", comment: "Approval mode yolo, its hint")
         }
     }
 }

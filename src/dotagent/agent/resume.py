@@ -35,7 +35,7 @@ from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.desktop.types import DESKTOP_ACT_TOOL
 from dotagent.llm.types import ToolCall
-from dotagent.policy.types import READ_ONLY_KINDS, ActionInfo, ActionKind, Flag
+from dotagent.policy.types import OUTWARD_FLAGS, READ_ONLY_KINDS, ActionInfo, ActionKind, Flag
 from dotagent.process_groups import GroupKind, GroupRecord
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -236,10 +236,6 @@ def handoff_of(run: RunRecord) -> HandOff | None:
 # The cuts of a run that the daemon's own end made: a crash, or a stop or restart of the daemon. A helper cut so is
 # resumed when the daemon starts again (:func:`helper_not_resumed`).
 RESTART_CUTS: frozenset[CutOff] = frozenset({"daemon_restarted", "daemon_shutdown"})
-# The flags of an action that pays, sends a message or mail for the owner or posts in their name: the policy's class of
-# what even yolo keeps for the owner (``dotagent.policy.engine.owners_guard``; a test holds the two equal). A call of
-# one that was cut while it ran may have been done, and a resumed run could do it a second time.
-OUTWARD_FLAGS: frozenset[Flag] = frozenset({"financial", "message_send", "public_post"})
 # What an action that reaches beyond the Mac raises: a message or mail, a post, an upload or data sent out, a payment, a
 # project's change put live. A call of one that was cut while it ran keeps its run from going on by itself after a
 # restart (item 1854), as a schedule's task with such a step is never tried again (``scheduler.recovery``).
