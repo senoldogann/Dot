@@ -2980,6 +2980,14 @@ class RunManager:
             chat_id, chosen, text, files, mode, model, effort, speed, approvals, goal_mode, source
         )
 
+    async def tasks_of_chat(self, thread_id: str) -> list[ChatTask]:
+        """The tasks of the chat of ``thread_id`` (itself, or the chat it is a lane of), as the pages show them (item
+        2013); none while the chat has no lane."""
+        chat_id: str = await self._chat_of(thread_id)
+        if not await self._runtime.store.lanes_of(chat_id):
+            return []
+        return await self._chat_tasks_of(chat_id)
+
     async def _chat_tasks_of(self, chat_id: str) -> list[ChatTask]:
         """The tasks of the chat ``chat_id`` (item 2012): the chat's own and each lane's, each with its newest run of
         the owner's, whether it works, the question it waits on (a card left unanswered, or a reply ending with a
@@ -3005,6 +3013,7 @@ class RunManager:
                 ChatTask(
                     thread_id=thread_id,
                     newest_run_id=newest.id,
+                    status=newest.status,
                     goal="" if owners is None else owners.goal,
                     at_work=at_work,
                     asked=asked,
@@ -3067,11 +3076,13 @@ class RunManager:
             chat_id, task_thread, text, files, mode, model, effort, speed, approvals, goal_mode, source
         )
         started: RunHandle | None = self._active_on(task_thread)
+        # A free task took the message at once and it left the queue: only its run can be moved, never its message.
+        waiting: bool = any(queued.id == message.id for queued in await self._runtime.store.list_queued(task_thread))
         return RoutedMessage(
             kind="queued",
             thread_id=task_thread,
             run_id=None if started is None else started.run_id,
-            message_id=message.id,
+            message_id=message.id if waiting else None,
         )
 
     async def _start_routed(

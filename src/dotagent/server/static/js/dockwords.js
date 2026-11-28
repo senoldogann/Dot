@@ -23,12 +23,13 @@ const RHYTHM_CHARS = 18;
  *   the one loop repeats, in few words
  * @property {{ count: number, held: boolean, problem: boolean, sending: boolean }} queue the messages queued for after the run
  * @property {{ count: number, problem: boolean }} running the commands at work in the chat
+ * @property {{ open: number }} tasks the tasks of a chat with several that work or wait for the owner (item 2013)
  */
 
 /**
  * One part of the capsule.
  * @typedef {object} DockSegment
- * @property {"status" | "stop" | "plan" | "helpers" | "loops" | "queue" | "running"} id
+ * @property {"status" | "stop" | "plan" | "helpers" | "tasks" | "loops" | "queue" | "running"} id
  * @property {string} label the words at the roomiest width
  * @property {string} short what stays of them when the capsule is tight: a count, a time
  * @property {string} name what a screen reader says
@@ -71,7 +72,7 @@ function statusSegment(state) {
 
 /**
  * The segments of the capsule, in the order it draws them: the run's status and its Stop, its plan, its helpers, the
- * chat's loops, its queue and the commands it has at work. Empty when none has anything to say.
+ * chat's tasks, its loops, its queue and the commands it has at work. Empty when none has anything to say.
  * @param {DockState} state
  * @returns {DockSegment[]}
  */
@@ -101,6 +102,11 @@ export function dockSegments(state) {
     const label = tCount(live, "dock.helperOne", "dock.helperMany");
     const detail = waitedFor > 0 ? tCount(waitedFor, "capsule.waitOne", "capsule.waitMany") : tCount(letGo, "capsule.backgroundOne", "capsule.backgroundMany");
     segments.push({ id: "helpers", label, short: String(live), name: `${label}. ${detail}`, tone: "quiet", sheet: true });
+  }
+  // The tasks of a chat with several (item 2013): how many work or wait for the owner; a tap opens their rows.
+  if (state.tasks.open > 0) {
+    const label = tCount(state.tasks.open, "tasks.one", "tasks.many");
+    segments.push({ id: "tasks", label, short: String(state.tasks.open), name: label, tone: "quiet", sheet: true });
   }
   const { loops } = state;
   if (loops.count > 0 || loops.problem) {

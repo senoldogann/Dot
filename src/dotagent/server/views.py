@@ -625,6 +625,32 @@ class QueueView(FrozenModel):
     routed: RoutedMessage | None = None
 
 
+TaskState = Literal["working", "waits", "ended"]
+
+
+class ChatTaskView(FrozenModel):
+    """A task of a chat with several (item 2013), as the pages and the phone list it: its thread (the chat's own, or
+    a lane), its title, its newest run and that run's status, whether it works, waits for the owner or ended, and
+    whether it is the chat's own."""
+
+    thread_id: str
+    title: str
+    run_id: str
+    status: RunStatus
+    state: TaskState
+    own: bool
+
+
+class TasksView(FrozenModel):
+    """The tasks of a chat (item 2013): the chat, its title, how many tasks may work at once (``[agent]
+    chat_tasks``: 1 means a message never starts a task of its own), and its tasks, none while it has no lane."""
+
+    chat_id: str
+    chat_title: str
+    cap: int
+    tasks: list[ChatTaskView]
+
+
 class MoveRequest(FrozenModel):
     """Where **Move** sends a message or a run the router sent to the wrong task (item 2012): another task of the same
     chat, by its thread, or a new task (``None``)."""

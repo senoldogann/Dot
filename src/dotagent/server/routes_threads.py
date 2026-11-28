@@ -27,6 +27,7 @@ from dotagent.server.thread_sync import (
     follow_thread,
     follow_threads,
     parse_cursors,
+    tasks_view,
     terminals_of,
     thread_view,
     threads_view,
@@ -37,6 +38,7 @@ from dotagent.server.views import (
     DeletedThreads,
     DeleteThreadsRequest,
     HelpersQuery,
+    TasksView,
     TerminalView,
     ThreadChange,
     ThreadsQuery,
@@ -90,6 +92,11 @@ def threads_router(ctx: ServerContext) -> APIRouter:
         cursors: dict[str, int] = parse_cursors(query.cursors)
         await check_cursors(store, thread_id, cursors)
         return event_stream(follow_thread(ctx, thread_id, cursors))
+
+    @router.get("/threads/{thread_id}/tasks")
+    async def chat_tasks(thread_id: str) -> TasksView:
+        """The tasks of the chat of ``thread_id`` (item 2013), for the pages' row of tasks; 404 for no thread."""
+        return await tasks_view(ctx, thread_id)
 
     @router.post("/threads/{thread_id}/stop", status_code=202)
     async def stop_chat(thread_id: str) -> ChatStopped:

@@ -19,6 +19,7 @@ function state(changes = {}) {
     loops: { count: 0, rhythm: null, problem: false },
     queue: { count: 0, held: false, problem: false, sending: false },
     running: { count: 0, problem: false },
+    tasks: { open: 0 },
     ...changes,
   };
 }
@@ -156,4 +157,15 @@ test("the segments come in one order, and the chat's own stand when no run works
     }),
   );
   assert.deepEqual(ids(resting), ["loops", "queue", "running"]);
+});
+
+test("a chat with several tasks counts those that work or wait, before its loops (item 2013)", () => {
+  const one = dockSegments(state({ tasks: { open: 1 } }));
+  assert.deepEqual(ids(one), ["tasks"]);
+  assert.equal(one[0].label, "1 task");
+  assert.equal(one[0].sheet, true);
+  const many = dockSegments(state({ tasks: { open: 3 }, loops: { count: 1, rhythm: "every 30 min", problem: false } }));
+  assert.deepEqual(ids(many), ["tasks", "loops"]);
+  assert.equal(many[0].label, "3 tasks");
+  assert.equal(many[0].short, "3");
 });
