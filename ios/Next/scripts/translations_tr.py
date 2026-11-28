@@ -1901,3 +1901,14 @@ TR.update({
     "Coding model": "Kodlama modeli",
     "Other-family check model": "Başka aileden denetim modeli",
 })
+
+# Custom providers on the phone's Models page (item 1949) and the inspector's model row.
+TR.update(
+    {
+        "%@ + listed": "%@ + listelenenler",
+        "%lld models": "%lld model",
+        "Added and changed in the Mac's Settings › AI services. Their models are in every model list.": "Mac'teki Ayarlar › Yapay zekâ hizmetleri'nde eklenir ve değiştirilir. Modelleri her model listesinde yer alır.",
+        "Model used": "Kullanılan model",
+        "Providers you added": "Eklediğin sağlayıcılar",
+    }
+)

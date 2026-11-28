@@ -14,6 +14,17 @@ next=$(dirname "$here")
 derived=${1:?usage: check_strings.sh <derived data folder>}
 # The Turkish table is Python the translator workflow imports: a broken one fails here, not at the next regeneration.
 python3 -c "import sys; sys.path.insert(0, sys.argv[1]); import translations_tr" "$here" || { echo "translations_tr.py does not import" >&2; exit 2; }
+# Every catalog key with a Turkish value must be in the table, or the next apply_translations.py run fails (item 2117).
+python3 - "$here" "$next/Resources/Localizable.xcstrings" <<'PY' || exit 2
+import json, sys
+sys.path.insert(0, sys.argv[1])
+from translations_tr import TR
+strings = json.load(open(sys.argv[2], encoding="utf-8"))["strings"]
+missing = sorted(k for k, v in strings.items() if v.get("localizations", {}).get("tr", {}).get("stringUnit", {}).get("value") and k not in TR)
+if missing:
+    print("in the catalog with Turkish but not in translations_tr.py (apply_translations.py would fail):", *missing, sep="\n  ", file=sys.stderr)
+    sys.exit(1)
+PY
 work=$(mktemp -d)
 data=$(find "$derived" -path '*DotNext.build*' -name '*.stringsdata' ! -name 'ExtractedAppShortcuts*')
 [ -n "$data" ] || { echo "no .stringsdata under $derived: build DotNext first" >&2; exit 2; }
