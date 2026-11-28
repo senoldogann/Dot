@@ -2,8 +2,7 @@ import DotEngine
 import SwiftUI
 
 // The home's "+" (PLAN §27): a group chat with some of the owner's bots (a team, item 610, where Dot leads them and hands
-// each its part), and a bot or a team made from the ready ones (items 315 and 504). A team's name, purpose and bots are
-// changed, and a team removed, on the Mac (PLAN §26 cuts team editing from the phone).
+// each its part), and a bot or a team made from the ready ones (items 315 and 504).
 
 private var teamsOnTheMac: String { String(localized: "Agents › Your teams", comment: "Where on the Mac: where teams are changed") }
 
@@ -17,6 +16,9 @@ struct TeamSheet: View {
     @State private var sending: Bool = false
     @State private var problem: SettingsFailure?
     @State private var started: String?
+    @State private var editing: TeamRecordView?
+    @State private var confirmsRemoval: Bool = false
+    @State private var removing: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -35,11 +37,12 @@ struct TeamSheet: View {
                             .accessibilityIdentifier("team.message")
                         Button(String(localized: "Send", comment: "Group chat: starts the new chat")) { send() }
                             .buttonStyle(PrimaryButtonStyle())
-                            .disabled(sending || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(removing || sending || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             .padding([.horizontal, .bottom], Space.groupedGutter)
                             .accessibilityIdentifier("team.send")
                     }
                     chats(team.chats)
+                    actions(team.record)
                 }
             }
             .toolbar {
@@ -47,6 +50,23 @@ struct TeamSheet: View {
                     Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
                 }
             }
+            .sheet(item: $editing) { team in
+                EditTeamSheet(team: team) {
+                    await load()
+                    await model.loadTeams()
+                }
+            }
+            .confirmationDialog(
+                String(localized: "Remove the team?", comment: "Group chat: asks before removing the team"),
+                isPresented: $confirmsRemoval, titleVisibility: .visible
+            ) {
+                Button(String(localized: "Remove", comment: "Group chat: removes the team"), role: .destructive) {
+                    Task { await remove() }
+                }
+            } message: {
+                Text(String(localized: "Its bots and chats stay.", comment: "Group chat: what remains after removing the team"))
+            }
+            .interactiveDismissDisabled(removing)
             .task { await load() }
             .refreshable { await load() }
             .navigationDestination(isPresented: Binding(get: { started != nil }, set: { if !$0 { started = nil } })) {
@@ -85,6 +105,34 @@ struct TeamSheet: View {
                     }
                 }
             }
+        }
+    }
+
+    private func actions(_ team: TeamRecordView) -> some View {
+        GroupedSection(header: nil, footer: nil) {
+            Button { editing = team } label: {
+                ListRow(systemImage: "pencil", title: String(localized: "Edit the team", comment: "Group chat: edits the team"),
+                        description: nil, accessory: .chevron)
+            }
+            .buttonStyle(RowPressStyle())
+            Button { confirmsRemoval = true } label: {
+                ListRow(systemImage: "trash", title: String(localized: "Remove the team", comment: "Group chat: opens removal confirmation"),
+                        description: nil, accessory: .none)
+            }
+            .buttonStyle(RowPressStyle())
+        }
+        .disabled(removing || sending)
+    }
+
+    private func remove() async {
+        guard !removing else { return }
+        removing = true
+        defer { removing = false }
+        switch await model.write({ api throws(DaemonRequestError) in try await api.deleteTeam(id) }) {
+        case .success:
+            await model.loadTeams()
+            close()
+        case .failure(let box): problem = box.failure
         }
     }
 

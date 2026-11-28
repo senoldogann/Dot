@@ -1,8 +1,7 @@
 import Foundation
 
 // The owner's teams (item 610, `routes_teams.py`) as group chats, and the bots and teams to start from (items 315 and 504,
-// `routes_agents.py`), for the phone's "+" (PLAN §27: New bot, New group chat). Editing and removing a team stay on the
-// Mac (PLAN §26).
+// `routes_agents.py`), for the phone's "+" (PLAN §27: New bot, New group chat).
 
 /// A team as `POST /api/teams` and a team's page give it (`TeamRecord`): its name, what it is for and its bots' ids.
 public struct TeamRecordView: Codable, Sendable, Hashable, Identifiable {
@@ -97,6 +96,14 @@ extension DaemonAPI {
     /// Makes a team of the owner's bots (`POST /api/teams`).
     public func createTeam(_ edit: TeamEdit) async throws(DaemonRequestError) -> TeamRecordView {
         try await send("POST", "/api/teams", body: Self.json(edit))
+    }
+
+    public func updateTeam(_ id: String, edit: TeamEdit) async throws(DaemonRequestError) -> TeamRecordView {
+        try await send("PUT", "/api/teams/\(id)", body: Self.json(edit))
+    }
+
+    public func deleteTeam(_ id: String) async throws(DaemonRequestError) {
+        try await sendVoid("DELETE", "/api/teams/\(id)", body: nil)
     }
 
     /// The bots to start from, in the gallery's order.

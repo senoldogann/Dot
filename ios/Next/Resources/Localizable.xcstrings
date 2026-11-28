@@ -4974,6 +4974,17 @@
         }
       }
     },
+    "Edit the team": {
+      "comment": "Group chat: edits the team",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takımı düzenle"
+          }
+        }
+      }
+    },
     "Edited %@": {
       "comment": "Tool row: a file edited; the argument is its path",
       "localizations": {
@@ -6649,6 +6660,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajanı duraklatıldı"
+          }
+        }
+      }
+    },
+    "Its bots and chats stay.": {
+      "comment": "Group chat: what remains after removing the team",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botları ve sohbetleri kalır."
           }
         }
       }
@@ -10636,6 +10658,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alıntıyı kaldır"
+          }
+        }
+      }
+    },
+    "Remove the team": {
+      "comment": "Group chat: opens removal confirmation",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takımı kaldır"
+          }
+        }
+      }
+    },
+    "Remove the team?": {
+      "comment": "Group chat: asks before removing the team",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takım kaldırılsın mı?"
           }
         }
       }
