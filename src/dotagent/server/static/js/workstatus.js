@@ -21,6 +21,7 @@
 
 import { clip, el, setText } from "./dom.js";
 import { t } from "./i18n.js";
+import { shortTitle } from "./routinewords.js";
 import { callKind, describeArguments, narrates } from "./tools.js";
 
 // The words for each kind of work (tools.js callKind): one phrase each, which stays while the same work goes on.
@@ -65,6 +66,11 @@ export function callPhrase(tool, args) {
   const about = describeArguments(args).trim();
   if (Object.hasOwn(DETAILED, kind) && about !== "") {
     return DETAILED[kind](about);
+  }
+  // Work handed to a helper is said with its task's short title, as the phone says it (item 2002): "Handed to a
+  // helper: Check the dentist's free slots".
+  if (tool === "delegate") {
+    return about === "" ? t("work.helper") : t("work.helperWith", { title: shortTitle(about) });
   }
   // A tool with no phrase of its own is "Working": a tool's name is no plain word (owner 2026-11-27).
   return t(PHRASES[kind] ?? PHRASES.other);

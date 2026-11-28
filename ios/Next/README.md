@@ -20,7 +20,7 @@ successful, as a row of the stretch of work with its first sentence; the words a
 in Hide all (the default) and Zen one live line under the last message says what the run does now (`WorkLineView`,
 `workNow`: typing, thinking, the command it runs, the file it reads, waiting for you), and a tap on it shows the steps.
 The floating capsule says Working with a clock that ticks every second whether events come or not, and no spinner;
-"Waiting on N helpers" stands in its place only while the main run has stopped for them, every open call of its step a
+"Waiting for N helpers" stands in its place only while the main run has stopped for them, every open call of its step a
 wait on a helper (`waitsOnHelpers`, DotEngine), never while it works beside them. The link to the Mac is told only when
 it is a lasting problem, and only there: Offline, or Can't reach <the Mac> once it lasted five seconds (`linkLine`,
 `linkLineDelay`); a reconnection that mends and a chat being brought up to date show nowhere, and a bot's header pill is

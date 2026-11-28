@@ -1191,7 +1191,7 @@ restarts), or when a call that pays, sends or posts for you was cut while it ran
 chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the
 work again rather than taking it as a failed part. A helper the run still waited for when the daemon stopped ends with
 that run, whose own resume note names the cut `delegate` call. The bar over the
-composer says "Waiting on N helpers" in place of Working only while the run has stopped for them (every call of its
+composer says "Waiting for N helpers" in place of Working only while the run has stopped for them (every call of its
 step that has no answer yet waits on a helper; while a command of the same step still runs, or the model thinks, it
 says Working and the helpers keep their own part), with no spinner, and the line over it says what the first helper
 does now; "N helpers keep working in the background" once it was released, and nothing when none work; on a phone
