@@ -9,6 +9,7 @@ import base64
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -162,9 +163,9 @@ def test_a_style_of_unclosed_urls_is_read_in_linear_time(tmp_path: Path) -> None
     the interpreter, and so the daemon, for minutes on a page's style. It reads 400,000 characters of them at once."""
     workspace, page = _site(tmp_path)
     css: str = "url(" * 100_000
-    started: float = time.perf_counter()
+    started: float = time.process_time()
     files: PageFiles = with_its_files(f"<style>{css}</style>", page, workspace, (), ())
-    assert time.perf_counter() - started < 2.0
+    assert time.process_time() - started < 2.0
     assert files.html == f"<style>{css}</style>" and files.left_out == []
 
 
@@ -429,9 +430,9 @@ def test_a_picture_that_many_img_tags_name_is_written_once_and_each_takes_it_fro
         + "".join(f'<tr><td>row {number}</td><td><img src="check.png" alt="ok"></td></tr>' for number in range(rows))
         + "</table>"
     )
-    started: float = time.perf_counter()
+    started: float = time.process_time()
     files: PageFiles = with_its_files(html, page, workspace, (), ())
-    assert time.perf_counter() - started < 5.0
+    assert time.process_time() - started < 5.0
     assert files.too_large == [] and files.left_out == [] and files.written == ["check.png"] * rows
     assert len(files.html) < PAGE_MAX_CHARS // 4
     # The picture is in the page once, in a table at its end; a row has only the mark of its entry.
@@ -564,14 +565,25 @@ def test_the_writing_in_has_a_time_limit_after_which_the_rest_is_as_written_and_
     )
     # Given a little time it goes on a while and stops: what is written in is a whole number of tags, the rest is as
     # it was written.
+    # The writer's clock is a counter that moves 0.01 s per reading, so what "a little time" holds does not depend on
+    # how fast or how loaded the machine is: the deadline is read at 0.00, the files at 0.01, 0.02 (inside) and 0.03.
+    ticks: list[float] = [0.0]
+
+    def tick() -> float:
+        now: float = ticks[0]
+        ticks[0] += 0.01
+        return now
+
+    monkeypatch.setattr(page_files, "time", SimpleNamespace(monotonic=tick))
     monkeypatch.setattr(page_files, "WORK_S", 0.02)
     more: PageFiles = with_its_files(html, page, workspace, (), ())
-    assert 0 <= len(more.written) < 300 and more.cut.startswith("Writing the files in took more than 0.02 seconds")
+    assert len(more.written) == 2 and more.cut.startswith("Writing the files in took more than 0.02 seconds")
     done: str = "".join(
         f'<img src="{_address(b"\x89PNG" + bytes([number % 256]) * 8)}">' for number in range(len(more.written))
     )
     assert more.html == done + "".join(f'<img src="f{number}.png">' for number in range(len(more.written), 300))
     # A page that does not take the time says nothing of it.
+    ticks[0] = 0.0
     monkeypatch.setattr(page_files, "WORK_S", 10.0)
     assert with_its_files(html, page, workspace, (), ()).cut == ""
 
@@ -624,9 +636,9 @@ def test_a_pathological_page_of_a_page_of_characters_is_written_in_in_a_moment(t
     (page.parent / "p.png").write_bytes(b"\x89PNG" + bytes(10))
     (page.parent / "s.css").write_text("a{color:red}", encoding="utf-8")
     html: str = page_of(480_000)  # type: ignore[operator]
-    started: float = time.perf_counter()
+    started: float = time.process_time()
     files: PageFiles = with_its_files(html, page, workspace, (), ())
-    assert time.perf_counter() - started < 5.0
+    assert time.process_time() - started < 5.0
     assert len(files.html) <= PAGE_MAX_CHARS and files.cut == ""
 
 

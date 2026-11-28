@@ -220,9 +220,9 @@ async def test_a_link_that_comes_where_the_file_is_awaited_is_never_read(
     refuses it (item 681), and the wait ends without reading it."""
     secret: Path = tmp_path / "outside" / "secret.txt"
     await asyncio.to_thread(secret.parent.mkdir, parents=True)
-    await asyncio.to_thread(secret.write_text, "the secret is 42\n", "utf-8")
+    await asyncio.to_thread(secret.write_text, "the secret is quince-7f3a\n", "utf-8")
     turns: list[ScriptedTurn] = [
-        _call(WAIT_UNTIL_TOOL, file="built/link.txt", contains="42", every_s=2, within_minutes=1),
+        _call(WAIT_UNTIL_TOOL, file="built/link.txt", contains="quince-7f3a", every_s=2, within_minutes=1),
         _call(FINISH_TOOL, answer="Waited.", success=True),
     ]
     async with _dot(tmp_path, monkeypatch, turns, private_ok=False) as runtime:
@@ -235,7 +235,8 @@ async def test_a_link_that_comes_where_the_file_is_awaited_is_never_read(
         said: list[tuple[bool, str]] = await _waits(runtime, None)
         await linking
     assert not said[0][0] and "is there but is no file Dot reads" in said[0][1], said
-    assert "42" not in said[0][1]
+    # A value no temp folder name can hold (pytest numbers its folders: pytest-42).
+    assert "quince-7f3a" not in said[0][1]
 
 
 async def test_the_owners_own_message_ends_a_wait_once_and_dots_notes_do_not(
