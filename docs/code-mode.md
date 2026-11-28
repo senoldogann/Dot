@@ -16,8 +16,10 @@ checks and the threat model (item 1503), and in a second pull request the swap o
 what the code prints, stdout and stderr in the order they were written, as a head and a tail when it is long, and a
 footer with the number of tool calls and the seconds: `[3 tool calls, 1.2 s]`. A code that ends by itself with nothing
 printed is told so. A code that fails is an error result with the end of its traceback, in which Dot's own paths are said
-short (`<tools>`, `<scratch>`, `<python>`, `<dot home>`, `~`) and the lines of the code are shown; one that is stopped
-(its own time, its memory, its calls, its output, its scratch folder, the run's Stop) is an error that says which and what
+short (`<tools>`, `<scratch>`, `<python>`, `<dot home>`, `~`) and the lines of the code are shown; one whose traceback
+ends on a file it could not open (`PermissionError` from the sandbox, `FileNotFoundError`) is told after it that the code
+opens only its scratch folder, which is not the run's working directory, and to copy the files it needs there first or
+read one with `read_file` (item 2066). One that is stopped (its own time, its memory, its calls, its output, its scratch folder, the run's Stop) is an error that says which and what
 to do about it, with what it printed before.
 
 The code calls tools as functions of `dot_tools` (see "The tools as files" below), parameters as keywords. A result is the

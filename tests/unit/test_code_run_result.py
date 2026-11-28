@@ -119,6 +119,39 @@ def test_the_traceback_names_no_path_of_dots_and_what_the_code_printed_is_left_a
     assert "dot_tools._bridge.ToolError: it failed" in after
 
 
+@pytest.mark.parametrize(
+    "last_line",
+    [
+        "PermissionError: [Errno 1] Operation not permitted: '{root}/memory-merge/C1.out.md'",
+        "FileNotFoundError: [Errno 2] No such file or directory: 'allnotes.json'",
+    ],
+)
+def test_a_code_that_could_not_open_a_file_is_told_that_it_opens_only_its_scratch_folder(
+    tmp_path: Path, last_line: str
+) -> None:
+    layout, interpreter = _layout(tmp_path)
+    trace: str = (
+        "Traceback (most recent call last):\n"
+        '  File "<code>", line 3, in <module>\n'
+        f"{last_line.format(root=layout.root)}\n"
+    )
+    result = tool.result_of(_ended("failed", trace, exit_code=1), CONFIG, LIMITS, layout, interpreter, False)
+    assert result.is_error
+    assert tool.FILE_HINT in result.text
+    assert result.text.index(tool.FILE_HINT) > result.text.index(last_line.split(":")[0])
+    other = tool.result_of(
+        _ended("failed", "Traceback (most recent call last):\nKeyError: 'x'\n", exit_code=1),
+        CONFIG,
+        LIMITS,
+        layout,
+        interpreter,
+        False,
+    )
+    assert tool.FILE_HINT not in other.text
+    printed = tool.result_of(_ended(output=f"{last_line}\n"), CONFIG, LIMITS, layout, interpreter, False)
+    assert tool.FILE_HINT not in printed.text
+
+
 def test_what_is_printed_is_cut_to_the_setting_as_a_head_and_a_tail_with_a_note(tmp_path: Path) -> None:
     layout, interpreter = _layout(tmp_path)
     lines: str = "".join(f"row {number} " + "y" * 40 + "\n" for number in range(3000))
