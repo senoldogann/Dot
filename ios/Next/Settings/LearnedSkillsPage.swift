@@ -104,6 +104,7 @@ private struct LearnedSkillPage: View {
                     }
                 }
             }
+            Button(String(localized: "Cancel", comment: "Skills: cancels restoring or deleting"), role: .cancel) {}
         } message: { choice in
             switch choice {
             case .restore:

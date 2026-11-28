@@ -70,6 +70,8 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
         XCTAssertTrue(app.staticTexts["This permanently deletes the skill and its versions. A later task may learn it again."].waitForExistence(timeout: 5))
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["weekly-review"].exists)
     }
 
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
