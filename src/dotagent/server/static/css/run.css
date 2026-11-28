@@ -4534,6 +4534,20 @@ dialog.computer-full::backdrop {
   }
 }
 
+/* While the microphone listens the box keeps its line, and the recorder takes the whole line under it, where the "+",
+   the model, the microphone and the send were (items 605 and 833), in either shape and on every width: the one row
+   above has no cell for it, and it fell into the "+"'s. After the rules above, which it must outweigh. */
+.composer .composer-bar.has-mic.recording {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "field"
+    "recorder";
+}
+
+.composer-bar.recording > .mic-recorder {
+  grid-area: recorder;
+}
+
 /* The chat's settings over a window wider than a phone's (item 2015): the phone's sheet, as wide as a reading column,
    standing over the middle of the window with all its corners rounded. */
 @media (min-width: 721px) {
