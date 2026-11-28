@@ -136,6 +136,10 @@ _FAMILIES: dict[str, str] = {
     "eval-tools": "dotagent.cli_eval",
     "eval-memory": "dotagent.cli_eval",
     "eval-speed": "dotagent.cli_eval",
+    "eval-suite": "dotagent.cli_eval_real",
+    "eval-real": "dotagent.cli_eval_real",
+    "eval-ablate": "dotagent.cli_eval_real",
+    "eval-costs": "dotagent.cli_eval_real",
     "stats": "dotagent.cli_stats",
     "perf": "dotagent.cli_perf",
     "daemon": "dotagent.cli_daemon",
@@ -722,6 +726,40 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="print the table of a saved report instead of playing; give two to compare a baseline with a later run",
     )
+    eval_suite = eval_commands.add_parser(
+        "suite",
+        help="build the suite of real runs: your runs of the last days (those that went wrong first), the catalog's "
+        "golden tasks and your own cases in evals/real/owner.json (reads the record, calls no model)",
+    )
+    eval_suite.add_argument("--days", type=int, default=30, help="the runs started in this many days (default 30)")
+    eval_suite.add_argument("--size", type=int, default=40, help="the most cases of the suite (default 40)")
+    eval_real = eval_commands.add_parser(
+        "real",
+        help="play the suite of real runs against a model and grade each attempt on its tools' order and its ending "
+        "(this spends the tokens of that model)",
+    )
+    eval_real.add_argument(
+        "--model", default=None, help="provider:model; the main model of the configuration if omitted"
+    )
+    eval_real.add_argument("--repeat", type=int, default=1, help="play every case this many times")
+    eval_ablate = eval_commands.add_parser(
+        "ablate",
+        help="play real goals with and without a skill or a note, and have a model pick the better answer blind "
+        "(this spends the tokens of both models)",
+    )
+    eval_ablate.add_argument("--skill", default=None, help="the skill or learned skill to ablate")
+    eval_ablate.add_argument("--note", default=None, help="the words of a memory note to ablate")
+    eval_ablate.add_argument(
+        "--case", dest="cases", action="append", default=[], help="a case of the suite to play; give it again for more"
+    )
+    eval_ablate.add_argument("--parts", action="store_true", help="also play the skill with each of its parts left out")
+    eval_ablate.add_argument("--model", default=None, help="provider:model playing; the main model if omitted")
+    eval_ablate.add_argument("--judge", default=None, help="provider:model judging; the review model if omitted")
+    eval_costs = eval_commands.add_parser(
+        "costs",
+        help="what each tool and skill call cost in tokens, per day (reads the record, calls no model)",
+    )
+    eval_costs.add_argument("--days", type=int, default=7, help="the runs started in this many days (default 7)")
     eval_report = eval_commands.add_parser(
         "report", help="show the score of saved eval runs and compare them (all saved runs if no file is given)"
     )

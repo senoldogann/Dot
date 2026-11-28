@@ -4,6 +4,7 @@ import pytest
 
 from dotagent.cli import build_parser, parse_command
 from dotagent.cli_commands import (
+    EvalAblateCommand,
     EvalFromRunCommand,
     RunCommand,
     ServiceInstallCommand,
@@ -30,6 +31,14 @@ def test_skills_lint_takes_the_skills_it_lints() -> None:
     linted = parse_command(build_parser(), ["skills", "lint", "memo", "learned-x"])
     assert isinstance(linted, SkillsLintCommand)
     assert linted.names == ("memo", "learned-x")
+
+
+def test_eval_ablate_takes_what_it_ablates_and_the_cases() -> None:
+    command = parse_command(
+        build_parser(), ["eval", "ablate", "--skill", "memo", "--parts", "--case", "real-1", "--case", "owner-2"]
+    )
+    assert isinstance(command, EvalAblateCommand)
+    assert (command.skill, command.note, command.parts, command.cases) == ("memo", None, True, ("real-1", "owner-2"))
 
 
 @pytest.mark.parametrize("browser", ["own", "attach"])

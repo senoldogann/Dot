@@ -31,6 +31,9 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/unit/test_skill_lint.py::test_a_skill_that_comes_with_dot_is_found_as_a_run_finds_it_and_a_gone_one_is_named` — `dotx
+  eval real` looked for a skill a case read in the home and playbook folders alone, and stopped mid-suite on one that
+  came with Dot, a plugin or `[skills] dirs` (item 2091's review).
 - `tests/smoke/test_chat_routing.py::test_a_routed_message_is_checked_as_a_queued_one_and_move_keeps_what_it_cannot_move` — words the router queued for a task skipped a queued message's checks, and Move took out a message it could not
   move (item 2012's review).
 - `tests/smoke/test_chat_routing.py::test_a_move_that_fails_loses_nothing` — a move that failed after the message was
