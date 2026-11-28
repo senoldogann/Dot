@@ -67,6 +67,7 @@ from dotagent.server.routes_channels import channels_router
 from dotagent.server.routes_code_review import code_review_router
 from dotagent.server.routes_connections import connections_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
+from dotagent.server.routes_desktop_app import desktop_app_router
 from dotagent.server.routes_drafts import drafts_router
 from dotagent.server.routes_files import files_router, looks_router
 from dotagent.server.routes_gallery import gallery_router
@@ -215,6 +216,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(proof_router(ctx.token, phones))
     app.include_router(system_router(ctx, pages.build, phones))
     app.include_router(about_router(ctx))
+    app.include_router(desktop_app_router(ctx))
     app.include_router(runs_router(ctx))
     app.include_router(queue_router(ctx))
     app.include_router(reactions_router(ctx))

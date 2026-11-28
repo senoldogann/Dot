@@ -21,6 +21,7 @@ import { t, uiLanguage } from "./i18n.js";
 import { fileDialog } from "./filepanel.js";
 import { icon, wordmark } from "./icons.js";
 import { buildShell } from "./shell.js";
+import { tellShellLanguage } from "./shelllanguage.js";
 import { requestCompose } from "./shortcuts.js";
 import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
@@ -857,6 +858,7 @@ async function connect() {
     return;
   }
   tellPhoneApp();
+  void tellShellLanguage();
   beginSession();
 }
 

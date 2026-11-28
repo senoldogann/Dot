@@ -49,6 +49,7 @@ type ConfigTable = Literal[
     "builtin_mcp",
     "channels",
     "code_review",
+    "desktop_app",
     "harness",
     "initiative",
     "judge",
@@ -100,6 +101,7 @@ BUDGET_SETTINGS: tuple[BudgetSetting, ...] = (
     "delegate_day_tokens",
 )
 type BuiltinMcpSetting = Literal["web_research"]
+type DesktopAppSetting = Literal["start_at_login", "language"]
 type HarnessSetting = Literal["proposer", "composer", "selector", "experience"]
 type InitiativeSetting = Literal["look_model"]
 type JudgeSetting = Literal["provider"]
@@ -119,6 +121,7 @@ type SettingKey = (
     | BuiltinMcpSetting
     | ChannelsSetting
     | CodeReviewSetting
+    | DesktopAppSetting
     | HarnessSetting
     | InitiativeSetting
     | JudgeSetting
