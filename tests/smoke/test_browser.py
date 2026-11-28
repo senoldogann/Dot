@@ -23,13 +23,14 @@ import pytest_asyncio
 from playwright.async_api import async_playwright
 
 from dotagent.browser.profile_lock import profile_holder_pid
-from dotagent.browser.render import render_page_view
+from dotagent.browser.render import render_act_outcome, render_page_view
 from dotagent.browser.safety import parse_element, refuse_secret_field
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ActOutcome, FindResult, PageView, Step, TextWait
 from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
+from dotagent.core.text import estimate_text_tokens
 from dotagent.policy.elements import Element
 from dotagent.tools.base import ToolResult
 from dotagent.tools.browser import wait_text_result
@@ -375,6 +376,67 @@ style="position:absolute;inset:0">Terms</a></label></span>
 }
 
 
+_PROSE: str = (
+    "The city is adding evening service after a six-month pilot. Ridership rose most on routes connecting the "
+    "library, the market and the station. The council will review weekend timetables after the winter holidays. "
+    "The next public meeting is on Thursday in the station hall."
+)
+_ROLES: tuple[str, ...] = ("Editor", "Designer", "Analyst", "Archivist", "Librarian", "Coordinator")
+_SUBJECTS: tuple[str, ...] = (
+    "Weekend shifts",
+    "Revised timetable",
+    "Station repairs",
+    "Meeting minutes",
+    "Reading list",
+    "Library budget",
+)
+_HEAVY_PAGES: dict[str, str] = {
+    "/long-news": (
+        "<main><h1>Evening buses return</h1><article>"
+        + "".join(f"<p>Section {n}. {_PROSE}</p>" for n in range(48))
+        + "</article></main>"
+    ),
+    "/job-board": (
+        "<main><h1>Vacancies</h1><ul>"
+        + "".join(
+            f'<li><a href="/form">{role} {n}</a><p>Full time · Helsinki · North District</p>'
+            f'<button aria-label="Save {role} {n}">Save</button></li>'
+            for n, role in enumerate(_ROLES * 10)
+        )
+        + "</ul></main>"
+    ),
+    "/inbox": (
+        "<main><h1>Inbox</h1><table><thead><tr><th>Select</th><th>From</th><th>Subject</th><th>Time</th></tr></thead>"
+        "<tbody>"
+        + "".join(
+            f'<tr><td><input type="checkbox" aria-label="Select message {n}"></td><td>Transit office</td>'
+            f'<td><a href="/long-news">{_SUBJECTS[n % len(_SUBJECTS)]} {n}</a></td><td>09:30</td></tr>'
+            for n in range(100)
+        )
+        + "</tbody></table></main>"
+    ),
+    "/application": (
+        '<main><h1>Apply for a travel grant</h1><form aria-label="Travel grant"><p>'
+        + _PROSE
+        + "</p>"
+        + "".join(
+            f"<fieldset><legend>{section}</legend><p>{_PROSE}</p>"
+            '<label>Contact name <input autocomplete="name"></label>'
+            "<label>Notes <textarea></textarea></label></fieldset>"
+            for section in ("Applicant", "Project", "Budget", "References", "Supporting documents")
+        )
+        + '<label><input type="checkbox"> I certify these details</label>'
+        '<button type="button">Review application</button></form></main>'
+    ),
+}
+for _path, _page in _HEAVY_PAGES.items():
+    _PAGES[_path] = (
+        '<!doctype html><title>Local browser benchmark</title><meta charset="utf-8">'
+        "<button onclick=\"this.nextElementSibling.textContent = 'Updated'\">Refresh status</button>"
+        "<span>Ready</span>" + _page
+    )
+
+
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = self.path.split("?", 1)[0]
@@ -522,6 +584,48 @@ async def test_click_returns_only_what_changed(browser: BrowserSession, site: st
     assert outcome.view.mode == "delta"
     assert '"1"' in outcome.view.body or ": 1" in outcome.view.body
     assert len(outcome.view.body) < len(view.body) / 2
+
+
+@pytest.mark.parametrize(
+    ("path", "control", "max_tokens"),
+    (
+        ("/long-news", 'heading "Evening buses return"', 1200),
+        ("/job-board", 'button "Save Editor 0"', 850),
+        ("/inbox", 'link "Weekend shifts 0"', 2750),
+        ("/application", 'button "Review application"', 700),
+    ),
+)
+async def test_heavy_pages_keep_their_controls_and_return_small_changes(
+    browser: BrowserSession, site: str, browser_config: BrowserConfig, path: str, control: str, max_tokens: int
+) -> None:
+    thread: str = f"compact-{path}"
+    opened: PageView = await browser.open_url(thread, site + path, True)
+    view: PageView = await browser.snapshot(thread, True)
+    nonce: str = "0" * 16
+    rendered: str = render_page_view(view, nonce, browser_config.snapshot_max_chars)
+    assert estimate_text_tokens(rendered) <= max_tokens
+    assert ref_of(rendered, control) == ref_of(opened.body, control)
+    action: Step = Step(action="click", ref=ref_of(rendered, 'button "Refresh status"'))
+    outcome: ActOutcome = await act(browser, thread, [action], False)
+    changed: str = render_act_outcome(outcome, nonce, browser_config.snapshot_max_chars)
+    assert outcome.steps[0].outcome == "done"
+    assert outcome.view.mode == "delta"
+    assert "Updated" in changed
+    assert estimate_text_tokens(changed) <= 200
+    if path == "/long-news":
+        assert "browser_read_text" in rendered
+        paragraph: re.Match[str] | None = re.search(r"paragraph \[ref=([^\]]+)\]: Section 0\..+…", rendered)
+        assert paragraph is not None
+        assert (await browser.read_text(thread, paragraph[1], 0, 1000)).text == f"Section 0. {_PROSE}"
+    if path == "/inbox":
+        opened_article: ActOutcome = await act(
+            browser, thread, [Step(action="click", ref=ref_of(rendered, control))], False
+        )
+        assert opened_article.steps[0].outcome == "done"
+        assert opened_article.view.mode == "full"
+        assert (
+            estimate_text_tokens(render_act_outcome(opened_article, nonce, browser_config.snapshot_max_chars)) <= 1250
+        )
 
 
 async def test_drag_at_moves_a_knob_from_one_pixel_to_another(browser: BrowserSession, site: str) -> None:

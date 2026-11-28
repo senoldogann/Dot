@@ -308,8 +308,8 @@ def _snapshot_tool() -> RegisteredTool:
     return make_tool(
         name="browser_snapshot",
         description=(
-            "Show the current tab again: every element in and around the viewport, with refs. It takes no "
-            "arguments. Use it after you lost track of the page; actions already return what changed."
+            "Show the current viewport and its surroundings, with refs and text previews. Use it after you lost "
+            "track of the page; actions already return what changed. Read longer text with browser_read_text."
         ),
         args_model=NoArgs,
         modes=ALL_MODES,

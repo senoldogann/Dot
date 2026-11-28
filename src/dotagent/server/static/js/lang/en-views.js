@@ -33,6 +33,8 @@ export const EN_VIEWS = {
   "views.agents.yours": "Yours",
   "views.agents.nameIsSavedAsName2": "{name} is saved as {name2}.",
   "views.agents.nameIsImported": "{name} is imported.",
+  "views.agents.botFileTooLarge": "{name} is larger than a bot file can be.",
+  "views.agents.invalidBotFile": "{name} is not a bot file: {reason}",
   "views.agents.allActions": "All actions",
   "views.agents.everyActionAndAnyAdded": "every action, and any added later",
   "views.agents.scout": "Scout",
