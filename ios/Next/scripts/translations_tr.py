@@ -1732,6 +1732,20 @@ TR.update(
     }
 )
 
+# A card of several secrets (item 2040).
+TR.update(
+    {
+        "Choose a file": "Dosya seç",
+        "Show": "Göster",
+        "Hide": "Gizle",
+        "No file chosen": "Dosya seçilmedi",
+        "%@ could not be read": "%@ okunamadı",
+        "%@ is too large for a card: a key file is a few KB at most.": "%@ bir kart için çok büyük: bir anahtar dosyası en fazla birkaç KB olur.",
+        "%@ is not a key in PEM: pick the key file itself (.p8, .pem, .key).": "%@ PEM biçiminde bir anahtar değil: anahtar dosyasının kendisini seç (.p8, .pem, .key).",
+        "%@ · %lld bytes": "%1$@ · %2$lld bayt",
+    }
+)
+
 # MS1: the last confirmed contact with the Mac.
 TR.update(
     {

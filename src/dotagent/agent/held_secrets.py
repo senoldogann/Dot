@@ -11,14 +11,16 @@ import re
 import tempfile
 import threading
 import time
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import dot_home
 from dotagent.core.text import KNOWN_SECRET_MIN_CHARS
-from dotagent.core.types import FrozenModel
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.secrets import hold_filled
 
 # The severity of the card that asks for one among the approvals: answered through its own route, which takes the value
@@ -28,6 +30,18 @@ SECRET_SEVERITY: str = "secret"
 HOLD_S: float = 24 * 3600.0
 # The longest secret a card takes: a token, a key, a password, a service account's file in one line.
 MOST_VALUE_CHARS: int = 8192
+# The longest file a card's field takes (item 2040): a private key in PEM (.p8, .pem, .key), as text.
+MOST_FILE_CHARS: int = 16384
+# How a card's field is typed (item 2040): `secret` in a box that shows no letter, `text` in one that shows them (an
+# id the owner copies), `file` picked from the phone or the computer. Every kind is held and masked the same.
+SecretKind = Literal["secret", "text", "file"]
+# A line of a key file that is no secret: a PEM's first and last, which every key of the kind shares.
+_PEM_EDGE: re.Pattern[str] = re.compile(r"-----(?:BEGIN|END) [A-Z0-9 ]{1,60}-----")
+# A line of a PEM key's body: base64 alone, `=` only as the padding at its end (a `NAME=value` line is no key's).
+_PEM_BODY_LINE: re.Pattern[str] = re.compile(r"[A-Za-z0-9+/]+={0,2}")
+# The shortest line of a key's text masked on its own: the floor of every held value, so a key's short last line is
+# masked too (the security review of item 2040).
+_FILE_LINE_MIN_CHARS: int = 8
 _NAME: re.Pattern[str] = re.compile(r"[A-Z][A-Z0-9_]{1,63}")
 _THREAD: re.Pattern[str] = re.compile(r"[A-Za-z0-9_-]{1,80}")
 # The names the shell, the loader or a language reads to decide how a command runs: a secret given under one would
@@ -195,6 +209,115 @@ def _write(path: Path, entries: dict[str, dict[str, object]]) -> None:
         raise
 
 
+class SecretAnswer(FrozenModel):
+    """One field of a card as the owner answered it (item 2040): the name the chat's commands read it as, the words of
+    the card, its kind and its value."""
+
+    name: str
+    label: str
+    kind: SecretKind
+    value: str = Field(repr=False)
+
+
+def card_answers(args: JsonObject, value: str | None, answers: dict[str, str] | None) -> list[SecretAnswer]:
+    """The fields of a card (an approval's ``args``) with what the owner gave for each: ``value`` answers a card of one
+    field, ``answers`` (by name) every field of a card once. A card of several answered with one ``value`` (an older
+    phone or page), a field left out, one the card did not ask for, or both forms at once are refused before anything
+    is held (item 2040). Pure."""
+    fields: list[SecretAnswer] = _card_fields(args)
+    if (value is None) == (answers is None):
+        raise InvalidValueError("answer a card with its value or with its fields' answers", {"fields": len(fields)})
+    if value is not None:
+        if len(fields) != 1:
+            raise InvalidValueError(
+                "this card asks for several secrets: update the app or reload the page to answer it",
+                {"fields": len(fields)},
+            )
+        return [fields[0].model_copy(update={"value": value})]
+    given: dict[str, str] = answers or {}
+    asked: list[str] = [field.name for field in fields]
+    if set(given) != set(asked):
+        raise InvalidValueError(
+            "answer every field of the card, and only those",
+            {"asked": ", ".join(asked), "given": ", ".join(sorted(given))},
+        )
+    return [field.model_copy(update={"value": given[field.name]}) for field in fields]
+
+
+def _card_fields(args: JsonObject) -> list[SecretAnswer]:
+    """The fields a card asks for, from its ``args``: its ``fields`` (item 2040), else the one ``name`` and ``label``
+    of a card asked before; values empty. A card that names no field is refused."""
+    raw: object = args.get("fields")
+    if isinstance(raw, list) and raw:
+        fields: list[SecretAnswer] = []
+        for entry in raw:
+            if not isinstance(entry, dict):
+                raise InvalidValueError("the card names no secret", {})
+            name, label, kind = entry.get("name"), entry.get("label"), entry.get("kind")
+            if not isinstance(name, str) or not isinstance(label, str) or kind not in ("secret", "text", "file"):
+                raise InvalidValueError("the card names no secret", {})
+            fields.append(SecretAnswer(name=name, label=label, kind=kind, value=""))
+        return fields
+    name, label = args.get("name"), args.get("label")
+    if not isinstance(name, str) or not isinstance(label, str):
+        raise InvalidValueError("the card names no secret", {})
+    return [SecretAnswer(name=name, label=label, kind="secret", value="")]
+
+
+def masked_parts(value: str, kind: str) -> tuple[str, ...]:
+    """What of a held value is masked where a command prints it: the value itself, and for a file's text each line long
+    enough to be part of a key (a PEM's base64 lines), as a command may print one line alone. A PEM's first and last
+    line are no secret and stay unmasked. Pure."""
+    if kind != "file":
+        return (value,)
+    lines: list[str] = [line.strip() for line in value.splitlines()]
+    parts: list[str] = [
+        value,
+        *(line for line in lines if len(line) >= _FILE_LINE_MIN_CHARS and not _PEM_EDGE.fullmatch(line)),
+    ]
+    return tuple(dict.fromkeys(parts))
+
+
+def is_pem_block(value: str) -> bool:
+    """Whether ``value`` is one key in PEM: a BEGIN line, base64 lines, an END line, blank lines and edge spaces aside.
+
+    Read line by line, not by one pattern over the whole text: a long odd text costs one pass, no backtracking. Pure.
+    """
+    lines: list[str] = [line.strip() for line in value.strip().splitlines() if line.strip()]
+    return (
+        len(lines) >= 3
+        and lines[0].startswith("-----BEGIN ")
+        and _PEM_EDGE.fullmatch(lines[0]) is not None
+        and lines[-1].startswith("-----END ")
+        and _PEM_EDGE.fullmatch(lines[-1]) is not None
+        and all(_PEM_BODY_LINE.fullmatch(line) is not None for line in lines[1:-1])
+    )
+
+
+def _checked_value(answer: SecretAnswer) -> str:
+    """The value as it is held: without the spaces and line ends around it (a file keeps its inner lines), at least as
+    long as the masks reach, at most :data:`MOST_VALUE_CHARS` (a file's text :data:`MOST_FILE_CHARS`); else refused."""
+    value: str = answer.value.strip()
+    if len(value) < KNOWN_SECRET_MIN_CHARS:
+        raise InvalidValueError(
+            f"a secret shorter than {KNOWN_SECRET_MIN_CHARS} characters cannot be masked where a command prints it",
+            {"name": answer.name},
+        )
+    most: int = MOST_FILE_CHARS if answer.kind == "file" else MOST_VALUE_CHARS
+    if len(value) > most:
+        raise InvalidValueError(f"a secret is at most {most} characters", {"name": answer.name})
+    if "\x00" in value or (answer.kind != "file" and ("\n" in value or "\r" in value)):
+        raise InvalidValueError(
+            "a secret is one line of text (a file's field takes a file's lines)", {"name": answer.name}
+        )
+    # A file's field takes a key in PEM alone: its body is base64 lines, each masked on its own. A JSON or an .env holds
+    # its secret in a form a command decodes (an escaped key, a short value after `=`) that no mask of its lines reaches
+    # (the security review of item 2040).
+    if answer.kind == "file" and not is_pem_block(value):
+        raise InvalidValueError("a file's field takes a key in PEM (.p8, .pem, .key)", {"name": answer.name})
+    return value
+
+
 def _live(entries: dict[str, dict[str, object]], now: float) -> dict[str, dict[str, object]]:
     return {
         name: entry
@@ -206,52 +329,71 @@ def _live(entries: dict[str, dict[str, object]], now: float) -> dict[str, dict[s
 
 
 def save_secret(thread_id: str, name: str, label: str, value: str, now: float | None = None) -> HeldSecret:
-    """Hold ``value``, without the spaces and line ends around it, for the chat ``thread_id`` under ``name`` for
-    :data:`HOLD_S` from ``now``, replacing a secret of that name, and mask it from now on. A value shorter than the
-    masks reach (8 characters, as a printed one would then stand bare) or longer than :data:`MOST_VALUE_CHARS` is
-    refused."""
-    checked_name(name)
-    # Kept as it is masked: a space or a line end pasted around it would stand in a printed value, and the mask would
-    # not match it.
-    value = value.strip()
-    if len(value) < KNOWN_SECRET_MIN_CHARS:
-        raise InvalidValueError(
-            f"a secret shorter than {KNOWN_SECRET_MIN_CHARS} characters cannot be masked where a command prints it",
-            {"name": name},
-        )
-    if len(value) > MOST_VALUE_CHARS:
-        raise InvalidValueError("a secret is at most 8192 characters", {"name": name})
+    """Hold ``value`` for the chat ``thread_id`` under ``name``: a card's one field, as cards were before item 2040
+    (:func:`save_secrets`)."""
+    answer: SecretAnswer = SecretAnswer(name=name, label=label, kind="secret", value=value)
+    return save_secrets(thread_id, [answer], now)[0]
+
+
+def save_secrets(thread_id: str, answers: Sequence[SecretAnswer], now: float | None = None) -> list[HeldSecret]:
+    """Hold every field of a card for the chat ``thread_id`` for :data:`HOLD_S` from ``now``, each under its name,
+    replacing a secret of that name, and mask them from now on (item 2040). All or none: every value is checked
+    (:func:`_checked_value`) and the names are distinct before anything is written, and the chat's file is written
+    once."""
+    if not answers:
+        raise InvalidValueError("a card holds at least one secret", {"thread_id": thread_id[:80]})
+    names: list[str] = [checked_name(answer.name) for answer in answers]
+    if len(set(names)) != len(names):
+        raise InvalidValueError("a card names each secret once", {"names": ", ".join(names)})
+    values: list[str] = [_checked_value(answer) for answer in answers]
     at: float = time.time() if now is None else now
     until: float = at + HOLD_S
     path: Path = _path(thread_id)
+    saved: list[HeldSecret] = []
     with _lock:
         entries: dict[str, dict[str, object]] = _live(_read(path), at)
-        replaced: dict[str, object] | None = entries.get(name)
-        entries[name] = {"value": value, "label": label[:200], "until": until}
+        for answer, value in zip(answers, values, strict=True):
+            replaced: dict[str, object] | None = entries.get(answer.name)
+            entries[answer.name] = {"value": value, "label": answer.label[:200], "kind": answer.kind, "until": until}
+            saved.append(HeldSecret(name=answer.name, label=answer.label[:200], until=until, replaced=replaced))
         _write(path, entries)
-    hold_filled(value)
-    return HeldSecret(name=name, label=label[:200], until=until, replaced=replaced)
+    hold_filled(
+        *(part for answer, value in zip(answers, values, strict=True) for part in masked_parts(value, answer.kind))
+    )
+    return saved
 
 
 def forget_secret(saved: HeldSecret, thread_id: str, value: str, now: float | None = None) -> None:
-    """Take back what :func:`save_secret` held as ``saved`` for the chat ``thread_id``, when the card was answered
-    otherwise meanwhile (two tabs, its deadline): the secret it replaced is put back while it holds, and a value saved
-    since (the other tab's) is left as it is. The mask stays, as a value once given stands nowhere."""
+    """Take back what :func:`save_secret` held as ``saved`` (:func:`forget_secrets`)."""
+    forget_secrets([saved], thread_id, {saved.name: value}, now)
+
+
+def forget_secrets(
+    saved: Sequence[HeldSecret], thread_id: str, values: dict[str, str], now: float | None = None
+) -> None:
+    """Take back what :func:`save_secrets` held as ``saved`` for the chat ``thread_id``, when the card was answered
+    otherwise meanwhile (two tabs, its deadline): each secret it replaced is put back while it holds, and a value saved
+    since (the other tab's) is left as it is; the file is written once. The masks stay, as a value once given stands
+    nowhere."""
     at: float = time.time() if now is None else now
     path: Path | None = _held_path(thread_id)
     if path is None:
         return
     with _lock:
         entries: dict[str, dict[str, object]] = _live(_read(path), at)
-        current: dict[str, object] | None = entries.get(saved.name)
-        if current is None or current.get("value") != value.strip():
-            return
-        before: dict[str, dict[str, object]] = _live({saved.name: saved.replaced}, at) if saved.replaced else {}
-        if before:
-            entries[saved.name] = before[saved.name]
-        else:
-            del entries[saved.name]
-        _write(path, entries)
+        changed: bool = False
+        for one in saved:
+            current: dict[str, object] | None = entries.get(one.name)
+            if current is None or current.get("value") != values.get(one.name, "").strip():
+                continue
+            before: dict[str, dict[str, object]] = _live({one.name: one.replaced}, at) if one.replaced else {}
+            if before:
+                entries[one.name] = before[one.name]
+            else:
+                del entries[one.name]
+            changed = True
+        if changed:
+            _write(path, entries)
 
 
 def held_secrets(thread_id: str, now: float | None = None) -> list[HeldSecret]:
@@ -285,7 +427,12 @@ def all_held_values(now: float | None = None) -> tuple[str, ...]:
     if not folder.is_dir():
         return ()
     with _lock:
-        return tuple(str(entry["value"]) for path in folder.glob("*.json") for entry in _live(_read(path), at).values())
+        return tuple(
+            part
+            for path in folder.glob("*.json")
+            for entry in _live(_read(path), at).values()
+            for part in masked_parts(str(entry["value"]), str(entry.get("kind", "secret")))
+        )
 
 
 def mask_all_held(now: float | None = None) -> int:
@@ -302,7 +449,11 @@ def mask_all_held(now: float | None = None) -> int:
             if not live:
                 path.unlink(missing_ok=True)
                 continue
-            values.extend(str(entry["value"]) for entry in live.values())
+            values.extend(
+                part
+                for entry in live.values()
+                for part in masked_parts(str(entry["value"]), str(entry.get("kind", "secret")))
+            )
     kept: list[str] = [value for value in values if len(value) >= KNOWN_SECRET_MIN_CHARS]
     if kept:
         hold_filled(*kept)

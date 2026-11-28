@@ -137,3 +137,36 @@ async def test_a_code_the_user_types_on_the_card_reaches_the_run_as_their_own_wo
 
     assert "4816" in result.text
     assert instructions == ["4816"]
+
+
+def test_ask_secret_takes_one_name_or_two_to_four_fields() -> None:
+    """Item 2040: one secret takes name; things that go together take fields, 2 to 4, never both."""
+    from pydantic import ValidationError
+
+    from dotagent.tools.meta import AskSecretArgs
+
+    AskSecretArgs(name="DEMO_TOKEN", label="Demo", why="To read the visits.")
+    pair = [
+        {"name": "ASC_ISSUER_ID", "label": "Issuer ID", "kind": "text"},
+        {"name": "ASC_KEY", "label": "Key", "kind": "file"},
+    ]
+    AskSecretArgs.model_validate({"label": "App Store Connect API key", "why": "To upload.", "fields": pair})
+    for wrong in (
+        {"label": "x", "why": "y", "name": "A_TOKEN", "fields": pair},
+        {"label": "x", "why": "y", "fields": pair[:1]},
+        {"label": "x", "why": "y", "fields": pair * 3},
+        {"label": "x", "why": "y"},
+    ):
+        with pytest.raises(ValidationError):
+            AskSecretArgs.model_validate(wrong)
+
+
+def test_a_one_name_card_with_a_long_title_still_has_its_field() -> None:
+    """Item 2040: a one-name call whose label is 81 to 120 characters (valid before fields came) builds its card."""
+    from dotagent.tools.meta import AskSecretArgs, _card_fields  # pyright: ignore[reportPrivateUsage]
+
+    args = AskSecretArgs(name="DEMO_TOKEN", label="L" * 100, why="To read the visits.")
+
+    fields = [(field.name, len(field.label), field.kind) for field in _card_fields(args)]
+
+    assert fields == [("DEMO_TOKEN", 100, "secret")]

@@ -67,6 +67,17 @@
         }
       }
     },
+    "%@ could not be read": {
+      "comment": "Ask dock: a picked key file that could not be read; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ okunamadı"
+          }
+        }
+      }
+    },
     "%@ is %@. The limit is 20 MiB per attachment.": {
       "comment": "Composer attachment error; arguments are file name and size",
       "localizations": {
@@ -100,6 +111,17 @@
         }
       }
     },
+    "%@ is not a key in PEM: pick the key file itself (.p8, .pem, .key).": {
+      "comment": "Ask dock: a picked file that is no key in PEM; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ PEM biçiminde bir anahtar değil: anahtar dosyasının kendisini seç (.p8, .pem, .key)."
+          }
+        }
+      }
+    },
     "%@ is off.": {
       "comment": "Watchers: one was switched off",
       "localizations": {
@@ -118,6 +140,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ açık."
+          }
+        }
+      }
+    },
+    "%@ is too large for a card: a key file is a few KB at most.": {
+      "comment": "Ask dock: a picked file larger than a card's field holds; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ bir kart için çok büyük: bir anahtar dosyası en fazla birkaç KB olur."
           }
         }
       }
@@ -195,6 +228,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ · %@ önbellekten"
+          }
+        }
+      }
+    },
+    "%@ · %lld bytes": {
+      "comment": "Ask dock: the key file picked; the arguments are its name and size",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %2$lld bayt"
           }
         }
       }
@@ -2717,6 +2761,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çipler"
+          }
+        }
+      }
+    },
+    "Choose a file": {
+      "comment": "Ask dock: picks the key file a card of secrets asks for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya seç"
           }
         }
       }
@@ -6180,6 +6235,17 @@
         }
       }
     },
+    "Hide": {
+      "comment": "Ask dock: hides an id typed on a card of secrets",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gizle"
+          }
+        }
+      }
+    },
     "Hide %@": {
       "comment": "VoiceOver: hides a model from the list; the argument is its name",
       "localizations": {
@@ -7995,6 +8061,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz değişen dosya yok."
+          }
+        }
+      }
+    },
+    "No file chosen": {
+      "comment": "Ask dock: a card's file field before a file is picked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya seçilmedi"
           }
         }
       }
@@ -11857,6 +11934,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekim'deki iki taslağı da ekleyeyim mi?"
+          }
+        }
+      }
+    },
+    "Show": {
+      "comment": "Ask dock: shows an id typed on a card of secrets",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Göster"
           }
         }
       }

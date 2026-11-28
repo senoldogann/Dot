@@ -827,4 +827,31 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Editing queued message"].waitForExistence(timeout: 3))
         XCTAssertEqual(app.textFields["composer.field"].value as? String, "Then send me the screenshots of the new designs")
     }
+
+    /// Item 2040: a card of several secrets shows each field's words and the name its commands read it as, the Issuer ID
+    /// in a box that shows its letters, the Key ID in one that shows none, a key file to pick; Save securely waits until
+    /// every field (the file too) holds a value.
+    func testACardOfSeveralSecretsTakesEachFieldAndWaitsForTheKeyFile() {
+        let app: XCUIApplication = launch("n2-secrets")
+        XCTAssertTrue(app.staticTexts["App Store Connect API key"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["$ASC_ISSUER_ID"].exists && app.staticTexts["$ASC_KEY"].exists, "each field's name")
+        // Every box shows no letter at first, the id's too, which the eye reveals (the security review of item 2040).
+        let issuer: XCUIElement = app.secureTextFields["secret.field.ASC_ISSUER_ID"]
+        let keyId: XCUIElement = app.secureTextFields["secret.field.ASC_KEY_ID"]
+        XCTAssertTrue(issuer.exists, "the Issuer ID hidden at first")
+        XCTAssertTrue(app.buttons["secret.reveal.ASC_ISSUER_ID"].exists, "with an eye to show it")
+        XCTAssertTrue(keyId.exists, "the Key ID shows none")
+        XCTAssertTrue(app.buttons["secret.file.ASC_KEY"].exists, "the key file is picked")
+        let save: XCUIElement = app.buttons["ask.primary"]
+        XCTAssertFalse(save.isEnabled)
+        issuer.tap()
+        issuer.typeText("69a6de70-made-up-issuer")
+        keyId.tap()
+        keyId.typeText("MADEUPKEY2040")
+        XCTAssertFalse(save.isEnabled, "the key file is still to pick")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "secret-fields"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
 }

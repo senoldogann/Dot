@@ -22,7 +22,14 @@ from dotagent.agent.attachments import (
 )
 from dotagent.agent.budget import loosens, run_budget
 from dotagent.agent.campaign import session_number
-from dotagent.agent.held_secrets import SECRET_SEVERITY, HeldSecret, forget_secret, save_secret
+from dotagent.agent.held_secrets import (
+    SECRET_SEVERITY,
+    HeldSecret,
+    SecretAnswer,
+    card_answers,
+    forget_secrets,
+    save_secrets,
+)
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import disliked_of, run_lessons
 from dotagent.agent.mode_words import resolved_mode
@@ -855,22 +862,22 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         record: ApprovalRecord = await store.get_approval(approval_id)
         if record.severity != SECRET_SEVERITY or record.status not in ("pending", "left"):
             raise InvalidValueError("no open card asks for a secret here", {"approval_id": approval_id})
-        name: object = record.args.get("name")
-        label: object = record.args.get("label")
-        if not isinstance(name, str) or not isinstance(label, str):
-            raise InvalidValueError("the card names no secret", {"approval_id": approval_id})
+        answers: list[SecretAnswer] = card_answers(record.args, request.value, request.answers_by_name())
         run: RunRecord = await store.get_run(record.run_id)
-        # Held before the card is answered, so that the run, woken by the answer, finds it; taken back when the card
-        # was answered otherwise meanwhile (two tabs, its deadline).
-        saved: HeldSecret = await asyncio.to_thread(save_secret, run.thread_id, name, label, request.value)
+        # Held before the card is answered, so that the run, woken by the answer, finds them; taken back when the card
+        # was answered otherwise meanwhile (two tabs, its deadline). All or none, in one write (item 2040).
+        saved: list[HeldSecret] = await asyncio.to_thread(save_secrets, run.thread_id, answers)
         try:
             answered: ApprovalRecord = await ctx.runtime.approvals.resolve(approval_id, True, UI_SOURCE, "")
         except Exception:
-            # Whatever kept the card from being answered (another answer, a run deleted meanwhile), the secret is not
-            # left held for the chat (the review of 2026-11-01).
-            await asyncio.to_thread(forget_secret, saved, run.thread_id, request.value)
+            # Whatever kept the card from being answered (another answer, a run deleted meanwhile), the secrets are
+            # not left held for the chat (the review of 2026-11-01).
+            values: dict[str, str] = {answer.name: answer.value for answer in answers}
+            await asyncio.to_thread(forget_secrets, saved, run.thread_id, values)
             raise
-        log.info("secret_held", approval_id=approval_id, run_id=record.run_id, name=name)
+        log.info(
+            "secret_held", approval_id=approval_id, run_id=record.run_id, names=[answer.name for answer in answers]
+        )
         return answered
 
     return router

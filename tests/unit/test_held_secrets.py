@@ -13,16 +13,21 @@ import pytest
 from dotagent import secrets
 from dotagent.agent.held_secrets import (
     HOLD_S,
+    SecretAnswer,
     all_held_values,
+    card_answers,
     checked_name,
     forget_secret,
+    forget_secrets,
     held_dir,
     held_secrets,
     held_values,
     mask_all_held,
     save_secret,
+    save_secrets,
 )
 from dotagent.core.errors import InvalidValueError
+from dotagent.core.types import JsonObject
 
 VALUE: str = "made-up-token-0123456789-item-857"
 THREAD: str = "thr_test_857"
@@ -170,3 +175,124 @@ def test_a_name_the_shell_reads_written_into_the_file_by_other_means_is_not_give
     entries["HTTPS_PROXY"] = {"value": "http://planted.example:8080", "label": "x", "until": 1e12}
     path.write_text(json.dumps(entries), encoding="utf-8")
     assert held_values(THREAD, now=1001.0) == {"DEMO_TOKEN": VALUE}
+
+
+# Item 2040: several fields on one card, one of them a key file.
+_PEM: str = (
+    "-----BEGIN PRIVATE KEY-----\n"
+    "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgmadeUpKeyLineOne\n"
+    "oAoGCCqGSM49AwEHoUQDQgAEmadeUpKeyLineTwoForTheTestOnly0123456789\n"
+    "-----END PRIVATE KEY-----\n"
+)
+
+
+def _answers() -> list[SecretAnswer]:
+    return [
+        SecretAnswer(name="ASC_ISSUER_ID", label="Issuer ID", kind="text", value="69a6de70-made-up-issuer-0123"),
+        SecretAnswer(name="ASC_KEY_ID", label="Key ID", kind="secret", value="MADEUPKEY1"),
+        SecretAnswer(name="ASC_KEY", label="Key file", kind="file", value=_PEM),
+    ]
+
+
+def test_a_cards_fields_are_held_together_in_one_write_each_masked_and_a_files_text_with_its_lines(home: Path) -> None:
+    saved = save_secrets(THREAD, _answers(), now=1000.0)
+    assert [one.name for one in saved] == ["ASC_ISSUER_ID", "ASC_KEY_ID", "ASC_KEY"]
+    values = held_values(THREAD, now=1001.0)
+    assert values["ASC_KEY"] == _PEM.strip(), "the file's text, its inner lines kept"
+    assert values["ASC_ISSUER_ID"] == "69a6de70-made-up-issuer-0123"
+    masked: str = secrets.mask_filled(
+        "id 69a6de70-made-up-issuer-0123 key MADEUPKEY1 line "
+        "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgmadeUpKeyLineOne "
+        "-----BEGIN PRIVATE KEY-----"
+    )
+    assert "made-up-issuer" not in masked and "MADEUPKEY1" not in masked and "madeUpKeyLineOne" not in masked, masked
+    assert "-----BEGIN PRIVATE KEY-----" in masked, "a PEM's first line is no secret"
+    # A daemon that starts masks the same parts from the file.
+    started: set[str] = set(all_held_values(now=1001.0))
+    assert "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgmadeUpKeyLineOne" in started
+    assert "-----END PRIVATE KEY-----" not in started
+
+
+def test_one_field_that_cannot_be_held_holds_none_of_the_card(home: Path) -> None:
+    short = [*_answers()[:2], SecretAnswer(name="ASC_KEY", label="Key file", kind="file", value="short")]
+    with pytest.raises(InvalidValueError, match="shorter than 8"):
+        save_secrets(THREAD, short, now=1000.0)
+    assert held_values(THREAD, now=1001.0) == {}
+    twice = [*_answers()[:2], SecretAnswer(name="ASC_KEY_ID", label="Again", kind="secret", value="another-value-123")]
+    with pytest.raises(InvalidValueError, match="names each secret once"):
+        save_secrets(THREAD, twice, now=1000.0)
+    lines = [SecretAnswer(name="DEMO_TOKEN", label="Token", kind="secret", value="line-one-12345\nline-two-12345")]
+    with pytest.raises(InvalidValueError, match="one line"):
+        save_secrets(THREAD, lines, now=1000.0)
+    assert not (home / "held-secrets" / f"{THREAD}.json").exists()
+
+
+def test_a_card_taken_back_puts_back_every_field_in_one_write(home: Path) -> None:
+    save_secret(THREAD, "ASC_KEY_ID", "Key ID", "older-key-id-value", now=1000.0)
+    saved = save_secrets(THREAD, _answers(), now=1001.0)
+    forget_secrets(saved, THREAD, {answer.name: answer.value for answer in _answers()}, now=1002.0)
+    assert held_values(THREAD, now=1003.0) == {"ASC_KEY_ID": "older-key-id-value"}
+
+
+def test_a_card_is_answered_by_its_fields_alone() -> None:
+    fields: JsonObject = {
+        "label": "App Store Connect key",
+        "fields": [
+            {"name": "ASC_ISSUER_ID", "label": "Issuer ID", "kind": "text"},
+            {"name": "ASC_KEY", "label": "Key file", "kind": "file"},
+        ],
+    }
+    answers = card_answers(fields, None, {"ASC_ISSUER_ID": "issuer-0123456789", "ASC_KEY": _PEM})
+    assert [(one.name, one.kind) for one in answers] == [("ASC_ISSUER_ID", "text"), ("ASC_KEY", "file")]
+    with pytest.raises(InvalidValueError, match="update the app"):
+        card_answers(fields, "one-value-0123456789", None)
+    with pytest.raises(InvalidValueError, match="every field"):
+        card_answers(fields, None, {"ASC_ISSUER_ID": "issuer-0123456789"})
+    with pytest.raises(InvalidValueError, match="every field"):
+        card_answers(fields, None, {"ASC_ISSUER_ID": "issuer-0123456789", "ASC_KEY": _PEM, "OTHER": "x" * 10})
+    with pytest.raises(InvalidValueError, match="value or with its fields"):
+        card_answers(fields, "x" * 10, {"ASC_KEY": _PEM})
+    # A card asked before item 2040: one name, answered with one value.
+    old = card_answers({"name": "DEMO_TOKEN", "label": "Demo"}, VALUE, None)
+    assert [(one.name, one.kind, one.value) for one in old] == [("DEMO_TOKEN", "secret", VALUE)]
+
+
+def test_a_file_field_takes_a_key_in_pem_alone(home: Path) -> None:
+    """The security review of item 2040: a JSON's escaped key, or an .env's short values, escape the line masks."""
+    for text in (
+        '{"type": "service_account", "private_key": "-----BEGIN PRIVATE KEY-----\\nMIIEv..."}',
+        "API_KEY=abc123456\n",
+    ):
+        answer = SecretAnswer(name="GCP_KEY", label="Key file", kind="file", value=text)
+        with pytest.raises(InvalidValueError, match="key in PEM"):
+            save_secrets(THREAD, [answer], now=1000.0)
+    assert held_values(THREAD, now=1001.0) == {}
+
+
+def test_a_key_file_is_read_line_by_line_so_a_long_odd_text_is_refused_at_once() -> None:
+    """Item 2040: the PEM check is one pass; a 16 KB text that only starts like a key is refused, a key taken."""
+    import time
+
+    from dotagent.agent.held_secrets import is_pem_block
+
+    started = time.monotonic()
+    refused = [
+        is_pem_block("-----BEGIN X-----" + " " * 16000 + "x"),
+        is_pem_block("-----BEGIN X-----\n" + "AB \n" * 3000 + "!"),
+    ]
+
+    assert refused == [False, False]
+    assert time.monotonic() - started < 0.5
+    assert is_pem_block("-----BEGIN PRIVATE KEY-----\nMIGTAgEA\nAwEHBG0w\n-----END PRIVATE KEY-----\n")
+
+
+def test_a_key_file_takes_base64_lines_alone_and_masks_its_short_last_line() -> None:
+    """Item 2040's security review: an .env between BEGIN and END lines is no key, and a key's 8-character last line is
+    masked on its own as its longer lines are."""
+    from dotagent.agent.held_secrets import is_pem_block, masked_parts
+
+    key = "-----BEGIN PRIVATE KEY-----\n" + "A" * 64 + "\n" + "ZZZZabcd\n-----END PRIVATE KEY-----"
+
+    assert not is_pem_block("-----BEGIN X-----\nAPITOKEN=abcd1234secret\n-----END X-----")
+    assert is_pem_block(key)
+    assert "ZZZZabcd" in masked_parts(key, "file")

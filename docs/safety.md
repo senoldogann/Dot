@@ -714,6 +714,20 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
     1073; before it, Save did nothing and said nothing). Such a code is in the chat, as any message is. A card left
     for you, which no run waits on, says to write the code in the chat instead, whose next run reads it; a note a
     command that cannot ask declines a card with is never taken for your words.
+  - **Several on one card (item 2040).** A run that needs things that go together (an App Store Connect key's issuer
+    id, key id and `.p8` file) asks for them on one card with `fields` (2 to 4), each with the name its commands read
+    it as, shown on the card. A field is typed in a box that shows no letter (`secret`), in one that shows no letter
+    until you press Show (`text`, an id you copy: the run chooses the kind, so an id's box starts hidden too), or as a
+    key file you pick (`file`: a key in PEM alone, `.p8`, `.pem`, `.key`, at most 16 KB, its text in `$NAME`, no file
+    written; a JSON or an `.env` is refused, as it holds its secret in a form a command decodes and no mask reaches).
+    The kind changes the box alone: every value is held for 24 hours, at least 8 characters, and masked as any other
+    (a key's text whole and each of its base64 lines of 8 characters or more; a decoded form of a key, its hex or `openssl -text`, is not
+    found). Masking is a guard against a value printed by chance, not against a run that means to send it: a command of
+    the chat reads the value, as it must to use it. **Save securely** sends every field at once and the daemon holds all or none in
+    one write; a field left out, one the card did not ask for, or one value from an older phone or page (which is
+    told to update) is refused. A card of several has no **Send as a message**. Dot gives them to no command after the
+    24 hours, and has no store that outlives the chat's hold, no "use the saved one"; the chat's file drops them at its
+    next write or when the daemon starts again.
   - The value goes to the daemon alone (`POST /api/approvals/{id}/secret`). It is held for that chat's commands
     (`shell`, `terminal_open`) under the name the run asked for, for 24 hours, in a file of the chat's own under
     Dot's home (`held-secrets/<chat>.json`, mode 0600).

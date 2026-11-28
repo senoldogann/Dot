@@ -245,4 +245,32 @@ final class ChatRulesTests: XCTestCase {
         // The helper's own chat: its parent run is in another chat.
         XCTAssertEqual(ownRuns(in: [runRecord("run_h1", parent: "run_b")], helperRunIds: []).map(\.id), ["run_h1"])
     }
+
+    /// Item 2040: a card of several secrets is read with each field's kind and the daemon's limits; one of one value keeps
+    /// its one box. Save waits until every field holds a value long enough and not too long.
+    func testACardOfSeveralSecretsIsReadWithItsFieldsAndSaveWaitsForEach() {
+        func field(_ name: String, _ label: String, _ kind: String, _ most: Int) -> JSONValue {
+            .object(["name": .string(name), "label": .string(label), "kind": .string(kind), "min_chars": .int(8), "max_chars": .int(most)])
+        }
+        let card: Ask = ask(
+            of: record("s", at: 1, severity: "secret", args: [
+                "label": .string("App Store Connect API key"), "why": .string("To upload the build."),
+                "fields": .array([field("ASC_ISSUER_ID", "Issuer ID", "text", 8192), field("ASC_KEY", "Key file", "file", 16384)]),
+            ], tool: "ask_secret"), chatRuns: ["run_a"])
+        XCTAssertEqual(card.kind, .secret)
+        XCTAssertEqual(card.secretFields.map(\.name), ["ASC_ISSUER_ID", "ASC_KEY"])
+        XCTAssertEqual(card.secretFields.map(\.kind), [.text, .file])
+        XCTAssertEqual(card.secretFields.map(\.most), [8192, 16384])
+        let single: Ask = ask(
+            of: record("t", at: 1, severity: "secret", args: [
+                "name": .string("DEMO_TOKEN"), "label": .string("Demo"), "fields": .array([field("DEMO_TOKEN", "Demo", "secret", 8192)]),
+            ], tool: "ask_secret"), chatRuns: ["run_a"])
+        XCTAssertEqual(single.secretFields, [], "a card of one value keeps its one box")
+        let fields: [SecretField] = card.secretFields
+        XCTAssertFalse(secretFieldsReady(fields, values: [:]))
+        XCTAssertFalse(secretFieldsReady(fields, values: ["ASC_ISSUER_ID": "69a6de70-made-up"]), "a field left empty")
+        XCTAssertFalse(secretFieldsReady(fields, values: ["ASC_ISSUER_ID": "short", "ASC_KEY": String(repeating: "x", count: 40)]))
+        XCTAssertFalse(secretFieldsReady(fields, values: ["ASC_ISSUER_ID": "69a6de70-made-up", "ASC_KEY": String(repeating: "x", count: 16385)]))
+        XCTAssertTrue(secretFieldsReady(fields, values: ["ASC_ISSUER_ID": "69a6de70-made-up", "ASC_KEY": String(repeating: "x", count: 40)]))
+    }
 }

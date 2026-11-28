@@ -1,5 +1,6 @@
 import DotEngine
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// What the dock asks the screen to do.
 struct AskDockActions {
@@ -7,6 +8,8 @@ struct AskDockActions {
     let decide: (_ ask: Ask, _ approve: Bool, _ note: String, _ remember: Bool) -> Void
     /// Sends a secret to its own route; the value is held only in the field.
     let giveSecret: (_ ask: Ask, _ value: String) -> Void
+    /// Sends every field of a card of several secrets together (item 2040), in the card's order.
+    let giveSecrets: (_ ask: Ask, _ answers: [(name: String, value: String)]) -> Void
     /// Lets an ask that ended elsewhere go.
     let dismiss: (_ id: String) -> Void
     /// Stops the run at work; `nil` when nothing can be stopped.
@@ -159,6 +162,14 @@ struct AskCard: View {
     @Binding var draft: QuestionDraft
     @State private var secret: String = ""
     @FocusState private var secretFocused: Bool
+    /// The values of a card of several secrets while they are typed (item 2040): in memory, emptied once sent.
+    @State private var secrets: [String: String] = [:]
+    /// What the card says of each file field: the file picked (its name and size) or why it was not taken.
+    @State private var fileWords: [String: String] = [:]
+    /// The file field whose picker is open.
+    @State private var choosingFile: String?
+    /// The id fields the owner chose to see as they type.
+    @State private var revealed: Set<String> = []
 
     private var ask: Ask { entry.ask }
 
@@ -208,7 +219,7 @@ struct AskCard: View {
         case .question:
             question
         case .secret:
-            secretField
+            if ask.secretFields.isEmpty { secretField } else { secretFieldsCard }
         }
     }
 
@@ -296,6 +307,120 @@ struct AskCard: View {
                 deny: (String(localized: "Decline", comment: "Ask dock: refuses to give a secret"), { actions.decide(ask, false, "", false) }),
                 primaryEnabled: value.count >= secretLeastCharacters)
         }
+    }
+
+    /// A card of several secrets (item 2040), as the web's: each field's words and the name its commands read it as, a box
+    /// that shows no letter (a secret), one that shows them (an id the owner copies), or a key file picked on the phone
+    /// (read once as text, sent, and let go); Save securely once every field holds a value the card holds.
+    private var secretFieldsCard: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            ForEach(ask.secretFields) { field in
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                        Text(field.label).textRole(.footnote).fontWeight(.semibold).foregroundStyle(Tone.text)
+                        Text(verbatim: "$" + field.name).textRole(.label).foregroundStyle(Tone.tertiary).lineLimit(1).truncationMode(.middle)
+                    }
+                    .accessibilityElement(children: .combine)
+                    secretInput(field)
+                }
+            }
+            Text(String(localized: "Sent once to your Mac, held for this chat's commands; never kept on this phone.", comment: "Ask dock: where a secret goes"))
+                .textRole(.label).foregroundStyle(Tone.tertiary)
+            stacked(
+                primary: String(localized: "Save securely", comment: "Ask dock: sends a secret to the Mac"),
+                approve: {
+                    actions.giveSecrets(ask, ask.secretFields.map { (name: $0.name, value: secrets[$0.name] ?? "") })
+                    secrets = [:]
+                    fileWords = [:]
+                }, extra: nil,
+                deny: (String(localized: "Decline", comment: "Ask dock: refuses to give a secret"), {
+                    secrets = [:]
+                    fileWords = [:]
+                    actions.decide(ask, false, "", false)
+                }),
+                primaryEnabled: secretFieldsReady(ask.secretFields, values: secrets))
+        }
+        .fileImporter(
+            isPresented: Binding(get: { choosingFile != nil }, set: { if !$0 { choosingFile = nil } }),
+            allowedContentTypes: [.data, .text], allowsMultipleSelection: false
+        ) { result in
+            guard let name = choosingFile, let field = ask.secretFields.first(where: { $0.name == name }) else { return }
+            choosingFile = nil
+            take(result, for: field)
+        }
+    }
+
+    @ViewBuilder private func secretInput(_ field: SecretField) -> some View {
+        let binding: Binding<String> = Binding(get: { secrets[field.name] ?? "" }, set: { secrets[field.name] = $0 })
+        switch field.kind {
+        case .secret:
+            SecureField(field.label, text: binding)
+                .textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
+                .textRole(.body).padding(Space.s).frame(minHeight: Metric.hit).background(Tone.nested, in: rounded(Radius.inner))
+                .accessibilityLabel(field.label).accessibilityIdentifier("secret.field." + field.name)
+        case .text:
+            // An id's box shows no letter at first either: the run chose the kind, and an injected one could ask for a
+            // password as an "id"; the owner reveals it with the eye (the security review of item 2040).
+            HStack(spacing: Space.xs) {
+                Group {
+                    if revealed.contains(field.name) {
+                        TextField(field.label, text: binding)
+                    } else {
+                        SecureField(field.label, text: binding)
+                    }
+                }
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                .textRole(.body).padding(Space.s).frame(minHeight: Metric.hit).background(Tone.nested, in: rounded(Radius.inner))
+                .accessibilityLabel(field.label).accessibilityIdentifier("secret.field." + field.name)
+                Button {
+                    if revealed.contains(field.name) { revealed.remove(field.name) } else { revealed.insert(field.name) }
+                } label: {
+                    Image(systemName: revealed.contains(field.name) ? "eye.slash" : "eye").frame(width: Metric.hit, height: Metric.hit)
+                }
+                .buttonStyle(.plain).foregroundStyle(Tone.secondary)
+                .accessibilityLabel(
+                    revealed.contains(field.name)
+                        ? String(localized: "Hide", comment: "Ask dock: hides an id typed on a card of secrets")
+                        : String(localized: "Show", comment: "Ask dock: shows an id typed on a card of secrets"))
+                .accessibilityIdentifier("secret.reveal." + field.name)
+            }
+        case .file:
+            HStack(spacing: Space.s) {
+                Button {
+                    choosingFile = field.name
+                } label: {
+                    Label(String(localized: "Choose a file", comment: "Ask dock: picks the key file a card of secrets asks for"), systemImage: "doc.badge.plus")
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .accessibilityIdentifier("secret.file." + field.name)
+                Text(fileWords[field.name] ?? String(localized: "No file chosen", comment: "Ask dock: a card's file field before a file is picked"))
+                    .textRole(.label).foregroundStyle(Tone.secondary).lineLimit(2)
+            }
+        }
+    }
+
+    /// Reads the key file the owner picked for `field`, once, as text: taken when it is text and no longer than the field
+    /// holds; else the card says why and the field stays empty. The file's access is let go at once.
+    private func take(_ result: Result<[URL], any Error>, for field: SecretField) {
+        secrets[field.name] = nil
+        guard case .success(let urls) = result, let url = urls.first else { return }
+        let opened: Bool = url.startAccessingSecurityScopedResource()
+        defer { if opened { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else {
+            fileWords[field.name] = String(localized: "\(url.lastPathComponent) could not be read", comment: "Ask dock: a picked key file that could not be read; the argument is its name")
+            return
+        }
+        guard data.count <= field.most else {
+            fileWords[field.name] = String(localized: "\(url.lastPathComponent) is too large for a card: a key file is a few KB at most.", comment: "Ask dock: a picked file larger than a card's field holds; the argument is its name")
+            return
+        }
+        // A key in PEM alone (the daemon refuses any other): a JSON or an .env holds its secret in a form no mask reaches.
+        guard let text = String(data: data, encoding: .utf8), !text.contains("\u{0}"), text.contains("-----BEGIN ") else {
+            fileWords[field.name] = String(localized: "\(url.lastPathComponent) is not a key in PEM: pick the key file itself (.p8, .pem, .key).", comment: "Ask dock: a picked file that is no key in PEM; the argument is its name")
+            return
+        }
+        secrets[field.name] = text
+        fileWords[field.name] = String(localized: "\(url.lastPathComponent) · \(data.count) bytes", comment: "Ask dock: the key file picked; the arguments are its name and size")
     }
 
     /// The buttons stacked full width (thumb reach, R-c #7): the yes in ink, then the others.

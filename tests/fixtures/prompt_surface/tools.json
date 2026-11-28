@@ -73,6 +73,42 @@
     "parameters": {
       "additionalProperties": false,
       "properties": {
+        "fields": {
+          "description": "Instead of name: 2-4 that go together.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "default": "secret",
+                "description": "text: an id; file: a PEM key, as text.",
+                "enum": [
+                  "secret",
+                  "text",
+                  "file"
+                ],
+                "type": "string"
+              },
+              "label": {
+                "description": "Its words: Issuer ID.",
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "name": {
+                "description": "Its env var.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "label"
+            ],
+            "type": "object"
+          },
+          "maxItems": 4,
+          "minItems": 0,
+          "type": "array"
+        },
         "label": {
           "description": "The card's title: what it is and its least access.",
           "maxLength": 120,
@@ -80,7 +116,8 @@
           "type": "string"
         },
         "name": {
-          "description": "The environment variable your commands read it as: CLOUDFLARE_API_TOKEN.",
+          "default": "",
+          "description": "The env var your commands read it as: CLOUDFLARE_API_TOKEN.",
           "type": "string"
         },
         "replace": {
@@ -96,7 +133,6 @@
         }
       },
       "required": [
-        "name",
         "label",
         "why"
       ],

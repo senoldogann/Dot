@@ -499,6 +499,26 @@ extension AppModel {
         }
     }
 
+    /// Gives every field of a card of several secrets at once (item 2040), as `giveSecret`: never through the outbox.
+    func giveSecrets(_ ask: Ask, answers: [(name: String, value: String)]) {
+        guard let engine else { return }
+        askPhases[ask.id] = .submitting
+        answeredHere.insert(ask.id)
+        Task {
+            do throws(DaemonRequestError) {
+                _ = try await engine.giveSecrets(approval: ask.id, answers: answers)
+            } catch {
+                if error.statusCode == 409 || error.statusCode == 404 {
+                    askPhases[ask.id] = .answeredElsewhere
+                } else if let code = error.statusCode {
+                    askPhases[ask.id] = .refused("HTTP \(code)")
+                } else {
+                    askPhases[ask.id] = .retry(String(describing: error))
+                }
+            }
+        }
+    }
+
     /// The models the daemon offers and its defaults, read once per launch for the composer's chip and the chat's
     /// settings (each again on the next ask while it could not be read).
     /// A read that fails says why (`modelsProblem`), for the picker to show with its retry: the defaults' too, without
