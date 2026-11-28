@@ -35,7 +35,6 @@ const CORE = {
   "work.forMinutes": "{count} min",
   // The line over the composer while a task works (capsule.js).
   "capsule.label": "How the task stands",
-  "capsule.working": "Working {took}",
   "capsule.stopping": "Stopping…",
   "capsule.plan": "Plan {done}/{total}",
   "capsule.planLabel": "Plan",
@@ -50,9 +49,7 @@ const CORE = {
   "capsule.details": "Details",
   "capsule.stop": "Stop",
   // The one capsule over a phone's composer and the sheets its segments open (dockbar.js, docksheet.js).
-  "dock.working": "Working · {took}",
   "dock.reconnecting": "Can't reach Dot",
-  "dock.stopLabel": "Stop the task",
   "dock.helperOne": "{count} helper",
   "dock.helperMany": "{count} helpers",
   "dock.loopOne": "1 loop",

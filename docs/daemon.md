@@ -809,8 +809,9 @@ picture and each file with its ×, its name the tooltip, and the files the box h
 the send does, or the queue's next message to the run when the box is empty. Settings › General › Messages chooses the
 send's way (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
-box (items 352 and 360, drawn since item 1335 as a plain bar on a hairline, no glass and no shadow) says in a few quiet words how long the run has worked, that it waits to start, that it waits
-for you or that it stops (once Stop was pressed, until it has),
+box (items 352 and 360, drawn since item 1335 as a plain bar on a hairline, no glass and no shadow) says in a few quiet words that the run waits to start, that it waits
+for you, that it waits on its helpers or that it stops (once Stop was pressed, until it has); a run that simply works
+has no part there (item 2105: the conversation's work line says it, and the composer's send is its Stop),
 how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
@@ -820,12 +821,14 @@ part closes it. It does not say what the run does now, which the conversation sh
 the commands at work in the chat, which stand right under it. **On a phone** (a window up to 720 px wide) nothing is
 stacked over the box (item 1383): the line that waits for helpers, the bar, the queue, the loops and the commands at
 work are one capsule of glass, a single row just above the box with a round way down beside it, whose segments are
-divided by hairlines and each at least 44 px tall: the run's status (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**, **Stopping…**) and its **Stop**, the plan, **2 helpers**, the loop (**every 10 min**, or **2
+divided by hairlines and each at least 44 px tall: the run's status while it is more than work (**Waiting for you**,
+**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**, **Stopping…**), the plan, **2 helpers**, the loop (**every 10 min**, or **2
 loops**), **1 queued** (**1 paused** while a stop holds the queue) and **1 running**; a segment is there only while it
-has something to say, and with none the capsule is not drawn. A row too narrow for its words says fewer, counts alone
-for the secondary segments, then the Stop without its word, then the time without "Working", and at the narrowest a
-second line that keeps the status and the Stop in words, never a scroll or a cut. A tap on a segment opens what its pane showed in a sheet from the foot of the screen, one at a time,
+has something to say, and with none the capsule is not drawn. A run that simply works has no segment and the capsule
+no Stop (item 2105, the owner's word that they said again what the conversation's work line and the composer's Stop
+say): the composer's send, its box empty, is the one Stop. A row too narrow for its words says fewer, counts alone
+for the secondary segments, then the same closer together, and at the narrowest a second line that keeps the status
+in words, never a scroll or a cut. A tap on a segment opens what its pane showed in a sheet from the foot of the screen, one at a time,
 closed by a tap outside it, by Escape, by its handle or by a swipe down: the queue with its up and down arrows (44 px,
 never a drag), pencil, **Steer** and ×; the loops with how often and when next, and **Stop repeating**; the commands
 with their words wrapped whole, how long they ran and **Stop**; the helpers with what the task waits on, what each does

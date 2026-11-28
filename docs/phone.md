@@ -134,8 +134,9 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    shortened to its site or, for a GitHub pull request, `#1012` after the GitHub mark, and opens in Safari's in-app
    view, the icons asked of a site only once the answer is whole; nothing is listed under the answer, items 1935 and 1961; a
    table's long cells wrap inside their rows, its columns fitting the screen, item 1961), the approvals and questions a run asks with Allow and Deny, one capsule
-   over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
-   waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
+   over the composer (item 1390) whose segments are the run's status (waiting on you with its clock,
+   waiting on N helpers; a run that simply works has no segment and the capsule no Stop, item 2105: the transcript's
+   live line says it works and the composer's button, the field empty, is its Stop; or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
    or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of
    "Done · 1 min ago", and the chat's row in the list, item 1466; while the chat is open the app asks for the list of helpers
    every 8 seconds as long as one is live, and keeps the last count, dimmed, with no link),
@@ -361,12 +362,12 @@ Over the composer there is one row and nothing stacked (item 1383, which ended t
 on the helpers, the queue, the loops and the commands at work, five panes one upon the other at different widths): a
 capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
 by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
-never a layer over it. Its segments are the run's status with its Stop (**Working · 36s**, whole seconds as the iPhone app says them (item 2000), **Waiting for you**,
-**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
+never a layer over it. Its segments are the run's status while it is more than work (**Waiting for you**,
+**Waiting on 2 helpers** (only while the run has stopped for them), **Can't reach Dot**; a run that simply works has
+none, and the capsule no Stop, item 2105: the composer's send is the Stop), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
 each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
-fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
-"Working") and at 320 px, with everything to say, takes a second line that keeps the status and the Stop in words, never
-a scroll or a cut. A tap on a segment opens its detail as a sheet from the foot of the screen, one
+fewer words (the counts alone for the secondary segments, then the same closer together) and at 320 px, with
+everything to say, takes a second line that keeps the status in words, never a scroll or a cut. A tap on a segment opens its detail as a sheet from the foot of the screen, one
 at a time, which closes by a tap outside, by Escape, by its handle or by a swipe down: the queue's rows with their
 arrows, the loops with when next and **Stop repeating**, the commands with their words wrapped and **Stop**, the helpers
 with **Details** and **Stop**, the plan. What Dot asks, and the Continue of a task that was cut off, are cards of their

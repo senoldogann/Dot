@@ -38,11 +38,11 @@ test("a page that chose no language reads English, its dates as Dot's English wr
   assert.equal(uiLanguage(), "en");
   assert.equal(uiLocale(), "en-GB");
   assert.equal(t("intent.steer"), "Add to task");
-  assert.equal(t("capsule.working", { took: "5 s" }), "Working 5 s");
+  assert.equal(t("capsule.queued", { count: 3 }), "3 queued");
 });
 
 test("a place without its value is an error, not a blank on the screen", () => {
-  assert.throws(() => fill("Working {took}", {}, "capsule.working"), /need a value for \{took\}/);
+  assert.throws(() => fill("{count} queued", {}, "capsule.queued"), /need a value for \{count\}/);
   assert.equal(fill("{a} and {b}", { a: 1, b: "two" }, "key"), "1 and two");
 });
 

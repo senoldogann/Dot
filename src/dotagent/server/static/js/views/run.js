@@ -1004,7 +1004,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // 1383): they are one capsule, `dockBar`, whose segments open the detail each pane showed in a sheet, one at a time. What
   // Dot asks stays its own card over the capsule. A computer's window keeps the panes.
   const sheets = createDockSheets();
-  const dockBar = createDockBar({ onWork: () => inspector.openTab("run"), onStop: () => stopRun(), onEnd: () => goDown(), sheets });
+  const dockBar = createDockBar({ onWork: () => inspector.openTab("run"), onEnd: () => goDown(), sheets });
   const dock = el("div", { class: "dock" }, capsule.wait, statusBar, resumeLine, refusedLine.element, queue.element, loops.element, background.element, asks.element, dockBar.element, frame.element, foot);
   sheets.add("queue", { anchor: dockBar.segment("queue"), title: () => t("dock.queueTitle"), adopt: queue.element, onOpen: () => queue.expand() });
   sheets.add("loops", {
@@ -1457,8 +1457,6 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     const { steps, done } = planNow;
     capsule.paint({
       status: active ? status : null,
-      since: run.created_at,
-      now: Date.now() / 1000,
       plan: steps.length === 0 ? null : { done, total: steps.length },
       helpers: timeline.helperStatuses(),
       helpersNow: timeline.helperNow(),
@@ -1486,7 +1484,6 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     const { steps, done } = planNow;
     dockBar.paint({
       status: active ? status : null,
-      took: Date.now() / 1000 - run.created_at,
       stopping: halting,
       reconnecting,
       plan: steps.length === 0 ? null : { done, total: steps.length },

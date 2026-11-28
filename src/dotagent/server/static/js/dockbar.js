@@ -1,7 +1,9 @@
 // The one row over a phone's composer (item 1383, after the mobile app of a developer tool): a capsule of glass whose
-// segments are divided by hairlines, with a round way down beside it. Its segments are the run's status with its Stop, its
-// plan, its helpers, the chat's loops, its queued messages and the commands it has at work, each there only while it has
-// something to say; with none, nothing is drawn. Where the panes above the composer once stood one upon the other, a tap on
+// segments are divided by hairlines, with a round way down beside it. Its segments are the run's status while it is more
+// than work (it waits for the owner or its helpers, stops, or lost its stream), its plan, its helpers, the chat's loops,
+// its queued messages and the commands it has at work, each there only while it has something to say; with none, nothing
+// is drawn. A run that simply works has no segment and the row no Stop (item 2105): the conversation's work line says it
+// works, and the composer's send is its Stop. Where the panes above the composer once stood one upon the other, a tap on
 // a segment opens its detail in a sheet (docksheet.js), and what Dot asks stays its own card above the row.
 // The words are in dockwords.js; the row fits the room it has by saying fewer of them (see `fit`), and never scrolls
 // sideways. A computer's window keeps the line over the composer that capsule.js draws; this row is not drawn there.
@@ -12,8 +14,8 @@ import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 
 // How much the row says, from the most to the least: every segment in words; the counts of the secondary ones only; the
-// Stop without its word; the status's time alone; and, when even that does not fit, a second line rather than a cut.
-const FITS = ["roomy", "counts", "compact", "tight", "wrapped"];
+// same closer together; and, when even that does not fit, a second line rather than a cut.
+const FITS = ["roomy", "counts", "tight", "wrapped"];
 // The segments that open a sheet of their own, in the order of the capsule.
 const SHEETED = ["plan", "helpers", "loops", "queue", "running"];
 
@@ -23,12 +25,12 @@ const SHEETED = ["plan", "helpers", "loops", "queue", "running"];
  */
 
 /**
- * The row. `onWork()` is a tap on the status, `onStop()` on its Stop and `onEnd()` on the way down; `sheets` is the page's
+ * The row. `onWork()` is a tap on the status and `onEnd()` on the way down; `sheets` is the page's
  * (docksheet.js), whose sheets the other segments open. Returns `element`, `segment(id)` (the button of a segment, for
  * the sheet it opens), `paint(state)` (a `DockState`: dockwords.js), `setEnd(shown, words)` (offer the way down, or
  * not), `setWorkOpen(open)` (the status's `aria-expanded`) and `dispose()`.
  */
-export function createDockBar({ onWork, onStop, onEnd, sheets }) {
+export function createDockBar({ onWork, onEnd, sheets }) {
   /** @type {Map<string, Part>} */
   const parts = new Map();
 
@@ -45,7 +47,6 @@ export function createDockBar({ onWork, onStop, onEnd, sheets }) {
   }
 
   const status = part("status", "alert", () => onWork());
-  const stop = part("stop", "stop", () => onStop());
   const plan = part("plan", "squareCheck", () => undefined);
   const helpers = part("helpers", "users", () => undefined);
   const loops = part("loops", "refresh", () => undefined);
@@ -58,7 +59,7 @@ export function createDockBar({ onWork, onStop, onEnd, sheets }) {
   // The secondary segments stand in one box that draws none of its own (`display: contents`), so that a row too narrow for
   // them takes it as a second line of its own.
   const chips = el("div", { class: "dockbar-chips" }, plan, helpers, loops, queue, running);
-  const capsule = el("div", { class: "dockbar-capsule", role: "group", "aria-label": t("capsule.label"), "data-fit": FITS[0], hidden: true }, status, stop, chips);
+  const capsule = el("div", { class: "dockbar-capsule", role: "group", "aria-label": t("capsule.label"), "data-fit": FITS[0], hidden: true }, status, chips);
   const end = el("button", { class: "dock-end", type: "button", hidden: true, onclick: () => onEnd() }, icon("arrowDown"));
   const element = el("div", { class: "dockbar", hidden: true }, capsule, end);
 

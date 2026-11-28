@@ -1,8 +1,9 @@
 // What the one capsule over a phone's composer says (item 1383): which segments it has, in which order, and the words of
 // each, from what the page knows of the run. A segment is there only when it has something to say, and with none the
-// capsule is not drawn. Pure, so that it runs under Node without a page.
+// capsule is not drawn. A run that simply works has no segment and no Stop of its own (item 2105, the owner's word that
+// they said again what the conversation's work line and the composer's Stop say). Pure, so that it runs under Node
+// without a page.
 
-import { elapsed } from "./dom.js";
 import { t, tCount } from "./i18n.js";
 
 // A loop's rhythm of more words than this ("on Mon, Wed and Fri at 18:30") is left to its sheet: the segment says how
@@ -13,7 +14,6 @@ const RHYTHM_CHARS = 18;
  * What the page knows of the run and of the chat around it.
  * @typedef {object} DockState
  * @property {string | null} status the run's status while it works ("running", "queued", "blocked"); null once it no longer works
- * @property {number} took how long the run has worked, in seconds
  * @property {boolean} stopping Stop was pressed and the run has not ended yet
  * @property {boolean} reconnecting the page lost the run's stream and has not got it back
  * @property {{ done: number, total: number } | null} plan how far the run's plan has come
@@ -28,7 +28,7 @@ const RHYTHM_CHARS = 18;
 /**
  * One part of the capsule.
  * @typedef {object} DockSegment
- * @property {"status" | "stop" | "plan" | "helpers" | "loops" | "queue" | "running"} id
+ * @property {"status" | "plan" | "helpers" | "loops" | "queue" | "running"} id
  * @property {string} label the words at the roomiest width
  * @property {string} short what stays of them when the capsule is tight: a count, a time
  * @property {string} name what a screen reader says
@@ -37,10 +37,11 @@ const RHYTHM_CHARS = 18;
  */
 
 /**
- * The status segment: how long the run has worked, or that it waits for the owner, waits on its helpers (only while it
- * has stopped for them, the owner's report of 2026-11-27), waits to start, stops or has lost its stream.
+ * The status segment: that the run waits for the owner, waits on its helpers (only while it has stopped for them, the
+ * owner's report of 2026-11-27), waits to start, stops or has lost its stream; null while it simply works, which the
+ * conversation's work line says (item 2105).
  * @param {DockState} state
- * @returns {DockSegment}
+ * @returns {DockSegment | null}
  */
 function statusSegment(state) {
   if (state.stopping) {
@@ -64,14 +65,12 @@ function statusSegment(state) {
     const label = tCount(waitedFor, "capsule.waitOne", "capsule.waitMany");
     return { id: "status", label, short: label, name: label, tone: "work", sheet: false };
   }
-  const took = elapsed(state.took);
-  const label = t("dock.working", { took });
-  return { id: "status", label, short: took, name: label, tone: "work", sheet: false };
+  return null;
 }
 
 /**
- * The segments of the capsule, in the order it draws them: the run's status and its Stop, its plan, its helpers, the
- * chat's loops, its queue and the commands it has at work. Empty when none has anything to say.
+ * The segments of the capsule, in the order it draws them: the run's status while it is more than work, its plan, its
+ * helpers, the chat's loops, its queue and the commands it has at work. Empty when none has anything to say.
  * @param {DockState} state
  * @returns {DockSegment[]}
  */
@@ -79,11 +78,9 @@ export function dockSegments(state) {
   /** @type {DockSegment[]} */
   const segments = [];
   const working = state.status !== null;
-  if (working || state.reconnecting) {
-    segments.push(statusSegment(state));
-  }
-  if (working && !state.stopping) {
-    segments.push({ id: "stop", label: t("capsule.stop"), short: "", name: t("dock.stopLabel"), tone: "quiet", sheet: false });
+  const status = working || state.reconnecting ? statusSegment(state) : null;
+  if (status !== null) {
+    segments.push(status);
   }
   if (working && state.plan !== null && state.plan.total > 0) {
     const { done, total } = state.plan;

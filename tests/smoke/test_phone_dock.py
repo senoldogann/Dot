@@ -3,7 +3,8 @@ the owner's iPhone draws it. A run at work that waits on two helpers, with a mes
 the background, stands as one row of segments over the composer and nothing stacked (before, five panes lay one upon
 the other at different widths); a segment is there only while it has something to say; a tap on one opens its detail in
 a sheet, one at a time, which closes by a tap outside, by Escape, by its handle and by a swipe down, with the queue's
-arrows, the loops' Stop repeating, the commands' Stop and the helpers' Details and Stop where the panes had them. What
+arrows, the loops' Stop repeating, the commands' Stop and the helpers' Details and Stop where the panes had them. The
+capsule has no Stop of its own: the composer's send is the run's Stop (item 2105). What
 Dot asks stays its own card over the capsule; a chat at rest has no capsule; a lost stream is said in it. A computer's
 window keeps its panes and draws no capsule.
 
@@ -111,7 +112,9 @@ async def test_a_phones_dock_is_one_capsule_of_segments_over_the_composer_and_ea
                 # The segments the run has something to say of, named for a screen reader whatever the room.
                 await expect(_segment(page, "status")).to_contain_text(re.compile(r"\d"))
                 await expect(_segment(page, "status")).to_have_attribute("aria-label", "Waiting on 2 helpers")
-                await expect(_segment(page, "stop")).to_have_attribute("aria-label", "Stop the task")
+                # No Stop of the capsule's own (item 2105): the composer's send, its box empty, is the one Stop.
+                await expect(_segment(page, "stop")).to_have_count(0)
+                await expect(page.locator(".dock .btn.send")).to_have_attribute("aria-label", "Stop")
                 await expect(_segment(page, "helpers")).to_have_attribute(
                     "aria-label", "2 helpers. Waiting on 2 helpers"
                 )
@@ -127,7 +130,7 @@ async def test_a_phones_dock_is_one_capsule_of_segments_over_the_composer_and_ea
                 assert _kinds(blocks) == ["dockbar", "composer"], blocks
                 assert blocks[0]["bottom"] <= blocks[1]["top"], blocks
                 # Every segment is a finger tall.
-                for name in ("status", "stop", "helpers", "loops", "queue", "running"):
+                for name in ("status", "helpers", "loops", "queue", "running"):
                     box = await _segment(page, name).bounding_box()
                     assert box is not None and box["height"] >= 43.99, (name, box)
                 await page.screenshot(path=str(tmp_path / f"capsule-{width}-{scheme}.png"), animations="disabled")

@@ -211,8 +211,8 @@ func waitingWords(_ step: HelperStep) -> String? {
 }
 
 /// One quiet line under the stream while the run waits on something: the terminal's prompt, "Waiting · Watching pull
-/// request #554" and Details, a plain text button that opens the run inspector. Stop is the pill's: one Stop on the
-/// screen, where the run's state already is (item 1909).
+/// request #554" and Details, a plain text button that opens the run inspector. Stop is the composer's: one Stop on the
+/// screen (items 1909 and 2105).
 struct WaitingLine: View {
     let words: String
     let details: () -> Void

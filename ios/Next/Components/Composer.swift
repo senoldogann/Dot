@@ -609,16 +609,18 @@ enum LinkLine: Equatable, Sendable {
     }
 }
 
-/// What the floating capsule says about the chat's work; a segment exists only while it has something to say.
+/// What the floating capsule says about the chat's work; a segment exists only while it has something to say. A run
+/// that simply works has no segment and the capsule no Stop (item 2105, the owner's word of 2026-11-28): the
+/// transcript's live line says it works, and the composer's button, with the field empty, is its Stop.
 struct WorkingSummary: Equatable, Sendable {
-    /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
-    /// transcript's live line says).
+    /// The chat's state while it is more than work: it waits on the owner (item 1769: never what the run does, which
+    /// the transcript's live line says); `nil` while the run simply works.
     let status: ChatStatus?
     /// "Waiting on 2 helpers" in the status's place while the main run only waits for its helpers; `nil` while it takes
-    /// a step of its own ("Working" and the turn's clock).
+    /// a step of its own.
     let activity: String?
-    /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not; `nil`
-    /// while it waits on its helpers.
+    /// Since when the run works, which the clock beside "Waiting on you" counts every second, whether events come or
+    /// not; `nil` while it waits on its helpers.
     let since: Date?
     let queued: Int
     /// The helpers the run started that ended, and all of them ("2/3" in the people segment).
@@ -626,28 +628,26 @@ struct WorkingSummary: Equatable, Sendable {
     let helpersTotal: Int
     /// The plan of the chat's newest run (item 1880); `nil` when that run keeps none.
     let plan: PlanProgress?
-    /// The run can be stopped from the capsule.
-    let canStop: Bool
     /// How the link to the Mac stands while it is not live, in the status's place (item 1931); `nil` while the chat is
     /// live.
     let link: LinkLine?
 
-    /// The pill opens with the link's words or the status.
-    var leads: Bool { status != nil || link != nil }
+    /// The pill opens with the link's words, the status or the wait on helpers.
+    var leads: Bool { status != nil || activity != nil || link != nil }
     var isEmpty: Bool { !leads && queued == 0 && helpersTotal == 0 && plan == nil }
 }
 
 /// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
 /// The capsule is one pill for everything about the chat's work, thin dividers between its segments (item 1880, the
-/// owner's reference app): "Working 1m 50s" or "Waiting on 2 helpers" | Stop | Plan 1/5 | queued | helpers done/total.
-/// Each segment is its own button, at least 44 pt each way. It stays one line at the default text size: in words where
-/// they fit, else Stop, the plan and the queue as their glyphs with the numbers and "Working" as its clock alone (the
-/// smallest iPhone with every segment shown). No segment spins: the ticking clock says the run works. At the accessibility sizes the segments stack, as glyphs.
+/// owner's reference app): "Waiting on you, 1m 50s" or "Waiting on 2 helpers" | Plan 1/5 | queued | helpers done/total.
+/// A run that simply works has no segment and the pill no Stop (item 2105): the live line says it, the composer's
+/// button stops it. Each segment is its own button, at least 44 pt each way. It stays one line at the default text
+/// size: in words where they fit, else the plan and the queue as their glyphs with the numbers (the smallest iPhone with
+/// every segment shown). No segment spins. At the accessibility sizes the segments stack, as glyphs.
 struct FloatingWorkingControl: View {
     let summary: WorkingSummary
     let showsScrollToBottom: Bool
     let openStatus: () -> Void
-    let stop: () -> Void
     let openPlan: () -> Void
     let openQueue: () -> Void
     let openHelpers: () -> Void
@@ -661,8 +661,8 @@ struct FloatingWorkingControl: View {
                     if compact {
                         capsule(glyphs: true)
                     } else {
-                        // One line always: in words where they fit, else Stop, the plan and the queue as their glyphs and
-                        // the status as its clock (the smallest iPhone with every segment shown).
+                        // One line always: in words where they fit, else the plan and the queue as their glyphs (the
+                        // smallest iPhone with every segment shown).
                         ViewThatFits(in: .horizontal) {
                             capsule(glyphs: false)
                             capsule(glyphs: true)
@@ -686,8 +686,7 @@ struct FloatingWorkingControl: View {
 
     private var compact: Bool { dynamicTypeSize.isAccessibilitySize }
 
-    /// The pill; with `glyphs`, Stop, the plan and the queue are their glyphs with the numbers, "Working" is its clock
-    /// alone, and the segments sit closer.
+    /// The pill; with `glyphs`, the plan and the queue are their glyphs with the numbers, and the segments sit closer.
     private func capsule(glyphs: Bool) -> some View {
         let inset: CGFloat = glyphs ? Space.xs : Space.s
         let layout: AnyLayout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
@@ -704,6 +703,10 @@ struct FloatingWorkingControl: View {
                     }
                 }
                 .accessibilityIdentifier("capsule.link")
+            } else if let activity = summary.activity {
+                // No spinner (the owner's report of 2026-11-27) and no clock: the words say what the run waits on.
+                segment(action: openStatus, label: activity, inset: inset) { ActivityWord(text: activity) }
+                    .accessibilityIdentifier("capsule.status")
             } else if let status = summary.status {
                 // The status and its clock are drawn every second, whether events come or not: a clock drawn with
                 // the screen froze between events and jumped when they came (the owner's report of 2026-11-25). The
@@ -711,19 +714,10 @@ struct FloatingWorkingControl: View {
                 // every drawing of the screen, so words streaming faster than once a second held the clock still.
                 TimelineView(.periodic(from: summary.since ?? .distantPast, by: 1)) { context in
                     let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
-                    segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", "), inset: inset) {
-                        // No spinner (the owner's report of 2026-11-27): the words and the ticking clock say the run
-                        // works; a status that is not work (asks, failed) keeps its mark.
+                    segment(action: openStatus, label: [status.word, clock].compactMap { $0 }.joined(separator: ", "), inset: inset) {
+                        // A status that is not work (asks, failed) keeps its mark.
                         HStack(spacing: Space.xxs + 1) {
-                            if let activity = summary.activity {
-                                ActivityWord(text: activity)
-                            } else if status == .working || status == .starting {
-                                if !(glyphs && clock != nil) {
-                                    Text(status.word).textRole(.label).fontWeight(.medium).foregroundStyle(status.tone.color).lineLimit(1).fixedSize()
-                                }
-                            } else {
-                                StatusWord(status: status)
-                            }
+                            StatusWord(status: status)
                             if let clock {
                                 Text(clock).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers().lineLimit(1).fixedSize()
                             }
@@ -732,20 +726,8 @@ struct FloatingWorkingControl: View {
                     .accessibilityIdentifier("capsule.status")
                 }
             }
-            if summary.canStop {
-                if summary.leads { divider }
-                segment(action: stop, label: String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), inset: inset) {
-                    if glyphs {
-                        Image(systemName: "stop.fill").textRole(.label).foregroundStyle(Tone.text)
-                    } else {
-                        Text(String(localized: "Stop", comment: "Chat toolbar: stops the run at work")).textRole(.label).fontWeight(.medium)
-                            .foregroundStyle(Tone.text).lineLimit(1).fixedSize()
-                    }
-                }
-                .accessibilityIdentifier("capsule.stop")
-            }
             if let plan = summary.plan {
-                if summary.leads || summary.canStop { divider }
+                if summary.leads { divider }
                 segment(
                     action: openPlan,
                     label: String(localized: "Plan, \(plan.done) of \(plan.total) steps done", comment: "VoiceOver: the plan chip beside the working capsule; the arguments are the steps done and all steps"),
@@ -763,7 +745,7 @@ struct FloatingWorkingControl: View {
                 .accessibilityIdentifier("capsule.plan")
             }
             if summary.queued > 0 {
-                if summary.leads || summary.canStop || summary.plan != nil { divider }
+                if summary.leads || summary.plan != nil { divider }
                 segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count"), inset: inset) {
                     Label { Text(verbatim: "\(summary.queued)").lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
                         .tabularNumbers().foregroundStyle(Tone.secondary)
@@ -771,7 +753,7 @@ struct FloatingWorkingControl: View {
                 .accessibilityIdentifier("capsule.queue")
             }
             if summary.helpersTotal > 0 {
-                if summary.leads || summary.canStop || summary.plan != nil || summary.queued > 0 { divider }
+                if summary.leads || summary.plan != nil || summary.queued > 0 { divider }
                 segment(
                     action: openHelpers,
                     label: String(localized: "Helpers, \(summary.helpersDone) of \(summary.helpersTotal) done", comment: "VoiceOver: the capsule segment of the run's helpers; the arguments are the helpers that ended and all of them"),
@@ -809,8 +791,8 @@ struct FloatingWorkingControl: View {
     }
 }
 
-/// What a run does now, as the capsule's status word ("Waiting on 2 helpers"): its own width and no more, so that Stop,
-/// the plan and the helpers keep their room, and no spinner (the owner's report of 2026-11-27).
+/// What a run does now, as the capsule's status word ("Waiting on 2 helpers"): its own width and no more, so that the
+/// plan and the helpers keep their room, and no spinner (the owner's report of 2026-11-27).
 struct ActivityWord: View {
     let text: String
 

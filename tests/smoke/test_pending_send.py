@@ -3,7 +3,7 @@ daemon in Chrome, wide and at a phone's width. The follow-up's request to start 
 page's own route for a few seconds, as a busy Mac answers: meanwhile its bubble stands under the conversation with a
 quiet "Pending" at its right edge, the agent's typing dots say "Starting…" under it, and the box is empty; once Dot took
 it the page of the new run is open and nothing pending is left. A send Dot refuses takes its bubble away and gives the
-words back to the box. The capsule's clock says whole seconds, "Working 2s" (item 2000), as the phone's pill does.
+words back to the box. The new run, which simply works, has no part in the capsule (item 2105): its work line says it.
 In Turkish the words are "Bekliyor" and "Başlıyor…".
 
 No network and no model service is used: the scripted model plays the runs.
@@ -102,10 +102,10 @@ async def test_a_sent_message_is_pending_in_the_chat_until_dot_took_it(
                 await expect(page).not_to_have_url(re.compile(f"/runs/{run.id}$"), timeout=_HOLD_S * 1000 + 5000)
                 await expect(page.locator(".pending-send")).to_have_count(0)
                 await expect(page.locator(".user-message .bubble.user").last).to_have_text("Count them again")
-                # The capsule's clock ticks in whole seconds while the run's command works.
-                await expect(page.locator(".capsule-time").first).to_have_text(
-                    re.compile(r"^(Working|Çalışıyor ·) [1-9]s$"), timeout=6000
-                )
+                # A run that simply works says nothing over the composer, on a phone or a computer (item 2105).
+                await expect(page.locator(".capsule .capsule-work:not([hidden])")).to_have_count(0)
+                await expect(page.locator('.dockbar [data-segment="status"]:not([hidden])')).to_have_count(0)
+                await expect(page.locator('.dockbar [data-segment="stop"]')).to_have_count(0)
                 await page.close()
             finally:
                 await browser.close()

@@ -282,7 +282,7 @@ struct ChatScreen: View {
                     // An ask that waits on the owner is the dock's, never this line's.
                     if !stopping, now != .waitingForYou, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
                         // While the run waits on something, one quiet line says on what in every mode (item 1909); Stop
-                        // is the pill's, so the line offers only Details. An ask of the owner's comes first: the run
+                        // is the composer's (item 2105), so the line offers only Details. An ask of the owner's comes first: the run
                         // waits on them, not on its command, and the line says so (item 1932).
                         WaitingLine(words: waiting, details: { panel = .inspector })
                     } else if linesTheWork || now == .queued || now == .typing {
@@ -469,16 +469,16 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    status: shownLink == nil ? capsuleStatus : nil, activity: activityWords,
+                    // A run that simply works or starts has no segment (item 2105): the live line says it.
+                    status: shownLink == nil && capsuleStatus == .waitingOnYou ? .waitingOnYou : nil, activity: shownLink == nil ? activityWords : nil,
                     since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil,
                     // The chat's queue on the Mac, which the segment's sheet lists; the phone's own messages still to go
                     // say so under their bubbles ("Pending", "Waiting for the link"), item 1931.
                     queued: view?.queue.messages.count ?? 0,
                     helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
-                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping && shownLink == nil,
+                    plan: newestPlan(items).map(PlanProgress.init(steps:)),
                     link: shownLink),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
-                stop: { stop() },
                 openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
                 scrollToBottom: {
                     pinned = true

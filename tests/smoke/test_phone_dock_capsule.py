@@ -21,11 +21,11 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 _NONE: dict[str, object] = {
     "status": None,
-    "took": 0,
     "stopping": False,
     "reconnecting": False,
     "plan": None,
     "helpers": {"live": 0, "waitedFor": 0, "letGo": 0},
+    "waits": False,
     "loops": {"count": 0, "rhythm": None, "problem": False},
     "queue": {"count": 0, "held": False, "problem": False, "sending": False},
     "running": {"count": 0, "problem": False},
@@ -33,25 +33,28 @@ _NONE: dict[str, object] = {
 _ALL: dict[str, object] = {
     **_NONE,
     "status": "running",
-    "took": 36,
     "plan": {"done": 2, "total": 5},
     "helpers": {"live": 2, "waitedFor": 2, "letGo": 0},
+    "waits": True,
     "loops": {"count": 1, "rhythm": "every 10 min", "problem": False},
     "queue": {"count": 1, "held": False, "problem": False, "sending": False},
     "running": {"count": 1, "problem": False},
 }
 # How the capsule can stand: what has something to say, and whether the way down is offered beside it.
 _CASES: dict[str, tuple[dict[str, object], bool]] = {
-    "working": ({**_NONE, "status": "running", "took": 36}, False),
-    "waiting": ({**_NONE, "status": "blocked", "took": 90}, False),
-    "reconnecting": ({**_NONE, "status": "running", "took": 90, "reconnecting": True}, True),
-    "stopping": ({**_NONE, "status": "running", "took": 90, "stopping": True}, False),
-    "helpers": ({**_NONE, "status": "running", "took": 36, "helpers": {"live": 2, "waitedFor": 2, "letGo": 0}}, False),
+    "working": ({**_NONE, "status": "running"}, False),
+    "waiting": ({**_NONE, "status": "blocked"}, False),
+    "reconnecting": ({**_NONE, "status": "running", "reconnecting": True}, True),
+    "stopping": ({**_NONE, "status": "running", "stopping": True}, False),
+    "helpers": (
+        {**_NONE, "status": "running", "helpers": {"live": 2, "waitedFor": 2, "letGo": 0}, "waits": True},
+        False,
+    ),
     "everything": (_ALL, False),
     "everything-but-a-plan": ({**_ALL, "plan": None}, False),
     "everything-and-the-way-down": (_ALL, True),
     "waiting-and-the-rest": ({**_ALL, "status": "blocked", "plan": None, "helpers": _NONE["helpers"]}, False),
-    "long-time": ({**_ALL, "took": 3600 * 5 + 60 * 20, "queue": {**_ALL["queue"], "count": 12}}, False),  # type: ignore[dict-item]
+    "many-queued": ({**_ALL, "queue": {**_ALL["queue"], "count": 12}}, False),  # type: ignore[dict-item]
     "chats-own": (
         {
             **_NONE,
@@ -79,7 +82,7 @@ const cases = %s;
 window.paint = (name) => {
   const [state, end] = cases[name];
   const sheets = createDockSheets();
-  const bar = createDockBar({ onWork() {}, onStop() {}, onEnd() {}, sheets });
+  const bar = createDockBar({ onWork() {}, onEnd() {}, sheets });
   document.getElementById("slot").replaceChildren(bar.element);
   bar.paint(state);
   bar.setEnd(end, "Jump to latest");
@@ -203,19 +206,16 @@ async def test_the_capsule_is_one_row_of_segments_a_finger_tall_that_neither_ove
                         assert end["right"] <= width, where
                     else:
                         assert seen["end"] is None, where
-                    # A row that has nothing to say is not drawn at all.
-                    if case == "way-down-only":
+                    # A row that has nothing to say is not drawn at all, and a run that simply works has nothing to
+                    # say there, nor a Stop (item 2105): the work line and the composer's send say and do it.
+                    if case in ("way-down-only", "working"):
                         assert seen["capsule"] is None, where
-                    # The row says as much as it has room for: a 390 px phone keeps "Working" over a chat that has
-                    # helpers, a loop, a queue and a command, and a second line keeps the status and the Stop in words.
-                    state: dict[str, Any] = _CASES[case][0]
-                    works: bool = state["status"] == "running" and not state["reconnecting"] and not state["stopping"]
                     words: dict[str, str] = {segment["id"]: segment["text"] for segment in segments}
-                    if case == "everything-but-a-plan" and width >= 390:
-                        assert words["status"].startswith("Working"), where
-                    if seen["fit"] == "wrapped" and works:
-                        assert words["status"].startswith("Working") and words["stop"] == "Stop", where
-                    if case in ("everything", "everything-and-the-way-down", "waiting-and-the-rest", "long-time"):
+                    assert "stop" not in words, where
+                    # The row says as much as it has room for, and a second line keeps the status in words.
+                    if case.startswith("everything"):
+                        assert words["status"] == "Waiting on 2 helpers", where
+                    if case in ("everything", "everything-and-the-way-down", "waiting-and-the-rest", "many-queued"):
                         await page.screenshot(
                             path=str(tmp_path / f"capsule-{case}-{width}-{scheme}.png"),
                             clip={"x": 0, "y": 0, "width": width, "height": 220},

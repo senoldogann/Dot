@@ -78,58 +78,47 @@ final class ChatUITests: XCTestCase {
         XCTAssertFalse(duration.exists)
     }
 
-    /// The owner's report of 2026-11-25: the capsule's clock froze between events. The fixture's run gets no event at
-    /// all, yet the clock goes on every second; and the capsule says what the run does (here: writing its words).
-    func testTheCapsuleClockTicksWithNoEventsAndSaysWhatTheRunDoes() {
+    /// Item 2105 (the owner's word of 2026-11-28): a run that simply works has no segment in the capsule and the capsule
+    /// no Stop; the live line says it works, and the composer's button, the field empty, is the one Stop, a tap away.
+    func testAWorkingRunHasNoStatusOrStopInTheCapsuleAndTheComposerIsItsStop() {
         let app: XCUIApplication = launch("n2-chat")
-        // Found by its kind (a button): a search of the whole tree is slow to read on a loaded runner.
-        let status: XCUIElement = app.buttons["capsule.status"]
-        XCTAssertTrue(status.waitForExistence(timeout: 10))
-        let first: String = status.label
-        // Items 1769 and 1880: the capsule says Working and its clock; what the run does is the live line's.
-        XCTAssertTrue(first.hasPrefix("Working, "), "the capsule says the main run works, with its clock: \(first)")
-        let second: String = nextLabel(of: status, after: first, within: 2.5)
-        XCTAssertNotEqual(second, first, "the clock moved on its own: \(first) -> \(second)")
-        let third: String = nextLabel(of: status, after: second, within: 2.5)
-        XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
+        let plan: XCUIElement = app.buttons["capsule.plan"]
+        XCTAssertTrue(plan.waitForExistence(timeout: 10), "the capsule keeps what else it has to say")
+        XCTAssertFalse(app.buttons["capsule.status"].exists, "no Working segment")
+        XCTAssertFalse(app.buttons["capsule.stop"].exists, "no Stop in the capsule")
+        let send: XCUIElement = app.buttons["composer.send"]
+        XCTAssertTrue(send.exists)
+        XCTAssertEqual(send.label, "Stop", "the composer's button stops the run")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "capsule-working"
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 
     /// The owner's report of 2026-11-27: the capsule says "Waiting on N helpers" only while the main run has stopped for
-    /// them (`n2-helpers`: its step's one open call is a delegate); while it works beside its helper (`n2-chat`) it says
-    /// "Working". No spinner on either, and the status takes only its words' width, so that Stop, the plan and the helpers
-    /// keep their room.
+    /// them (`n2-helpers`: its step's one open call is a delegate); while it works beside its helper (`n2-chat`) it has
+    /// no status (item 2105). No spinner, and the status takes only its words' width, so that the helpers keep their room.
     func testTheCapsuleSaysWaitingOnlyWhileTheRunWaitsAndSpinsNothing() {
-        for (scene, words) in [("n2-helpers", "Waiting on 1 helper"), ("n2-chat", "Working, ")] {
-            let app: XCUIApplication = launch(scene)
-            let status: XCUIElement = app.buttons["capsule.status"]
-            XCTAssertTrue(status.waitForExistence(timeout: 10), scene)
-            XCTAssertTrue(status.label.hasPrefix(words), "\(scene): \(status.label)")
-            let stop: XCUIElement = app.buttons["capsule.stop"]
-            let people: XCUIElement = app.buttons["capsule.helpers"]
-            XCTAssertTrue(stop.exists && people.exists, scene)
-            let spinners: [XCUIElement] = app.activityIndicators.allElementsBoundByIndex.filter { $0.frame.intersects(status.frame) }
-            XCTAssertTrue(spinners.isEmpty, "\(scene): no spinner in the capsule: \(spinners.map { $0.frame })")
-            print("capsule \(scene): status \(status.frame) stop \(stop.frame) helpers \(people.frame)")
-            XCTAssertLessThanOrEqual(status.frame.width, 180, "\(scene): the status keeps to its words: \(status.frame)")
-            XCTAssertLessThanOrEqual(stop.frame.minX - status.frame.maxX, 2, "\(scene): Stop follows at once: \(status.frame) \(stop.frame)")
-            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
-            shot.name = "capsule-\(scene)"
-            shot.lifetime = .keepAlways
-            add(shot)
-            app.terminate()
-        }
-    }
-
-    /// The element's label once it differs from `label`, read every 100 ms (an `XCTNSPredicateExpectation` reads it about
-    /// once a second, so a tick could be seen a second late, past the wait on a slow runner); the last label read when
-    /// nothing changed within `seconds`.
-    private func nextLabel(of element: XCUIElement, after label: String, within seconds: TimeInterval) -> String {
-        var now: String = element.label
-        _ = holds(within: seconds) {
-            now = element.label
-            return now != label
-        }
-        return now
+        let waits: XCUIApplication = launch("n2-helpers")
+        let status: XCUIElement = waits.buttons["capsule.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        XCTAssertTrue(status.label.hasPrefix("Waiting on 1 helper"), status.label)
+        let people: XCUIElement = waits.buttons["capsule.helpers"]
+        XCTAssertTrue(people.exists)
+        XCTAssertFalse(waits.buttons["capsule.stop"].exists)
+        let spinners: [XCUIElement] = waits.activityIndicators.allElementsBoundByIndex.filter { $0.frame.intersects(status.frame) }
+        XCTAssertTrue(spinners.isEmpty, "no spinner in the capsule: \(spinners.map { $0.frame })")
+        print("capsule n2-helpers: status \(status.frame) helpers \(people.frame)")
+        XCTAssertLessThanOrEqual(status.frame.width, 180, "the status keeps to its words: \(status.frame)")
+        let shot: XCTAttachment = XCTAttachment(screenshot: waits.screenshot())
+        shot.name = "capsule-n2-helpers"
+        shot.lifetime = .keepAlways
+        add(shot)
+        waits.terminate()
+        let beside: XCUIApplication = launch("n2-chat")
+        XCTAssertTrue(beside.buttons["capsule.helpers"].waitForExistence(timeout: 10))
+        XCTAssertFalse(beside.buttons["capsule.status"].exists, "working beside its helper: no status")
+        beside.terminate()
     }
 
     /// The owner's order of 2026-11-25: a long press on the composer's button while a run works opens Steer now and
@@ -174,19 +163,16 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(chip.waitForExistence(timeout: 10))
         XCTAssertEqual(chip.label, "Plan, 1 of 3 steps done")
         XCTAssertFalse(app.staticTexts["Plan · 1 of 3 done"].exists, "no plan card in the stream")
-        let status: XCUIElement = app.descendants(matching: .any).matching(identifier: "capsule.status").firstMatch
-        let stop: XCUIElement = app.buttons["capsule.stop"]
         let people: XCUIElement = app.buttons["capsule.helpers"]
-        XCTAssertTrue(status.exists && stop.exists && people.exists)
-        let segments: [XCUIElement] = [status, stop, chip, people]
+        XCTAssertTrue(people.exists)
+        let segments: [XCUIElement] = [chip, people]
         let measured: String = segments.map { "\($0.identifier) \($0.frame)" }.joined(separator: "; ") + "; window \(app.windows.firstMatch.frame)"
         add(XCTAttachment(string: measured))
         for segment in segments {
-            XCTAssertEqual(segment.frame.midY, status.frame.midY, accuracy: 1, measured)
-            XCTAssertEqual(segment.frame.height, status.frame.height, accuracy: 1, measured)
+            XCTAssertEqual(segment.frame.midY, chip.frame.midY, accuracy: 1, measured)
+            XCTAssertEqual(segment.frame.height, chip.frame.height, accuracy: 1, measured)
             XCTAssertGreaterThanOrEqual(segment.frame.height, 44, measured)
         }
-        XCTAssertLessThan(status.frame.maxX, stop.frame.minX + 1, "one line, in order: \(measured)")
         XCTAssertLessThan(chip.frame.maxX, people.frame.minX + 1, "one line, in order: \(measured)")
         XCTAssertLessThanOrEqual(people.frame.maxX, app.windows.firstMatch.frame.maxX, "inside the screen: \(measured)")
         let bar: XCTAttachment = XCTAttachment(screenshot: app.screenshot())

@@ -1012,7 +1012,7 @@
   }
 
   .dock-seg:not([hidden]) ~ .dock-seg:not([hidden])::before,
-  .dockbar-capsule:not([data-fit="wrapped"]) > :is(.dock-status, .dock-stop):not([hidden]) ~ .dockbar-chips > .dock-seg:not([hidden])::before {
+  .dockbar-capsule:not([data-fit="wrapped"]) > .dock-status:not([hidden]) ~ .dockbar-chips > .dock-seg:not([hidden])::before {
     content: "";
     position: absolute;
     left: 0;
@@ -1065,47 +1065,29 @@
     color: var(--warn);
   }
 
-  .dock-stop {
-    color: var(--text);
-    font-weight: var(--weight-label);
-  }
-
-  .dock-stop .icon {
-    color: var(--bad);
-  }
-
   .dock-short {
     display: none;
   }
 
   /* The row says less before it scrolls or cuts (dockbar.js `fit`): first the counts of the secondary segments alone, then
-     the Stop without its word, then the status's time without its word, and last a second line. */
-  .dockbar-capsule:is([data-fit="counts"], [data-fit="compact"], [data-fit="tight"], [data-fit="wrapped"]) .dock-seg:not(.dock-status, .dock-stop) .dock-long {
+     the same closer together, and last a second line. The status keeps its words: they are its whole message. */
+  .dockbar-capsule:is([data-fit="counts"], [data-fit="tight"], [data-fit="wrapped"]) .dock-seg:not(.dock-status) .dock-long {
     display: none;
   }
 
-  .dockbar-capsule:is([data-fit="counts"], [data-fit="compact"], [data-fit="tight"], [data-fit="wrapped"]) .dock-seg:not(.dock-status, .dock-stop) .dock-short {
+  .dockbar-capsule:is([data-fit="counts"], [data-fit="tight"], [data-fit="wrapped"]) .dock-seg:not(.dock-status) .dock-short {
     display: inline;
   }
 
-  .dockbar-capsule:is([data-fit="compact"], [data-fit="tight"]) .dock-stop .dock-long,
-  .dockbar-capsule[data-fit="tight"] .dock-status .dock-long {
-    display: none;
-  }
-
-  .dockbar-capsule[data-fit="tight"] .dock-status .dock-short {
-    display: inline;
-  }
-
-  .dockbar-capsule:is([data-fit="compact"], [data-fit="tight"]) .dock-seg {
+  .dockbar-capsule[data-fit="tight"] .dock-seg {
     padding-inline: var(--space-2);
   }
 
-  /* Where even that does not fit (a narrow phone, many segments, and the way down beside them) the status and its Stop
-     keep a line, in words, and the others share a second, equal and divided, rather than a cut or a scroll. */
+  /* Where even that does not fit (a narrow phone, many segments, and the way down beside them) the status keeps a line,
+     in words, and the others share a second, equal and divided, rather than a cut or a scroll. */
   .dockbar-capsule[data-fit="wrapped"] {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     border-radius: var(--radius-lg);
   }
 
@@ -1118,8 +1100,7 @@
     grid-column: 1 / -1;
   }
 
-  .dockbar-capsule[data-fit="wrapped"] > .dock-status:not([hidden]) ~ .dockbar-chips,
-  .dockbar-capsule[data-fit="wrapped"] > .dock-stop:not([hidden]) ~ .dockbar-chips {
+  .dockbar-capsule[data-fit="wrapped"] > .dock-status:not([hidden]) ~ .dockbar-chips {
     border-top: 1px solid var(--border-strong);
   }
 
