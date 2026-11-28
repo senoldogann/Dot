@@ -12,6 +12,11 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    # A draft in the owner's own Gmail or Outlook (item 2047).
+    "Goes from": "Gönderen hesap",
+    "Open in Gmail": "Gmail'de aç",
+    "Open in Outlook": "Outlook'ta aç",
+    "It goes out from %@ as it stands on the card.": "Karttaki haliyle %@ hesabından gönderilir.",
     # Activity's skill and plugin proposals (item 2062).
     "Install a plugin the review rates risky?": "İncelemenin riskli bulduğu eklenti kurulsun mu?",
     "Use a skill written from outside content?": "Dış içerikten yazılmış beceri kullanılsın mı?",

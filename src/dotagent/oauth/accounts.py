@@ -26,7 +26,7 @@ from dotagent.mcp.signin import CALLBACK_PATH
 from dotagent.oauth.keychain import Keychain
 from dotagent.oauth.pkce import challenge_of, new_state, new_verifier
 from dotagent.oauth.providers import PROVIDERS, Provider, ProviderId
-from dotagent.oauth.tokens import Account, Tokens, address_from, tokens_from
+from dotagent.oauth.tokens import Account, Tokens, address_from, granted, tokens_from
 from dotagent.secrets import resolve_secret
 from dotagent.store.db import Store
 
@@ -90,8 +90,11 @@ class Waiting(FrozenModel):
 
 
 class AccountView(FrozenModel):
+    """``drafts``: whether its sign-in allowed drafts and sending (item 2047)."""
+
     address: str
     connected_at: float
+    drafts: bool
 
 
 class ProviderView(FrozenModel):
@@ -143,17 +146,27 @@ def refresh_advice(provider_id: ProviderId, error: str | None) -> str:
     return "(sign in again in Settings › Connectors)"
 
 
-def authorize_link(provider: Provider, client_id: str, redirect_uri: str, state: str, challenge: str) -> str:
-    """The address of the provider's page that asks the owner for a yes."""
+def authorize_link(
+    provider: Provider,
+    scopes: tuple[str, ...],
+    hint: tuple[tuple[str, str], ...],
+    client_id: str,
+    redirect_uri: str,
+    state: str,
+    challenge: str,
+) -> str:
+    """The address of the provider's page that asks the owner for a yes to ``scopes``; ``hint`` the parameters that
+    name the account (``login_hint``), none for a new one."""
     parameters: dict[str, str] = {
         "client_id": client_id,
         "response_type": "code",
         "redirect_uri": redirect_uri,
-        "scope": " ".join(provider.scopes),
+        "scope": " ".join(scopes),
         "state": state,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
         **dict(provider.extra),
+        **dict(hint),
     }
     return f"{provider.authorize_url}?{urlencode(parameters)}"
 
@@ -311,7 +324,7 @@ class Accounts:
                     configured=all(values),
                     client_names=names,
                     accounts=tuple(
-                        AccountView(address=account.address, connected_at=account.connected_at)
+                        AccountView(address=account.address, connected_at=account.connected_at, drafts=account.drafts)
                         for account in accounts
                         if account.provider == provider.id
                     ),
@@ -320,8 +333,23 @@ class Accounts:
         return tuple(views)
 
     async def start(self, provider_id: ProviderId, port: int, now: float) -> str:
-        """Start a sign-in for a browser on this Mac; returns the address of the provider's page."""
+        """Start a sign-in for a browser on this Mac, which reads only; returns the address of the provider's page."""
         provider: Provider = PROVIDERS[provider_id]
+        return await self._start(provider, provider.scopes, (), port, now)
+
+    async def start_drafts(self, provider_id: ProviderId, address: str, port: int, now: float) -> str:
+        """Start the sign-in that allows drafts and sending for the account ``address`` (item 2047): what a sign-in
+        asks, and the provider's draft scopes; returns the address of the provider's page, which names the account."""
+        provider: Provider = PROVIDERS[provider_id]
+        account: Account = await self.account_of(address)
+        if account.provider != provider.id:
+            raise SignInError(f"{account.address} is not a {provider.name} account", {"provider": provider.id})
+        hint: tuple[tuple[str, str], ...] = (("login_hint", account.address),)
+        return await self._start(provider, (*provider.scopes, *provider.draft_scopes), hint, port, now)
+
+    async def _start(
+        self, provider: Provider, scopes: tuple[str, ...], hint: tuple[tuple[str, str], ...], port: int, now: float
+    ) -> str:
         client_id, _ = await self._client_of(provider)
         self._waiting = {
             state: waiting for state, waiting in self._waiting.items() if now - waiting.started_at < WAIT_S
@@ -332,8 +360,8 @@ class Accounts:
         self._waiting[state] = Waiting(
             provider=provider.id, verifier=verifier, redirect_uri=redirect_uri, started_at=now
         )
-        log.info("sign_in_started", provider=provider.id)
-        return authorize_link(provider, client_id, redirect_uri, state, challenge_of(verifier))
+        log.info("sign_in_started", provider=provider.id, drafts=bool(hint))
+        return authorize_link(provider, scopes, hint, client_id, redirect_uri, state, challenge_of(verifier))
 
     async def come_back(
         self, state: str, code: str | None, error: str | None, error_description: str | None, now: float
@@ -394,9 +422,15 @@ class Accounts:
             for account in await self.accounts()
             if not (account.provider == provider.id and account.address == address)
         ]
-        account: Account = Account(provider=provider.id, address=address, connected_at=now)
+        # Drafts are allowed when the token holds the draft scopes: the owner may untick one on Google's page.
+        account: Account = Account(
+            provider=provider.id,
+            address=address,
+            connected_at=now,
+            drafts=granted(provider.draft_scopes, tokens.scope),
+        )
         await self._keep([*others, account])
-        log.info("signed_in", provider=provider.id, refresh=tokens.refresh_token is not None)
+        log.info("signed_in", provider=provider.id, refresh=tokens.refresh_token is not None, drafts=account.drafts)
         return account
 
     async def _address(self, provider: Provider, access_token: str) -> str:

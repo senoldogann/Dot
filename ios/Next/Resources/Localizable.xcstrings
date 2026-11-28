@@ -6304,6 +6304,17 @@
         }
       }
     },
+    "Goes from": {
+      "comment": "Draft card: the account of the owner's the email goes from",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderen hesap"
+          }
+        }
+      }
+    },
     "Goes into the running task at its next step": {
       "comment": "Follow-up setting: what Steer does",
       "localizations": {
@@ -6916,6 +6927,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Şu an kullanılamaz: %@"
+          }
+        }
+      }
+    },
+    "It goes out from %@ as it stands on the card.": {
+      "comment": "Confirmation of a draft's Send from the owner's Gmail or Outlook; the argument is the account",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Karttaki haliyle %@ hesabından gönderilir."
           }
         }
       }
@@ -9748,6 +9770,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "iOS Ayarları'nı aç"
+          }
+        }
+      }
+    },
+    "Open in Gmail": {
+      "comment": "Draft card: opens the draft in the owner's Gmail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gmail'de aç"
+          }
+        }
+      }
+    },
+    "Open in Outlook": {
+      "comment": "Draft card: opens the draft in the owner's Outlook",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outlook'ta aç"
           }
         }
       }

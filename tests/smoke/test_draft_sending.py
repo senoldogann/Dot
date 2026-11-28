@@ -6,6 +6,8 @@ run would send for real); ``osascript`` itself is a stand-in written here that f
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -14,6 +16,7 @@ from dotagent.drafts import service
 from dotagent.drafts.scripts import SCRIPTS, send_calls
 from dotagent.drafts.service import DraftWords, create_draft, send_draft
 from dotagent.events import EventBus
+from dotagent.oauth.accounts import Accounts
 from dotagent.store.db import Store
 from dotagent.store.models import DraftChannel, DraftRecord
 
@@ -21,6 +24,8 @@ _OSACOMPILE: str = "/usr/bin/osacompile"
 _FIRST: str = "+90 555 000 00 01"
 _SECOND: str = "+90 555 000 00 02"
 _THIRD: str = "+90 555 000 00 03"
+# A draft that is in no mailbox is sent by its application: no account is used.
+NO_ACCOUNTS: Accounts = cast(Accounts, SimpleNamespace())
 _NO_PARTICIPANT: str = "execution error: Messages got an error: Can't get participant. (-1728)"
 
 
@@ -71,7 +76,7 @@ async def test_a_message_that_fails_partway_names_those_it_reached_and_a_retry_l
         draft: DraftRecord = await _draft(store, bus, "message", [_FIRST, _SECOND, _THIRD])
         words: DraftWords = DraftWords(to=draft.to, cc=(), subject="", body=draft.body)
 
-        failed: DraftRecord = await send_draft(store, bus, 30.0, draft.id, words)
+        failed: DraftRecord = await send_draft(store, bus, NO_ACCOUNTS, 30.0, draft.id, words)
 
         assert failed.status == "failed" and failed.error is not None
         assert _NO_PARTICIPANT in failed.error and f"already sent to {_FIRST}," in failed.error, failed.error
@@ -83,7 +88,12 @@ async def test_a_message_that_fails_partway_names_those_it_reached_and_a_retry_l
         broken.clear()
         calls.clear()
         retry: DraftRecord = await send_draft(
-            store, bus, 30.0, draft.id, DraftWords(to=(_SECOND, _THIRD), cc=(), subject="", body=draft.body)
+            store,
+            bus,
+            NO_ACCOUNTS,
+            30.0,
+            draft.id,
+            DraftWords(to=(_SECOND, _THIRD), cc=(), subject="", body=draft.body),
         )
         assert retry.status == "sent" and retry.error is None
         assert calls == [("The words.", _SECOND), ("The words.", _THIRD)]
@@ -108,7 +118,12 @@ async def test_an_email_to_several_people_is_one_run_of_its_script_and_one_failu
         monkeypatch.setattr(service, "run_osascript", osascript)
         draft: DraftRecord = await _draft(store, bus, "mail", ["ayse@example.com", "mert@example.com"])
         failed: DraftRecord = await send_draft(
-            store, bus, 30.0, draft.id, DraftWords(to=draft.to, cc=(), subject=draft.subject, body=draft.body)
+            store,
+            bus,
+            NO_ACCOUNTS,
+            30.0,
+            draft.id,
+            DraftWords(to=draft.to, cc=(), subject=draft.subject, body=draft.body),
         )
         assert len(calls) == 1 and calls == [send_calls(draft)[0]]
         assert failed.status == "failed" and failed.error is not None

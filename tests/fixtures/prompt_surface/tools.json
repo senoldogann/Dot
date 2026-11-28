@@ -1651,6 +1651,67 @@
     }
   },
   {
+    "description": "Draft an email in the owner's own Gmail or Outlook, a reply in its thread or a new mail: a draft they open, edit and send there or from a card here. Prefer it to draft_message for a signed-in account.",
+    "name": "mail_draft",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "description": "The signed-in account the draft is made in.",
+          "maxLength": 320,
+          "minLength": 3,
+          "type": "string"
+        },
+        "body": {
+          "description": "The final text, in the owner's voice, no placeholders.",
+          "maxLength": 20000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "cc": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "draft": {
+          "default": "",
+          "description": "A waiting draft's id, to write it again.",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "reply_to": {
+          "default": "",
+          "description": "The id mail_search gave the message this answers, in its thread.",
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "subject": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "to": {
+          "description": "Email addresses.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "account",
+        "to",
+        "subject",
+        "body"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "description": "Read one message of the owner's mail whole, by the id mail_search gave: its people, date, text and the files it carries. Only reads: it is not marked read.",
     "name": "mail_read",
     "parameters": {

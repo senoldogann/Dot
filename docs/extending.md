@@ -457,23 +457,31 @@ security add-generic-password -U -s dot-agent -a DOT_GOOGLE_CLIENT_SECRET -w
 security add-generic-password -U -s dot-agent -a DOT_MS_CLIENT_ID -w
 ```
 
-Google is asked for `gmail.readonly` and `calendar.readonly` (and who you are), Microsoft for `Mail.Read`,
+A sign-in asks Google for `gmail.readonly` and `calendar.readonly` (and who you are), Microsoft for `Mail.Read`,
 `Calendars.Read`, `User.Read` and `offline_access`: the account tools only read (item 558; before, Google was asked for
-`gmail.modify` and `calendar` and Microsoft for `Mail.ReadWrite`, `Mail.Send` and `Calendars.ReadWrite`, and an account
-signed in then keeps that grant until you sign in again). A tool that writes will ask for what it needs, and be one that
-asks before it sends. The tokens of each account are in the login Keychain under the
-service `dot-oauth`, in pieces short enough for a line of `security`'s own prompt (Microsoft's run to some kilobytes):
-the item `google:<address>` says which of two slots holds them and how many there are (`a2`), the items
+`gmail.modify` and `calendar` and Microsoft for `Mail.ReadWrite`, `Mail.Send` and `Calendars.ReadWrite`). Drafts are
+asked apart, for one account (item 2047): **Allow drafts and sending** beside it signs it in again, naming it to the
+provider (`login_hint`), with Gmail's `gmail.compose` or Graph's `Mail.ReadWrite` and `Mail.Send` added, and the account
+shows "Drafts and sending allowed" once the token holds them (Google's page lets you untick one: then it does not).
+Neither provider has a scope for drafts alone: `gmail.compose` makes, changes and sends drafts (it cannot delete or
+change the mailbox's other mail), and Graph makes a draft only with `Mail.ReadWrite`, which may change and delete any
+mail of the account. So such an account's token, read out of the Keychain, could send mail as you, and at Microsoft
+change or delete it; an account you never allow keeps the narrow grant. Nothing of Dot sends a draft but your press of
+Send on its card, and nothing of Dot deletes mail but your Discard of a card's draft. A plain sign-in of the account
+again reads only. Until drafts are allowed, `mail_draft` is refused with this advice; the allowing is on the Mac, as
+every sign-in (`POST /api/accounts/<provider>/<address>/drafts`). The tokens of each account are in the login Keychain
+under the service `dot-oauth`, in pieces short enough for a line of `security`'s own prompt (Microsoft's run to some
+kilobytes): the item `google:<address>` says which of two slots holds them and how many there are (`a2`), the items
 `google:<address>#a0`, `#a1`… hold the pieces, and new tokens go to the other slot before that item names it, so that
 tokens cut off half-written leave the ones before them whole. They are written through that prompt so that no token is
 on a command line, and the list of accounts, with no secret in it, is in the store. A sign-in the browser comes back to
-after more than 10 minutes is turned away. Nothing logs a token, a code or an address (`GET /api/accounts`,
-`POST /api/accounts/<provider>/start`, `DELETE /api/accounts/<provider>/<address>`).
+after more than 10 minutes is turned away. Nothing logs a token, a code or an address (`GET /api/accounts`, `POST
+/api/accounts/<provider>/start`, `DELETE /api/accounts/<provider>/<address>`).
 
 Runs read the mail and the calendar of each account with `mail_search`, `mail_read` and `calendar_events` (item 424,
 [Runs and tools](runs.md#mail-and-calendars)); the prompt of a run that has one of these tools names the accounts
-signed in (an agent of yours may have none of them, or only some). They only read: an email a run writes for you is a
-draft you send from the conversation.
+signed in (an agent of yours may have none of them, or only some). They only read; an email a run writes for you is a
+draft you send from the conversation, in the account's own Drafts with `mail_draft` (item 2047).
 
 ## MCP servers
 

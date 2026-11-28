@@ -15,7 +15,7 @@ from dotagent.oauth.accounts import authorize_link, client_names
 from dotagent.oauth.keychain import pieces_of, tokens_of, without_pieces
 from dotagent.oauth.pkce import challenge_of, new_state, new_verifier
 from dotagent.oauth.providers import GOOGLE, MICROSOFT
-from dotagent.oauth.tokens import Tokens, address_from, tokens_from
+from dotagent.oauth.tokens import Tokens, address_from, granted, tokens_from
 from dotagent.server.guard import PHONE_STATE
 from dotagent.server.routes_accounts import on_this_mac
 
@@ -29,7 +29,9 @@ def test_the_challenge_is_the_verifiers_sha256_in_base64url_without_padding() ->
 
 
 def test_the_providers_page_asks_for_the_access_with_pkce_and_comes_back_to_this_mac() -> None:
-    link: str = authorize_link(GOOGLE, "client-1", "http://127.0.0.1:8765/oauth/callback", "state-1", "challenge-1")
+    link: str = authorize_link(
+        GOOGLE, GOOGLE.scopes, (), "client-1", "http://127.0.0.1:8765/oauth/callback", "state-1", "challenge-1"
+    )
     parts = urlsplit(link)
     query: dict[str, list[str]] = parse_qs(parts.query)
     assert f"{parts.scheme}://{parts.netloc}{parts.path}" == GOOGLE.authorize_url
@@ -42,10 +44,11 @@ def test_the_providers_page_asks_for_the_access_with_pkce_and_comes_back_to_this
     assert "offline_access" in MICROSOFT.scopes
 
 
-def test_the_access_asked_for_is_what_the_account_tools_do_which_is_to_read() -> None:
+def test_a_sign_in_asks_to_read_and_drafts_are_asked_apart() -> None:
     """Item 558: Google was asked for ``gmail.modify`` and ``calendar``, Microsoft for ``Mail.ReadWrite``,
-    ``Mail.Send`` and ``Calendars.ReadWrite``, though every account tool only reads. A token read out of the Keychain
-    by a script could then send mail as the owner, and delete or change their events."""
+    ``Mail.Send`` and ``Calendars.ReadWrite``, though every account tool only reads; a token read out of the Keychain
+    by a script could then send mail as the owner. A sign-in still asks only to read. Item 2047's drafts ask, apart and
+    for one account, for Gmail's ``gmail.compose`` and Graph's ``Mail.ReadWrite`` and ``Mail.Send``."""
     assert GOOGLE.scopes == (
         "openid",
         "email",
@@ -56,6 +59,30 @@ def test_the_access_asked_for_is_what_the_account_tools_do_which_is_to_read() ->
     for scope in (*GOOGLE.scopes, *MICROSOFT.scopes):
         assert not any(word in scope for word in ("modify", "send", "Send", "ReadWrite", "compose", "full_access"))
         assert scope != "https://www.googleapis.com/auth/calendar"
+    assert GOOGLE.draft_scopes == ("https://www.googleapis.com/auth/gmail.compose",)
+    assert MICROSOFT.draft_scopes == ("Mail.ReadWrite", "Mail.Send")
+    link: str = authorize_link(
+        MICROSOFT,
+        (*MICROSOFT.scopes, *MICROSOFT.draft_scopes),
+        (("login_hint", "ada@outlook.com"),),
+        "client-ms",
+        "http://localhost:8765/oauth/callback",
+        "state-2",
+        "challenge-2",
+    )
+    query: dict[str, list[str]] = parse_qs(urlsplit(link).query)
+    assert query["login_hint"] == ["ada@outlook.com"] and query["scope"][0].endswith("Mail.ReadWrite Mail.Send")
+
+
+def test_drafts_are_allowed_only_when_the_token_holds_every_draft_scope() -> None:
+    assert granted(
+        MICROSOFT.draft_scopes,
+        "openid https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send",
+    )
+    assert granted(GOOGLE.draft_scopes, "openid https://www.googleapis.com/auth/gmail.compose")
+    # Google lets the owner untick a scope on its page: the token then lacks it.
+    assert not granted(GOOGLE.draft_scopes, "openid https://www.googleapis.com/auth/gmail.readonly")
+    assert not granted(MICROSOFT.draft_scopes, "Mail.Read Mail.ReadWrite")
 
 
 def test_only_google_has_a_call_that_ends_a_grant() -> None:

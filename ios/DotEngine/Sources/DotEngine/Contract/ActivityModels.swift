@@ -485,6 +485,23 @@ public struct WatcherRequest: Codable, Sendable, Hashable {
 
 /// A draft a run wrote for the owner (item 314): `channel` is `mail` or `message`; `status` `waiting`, `sending`,
 /// `sent`, `discarded` or `failed` (`error` says why the last send failed).
+/// Where an email draft also is in the owner's own Gmail or Outlook (item 2047): the account it goes from and the
+/// address that opens it there (empty when the provider gave none).
+public struct DraftMailbox: Codable, Sendable, Hashable {
+    public let provider: String
+    public let account: String
+    public let link: String
+
+    public init(provider: String, account: String, link: String) {
+        self.provider = provider
+        self.account = account
+        self.link = link
+    }
+
+    /// The provider's own name: Gmail or Outlook.
+    public var name: String { provider == "google" ? "Gmail" : "Outlook" }
+}
+
 public struct DraftView: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let runId: String
@@ -496,8 +513,9 @@ public struct DraftView: Codable, Sendable, Hashable, Identifiable {
     public let status: String
     public let createdAt: Double
     public let error: String?
+    public let mailbox: DraftMailbox?
 
-    public init(id: String, runId: String, channel: String, to: [String], cc: [String], subject: String, body: String, status: String, createdAt: Double, error: String?) {
+    public init(id: String, runId: String, channel: String, to: [String], cc: [String], subject: String, body: String, status: String, createdAt: Double, error: String?, mailbox: DraftMailbox?) {
         self.id = id
         self.runId = runId
         self.channel = channel
@@ -508,10 +526,11 @@ public struct DraftView: Codable, Sendable, Hashable, Identifiable {
         self.status = status
         self.createdAt = createdAt
         self.error = error
+        self.mailbox = mailbox
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, channel, to, cc, subject, body, status, error
+        case id, channel, to, cc, subject, body, status, error, mailbox
         case runId = "run_id"
         case createdAt = "created_at"
     }

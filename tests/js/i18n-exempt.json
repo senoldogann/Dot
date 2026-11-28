@@ -172,5 +172,7 @@
   "important": "the keywords of a language the change view colours, never shown as words",
   "true false": "the keywords of a language the change view colours, never shown as words",
   "true false null": "the keywords of a language the change view colours, never shown as words",
-  "true false null yes no on off": "the keywords of a language the change view colours, never shown as words"
+  "true false null yes no on off": "the keywords of a language the change view colours, never shown as words",
+  "Gmail": "a product's own name, the same in every language",
+  "Outlook": "a product's own name, the same in every language"
 }

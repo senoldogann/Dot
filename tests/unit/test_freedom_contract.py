@@ -532,7 +532,7 @@ ROWS: tuple[Row, ...] = (
         "web_extract",
         {"sources": ["https://example.com"], "fields": [{"name": "t", "description": "the title"}]},
     ),
-    # --- the owner's mail and calendar, read only
+    # --- the owner's mail and calendar, read, and drafts in it
     _row("mail: search", "mail_search", {"account": "ada@example.invalid"}),
     _row("mail: read", "mail_read", {"account": "ada@example.invalid", "message_id": "m1"}),
     _row(
@@ -541,6 +541,12 @@ ROWS: tuple[Row, ...] = (
         {"account": "ada@example.invalid", "start": "2026-11-24", "end": "2026-11-25"},
     ),
     _row("mail: a code from Mail", "code_fetch", {"app": "mail"}),
+    # A draft in the owner's own mailbox (item 2047): nothing is sent, the owner's press is.
+    _row(
+        "mail: a draft in the owner's Gmail",
+        "mail_draft",
+        {"account": "ada@example.invalid", "to": ["bob@example.invalid"], "subject": "Re: Hi", "body": "Hi Bob"},
+    ),
     # --- schedules
     _row(
         "schedule: create",

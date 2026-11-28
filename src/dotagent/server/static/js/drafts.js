@@ -1,7 +1,8 @@
 // A draft a run wrote for the owner (item 314, after Grok's): a card in the conversation with the recipients and the
 // words. The owner sends it as it is, changes it first (Edit) or discards it; nothing goes out before Send, and then
 // the daemon hands it to Mail or Messages with what the card holds. A run goes on without waiting for it, so a card
-// may be answered long after its run ended.
+// may be answered long after its run ended. An email drafted in the owner's own Gmail or Outlook (item 2047) names the
+// account it goes from and opens there too; its Send goes through that account.
 
 import { api } from "./api.js";
 import { clock, el, setText } from "./dom.js";
@@ -17,6 +18,18 @@ const BADGE = { waiting: "b-warn", sending: "b-muted", sent: "b-ok", discarded: 
 // The drafts that still take an answer: one that waits, and one whose send failed; and the answered ones.
 const OPEN = new Set(["waiting", "failed"]);
 const FINAL = new Set(["sent", "discarded"]);
+const MAILBOX = { google: "Gmail", microsoft: "Outlook" };
+const OPEN_IN = { google: t("drafts.openInGmail"), microsoft: t("drafts.openInOutlook") };
+
+/** The draft's place in a mailbox of the owner's, or null; its link only when it is an https address. */
+function mailboxOf(draft) {
+  const mailbox = draft.mailbox ?? null;
+  if (mailbox === null || typeof mailbox.account !== "string") {
+    return null;
+  }
+  const link = typeof mailbox.link === "string" && /^https:\/\//.test(mailbox.link) ? mailbox.link : null;
+  return { name: MAILBOX[mailbox.provider] ?? mailbox.provider, open: OPEN_IN[mailbox.provider] ?? mailbox.provider, account: mailbox.account, link };
+}
 
 /** The addresses in what the owner typed: separated by commas, semicolons or lines. */
 function addresses(text) {
@@ -134,10 +147,12 @@ export function draftCard(initial, changed) {
 
   function shown() {
     const mail = draft.channel === "mail";
+    const mailbox = mailboxOf(draft);
     return [
       el(
         "div",
         { class: "draft-fields" },
+        mailbox === null ? null : field(t("drafts.from"), t("drafts.fromMailbox", { account: mailbox.account, name: mailbox.name })),
         field("To", draft.to.join(", ")),
         mail && draft.cc.length > 0 ? field("Cc", draft.cc.join(", ")) : null,
         mail ? field(t("drafts.subject"), draft.subject) : null,
@@ -162,6 +177,11 @@ export function draftCard(initial, changed) {
     const button = (label, className, action, iconName) =>
       el("button", { class: className, type: "button", disabled: busy, onclick: () => attempt(action) }, iconName === null ? null : icon(iconName), label);
     const sendLabel = draft.status === "failed" ? t("drafts.sendAgain") : SEND[draft.channel];
+    const mailbox = mailboxOf(draft);
+    const open =
+      mailbox === null || mailbox.link === null || editing
+        ? null
+        : el("a", { class: "btn", href: mailbox.link, target: "_blank", rel: "noopener noreferrer" }, icon("external"), mailbox.open);
     return el(
       "div",
       { class: "draft-actions" },
@@ -172,6 +192,7 @@ export function draftCard(initial, changed) {
           }, null)
         : button(t("drafts.discard"), "btn", discard, null),
       editing ? null : button(t("drafts.edit"), "btn", async () => edit(), "pencil"),
+      open,
       button(sendLabel, "btn primary draft-send", send, "send"),
     );
   }
@@ -181,7 +202,8 @@ export function draftCard(initial, changed) {
     const parts = [
       head(),
       ...(editing && OPEN.has(draft.status) ? form() : shown()),
-      draft.status === "failed" && draft.error !== null ? el("div", { class: "draft-error" }, icon("alert"), el("span", null, draft.error)) : null,
+      // A failed send says why; a discarded draft its mailbox could not delete says it stays there (item 2047).
+      (draft.status === "failed" || draft.status === "discarded") && draft.error !== null ? el("div", { class: "draft-error" }, icon("alert"), el("span", null, draft.error)) : null,
       actions(),
     ];
     // The DOM's replaceChildren writes a null as the word "null".

@@ -16,6 +16,7 @@ from dotagent.core.errors import InvalidValueError, ToolInputError
 from dotagent.drafts import service
 from dotagent.drafts.service import DraftWords, create_draft, send_draft
 from dotagent.events import EventBus
+from dotagent.oauth.accounts import Accounts
 from dotagent.store.db import Store
 from dotagent.store.models import DraftChannel, DraftRecord
 from dotagent.tools.base import PreparedCall, ToolResult
@@ -25,6 +26,8 @@ from dotagent.tools.drafts import build_draft_tool
 PHONE: str = "+358401234567"
 ADDRESS: str = "me@example.com"
 SOMEONE_ELSE: str = "+49 151 1234 5678"
+# A draft that is in no mailbox is sent by its application: no account is used.
+NO_ACCOUNTS: Accounts = cast(Accounts, SimpleNamespace())
 
 
 @pytest_asyncio.fixture
@@ -95,13 +98,18 @@ async def test_a_card_whose_recipient_was_changed_to_a_paired_number_is_not_sent
     draft: DraftRecord = await _draft(store, "message", [SOMEONE_ELSE])
     words: DraftWords = DraftWords(to=(PHONE,), cc=(), subject="", body=draft.body)
     with pytest.raises(InvalidValueError) as refused:
-        await send_draft(store, EventBus(store), 30.0, draft.id, words)
+        await send_draft(store, EventBus(store), NO_ACCOUNTS, 30.0, draft.id, words)
     assert "paired with Dot's iMessage channel" in refused.value.message
     assert calls == []
     assert (await store.get_draft(draft.id)).status == "waiting"
     # The same card, with someone else, goes out.
     sent: DraftRecord = await send_draft(
-        store, EventBus(store), 30.0, draft.id, DraftWords(to=(SOMEONE_ELSE,), cc=(), subject="", body=draft.body)
+        store,
+        EventBus(store),
+        NO_ACCOUNTS,
+        30.0,
+        draft.id,
+        DraftWords(to=(SOMEONE_ELSE,), cc=(), subject="", body=draft.body),
     )
     assert sent.status == "sent" and calls == [("The words.", SOMEONE_ELSE)]
 

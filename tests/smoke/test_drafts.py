@@ -23,9 +23,12 @@ from dotagent.config import load_default_config
 from dotagent.core.types import JsonObject
 from dotagent.desktop import script as osascript
 from dotagent.drafts.service import (
+    _MAILBOX_LOCKS,
+    _MAILBOX_USERS,
     DRAFT_CREATED_EVENT,
     DRAFT_DECIDED_EVENT,
     STOPPED_WHILE_SENDING,
+    _writing,
     fail_unsettled_drafts,
 )
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -38,7 +41,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import DraftRecord, EventRecord, RunRecord
+from dotagent.store.models import DraftMailbox, DraftRecord, EventRecord, RunRecord, ThreadRecord
 from dotagent.tools.drafts import DRAFT_TOOL
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
@@ -309,7 +312,9 @@ async def test_a_draft_a_stopped_daemon_was_sending_is_not_sent_again(login_env:
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
         try:
-            draft: DraftRecord = await runtime.store.add_draft("run_x", "mail", ["a@example.com"], [], "Hi", "Hello.")
+            draft: DraftRecord = await runtime.store.add_draft(
+                "run_x", "mail", ["a@example.com"], [], "Hi", "Hello.", None
+            )
             await runtime.store.claim_draft(draft.id, ["a@example.com"], [], "Hi", "Hello.")
             assert await fail_unsettled_drafts(runtime.store, runtime.bus) == 1
             failed: DraftRecord = await runtime.store.get_draft(draft.id)
@@ -317,5 +322,116 @@ async def test_a_draft_a_stopped_daemon_was_sending_is_not_sent_again(login_env:
             told: list[EventRecord] = await runtime.store.list_events("run_x", 0, 10)
             assert [event.kind for event in told] == [DRAFT_DECIDED_EVENT]
             assert await fail_unsettled_drafts(runtime.store, runtime.bus) == 0
+        finally:
+            await close_runtime(runtime)
+
+
+@pytest.mark.browser
+async def test_a_draft_in_the_owners_gmail_names_its_account_and_opens_there(login_env: dict[str, str]) -> None:
+    """Item 2047: a draft made in the owner's own Gmail shows the account it goes from and Open in Gmail, the draft's
+    address there, wide and on a phone; a link that is not https is not drawn."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env) as (runtime, _manager, address), async_playwright() as playwright:
+            # The run is still live while its drafts are made: a finished run's stream stops at run_finished, so
+            # drafts emitted after it would never reach the page.
+            chat: ThreadRecord = await runtime.store.create_thread("Write my emails", "test")
+            run: RunRecord = await runtime.store.create_run(
+                chat.id,
+                "Write my emails",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "test",
+                "medium",
+                "standard",
+                None,
+                "yolo",
+                False,
+                None,
+                None,
+                None,
+            )
+            link: str = "https://mail.google.com/mail/u/ada@gmail.com/#drafts?compose=17a"
+            for mailbox in (
+                DraftMailbox(
+                    provider="google",
+                    account="ada@gmail.com",
+                    remote_id="r-7",
+                    version="17a",
+                    reply_to="m-1",
+                    link=link,
+                ),
+                DraftMailbox(
+                    provider="microsoft",
+                    account="ada@outlook.com",
+                    remote_id="D1",
+                    version="ck1",
+                    reply_to=None,
+                    link="javascript:x",
+                ),
+            ):
+                draft: DraftRecord = await runtime.store.add_draft(
+                    run.id, "mail", ["bob@example.com"], [], "Re: Invoice", "Paid today.", mailbox
+                )
+                await runtime.bus.emit(run.id, DRAFT_CREATED_EVENT, draft.model_dump(mode="json"), True)
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                screens: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+                for width, scheme in screens:
+                    page: Page = await _open(browser, address, run.id, width, scheme)
+                    gmail: Locator = page.locator(".timeline .draft-card", has_text="ada@gmail.com")
+                    await expect(gmail.locator(".draft-fields")).to_contain_text("ada@gmail.com (Gmail)")
+                    await expect(gmail.get_by_role("link", name="Open in Gmail")).to_have_attribute("href", link)
+                    outlook: Locator = page.locator(".timeline .draft-card", has_text="ada@outlook.com")
+                    await expect(outlook.locator(".draft-fields")).to_contain_text("ada@outlook.com (Outlook)")
+                    await expect(outlook.get_by_role("link")).to_have_count(0)
+                    # On a phone the row of buttons wraps inside the card: nothing wider than the page.
+                    wide: bool = await page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+                    assert not wide
+                    await page.close()
+            finally:
+                await browser.close()
+
+
+async def test_the_draft_lock_map_empties_once_the_writers_of_a_decided_draft_finish(login_env: dict[str, str]) -> None:
+    """Item 2047: many writers of one draft share its lock; once the draft is discarded and they are done, neither
+    the lock nor the count of its users is left behind."""
+    with scratch_home() as home, eval_environment(home, {}):
+        runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
+        try:
+            chat: ThreadRecord = await runtime.store.create_thread("Write my emails", "test")
+            run: RunRecord = await runtime.store.create_run(
+                chat.id,
+                "Write",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "test",
+                "medium",
+                "standard",
+                None,
+                "yolo",
+                False,
+                None,
+                None,
+                None,
+            )
+            draft: DraftRecord = await runtime.store.add_draft(
+                run.id, "mail", ["bob@example.com"], [], "Hi", "Body", None
+            )
+
+            inflight: list[int] = [0]
+
+            async def write() -> None:
+                async with _writing(runtime.store, draft.id):
+                    inflight[0] += 1
+                    assert inflight[0] == 1, "two writers held the draft's lock at once"
+                    await asyncio.sleep(0.01)
+                    inflight[0] -= 1
+
+            await runtime.store.discard_draft(draft.id, None)
+            await asyncio.gather(*(write() for _ in range(5)))
+            assert draft.id not in _MAILBOX_LOCKS
+            assert draft.id not in _MAILBOX_USERS
         finally:
             await close_runtime(runtime)

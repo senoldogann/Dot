@@ -120,8 +120,8 @@ async def test_an_agents_work_that_a_run_sent_is_listed_unless_the_owners_own_ru
                                 (helper, "yolo"), (chained, "yolo"), (through_helper, "yolo")):  # fmt: skip
             asked = await store.create_approval(run.id, "shell", "x", "high", {})
             await store.decide_approval(asked.id, "approved", decided_by, "")
-        await store.add_draft(sent_by_dot.id, "mail", ["a@example.com"], [], "Offer", "x")
-        await store.add_draft(sent_by_me.id, "mail", ["b@example.com"], [], "Mine", "x")
+        await store.add_draft(sent_by_dot.id, "mail", ["a@example.com"], [], "Offer", "x", None)
+        await store.add_draft(sent_by_me.id, "mail", ["b@example.com"], [], "Mine", "x", None)
         for run in (by_dot, mine, sent_by_dot, sent_by_me, sent_on, helper, chained, mine_helper, through_helper):
             await _ended(store, run)
         view: AwayView = await read_away(store, since, time.time() + 1)
@@ -176,8 +176,8 @@ async def test_the_decisions_and_the_drafts_of_the_new_runs_and_their_helpers_ar
         for run, decided_by in ((reply, "yolo"), (helper, "reviewer"), (mine, "yolo")):
             asked = await store.create_approval(run.id, "shell", "x", "high", {})
             await store.decide_approval(asked.id, "approved", decided_by, "")
-        await store.add_draft(helper.id, "mail", ["a@example.com"], [], "Hi", "x")
-        await store.add_draft(mine.id, "mail", ["b@example.com"], [], "Mine", "x")
+        await store.add_draft(helper.id, "mail", ["a@example.com"], [], "Hi", "x", None)
+        await store.add_draft(mine.id, "mail", ["b@example.com"], [], "Mine", "x", None)
         goal_chat: ThreadRecord = await store.create_thread("Ship 2.0", "ui")
         campaign = await store.create_campaign(
             "Ship 2.0", "Ship it.", goal_chat.id, "m:m", "high", "standard", None, "yolo", [], "own", ()

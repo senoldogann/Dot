@@ -225,7 +225,9 @@ run needs, sent where the configuration points:
   `mail_read` and `calendar_events` ask Gmail and Google Calendar (`googleapis.com`) or Microsoft Graph
   (`graph.microsoft.com`) for your messages and events, with the words of a search (see
   [Mail and calendars](runs.md#mail-and-calendars)); a mail or calendar watcher asks them for the newest mail of the
-  inbox or the events of the next minutes every few minutes (item 571).
+  inbox or the events of the next minutes every few minutes (item 571). Once you allowed drafts and sending for an
+  account (item 2047), `mail_draft` writes a draft's recipients, subject and body into your own Gmail or Outlook, and
+  your press of Send writes the card's words there again and sends the mail through the account.
 - **Nowhere, for Dot's own vault (item 621), but the page a fill types into.** Its secrets stay in your Keychain; a
   login is typed only into a page of its own site, and a card into none; a card's photo
   is read by Vision on this Mac; the text of an import is read in memory (see [Secrets](#safety)).

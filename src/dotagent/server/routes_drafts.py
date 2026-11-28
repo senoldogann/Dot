@@ -36,14 +36,15 @@ def drafts_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/drafts/{draft_id}/send")
     async def send(draft_id: str, request: DraftWords) -> DraftRecord:
-        """Hand the draft to its application: ``sent``, or ``failed`` with what the application said (200 both); 409
+        """Hand the draft to its application, or to the account whose mailbox holds it (item 2047): ``sent``, or
+        ``failed`` with what the application or the provider said (200 both); 409
         when it no longer waits, 422 when the words cannot go out."""
         timeout_s: float = ctx.runtime.config.desktop.osascript_timeout_s
-        return await send_draft(ctx.runtime.store, ctx.runtime.bus, timeout_s, draft_id, request)
+        return await send_draft(ctx.runtime.store, ctx.runtime.bus, ctx.runtime.accounts, timeout_s, draft_id, request)
 
     @router.post("/drafts/{draft_id}/discard")
     async def discard(draft_id: str) -> DraftRecord:
-        """Drop the draft; 409 when it no longer waits."""
-        return await discard_draft(ctx.runtime.store, ctx.runtime.bus, draft_id)
+        """Drop the draft, and delete it from the owner's mailbox when it is in one; 409 when it no longer waits."""
+        return await discard_draft(ctx.runtime.store, ctx.runtime.bus, ctx.runtime.accounts, draft_id)
 
     return router

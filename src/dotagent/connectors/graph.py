@@ -13,12 +13,15 @@ from dotagent.connectors.types import (
     Attendee,
     CalendarEvent,
     EventList,
+    MailboxDraft,
     MailList,
     MailMessage,
     MailSummary,
+    OutgoingMail,
     ProviderAnswer,
 )
 from dotagent.core.errors import AccountApiError
+from dotagent.core.types import JsonArray, JsonObject
 from dotagent.web.text import html_to_text
 
 GRAPH: str = "https://graph.microsoft.com/v1.0/me"
@@ -281,3 +284,66 @@ async def outlook_events(api: AccountApi, start: dt.datetime, end: dt.datetime, 
         # A next page's address carries the query of the first.
         address, params, pages = link, [], pages + 1
     return EventList(events=tuple(kept[:limit]), more=len(kept) > limit or address is not None)
+
+
+class _Drafted(ProviderAnswer):
+    id: str
+    # Graph's version of an item, which every change of it moves.
+    changeKey: str
+    webLink: str = ""
+
+
+def _recipients(addresses: tuple[str, ...]) -> JsonArray:
+    return [{"emailAddress": {"address": address}} for address in addresses]
+
+
+def outlook_draft_body(mail: OutgoingMail) -> JsonObject:
+    """The draft's fields as Graph's message takes them, its words as plain text."""
+    return {
+        "subject": " ".join(mail.subject.split()),
+        "body": {"contentType": "Text", "content": mail.body},
+        "toRecipients": _recipients(mail.to),
+        "ccRecipients": _recipients(mail.cc),
+    }
+
+
+def outlook_draft_of(answer: object, url: str) -> MailboxDraft:
+    drafted: _Drafted = read_answer(_Drafted, answer, MAIL_NAME, url)
+    # The address goes to the owner's screens as a link: only an https one.
+    link: str = drafted.webLink if drafted.webLink.startswith("https://") else ""
+    return MailboxDraft(remote_id=drafted.id, version=drafted.changeKey, link=link)
+
+
+def _message_url(message_id: str) -> str:
+    return f"{GRAPH}/messages/{quote(message_id, safe='')}"
+
+
+async def create_outlook_draft(api: AccountApi, mail: OutgoingMail, reply_to: str | None) -> MailboxDraft:
+    """A draft of ``mail`` in the account's Drafts folder; an answer to the message ``reply_to`` (in its conversation,
+    Graph's createReply) when it names one."""
+    if reply_to is None:
+        url: str = f"{GRAPH}/messages"
+        return outlook_draft_of(await api.write(MAIL_NAME, "POST", url, outlook_draft_body(mail)), url)
+    replying: str = f"{_message_url(reply_to)}/createReply"
+    answer: object | None = await api.write(MAIL_NAME, "POST", replying, {"message": outlook_draft_body(mail)})
+    return outlook_draft_of(answer, replying)
+
+
+async def update_outlook_draft(api: AccountApi, remote_id: str, mail: OutgoingMail) -> MailboxDraft:
+    url: str = _message_url(remote_id)
+    return outlook_draft_of(await api.write(MAIL_NAME, "PATCH", url, outlook_draft_body(mail)), url)
+
+
+async def outlook_draft_version(api: AccountApi, remote_id: str) -> str:
+    """The draft's ``changeKey`` as Graph holds it now: every change of it, in Outlook too, moves it."""
+    url: str = _message_url(remote_id)
+    answer: object = await api.get(MAIL_NAME, url, [("$select", "id,changeKey")], {})
+    return read_answer(_Drafted, answer, MAIL_NAME, url).changeKey
+
+
+async def send_outlook_draft(api: AccountApi, remote_id: str) -> None:
+    await api.write(MAIL_NAME, "POST", f"{_message_url(remote_id)}/send", None)
+
+
+async def delete_outlook_draft(api: AccountApi, remote_id: str) -> None:
+    await api.write(MAIL_NAME, "DELETE", _message_url(remote_id), None)
