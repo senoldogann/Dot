@@ -60,17 +60,12 @@ _PLAIN: dict[str, object] = {
 
 
 async def _with_two_models(route: Route) -> None:
-    # The daemon's list is read here rather than with `route.fetch`: on GitHub's runners the WebKit sheet found no
-    # Thinker to pick, as if the list never came, and `route.fetch` cut another test's request there (ECONNRESET).
-    headers: dict[str, str] = await route.request.all_headers()
-    async with httpx.AsyncClient(headers={"Authorization": headers["authorization"]}, timeout=30) as client:
-        response: httpx.Response = await client.get(route.request.url)
-    response.raise_for_status()
-    providers: list[dict[str, list[dict[str, object]]]] = response.json()
+    response = await route.fetch()
+    providers: list[dict[str, list[dict[str, object]]]] = await response.json()
     for provider in providers:
         if provider["provider"] == "ollama":
             provider["models"].extend([_THINKER, _PLAIN])
-    await route.fulfill(json=providers)
+    await route.fulfill(response=response, json=providers)
 
 
 def _shots(tmp_path: Path) -> Path:
@@ -131,8 +126,15 @@ async def address(runtime: Runtime) -> AsyncIterator[str]:
 
 async def _open(browser: Browser, address: str, width: int, height: int, scheme: Literal["light", "dark"]) -> Page:
     phone: bool = width <= 720
+    # No service worker: once Dot's controls the page, WebKit sends the page's requests past its route, and the list of
+    # models came without the two added here (the phone's sheet had no Thinker on GitHub's runners). test_voice.py
+    # blocks it for the same reason.
     page: Page = await browser.new_page(
-        viewport={"width": width, "height": height}, color_scheme=scheme, has_touch=phone, is_mobile=phone
+        viewport={"width": width, "height": height},
+        color_scheme=scheme,
+        has_touch=phone,
+        is_mobile=phone,
+        service_workers="block",
     )
     await page.route("**/api/models", _with_two_models)
     port: int = int(address.rpartition(":")[2])
