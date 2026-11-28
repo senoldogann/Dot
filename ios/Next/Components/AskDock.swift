@@ -23,6 +23,9 @@ struct AskDock: View {
     @State private var current: String?
     /// What was picked and written for each question, kept while the owner pages between them (§21: one Submit).
     @State private var drafts: [String: QuestionDraft] = [:]
+    /// The asks' scroll: back at the top whenever the shown ask changes (paging, or an answered ask leaving), so that a
+    /// short ask never shows from where a tall one was scrolled to.
+    @State private var scroll: ScrollPosition = ScrollPosition(edge: .top)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
@@ -41,12 +44,23 @@ struct AskDock: View {
             header
             if !folded, entries.indices.contains(index) {
                 ScrollView {
-                    AskCard(
-                        entry: entries[index], actions: actions,
-                        draft: Binding(get: { drafts[entries[index].id] ?? .empty }, set: { drafts[entries[index].id] = $0 })
-                    )
-                    .id(entries[index].id)
+                    // Every ask is laid out, the shown one alone visible: the dock takes the tallest one's height, so
+                    // that its header and Previous/Next stay where they are while the owner pages (a dock that shrank
+                    // to a short page moved its arrows from under the finger).
+                    ZStack(alignment: .topLeading) {
+                        ForEach(entries) { entry in
+                            let shown: Bool = entry.id == entries[index].id
+                            AskCard(
+                                entry: entry, actions: actions,
+                                draft: Binding(get: { drafts[entry.id] ?? .empty }, set: { drafts[entry.id] = $0 })
+                            )
+                            .opacity(shown ? 1 : 0)
+                            .allowsHitTesting(shown)
+                            .accessibilityHidden(!shown)
+                        }
+                    }
                 }
+                .scrollPosition($scroll)
                 .scrollBounceBehavior(.basedOnSize)
                 // The dock is bounded (B1) and scrolls inside; at the accessibility sizes it may take more of the screen.
                 .frame(maxHeight: dynamicTypeSize.isAccessibilitySize ? 560 : 420)
@@ -82,6 +96,7 @@ struct AskDock: View {
         .overlay(alignment: .top) { Capsule().fill(Tone.warn).frame(width: 36, height: 3).padding(.top, 5).accessibilityHidden(true) }
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: folded)
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: index)
+        .onChange(of: entries.indices.contains(index) ? entries[index].id : nil) { scroll.scrollTo(edge: .top) }
         .onChange(of: entries.map(\.id)) { old, new in
             // A new ask unfolds the dock: something new to answer. The one being read stays the one shown.
             if new.count > old.count, Set(new).subtracting(old).isEmpty == false { folded = false }
