@@ -5219,6 +5219,9 @@ class RunManager:
         chosen: MessageChoices = message_choices(sent, named, await self._runtime.store.chat_choices(thread_id))
         if chosen.effort is None or "effort" in named or "model" in named:
             return chosen
+        # The model is asked for its levels only once it can answer: one that cannot is refused by name, as a message
+        # on it is (:meth:`check_model_answers`), not with the bare error of its provider.
+        await self.check_model_answers(parse_model_ref(self._main_model if chosen.model is None else chosen.model))
         if await self._level_offered(chosen.model, chosen.effort):
             return chosen
         return chosen.model_copy(update={"effort": None})

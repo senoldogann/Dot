@@ -447,7 +447,8 @@ MessageKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{16,64}$")]
 
 
 class StartRunRequest(FrozenModel):
-    """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones; ``speed``
+    """Start a run. ``mode``, ``model``, ``effort``, ``speed``, ``approvals`` and ``goal_mode`` left out take the chat's
+    for a message to a chat (``thread_id``, item 2071), else the configured ones; ``speed``
     is ``fast`` for fast mode, on a model that has it (item 223); ``once`` is a choice for this message only (item 251):
     ``ultrathink`` asks the model for its Max level, ``ultracode`` for its Extra high level and tells the run to split
     its independent parts across delegated runs, while the chat keeps ``effort``. ``plugins``, ``skills`` and
@@ -545,7 +546,7 @@ class SteerRequest(FrozenModel):
 
 class QueueMessageRequest(FrozenModel):
     """Put a message in a chat's queue (item 148), with the choices of the run it starts; those left out take the
-    configured ones then, as for ``StartRunRequest``."""
+    chat's (item 2071), as for ``StartRunRequest`` with a ``thread_id``."""
 
     text: str = Field(min_length=1, max_length=_GOAL_CHARS)
     mode: ChatMode = "task"

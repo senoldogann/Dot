@@ -19,6 +19,7 @@ from dotagent.config import AppConfig, load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.llm.types import Effort
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -44,8 +45,8 @@ def _finish(answer: str) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": True}),))
 
 
-def _kept(model: str | None) -> ChatChoices:
-    return ChatChoices(mode="auto", model=model, effort=None, speed="standard", approvals="yolo", goal_mode=False)
+def _kept(model: str | None, effort: Effort | None) -> ChatChoices:
+    return ChatChoices(mode="auto", model=model, effort=effort, speed="standard", approvals="yolo", goal_mode=False)
 
 
 def _config(kinds: dict[str, str]) -> AppConfig:
@@ -112,7 +113,7 @@ async def test_a_follow_up_that_names_no_choice_starts_on_the_chats_model_in_an_
             "JobHunter", "Finds jobs", "", "", None, None, (), None, None
         )
         for agent_id in (None, agent.id):
-            thread, first = await _chat(runtime, _kept(CHOSEN), agent_id, "done")
+            thread, first = await _chat(runtime, _kept(CHOSEN, None), agent_id, "done")
             # What the iPhone sends: the text and the key, no choice.
             sent: httpx.Response = await client.post(
                 f"/api/threads/{thread.id}/queue",
@@ -127,7 +128,7 @@ async def test_a_follow_up_that_names_no_choice_starts_on_the_chats_model_in_an_
 async def test_a_message_to_a_chat_keeps_the_chats_model_over_a_kind_and_its_own_model_over_the_chats() -> None:
     # Code work is named a model of its own; a chat that keeps one still starts on it.
     async with _daemon({"code": MAIN}) as (runtime, manager, client):
-        thread, _ = await _chat(runtime, _kept(CHOSEN), None, "done")
+        thread, _ = await _chat(runtime, _kept(CHOSEN, None), None, "done")
         goal: str = "Fix the failing tests in the repo."
         named_none: httpx.Response = await client.post("/api/runs", json={"goal": goal, "thread_id": thread.id})
         assert named_none.status_code == 201, named_none.text
@@ -146,7 +147,7 @@ async def test_a_message_to_a_chat_keeps_the_chats_model_over_a_kind_and_its_own
 
 async def test_a_resume_starts_on_the_model_the_chat_names_since() -> None:
     async with _daemon({}) as (runtime, manager, client):
-        thread, failed = await _chat(runtime, _kept(CHOSEN), None, "failed")
+        thread, failed = await _chat(runtime, _kept(CHOSEN, None), None, "failed")
         resumed: httpx.Response = await client.post(f"/api/runs/{failed.id}/resume")
         assert resumed.status_code == 201, resumed.text
         async with asyncio.timeout(_TIME_LIMIT_S):
@@ -156,17 +157,39 @@ async def test_a_resume_starts_on_the_model_the_chat_names_since() -> None:
 
 async def test_a_chat_whose_models_provider_has_no_key_refuses_the_message_plainly() -> None:
     async with _daemon({}) as (runtime, _manager, client):
-        thread, first = await _chat(runtime, _kept(KEYLESS), None, "done")
+        # A chat that kept a level too (the owner's kept "medium") is refused by name all the same.
+        thread, first = await _chat(runtime, _kept(KEYLESS, "medium"), None, "done")
         sent: httpx.Response = await client.post(
             f"/api/threads/{thread.id}/queue", json={"text": "Apply to them.", "key": "phone-follow-up-keyless-1"}
         )
         assert sent.status_code >= 400, sent.text
         assert f"{KEYLESS} cannot answer this message: no openai key is set" in sent.json()["message"], sent.text
+        named_none: httpx.Response = await client.post("/api/runs", json={"goal": "Again.", "thread_id": thread.id})
+        assert named_none.status_code >= 400 and "no openai key is set" in named_none.json()["message"], named_none.text
         assert [run.id for run in await runtime.store.list_runs(5, thread.id)] == [first.id]
         assert await runtime.store.list_queued(thread.id) == []
+        await runtime.store.set_chat_choices(thread.id, _kept(KEYLESS, None))
         failed: RunRecord = await runtime.store.create_run(
             thread.id, "Again.", "task", MAIN, None, "ui", None, "standard", None, "yolo", False, None, None, None
         )
         await runtime.store.finish_run(failed.id, "failed", "It stopped.")
         resumed: httpx.Response = await client.post(f"/api/runs/{failed.id}/resume")
         assert resumed.status_code >= 400 and "no openai key is set" in resumed.json()["message"], resumed.text
+
+
+async def test_a_level_the_chat_kept_is_left_out_for_a_model_that_offers_none() -> None:
+    # A chat keeps the level its first run resolved; the scripted model offers none, and a message that names neither
+    # its model nor its level starts there without it, as the composer would send it, not refused.
+    async with _daemon({}) as (runtime, manager, client):
+        thread, first = await _chat(runtime, _kept(CHOSEN, "medium"), None, "done")
+        sent: httpx.Response = await client.post(
+            f"/api/threads/{thread.id}/queue", json={"text": "Apply to them.", "key": f"phone-follow-up-{token_hex(8)}"}
+        )
+        assert sent.status_code == 201, sent.text
+        run: RunRecord = await _newest(runtime, manager, thread.id)
+        assert (run.id != first.id, run.model, run.status) == (True, CHOSEN, "done"), run
+        # A level the message names is its own, and the model is asked for it.
+        named: httpx.Response = await client.post(
+            "/api/runs", json={"goal": "Read the notes.", "thread_id": thread.id, "effort": "high"}
+        )
+        assert named.status_code == 422 and "does not offer that reasoning effort" in named.text, named.text
