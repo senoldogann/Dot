@@ -649,10 +649,12 @@ struct WorkingSummary: Equatable, Sendable {
     /// How the link to the Mac stands while it is not live, in the status's place (item 1931); `nil` while the chat is
     /// live.
     let link: LinkLine?
+    /// The chat's tasks that work or wait on the owner (item 2013); 0 hides the segment.
+    let tasks: Int
 
     /// The pill opens with the link's words or the status.
     var leads: Bool { status != nil || link != nil }
-    var isEmpty: Bool { !leads && queued == 0 && helpersTotal == 0 && plan == nil }
+    var isEmpty: Bool { !leads && queued == 0 && helpersTotal == 0 && plan == nil && tasks == 0 }
 }
 
 /// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
@@ -669,6 +671,7 @@ struct FloatingWorkingControl: View {
     let openPlan: () -> Void
     let openQueue: () -> Void
     let openHelpers: () -> Void
+    let openTasks: () -> Void
     let scrollToBottom: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
@@ -794,6 +797,19 @@ struct FloatingWorkingControl: View {
                         .textRole(.label).fontWeight(.medium).tabularNumbers().foregroundStyle(Tone.secondary)
                 }
                 .accessibilityIdentifier("capsule.helpers")
+            }
+            if summary.tasks > 0 {
+                if summary.leads || summary.canStop || summary.plan != nil || summary.queued > 0 || summary.helpersTotal > 0 { divider }
+                let words: String = String(localized: "\(summary.tasks) tasks", comment: "The capsule segment of the chat's tasks at work or waiting on the owner; the argument is their count")
+                segment(action: openTasks, label: words, inset: inset) {
+                    Label {
+                        Text(verbatim: glyphs ? "\(summary.tasks)" : words).lineLimit(1).fixedSize()
+                    } icon: {
+                        Image(systemName: "square.stack")
+                    }
+                    .textRole(.label).fontWeight(.medium).tabularNumbers().foregroundStyle(Tone.secondary)
+                }
+                .accessibilityIdentifier("capsule.tasks")
             }
         }
         .padding(.horizontal, Space.xxs)

@@ -397,7 +397,8 @@ first_words = true
 # (busy_parallel) starts in a lane of the chat, a thread of its own the chat list does not show, rather than in a chat
 # of its own, given what the chat said so far; the answer to a question card goes to the task that asked even when
 # another run works on its thread then; and POST /api/threads/{id}/stop stops every task of the chat. 1 keeps one run
-# at a time. The pages do not show lanes yet (item 1982's slice 3), so 1 is the default.
+# at a time, the default: the owner switches several on in their own config.toml (5, their word of 2026-11-27); the
+# pages and the phone list a chat's tasks (item 2013).
 chat_tasks = 1
 # A reply without a tool call is nudged towards finish; the finish_nudges + 1st such reply in a row ends a task run with
 # that reply as its result (a step with tool calls starts the count again). A reply the model service cut short (its

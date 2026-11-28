@@ -841,6 +841,35 @@
         }
       }
     },
+    "%lld tasks": {
+      "comment": "The capsule segment of the chat's tasks at work or waiting on the owner; the argument is their count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld task"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld tasks"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld görev"
+          }
+        }
+      }
+    },
     "%lld tasks: %@": {
       "comment": "Away card: how many tasks Dot did on its own, then how they went",
       "localizations": {
@@ -1291,6 +1320,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir kampanyanın oturumu"
+          }
+        }
+      }
+    },
+    "A task of %@": {
+      "comment": "Under a task's title: the chat it is a task of; the argument is the chat's title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ sohbetinin görevi"
           }
         }
       }
@@ -2171,6 +2211,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mesajından öncesine dönüldü. Bazı dosyalar o zamandan beri değiştiği için oldukları gibi bırakıldı."
+          }
+        }
+      }
+    },
+    "Back to the chat": {
+      "comment": "Under a task's title: opens the chat it is a task of",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbete dön"
           }
         }
       }
@@ -7618,6 +7669,17 @@
         }
       }
     },
+    "Move": {
+      "comment": "Toast of a routed message: sends it to another task",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taşı"
+          }
+        }
+      }
+    },
     "Move down": {
       "comment": "VoiceOver action: moves a queued message one place later",
       "localizations": {
@@ -7625,6 +7687,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aşağı taşı"
+          }
+        }
+      }
+    },
+    "Move to": {
+      "comment": "Title of the picker of where Move sends a routed message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şuraya taşı"
           }
         }
       }
@@ -7779,6 +7852,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni zamanlanmış görev"
+          }
+        }
+      }
+    },
+    "New task": {
+      "comment": "Move to: a task of its own",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni görev"
           }
         }
       }
@@ -8303,6 +8387,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ölçülmedi"
+          }
+        }
+      }
+    },
+    "Not moved: %@": {
+      "comment": "Toast: Move failed; the argument is the Mac's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taşınamadı: %@"
           }
         }
       }
@@ -11586,6 +11681,17 @@
         }
       }
     },
+    "Sent to %@": {
+      "comment": "Toast: the message went to another task of the chat; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ görevine gönderildi"
+          }
+        }
+      }
+    },
     "Sent to others": {
       "comment": "Hand-offs: messages the bot sent to other bots",
       "localizations": {
@@ -12319,6 +12425,17 @@
         }
       }
     },
+    "Started a new task: %@": {
+      "comment": "Toast: the message started a task of its own; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni görev başladı: %@"
+          }
+        }
+      }
+    },
     "Starting": {
       "comment": "Status word: a run is starting",
       "localizations": {
@@ -12513,6 +12630,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Durduruldu"
+          }
+        }
+      }
+    },
+    "Stopped %@": {
+      "comment": "Toast: the message was a stop of one task; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ durduruldu"
+          }
+        }
+      }
+    },
+    "Stopped every task": {
+      "comment": "Toast: the message was a stop and stopped every task of the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm görevler durduruldu"
           }
         }
       }
@@ -12855,6 +12994,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Görev"
+          }
+        }
+      }
+    },
+    "Tasks": {
+      "comment": "Title of the sheet of a chat's tasks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görevler"
           }
         }
       }
@@ -14945,6 +15095,17 @@
         }
       }
     },
+    "Waits for you": {
+      "comment": "Tasks sheet: the task's run ended asking the owner something",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seni bekliyor"
+          }
+        }
+      }
+    },
     "Waits for your answer": {
       "comment": "Activity: a question a task waits for",
       "localizations": {
@@ -16618,6 +16779,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld yardımcı başlattı"
+          }
+        }
+      }
+    },
+    "task.open": {
+      "comment": "Toast of a routed message: opens the task it went to",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Open"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aç"
+          }
+        }
+      }
+    },
+    "task.stopped": {
+      "comment": "Tasks sheet: the task's run was stopped",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Stopped"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durdu"
           }
         }
       }

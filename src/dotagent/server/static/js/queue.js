@@ -23,7 +23,8 @@ function oneLine(text) {
 
 /**
  * The queue's banner for the chat `threadId`, which goes right above the composer `frame`. `onSteered(text)` hears of
- * a message sent to the run at work, `onStarted(runId, afterRunId)` of one the daemon started as the chat's next run
+ * a message sent to the run at work, `onRouted(routed)` of where a message sent to a chat with several tasks went
+ * (`QueueView.routed`, item 2013), `onStarted(runId, afterRunId)` of one the daemon started as the chat's next run
  * after `afterRunId`, and `onEdit()` of the start and the end of an edit, which the composer's send names Save while
  * it lasts.
  *
@@ -34,7 +35,7 @@ function oneLine(text) {
  * of the queue (item 352: the line over the composer counts them; item 1383: on a phone it says whether the queue is
  * held, could not be read, or has a message on its way, which the queue's own banner is not drawn there to say).
  */
-export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onChange }) {
+export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onChange, onRouted }) {
   const listId = `queue-${threadId}`;
   // Its reads end when the chat is left (item 1521).
   const leaving = new AbortController();
@@ -382,6 +383,11 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         tell();
       }
       showNewest(mine, view);
+      // A chat with several tasks (item 2013) says where the message went, with the way to it and Move.
+      if (view.routed !== null && view.routed !== undefined) {
+        onRouted(view.routed);
+        return;
+      }
       // A request of its own started at once in a chat of its own (item 915): said, with the way to it.
       if (typeof view.beside_run_id === "string") {
         const runId = view.beside_run_id;
