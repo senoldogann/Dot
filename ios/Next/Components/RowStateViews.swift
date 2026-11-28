@@ -7,7 +7,7 @@ func rowStateWords(_ state: RowState) -> String? {
     case .needsYou: String(localized: "Needs you", comment: "Chat row: an approval, a question or a secret waits for the owner")
     case .working: String(localized: "Working", comment: "Chat row: a run of the chat is at work")
     case .waitingOnHelpers(let count):
-        String(localized: "Waiting on \(count) helpers", comment: "Chat row: the run waits on helpers; the argument is how many")
+        String(localized: "Waiting for \(count) helpers", comment: "Chat row: the run waits for its helpers; the argument is how many")
     case .waiting(let what): String(localized: "Waiting · \(what)", comment: "Chat row: something works for the chat in the background; the argument names it")
     case .rest: nil
     }

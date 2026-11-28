@@ -9,7 +9,7 @@ const WORKING = new Set(["queued", "running", "ending"]);
 const WHAT_CHARS = 80;
 
 /**
- * What a chat waits on, in words for its last line, or null: while its run waits on its helpers "Waiting on 2 helpers…",
+ * What a chat waits on, in words for its last line, or null: while its run waits on its helpers "Waiting for 2 helpers…",
  * which the row draws shimmering as the work does (`live`); while the chat rests and something still works for it (a
  * helper let go, a command in the background, its loop: `background`, from `GET /threads/view`) "Waiting · <the first
  * of them>", quiet. A daemon from before sends neither.

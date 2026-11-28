@@ -41,7 +41,7 @@
         /// A run that wrote its answer and finished with it in slightly other words (item 1996): the answer stands once.
         case restated = "n2-restated"
         /// The main run has stopped and only waits for a helper it delegated to (its newest step's one open call is a
-        /// delegate): the capsule says "Waiting on 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
+        /// delegate): the capsule says "Waiting for 1 helper" (the owner's report of 2026-11-27). In `n2-chat` the run works
         /// beside its helper and says "Working".
         case helpersWait = "n2-helpers"
         /// The first run a schedule fired (owner 2026-11-27): its message is the routine's compact row, not a bubble.
