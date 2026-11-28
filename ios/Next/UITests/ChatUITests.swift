@@ -238,9 +238,9 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(steps.element(boundBy: 1).label.hasSuffix("in progress"), steps.element(boundBy: 1).label)
         // Sized to its content: three steps are no tall empty sheet.
         let window: CGRect = app.windows.firstMatch.frame
-        let bar: XCUIElement = app.navigationBars["Plan"]
-        print("plan sheet: bar \(bar.frame) window \(window)")
-        XCTAssertGreaterThan(bar.frame.minY, window.height * 0.4, "the sheet takes the height its steps need: \(bar.frame)")
+        let planBar: XCUIElement = app.navigationBars["Plan"]
+        print("plan sheet: bar \(planBar.frame) window \(window)")
+        XCTAssertGreaterThan(planBar.frame.minY, window.height * 0.4, "the sheet takes the height its steps need: \(planBar.frame)")
         let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         sheet.name = "plan-sheet"
         sheet.lifetime = .keepAlways
