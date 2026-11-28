@@ -1631,6 +1631,8 @@ TR.update(
     }
 )
 
+# The expanded composer chip (item 1991)
+TR.update({"Fast": "Hızlı"})
 # A bot's Work group: work orders, objectives and hand-offs, and Pause in the profile's menu.
 TR.update(
     {

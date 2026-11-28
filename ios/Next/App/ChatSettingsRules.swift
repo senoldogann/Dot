@@ -208,6 +208,39 @@ func providerOfModel(_ ref: String, in options: [ProviderModels]) -> String {
     return ref.contains(":") ? String(ref.split(separator: ":", maxSplits: 1)[0]) : ""
 }
 
+/// Whether the chat follows new words after the scroll changed (pure): at the end it always does; away from it, the owner's
+/// own scroll stops it, and without one it keeps what it was (a lazy stack's moving height is no scroll of theirs). The
+/// owner's scroll counts when it begins as well as when the end moves away: a chat whose end moved away first, by itself,
+/// would otherwise never be seen to be left, and the jump button would never come.
+func followsAfterScroll(following: Bool, atEnd: Bool, ownerScrolls: Bool) -> Bool {
+    if atEnd { return true }
+    return ownerScrolls ? false : following
+}
+
+/// A model's name without its provider's name in front ("Anthropic · Opus 5.5", "Claude Code: Opus" and "Anthropic / Opus"
+/// give "Opus 5.5" and "Opus"): the provider's mark stands beside it. Only a separator ends the provider's name: ":", "/" or
+/// "·", or a dash with a space on both sides. A label that does not start so ("Mistral Large", "Mistral-Large" of the
+/// provider Mistral are models' own names), or is no more than the provider's name, is kept (pure).
+func modelNameWithoutProvider(_ label: String, provider: String) -> String {
+    let title: String = providerTitle(provider)
+    guard !title.isEmpty, let range = label.range(of: title, options: [.anchored, .caseInsensitive]) else { return label }
+    let afterName: Substring = label[range.upperBound...]
+    let tail: Substring = afterName.drop { $0 == " " }
+    guard let mark = tail.first else { return label }
+    let spaced: Bool = afterName.first == " " && tail.dropFirst().first == " "
+    let separates: Bool = "·:/".contains(mark) || (spaced && "-–—".contains(mark))
+    guard separates else { return label }
+    let rest: Substring = tail.dropFirst().drop { $0 == " " }
+    return rest.isEmpty ? label : String(rest)
+}
+
+/// What the expanded composer's chip says in grey after the model's name: its level and "Fast" when fast mode is on
+/// ("Medium Fast"); `nil` when neither (pure).
+func chipDetail(effort: String?, fast: Bool) -> String? {
+    let parts: [String] = [effort.map(effortTitle), fast ? String(localized: "Fast", comment: "The composer's model chip: fast mode is on") : nil].compactMap { $0 }
+    return parts.isEmpty ? nil : parts.joined(separator: " ")
+}
+
 /// What the composer's model chip draws for a model (item 1992): its provider's mark, except for a model of a family this
 /// app has no mark of that a gateway hosts (DeepSeek, Kimi, GLM, Qwen, MiniMax on OpenCode Go, OpenRouter or Ollama), which
 /// wore the gateway's: OpenCode's mark is a plain white block, so every such model read as an empty rectangle. Those get a
