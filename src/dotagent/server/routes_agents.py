@@ -7,8 +7,11 @@ from collections.abc import Sequence
 
 from fastapi import APIRouter
 
+from dotagent.agent import team_review_service
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
+from dotagent.agent.team_load import LOAD_WINDOW_S, BotLoad, bot_load
+from dotagent.agent.team_review import REVIEW_PERIODS, TeamReviewState
 from dotagent.agent.templates import (
     TEAMS,
     TEMPLATES,
@@ -26,7 +29,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.secrets import known_secrets
-from dotagent.server import CLI_SOURCE, UI_SOURCE
+from dotagent.server import CLI_SOURCE, REVIEW_SOURCE, UI_SOURCE
 from dotagent.server.activity import start_of_today
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_system import learned_skill_view
@@ -39,6 +42,8 @@ from dotagent.server.views import (
     AgentWelcomeRequest,
     AgentWork,
     TeamMessage,
+    TeamReviewSettings,
+    TeamReviewView,
     TeamUse,
     TeamView,
     TemplateUse,
@@ -53,6 +58,7 @@ from dotagent.store.models import (
     AgentLook,
     AgentRecord,
     AgentToolUse,
+    BotLoadRow,
     MemoryRecord,
     ObjectiveRecord,
     RunRecord,
@@ -93,7 +99,7 @@ def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
     unknown: list[str] = sorted(set(request.tools or ()) - known)
     if unknown:
         raise InvalidValueError(
-            f"an agent names actions that do not exist here: {', '.join(unknown)}", {"tools": ", ".join(unknown)}
+            f"a bot names actions that do not exist here: {', '.join(unknown)}", {"tools": ", ".join(unknown)}
         )
     return request
 
@@ -247,6 +253,14 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         """The names of the tools an agent may be given, in alphabetical order."""
         return sorted(known())
 
+    async def bot_loads() -> dict[str, BotLoad]:
+        """What every bot carries now, by its id (item 2067)."""
+        now: float = time.time()
+        rows: list[BotLoadRow] = await store.bot_load_rows(
+            now - LOAD_WINDOW_S, now - 2 * LOAD_WINDOW_S, (REVIEW_SOURCE,)
+        )
+        return {row.agent_id: bot_load(row) for row in rows}
+
     @router.get("/agents")
     async def list_agents() -> list[AgentSummary]:
         """Dot first, then the agents the owner made, oldest first, each with its newest run and the title of the chat
@@ -261,11 +275,13 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         titles: dict[str, str] = await store.thread_titles(
             [run.thread_id for run in latest.values()] + ([] if dots is None else [dots.thread_id])
         )
+        loads: dict[str, BotLoad] = await bot_loads()
         dot: AgentSummary = AgentSummary(
             record=await dot_record(store),
             latest=dots,
             latest_title=None if dots is None else titles.get(dots.thread_id),
             home=await store.dot_home_chat(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat),
+            load=loads.get(DOT_AGENT_ID),
         )
         return [dot] + [
             AgentSummary(
@@ -273,9 +289,71 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 latest=latest.get(agent.id),
                 latest_title=titles.get(latest[agent.id].thread_id) if agent.id in latest else None,
                 home=homes.get(agent.id),
+                load=loads.get(agent.id),
             )
             for agent in await store.list_agents()
         ]
+
+    reviews: set[asyncio.Task[None]] = set()
+
+    def review_view(state: TeamReviewState) -> TeamReviewView:
+        # Off: none is due; on and never tried, or due already (a try that failed counts as the period's): now, at
+        # the scheduler's next tick.
+        due: float | None = None
+        if state.every != "off":
+            now: float = time.time()
+            due = now if state.last_at is None else max(now, state.last_at + REVIEW_PERIODS[state.every])
+        return TeamReviewView(
+            manager=state.manager,
+            every=state.every,
+            last_at=state.last_at,
+            next_at=due,
+            running=team_review_service.running(store) or any(not task.done() for task in reviews),
+            review=state.review,
+            error=state.error,
+        )
+
+    @router.get("/team-review")
+    async def team_review() -> TeamReviewView:
+        """The manager review of the team (item 2068): its settings, the newest review and its proposals."""
+        return review_view(await team_review_service.load(store))
+
+    @router.put("/team-review")
+    async def set_team_review(settings: TeamReviewSettings) -> TeamReviewView:
+        """Choose the bot that reviews the team and how often (``off`` until the owner turns it on)."""
+        return review_view(await team_review_service.configure(store, settings.manager, settings.every))
+
+    async def reviewed() -> None:
+        """A review the owner asked for, in the background: its failure is stored as the state's error, and logged."""
+        try:
+            await team_review_service.review(
+                ctx.runtime,
+                time.time(),
+                lambda manager: team_review_service.reviewer_of(ctx.runtime, manager, time.time()),
+            )
+        except DotError as error:
+            log.warning("team_review_failed", error=error.message, context=error.context)
+
+    @router.post("/team-review/run", status_code=202)
+    async def run_team_review() -> TeamReviewView:
+        """Review the team now, whatever its settings say; 409 while a review is under way."""
+        if team_review_service.running(store) or any(not task.done() for task in reviews):
+            raise RunConflict("a review of the team is under way", {})
+        task: asyncio.Task[None] = asyncio.create_task(reviewed(), name="team-review")
+        reviews.add(task)
+        task.add_done_callback(reviews.discard)
+        return review_view(await team_review_service.load(store))
+
+    @router.post("/team-review/proposals/{proposal_id}/accept")
+    async def accept_team_proposal(proposal_id: str) -> TeamReviewView:
+        """Make the change a proposal of the newest review proposes, as the owner's own; 409 for one that no longer
+        fits the team or was decided already, 404 for one that is not there."""
+        return review_view(await team_review_service.accept(store, ctx.manager.desk, proposal_id, time.time()))
+
+    @router.post("/team-review/proposals/{proposal_id}/skip")
+    async def skip_team_proposal(proposal_id: str) -> TeamReviewView:
+        """Skip a proposal: nothing changes but its card."""
+        return review_view(await team_review_service.skip(store, proposal_id, time.time()))
 
     @router.get("/work-orders")
     async def list_work_orders() -> list[WorkOrderView]:
@@ -443,6 +521,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 messages=[],
                 learned=_NOTHING_LEARNED,
                 home=await store.dot_home_chat(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat),
+                load=(await bot_loads()).get(DOT_AGENT_ID),
             )
         record: AgentRecord = await store.get_agent(agent_id)
         return AgentDetail(
@@ -455,6 +534,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             home=(await store.agent_home_chats(_HOME_SOURCES, ctx.runtime.config.scheduler.same_chat, agent_id)).get(
                 agent_id
             ),
+            load=(await bot_loads()).get(agent_id),
         )
 
     @router.put("/agents/{agent_id}")

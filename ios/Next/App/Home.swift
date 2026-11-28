@@ -55,6 +55,22 @@ struct HomeShell: View {
         }
         .sheet(isPresented: $showsApps) { ConnectAppsSheet(opensDetail: nil) }
         .task { await model.loadAgents() }
+        .task(id: model.requestedRun) {
+            guard let run = model.requestedRun, let api = model.engine?.api else { return }
+            do {
+                let head: RunHead = try await api.runHead(run)
+                guard !Task.isCancelled, model.requestedRun == run else { return }
+                showsSettings = false
+                showsNewBot = false
+                showsApps = false
+                selection = BotRoute(bot: head.run.agentId ?? dotAgentId, thread: head.run.threadId)
+            } catch {
+                if !Task.isCancelled {
+                    PhonePush.log.warning("Could not open the notified run run=\(run, privacy: .public) error=\(String(describing: error), privacy: .private)")
+                }
+            }
+            if !Task.isCancelled, model.requestedRun == run { model.requestedRun = nil }
+        }
         // Back on the home: the agents' home chats (outside the list's window) are read again, so a chat read stops
         // counting as unread.
         .onChange(of: selection == nil) { _, home in if home { Task { await model.loadAgents() } } }
@@ -347,6 +363,11 @@ struct BotRowView: View {
                     Text(bot.record.name).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
                     if pinned { Image(systemName: "pin.fill").font(.system(.caption2, weight: .semibold)).foregroundStyle(Tone.tertiary) }
                     if muted { Image(systemName: "bell.slash").font(.system(.caption2, weight: .semibold)).foregroundStyle(Tone.tertiary) }
+                    // A bot that carries too much (item 2067), quietly: its reasons are on its profile.
+                    if bot.overloaded {
+                        Image(systemName: "gauge.with.dots.needle.100percent").font(.system(.caption2, weight: .semibold)).foregroundStyle(Tone.tertiary)
+                            .accessibilityIdentifier("home.bot.overloaded")
+                    }
                     Spacer(minLength: Space.xs)
                     if let latest = bot.latest {
                         RowTrailing(state: state, time: rowTime(latest.summary.updatedAt, now: now))
@@ -382,6 +403,7 @@ struct BotRowView: View {
 func botLabel(_ bot: Bot) -> String {
     var parts: [String] = [bot.record.name]
     if let words = rowStateWords(botState(bot)) { parts.append(words) }
+    if bot.overloaded { parts.append(String(localized: "Overloaded", comment: "VoiceOver: a bot that carries too much")) }
     if bot.unread > 0 { parts.append(String(localized: "Unread", comment: "VoiceOver: a bot has unread chats")) }
     if let latest = bot.latest, !latest.summary.lastMessage.isEmpty { parts.append(latest.summary.lastMessage) }
     return parts.joined(separator: ", ")

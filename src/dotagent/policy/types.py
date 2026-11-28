@@ -83,6 +83,8 @@ DecisionSource = Literal[
     "initiative",
     # The owner's question in yolo for a payment, a message or mail, a post in a chat they opened (item 860).
     "owner_asks",
+    # A step of a run nobody started that reads or writes what its sandbox seals, refused in every mode (item 2026).
+    "seal",
 ]
 
 # Who answers a question the policy raised, strictest first: ``supervised`` the user, who is also asked before every
@@ -173,7 +175,8 @@ class ActionInfo(FrozenModel):
     one (item 418): a call that names an application is checked again as it starts, and the application it found is the
     one it opens, not another put in its place meanwhile. ``body`` is the whole of what the step runs when the summary
     shows its start alone and the target is where it runs, not what (a page's script, item 985): the owner's rules and
-    the review read it whole; every other action has none."""
+    the review read it whole; every other action has none. ``reads`` are the files a step reads besides its target,
+    which a run nobody started may not read where its sandbox seals them (item 2026)."""
 
     tool: str
     kind: ActionKind
@@ -185,6 +188,9 @@ class ActionInfo(FrozenModel):
     changes: tuple[str, ...] = ()
     bundle: str | None = None
     body: str = ""
+    # The files the step reads in Dot's own process besides its target (item 2026): a browser upload's, a web
+    # tool's file sources; resolved, as the target of a read or a write is.
+    reads: tuple[str, ...] = ()
 
 
 class Decision(FrozenModel):

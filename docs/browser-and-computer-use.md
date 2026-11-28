@@ -527,7 +527,10 @@ Both modes share what follows.
   the last tabs that closed without the run closing them, with what closed each: Dot, when a run ended, once it
   stood unused or to stay within `max_tabs`, or its page or Chrome (item 1209). A tab whose page does not answer a script as simple as `1` within the navigation
   timeout (`navigation_timeout_s`; a page stuck in a loop of its own, a Chrome too loaded to answer) fails saying so,
-  and that it is to be closed and the page opened in a new tab (item 753): it was told as a document not yet parsed. A
+  and that it is to be closed and the page opened in a new tab (item 753): it was told as a document not yet parsed.
+  While a navigation of the tab is under way the page is asked so before Dot waits for it to commit, so a stuck tab
+  is told after that one timeout (item 2079): the two waits one after the other ran past `browser_snapshot`'s own
+  45 s, which cut the call with no word of what was wrong. A
   page busy for a while (a heavy app starting) has that whole time to answer. A page `browser_open` or `browser_new_tab`
   has loaded that answers but has not settled within that time (still being parsed, or busy past the quiet window) is
   shown as it is, with the note that it is still loading (item 954): the open failed, and the run read the very page

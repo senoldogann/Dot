@@ -34,7 +34,7 @@ final class RowStatesLiveUITests: XCTestCase {
     func testEachRowSaysItsStateAndAPinnedBotGoesToTheTop() throws {
         let app: XCUIApplication = try launch("en")
         let states: [(String, String)] = [
-            ("Asker", "Needs you"), ("Worker", "Working"), ("Delegator", "Waiting on 1 helper"), ("Runner", "Waiting · sleep 600"),
+            ("Asker", "Needs you"), ("Worker", "Working"), ("Delegator", "Waiting for 1 helper"), ("Runner", "Waiting · sleep 600"),
         ]
         for (name, words) in states {
             let element: XCUIElement = row(app, name)

@@ -153,7 +153,7 @@ def test_a_provider_address_the_http_client_cannot_use_is_refused(address: str) 
     ("path", "value", "where"),
     [
         (("models", "main"), "minimax-m2.7", ("models", "main")),
-        (("models", "fast"), "olama:gpt-oss:20b", ("models", "fast")),
+        (("models", "fast"), "Olama:gpt-oss:20b", ("models", "fast")),
         (("models", "search"), "ollama:gpt-oss:20b", ("models", "search")),
         (("models", "helpers"), ["openai"], ("models", "helpers", 0)),
     ],
@@ -165,6 +165,14 @@ def test_a_model_that_names_no_provider_dot_knows_is_refused(
     with pytest.raises(ValidationError) as refused:
         AppConfig.model_validate(_with(path, value))
     assert [error["loc"] for error in refused.value.errors()] == [where]
+
+
+def test_a_model_of_a_provider_neither_built_in_nor_configured_is_refused_by_its_setting() -> None:
+    """Item 1949: a lower-case name may be a custom provider's, so the whole configuration says whether one of
+    ``[providers.custom]`` has it, and the message names the setting."""
+    with pytest.raises(ValidationError) as refused:
+        AppConfig.model_validate(_with(("models", "fast"), "olama:gpt-oss:20b"))
+    assert "models.fast names olama:gpt-oss:20b" in str(refused.value)
 
 
 @pytest.mark.parametrize("site", ["www.example.com", "https://example.com", "Example.com", "example.com/shop"])

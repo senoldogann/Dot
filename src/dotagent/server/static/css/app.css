@@ -2866,6 +2866,51 @@ input[type="radio"] {
   margin: 0;
 }
 
+/* The manager review of the team (item 2068), above the work orders. */
+/* The card's own lines sit in its row padding, as the work orders' rows do. */
+.team-review > p,
+.team-review-settings {
+  margin: 0;
+  padding: var(--pad-row);
+}
+
+.team-review > p + p {
+  padding-top: 0;
+}
+
+.team-review-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+}
+
+.team-review-settings .field {
+  margin: 0;
+}
+
+.team-review-when {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.team-findings {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3) var(--space-6);
+}
+
+.team-proposal-list {
+  margin: var(--space-1) 0;
+  padding-left: var(--space-4);
+}
+
+.team-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
 .scout-card {
   align-items: flex-start;
 }
@@ -4297,21 +4342,6 @@ dialog.modal.versions-dialog {
 @media (prefers-reduced-motion: reduce) {
   .mic-bar {
     transition: none;
-  }
-}
-
-/* On a phone the box keeps its line, and the recorder the whole line under it, where the "+", the send and the
-   choices were. */
-@media (max-width: 720px) {
-  .composer-bar.has-mic.recording {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "field"
-      "recorder";
-  }
-
-  .composer-bar.recording > .mic-recorder {
-    grid-area: recorder;
   }
 }
 
@@ -8621,7 +8651,7 @@ dialog.message-sheet::backdrop {
 /* While Dot asks, the sheets of the chat's loops and of its commands at work give way (the owner's word of
    2026-11-05): drawn to tuck under the composer's top edge, they lay over the panel's head instead. They come back
    once nothing is asked. */
-.dock:has(> .asks:not([hidden])) > :is(.chat-loops, .background-work) {
+.dock:has(> .asks:not([hidden])) > :is(.chat-tasks, .chat-loops, .background-work) {
   display: none;
 }
 
@@ -8646,6 +8676,7 @@ dialog.message-sheet::backdrop {
 /* A dock with nothing to type in (a delegated run's, item 244) holds the run's pill; the commands at work in its chat
    close their sheet above the pill, with no frame to draw over its lower edge. */
 .dock.dock-bare .background-work,
+.dock.dock-bare .chat-tasks,
 .dock.dock-bare .chat-loops {
   margin-bottom: var(--space-2);
   padding-bottom: var(--space-1);
@@ -8656,6 +8687,7 @@ dialog.message-sheet::backdrop {
    above the composer and under the queue; the frame is drawn over its lower edge, and it over the queue's. The loops
    of the chat (item 281) are the same sheet, above the commands. */
 .background-work,
+.chat-tasks,
 .chat-loops {
   position: relative;
   margin: 0 var(--space-4) calc(-1 * var(--radius-composer));
@@ -8667,11 +8699,13 @@ dialog.message-sheet::backdrop {
 
 .queue + .background-work,
 .queue + .chat-loops,
+.chat-tasks + .queue,
 .chat-loops + .background-work {
   z-index: 1;
 }
 
 .background-work + .composer,
+.chat-tasks ~ .composer,
 .chat-loops ~ .composer {
   position: relative;
   z-index: 2;
@@ -8775,6 +8809,80 @@ dialog.message-sheet::backdrop {
   color: var(--muted);
   font-weight: var(--weight-text);
   font-variant-numeric: tabular-nums;
+}
+
+/* The tasks of a chat with several (item 2013): the loops' look, with a head that folds nothing, and a Stop and an
+   Open at each row's end in one column. */
+.chat-tasks > .chat-tasks-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+/* The Stop and the Open of every row stand in one column at its end, an Open under an Open. */
+.chat-tasks .task-actions {
+  display: inline-grid;
+  grid-template-columns: repeat(2, auto);
+  justify-content: end;
+  gap: var(--space-1);
+}
+
+/* A row's dot says how its task stands, over the accent every background row's dot has. */
+.chat-tasks .task-row .status-dot.s-blocked {
+  background: var(--warn);
+}
+
+.chat-tasks .task-row .status-dot.s-done {
+  background: var(--fine);
+}
+
+.chat-tasks .task-row .status-dot.s-failed {
+  background: var(--bad);
+}
+
+.chat-tasks .task-row .status-dot.s-stopped {
+  background: var(--faint);
+}
+
+.chat-tasks .task-gap {
+  visibility: hidden;
+}
+
+.chat-tasks .task-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-tasks .task-row[aria-current="true"] .background-command {
+  font-weight: var(--weight-label);
+}
+
+/* On a task's own page, the line that says whose task it is, with the way back to the chat. */
+.lane-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.lane-line .icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.lane-line-text {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-loops-next {

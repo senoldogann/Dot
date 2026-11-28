@@ -524,6 +524,16 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
             await expect(save).to_be_disabled()
             listed.set()
             await expect(save).to_be_enabled()
+            # The model is the chat settings' list (the owner's report of 2026-11-28): the main model's row on top, the
+            # providers as sections that fold, a search; a model no longer offered is kept and said so.
+            picker: Locator = page.get_by_role("group", name="Model")
+            await expect(picker.locator(".sheet-search-field")).to_be_visible()
+            await expect(picker.locator("details.sheet-section").first).to_be_attached()
+            await expect(picker.get_by_role("option").first).to_contain_text("Main model")
+            await expect(picker.get_by_role("option").first).to_contain_text(
+                "For chats that have no model of their own"
+            )
+            await expect(picker.locator(".hint")).to_contain_text("ollama:gone-model")
             await expect(page.locator(".tool-pick input[value='shell']")).to_be_checked()
             await save.click()
             await expect(page.get_by_text("Bot saved.")).to_be_visible()

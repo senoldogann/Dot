@@ -27,6 +27,12 @@ def main() -> int:
         return 1
     for key, entry in strings.items():
         localizations: dict[str, object] = {"tr": unit(TR[key])}
+        # A key that is not its English (`String(localized: "task.open", defaultValue: "Open")`, for words whose Turkish
+        # differs from another use of the same English) keeps the English the build wrote for it, marked translated:
+        # the sync writes it as "new", and xcstringstool leaves a "new" unit out of en.lproj, so the key would show.
+        english: object = entry.get("localizations", {}).get("en")
+        if isinstance(english, dict) and "stringUnit" in english:
+            localizations["en"] = unit(english["stringUnit"]["value"])
         if key in EN_PLURALS:
             one, other = EN_PLURALS[key]
             localizations["en"] = {"variations": {"plural": {"one": unit(one), "other": unit(other)}}}

@@ -78,6 +78,30 @@ async def origin_source(runtime: Runtime, run: RunRecord) -> str | None:
     return None
 
 
+async def origin_short_of_the_owner(runtime: Runtime, run: RunRecord) -> str | None:
+    """The source :func:`origin_source` finds for ``run``, but stopping at a resume the owner made by hand (item 2027,
+    the security review): that resume is their word, and :data:`RESUME_SOURCE` is returned for it, as the source a run
+    they resumed is marked by. Followed back only through the resumes the daemon made on its own (the ``resumed``
+    event's ``automatic``). ``None`` when the chain cannot be read. Reads the store."""
+    for _ in range(RESUMES_FOLLOWED):
+        if run.source != RESUME_SOURCE:
+            return run.source
+        resumed: EventRecord | None = await runtime.store.last_event(run.id, RESUMED_EVENT)
+        if resumed is None:
+            return None
+        automatic: JsonValue = resumed.data.get("automatic")
+        if automatic is False:
+            return RESUME_SOURCE
+        origin: JsonValue = resumed.data.get("from_run_id")
+        if automatic is not True or not isinstance(origin, str):
+            return None
+        try:
+            run = await runtime.store.get_run(origin)
+        except NotFoundError:
+            return None
+    return None
+
+
 # The policy kinds of calls that change nothing when they run again. A delegated run may have done anything its mode
 # allows, so a delegation is not one of them, and neither is a ``meta`` call: that kind holds the tools that make an
 # agent, show a notification or a page, ask the owner and end the run (item 552), which a second call does again.

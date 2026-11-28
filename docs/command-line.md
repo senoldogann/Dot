@@ -75,7 +75,9 @@ off by the command's death, and it can be resumed too; a run handed to the daemo
   and go on without it, as a chat's run does: it stays on the run's page
 - `--review` marks a code review (the pre-push hook's, item 1256): its chat is kept under **Code reviews** in the
   sidebar and in the iPhone app's list (item 1664), folded, apart from your chats, and is never Dot's home chat. A
-  review whose `--thread` chat was deleted starts in a new chat; any other run whose chat is gone is refused (item 1986)
+  review whose `--thread` chat was deleted starts in a new chat; any other run whose chat is gone is refused (item 1986).
+  A review handed to the daemon whose chat still has a run under way (an earlier push's review of the branch) starts
+  in a new chat too; any other run is refused in a busy chat (item 2065)
 - `--thinking` shows the model's reasoning stream, `--verbose` the tool output and the token use
 - a goal of `-` is read from standard input
 

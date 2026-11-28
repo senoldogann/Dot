@@ -51,6 +51,8 @@ from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.failed import failed_result_sql
 from dotagent.store.kinds import KindBy, MemoryKind, rule_kind
 from dotagent.store.models import (
+    BOT_HELD_WORK_ORDERS,
+    DOT_AGENT_ID,
     NO_PICKS,
     OBJECTIVE_MOVES,
     OCCUPIED_STATUSES,
@@ -69,6 +71,7 @@ from dotagent.store.models import (
     AwakeNotes,
     AwayRule,
     Behavior,
+    BotLoadRow,
     BrowserMode,
     BudgetSpent,
     CampaignEntry,
@@ -80,6 +83,7 @@ from dotagent.store.models import (
     ChatMessage,
     ChatTeam,
     Correspondent,
+    DeletedRunRecord,
     DraftChannel,
     DraftRecord,
     DraftStatus,
@@ -2016,6 +2020,9 @@ _OCCUPIED_SQL: str = ", ".join(f"'{status}'" for status in sorted(OCCUPIED_STATU
 _RUN_WORKS_SQL: str = f"EXISTS (SELECT 1 FROM runs WHERE runs.id = ? AND runs.status IN ({_WORKING_SQL}))"
 
 
+# A thread's family (item 2013), as a join of ``me`` (the thread) to ``t``: the chat it is or is a lane of, and every
+# lane of that chat.
+_FAMILY_SQL: str = "(t.id = COALESCE(me.lane_of, me.id) OR t.lane_of = COALESCE(me.lane_of, me.id))"
 # How long a lane with no run yet counts as a task at work (item 2012): its first run starts within moments of it, and a
 # lane a crash left without one stops taking a place of its chat's after this.
 LANE_START_GRACE_S: float = 60.0
@@ -2135,9 +2142,14 @@ class Store:
     # ----- the chats' revisions (item 1686) -------------------------------------------------
 
     async def thread_revision(self, thread_id: str) -> int:
-        """The chat's revision (:mod:`dotagent.store.revisions`); ``NotFoundError`` for no chat."""
-        row: aiosqlite.Row | None = await self._one("SELECT revision FROM threads WHERE id = ?", (thread_id,))
-        if row is None:
+        """The chat's revision (:mod:`dotagent.store.revisions`), the newest of its family's (item 2013): of the chat a
+        thread is or is a lane of, and of that chat's lanes, since a chat's view and a lane's both show the chat's
+        tasks; ``NotFoundError`` for no chat."""
+        row: aiosqlite.Row | None = await self._one(
+            f"SELECT MAX(t.revision) AS revision FROM threads AS me JOIN threads AS t ON {_FAMILY_SQL} WHERE me.id = ?",
+            (thread_id,),
+        )
+        if row is None or row["revision"] is None:
             raise NotFoundError("thread not found", {"thread_id": thread_id})
         return int(row["revision"])
 
@@ -2151,9 +2163,14 @@ class Store:
         One statement reads both, so that a write of another process between two reads cannot skip a chat."""
         rows: list[aiosqlite.Row] = await self._all(
             "SELECT id AS name, revision AS revision, 0 AS deleted FROM threads WHERE revision > ? "
+            # A thread's change is its family's too (item 2013): its chat's and every other lane's of that chat,
+            # whose views show the chat's tasks.
+            "UNION ALL SELECT me.id AS name, t.revision AS revision, 0 AS deleted FROM threads AS t "
+            "JOIN threads AS me ON me.id = COALESCE(t.lane_of, t.id) OR me.lane_of = COALESCE(t.lane_of, t.id) "
+            "WHERE t.revision > ? AND me.id != t.id "
             "UNION ALL SELECT key AS name, CAST(value AS INTEGER) AS revision, 1 AS deleted FROM kv "
             "WHERE key >= ? AND key < ? AND CAST(value AS INTEGER) > ? ORDER BY revision",
-            (after, DELETED_PREFIX, DELETED_END, after),
+            (after, after, DELETED_PREFIX, DELETED_END, after),
         )
         return [
             ThreadRevision(
@@ -2165,14 +2182,18 @@ class Store:
         ]
 
     async def thread_revisions(self, thread_ids: Sequence[str]) -> dict[str, int]:
-        """The revisions of the chats ``thread_ids`` that exist, by id."""
+        """The revisions of the chats ``thread_ids`` that exist, by id, each the newest of its own and its lanes'
+        (:meth:`thread_revision`)."""
         named: tuple[str, ...] = tuple(thread_ids)
         if not named:
             return {}
+        marks: str = ", ".join("?" for _ in named)
         rows: list[aiosqlite.Row] = await self._all(
-            f"SELECT id, revision FROM threads WHERE id IN ({', '.join('?' for _ in named)})", named
+            f"SELECT me.id AS chat, MAX(t.revision) AS revision FROM threads AS me JOIN threads AS t ON {_FAMILY_SQL}"
+            f" WHERE me.id IN ({marks}) GROUP BY me.id",
+            named,
         )
-        return {str(row["id"]): int(row["revision"]) for row in rows}
+        return {str(row["chat"]): int(row["revision"]) for row in rows}
 
     async def thread_summary(self, thread_id: str, same_chat: bool) -> ThreadSummary | None:
         """The chat as :meth:`list_thread_summaries` lists it, ``None`` for a thread that is no chat (one that holds a
@@ -4179,6 +4200,28 @@ class Store:
         if row is None:
             raise NotFoundError("run not found", {"run_id": run_id})
         return _run(row)
+
+    async def get_deleted_run(self, run_id: str) -> DeletedRunRecord:
+        """What the run ledger keeps of ``run_id``, a run deleted with its chat (item 2077); ``NotFoundError`` when the
+        ledger has no row of it (a run still kept, one deleted before the ledger was, or no run of Dot's)."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT id, source, model, status, created_at, finished_at, deleted_at, parent_run_id, schedule_id"
+            " FROM run_ledger WHERE id = ?",
+            (run_id,),
+        )
+        if row is None:
+            raise NotFoundError("deleted run not found", {"run_id": run_id})
+        return DeletedRunRecord(
+            id=row["id"],
+            source=row["source"],
+            model=row["model"],
+            status=_STATUS.validate_python(row["status"]),
+            created_at=row["created_at"],
+            finished_at=row["finished_at"],
+            deleted_at=row["deleted_at"],
+            parent_run_id=row["parent_run_id"],
+            schedule_id=row["schedule_id"],
+        )
 
     async def goals_of(self, run_ids: Sequence[str]) -> dict[str, str]:
         """The goal of each of ``run_ids``, a run no longer kept left out (item 1118)."""
@@ -8728,6 +8771,88 @@ class Store:
             (TEAM_SOURCE, agent_id, agent_id, limit),
         )
         return [_run(row) for row in rows]
+
+    async def bot_load_rows(
+        self, since: float, prior_since: float, skipped_sources: tuple[str, ...]
+    ) -> list[BotLoadRow]:
+        """What each bot carries (item 2067), Dot's row first, then each agent's: its open work orders (not one
+        escalated to the owner, which the bot no longer holds), its routines, the active objectives its open orders
+        serve (Dot's: every active one) and its runs started at or after ``since`` and between ``prior_since`` and
+        ``since`` (a bot's order attempts and the parts its runs hand out are its own; the parts Dot's runs hand out,
+        which carry no bot, are not Dot's runs but parts of them), of the stored runs and of the ledger of those whose
+        chats were deleted (item 1323), the runs of ``skipped_sources`` aside (the pre-push code reviews are not a
+        bot's work). Counts only: nothing a run wrote is read."""
+        marks: str = ",".join("?" for _ in skipped_sources) or "''"
+        held: str = ",".join("?" for _ in BOT_HELD_WORK_ORDERS)
+        rows = await self._all(
+            "WITH bots AS (SELECT ? AS id UNION ALL SELECT id FROM agents),"
+            " every_run AS ("
+            "  SELECT coalesce(agent_id, ?) AS aid, status, steps, created_at, source FROM runs"
+            "  WHERE parent_run_id IS NULL OR agent_id IS NOT NULL"
+            "  UNION ALL SELECT coalesce(agent_id, ?), status, steps, created_at, source FROM run_ledger"
+            "  WHERE (parent_run_id IS NULL OR agent_id IS NOT NULL) AND id NOT IN (SELECT id FROM runs)),"
+            f" counted AS (SELECT * FROM every_run WHERE source NOT IN ({marks})),"
+            " ran AS (SELECT aid,"
+            "  sum(created_at >= ?) AS runs, sum(created_at >= ? AND status = 'done') AS done,"
+            "  sum(created_at >= ? AND status = 'failed') AS failed,"
+            "  sum(CASE WHEN created_at >= ? THEN steps ELSE 0 END) AS steps,"
+            "  sum(created_at >= ? AND created_at < ?) AS prior_runs,"
+            "  sum(created_at >= ? AND created_at < ? AND status = 'done') AS prior_done"
+            "  FROM counted GROUP BY aid),"
+            " newest AS (SELECT aid, max(created_at) AS last_run_at FROM counted GROUP BY aid),"
+            f" open_orders AS (SELECT agent_id AS aid, count(*) AS n FROM work_orders WHERE status IN ({held})"
+            "  GROUP BY agent_id),"
+            " routines AS (SELECT coalesce(agent_id, ?) AS aid, sum(enabled) AS active, count(*) AS n FROM schedules"
+            "  GROUP BY 1),"
+            " aims AS (SELECT w.agent_id AS aid, count(DISTINCT w.objective_id) AS n FROM work_orders AS w"
+            "  JOIN objectives AS o ON o.id = w.objective_id"
+            f"  WHERE o.status = 'active' AND w.status IN ({held}) GROUP BY w.agent_id)"
+            " SELECT bots.id AS agent_id, coalesce(open_orders.n, 0) AS open_orders,"
+            " coalesce(routines.active, 0) AS active_routines, coalesce(routines.n, 0) AS routines,"
+            " CASE WHEN bots.id = ? THEN (SELECT count(*) FROM objectives WHERE status = 'active')"
+            "  ELSE coalesce(aims.n, 0) END AS objectives,"
+            " coalesce(ran.runs, 0) AS runs, coalesce(ran.done, 0) AS done, coalesce(ran.failed, 0) AS failed,"
+            " coalesce(ran.steps, 0) AS steps, coalesce(ran.prior_runs, 0) AS prior_runs,"
+            " coalesce(ran.prior_done, 0) AS prior_done, newest.last_run_at AS last_run_at"
+            " FROM bots LEFT JOIN ran ON ran.aid = bots.id LEFT JOIN newest ON newest.aid = bots.id"
+            " LEFT JOIN open_orders ON open_orders.aid = bots.id LEFT JOIN routines ON routines.aid = bots.id"
+            " LEFT JOIN aims ON aims.aid = bots.id",
+            (
+                DOT_AGENT_ID,
+                DOT_AGENT_ID,
+                DOT_AGENT_ID,
+                *skipped_sources,
+                since,
+                since,
+                since,
+                since,
+                prior_since,
+                since,
+                prior_since,
+                since,
+                *BOT_HELD_WORK_ORDERS,
+                DOT_AGENT_ID,
+                *BOT_HELD_WORK_ORDERS,
+                DOT_AGENT_ID,
+            ),
+        )
+        return [
+            BotLoadRow(
+                agent_id=str(row["agent_id"]),
+                open_orders=int(row["open_orders"]),
+                active_routines=int(row["active_routines"]),
+                routines=int(row["routines"]),
+                objectives=int(row["objectives"]),
+                runs=int(row["runs"]),
+                done=int(row["done"]),
+                failed=int(row["failed"]),
+                steps=int(row["steps"]),
+                prior_runs=int(row["prior_runs"]),
+                prior_done=int(row["prior_done"]),
+                last_run_at=None if row["last_run_at"] is None else float(row["last_run_at"]),
+            )
+            for row in rows
+        ]
 
     async def latest_agent_runs(self) -> dict[str, RunRecord]:
         """The newest run of every agent that ran, by agent id."""

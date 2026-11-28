@@ -30,7 +30,7 @@ from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.browser.types import Screenshot
 from dotagent.config import load_config
-from dotagent.core.errors import BrowserError, ToolInputError
+from dotagent.core.errors import BrowserError, ForbiddenUrlError, ToolInputError
 from dotagent.core.paths import env_file_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ApprovalMode
@@ -375,6 +375,55 @@ async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: R
     ]
     assert [record.tool for record in records] == ["browser_fill_login"], records
     _unseen(*(record.model_dump_json() for record in records))
+
+
+async def test_a_page_opened_from_the_filled_tab_opens_in_a_new_tab_where_scripts_run(
+    runtime: Runtime, site: _Site
+) -> None:
+    """A page opened in the tab a login was filled into, the chat's only tab, opens in a new tab in its place (item
+    2076): the filled page is in no tab's history, so a script runs at once, with no tab to close first."""
+    ctx, gate = await _context(runtime, "yolo")
+    refs: dict[str, str] = await _form(ctx, gate, site)
+    await _call(ctx, gate, "browser_fill_login", {"login": "i1", "username": refs["user"], "password": refs["pass"]})
+    with pytest.raises(BrowserError, match="scripts stay off"):
+        await _call(ctx, gate, "browser_eval", {"script": "document.title"})
+    opened: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/home"})
+    assert "in a new tab in its place" in opened.text and "Tab 1 of 1" in opened.text, opened.text
+    # Its history is that of a tab opened at the page, which never held the filled one.
+    replaced: ToolResult = await _call(ctx, gate, "browser_eval", {"script": "`history ${history.length}`"})
+    await _call(ctx, gate, "browser_new_tab", {"url": f"http://127.0.0.1:{site.port}/home"})
+    fresh: ToolResult = await _call(ctx, gate, "browser_eval", {"script": "`history ${history.length}`"})
+    length: re.Match[str] | None = re.search(r'"history (\d+)"', fresh.text)
+    assert length is not None, fresh.text
+    assert f'"history {length.group(1)}"' in replaced.text, (replaced.text, fresh.text)
+    assert PASSWORD in runtime.browser.vault_values(ctx.thread_id)
+
+
+async def test_another_filled_tab_keeps_scripts_off_and_a_refused_address_leaves_the_filled_tab(
+    runtime: Runtime, site: _Site
+) -> None:
+    """With a login filled into two tabs, a page opened from the first takes its number in a new tab, and the second
+    still keeps scripts off (item 2076). An address the rules refuse, opened from the filled tab, changes no tab."""
+    ctx, gate = await _context(runtime, "yolo")
+    first: dict[str, str] = await _form(ctx, gate, site)
+    await _call(ctx, gate, "browser_fill_login", {"login": "i1", "username": first["user"], "password": first["pass"]})
+    await _call(ctx, gate, "browser_new_tab", {"url": f"http://127.0.0.1:{site.port}/home"})
+    second: dict[str, str] = await _form(ctx, gate, site)
+    await _call(
+        ctx, gate, "browser_fill_login", {"login": "i1", "username": second["user"], "password": second["pass"]}
+    )
+    # Dot's own interface, which no run opens, given to the session itself (the tool refuses it before): refused
+    # before the filled tab is touched.
+    with pytest.raises(ForbiddenUrlError):
+        await runtime.browser.open_url(ctx.thread_id, f"http://127.0.0.1:{runtime.config.server.port}/", False)
+    with pytest.raises(BrowserError, match=r"filled into tabs 1, 2 of"):
+        await _call(ctx, gate, "browser_eval", {"script": "document.title"})
+    await _call(ctx, gate, "browser_switch_tab", {"index": 1})
+    opened: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/home"})
+    assert "in a new tab in its place" in opened.text, opened.text
+    assert "Tab 1 of 2" in opened.text and "[1]*" in opened.text, opened.text
+    with pytest.raises(BrowserError, match=r"filled into tab 2 of .* \(browser_close_tab with index 2\)"):
+        await _call(ctx, gate, "browser_eval", {"script": "document.title"})
 
 
 async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_get_nothing(

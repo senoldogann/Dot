@@ -166,6 +166,8 @@
             client?.urlProtocolDidFinishLoading(self)
         }
 
+        private let storedRule: String = #"{"id":"rule_example","enabled":true,"behavior":"ask","tool_glob":"shell","match_regex":"rm","description":"Ask before deleting a file.","never_decided_by":null}"#
+
         private func answer(method: String, path: String, behaviour: FixtureBehaviour) -> (Int, String) {
             if path == "/api/health" { return (200, #"{"ok":true,"version":"0.2.0","notifications":"ok","awake":"holding"}"#) }
             if path == "/api/proof" {
@@ -208,6 +210,14 @@
                     #"{"model":"claude_code:opus","effort":"high","fallback":["opencode_go:deepseek-v4.1-flash"],"fallback_effort":"high","small_model":"","small_max_lines":150,"max_minutes":15}"#
                 )
             case ("GET", "/api/policy/free"): return (200, #"{"free":false}"#)
+            case ("GET", "/api/rules"): return (200, "[\(storedRule)]")
+            case ("GET", "/api/rules/usage"):
+                return (200, #"{"rules":[{"rule_id":"rule_example","decides":2}],"partial":false,"problem":null}"#)
+            case ("POST", "/api/rules/draft"):
+                return (200, #"{"behavior":"ask","tool_glob":"shell","match_regex":"rm","description":"Ask before deleting a file."}"#)
+            case ("POST", "/api/rules/preview"):
+                return (200, #"{"scanned":10,"fits":3,"would_decide":2,"partial":false,"problem":null}"#)
+            case ("POST", "/api/rules"): return (201, storedRule)
             case ("GET", "/api/memories"): return (200, memories(now: now))
             case ("GET", "/api/memories/trash"): return (200, trash(now: now))
             case ("GET", "/api/agents"): return (200, agents(now: now))

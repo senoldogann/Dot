@@ -326,7 +326,8 @@ async def test_a_message_to_a_team_starts_a_run_in_a_chat_with_the_team_which_th
         await expect(page.locator(".team-who .face-stack .avatar")).to_have_count(2)
         await expect(page).to_have_title("Desk · Bots · Dot")
         message: Locator = page.locator("textarea[aria-label='Message']")
-        await expect(message).to_have_attribute("placeholder", "Message Desk")
+        # The empty box asks the team as it asks a bot (item 2015, DotNext's words).
+        await expect(message).to_have_attribute("placeholder", "Ask Desk")
         await expect(page.locator(".team-empty")).to_have_count(0)
         MODEL.script = ScriptedProvider(_PROVIDER, [ANSWER, ANSWER])
         await message.fill("Write the report on the launch")

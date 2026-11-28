@@ -19,6 +19,7 @@ function state(changes = {}) {
     loops: { count: 0, rhythm: null, problem: false },
     queue: { count: 0, held: false, problem: false, sending: false },
     running: { count: 0, problem: false },
+    tasks: { open: 0 },
     ...changes,
   };
 }
@@ -73,7 +74,7 @@ test("helpers that work are counted, and the name says whether the run waits for
   const waited = dockSegments(state({ status: "running", helpers: { live: 2, waitedFor: 2, letGo: 0 } })).find((segment) => segment.id === "helpers");
   assert.equal(waited?.label, "2 helpers");
   assert.equal(waited?.short, "2");
-  assert.equal(waited?.name, "2 helpers. Waiting on 2 helpers");
+  assert.equal(waited?.name, "2 helpers. Waiting for 2 helpers");
   const loose = dockSegments(state({ status: "running", helpers: { live: 1, waitedFor: 0, letGo: 1 } })).find((segment) => segment.id === "helpers");
   assert.equal(loose?.label, "1 helper");
   assert.equal(loose?.name, "1 helper. 1 helper keeps working in the background");
@@ -85,7 +86,7 @@ test("the status says it waits on helpers only while the run has stopped for the
   assert.equal(beside[0].label, "Working · 40s", "the run works beside its helpers");
   assert.ok(beside.some((segment) => segment.id === "helpers"), "the helpers keep their own segment");
   const waits = dockSegments(state({ status: "running", took: 40, helpers, waits: true }));
-  assert.deepEqual([waits[0].label, waits[0].short, waits[0].tone], ["Waiting on 2 helpers", "Waiting on 2 helpers", "work"]);
+  assert.deepEqual([waits[0].label, waits[0].short, waits[0].tone], ["Waiting for 2 helpers", "Waiting for 2 helpers", "work"]);
   assert.deepEqual(ids(waits), ["status", "stop", "helpers"]);
   // Helpers it let go hold nothing: with none waited for, it works.
   const loose = dockSegments(state({ status: "running", took: 40, helpers: { live: 1, waitedFor: 0, letGo: 1 }, waits: true }));
@@ -156,4 +157,15 @@ test("the segments come in one order, and the chat's own stand when no run works
     }),
   );
   assert.deepEqual(ids(resting), ["loops", "queue", "running"]);
+});
+
+test("a chat with several tasks counts those that work or wait, before its loops (item 2013)", () => {
+  const one = dockSegments(state({ tasks: { open: 1 } }));
+  assert.deepEqual(ids(one), ["tasks"]);
+  assert.equal(one[0].label, "1 task");
+  assert.equal(one[0].sheet, true);
+  const many = dockSegments(state({ tasks: { open: 3 }, loops: { count: 1, rhythm: "every 30 min", problem: false } }));
+  assert.deepEqual(ids(many), ["tasks", "loops"]);
+  assert.equal(many[0].label, "3 tasks");
+  assert.equal(many[0].short, "3");
 });

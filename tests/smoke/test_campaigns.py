@@ -1263,7 +1263,7 @@ async def test_a_session_that_ends_as_the_daemon_stops_is_followed_unless_the_sh
         )  # fmt: skip
         manager._stopping = True
         try:
-            await manager._record_end(session, status, result, "", None, RunInbox())
+            await manager._record_end(session, status, result, "", None, RunInbox(), restated=(), goal_blocked=False)
         finally:
             manager._stopping = False
             await manager.shutdown()
@@ -1338,13 +1338,13 @@ async def test_a_campaign_whose_sessions_keep_failing_stops_saying_so(login_env:
                     thread.id, GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, "medium", "standard", None, "ask",
                     False, campaign.id, None, None,
                 )  # fmt: skip
-                await manager._record_end(session, status, "x", "", None, RunInbox())
+                await manager._record_end(session, status, "x", "", None, RunInbox(), restated=(), goal_blocked=False)
                 assert (await store.get_campaign(campaign.id)).status == "active"
             last: RunRecord = await store.create_run(
                 thread.id, GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, "medium", "standard", None, "ask", False,
                 campaign.id, None, None,
             )  # fmt: skip
-            await manager._record_end(last, "failed", "x", "", None, RunInbox())
+            await manager._record_end(last, "failed", "x", "", None, RunInbox(), restated=(), goal_blocked=False)
         finally:
             await manager.shutdown()
         stopped: CampaignRecord = await store.get_campaign(campaign.id)

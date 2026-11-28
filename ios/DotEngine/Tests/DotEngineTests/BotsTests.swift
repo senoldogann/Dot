@@ -22,9 +22,9 @@ final class BotsTests: XCTestCase {
 
     private var agents: [AgentSummary] {
         [
-            AgentSummary(record: record("dot", "Dot", role: "", created: 0), home: nil),
-            AgentSummary(record: record("a1", "Researcher", role: "Finds sources", created: 10), home: nil),
-            AgentSummary(record: record("a2", "Writer", role: "Drafts posts", created: 20), home: nil),
+            AgentSummary(record: record("dot", "Dot", role: "", created: 0), home: nil, load: nil),
+            AgentSummary(record: record("a1", "Researcher", role: "Finds sources", created: 10), home: nil, load: nil),
+            AgentSummary(record: record("a2", "Writer", role: "Drafts posts", created: 20), home: nil, load: nil),
         ]
     }
 
@@ -57,18 +57,18 @@ final class BotsTests: XCTestCase {
 
     func testABotWhoseChatsAreOutsideTheListsWindowOpensItsHomeChat() throws {
         let home: ThreadSummary = row("t9", actor: "a2", updated: 5, unread: true, asks: 0, title: "Writer", last: "Draft ready").summary
-        let withHome: [AgentSummary] = [agents[0], agents[1], AgentSummary(record: agents[2].record, home: home)]
+        let withHome: [AgentSummary] = [agents[0], agents[1], AgentSummary(record: agents[2].record, home: home, load: nil)]
         let built: [Bot] = bots(agents: withHome, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         let writer: Bot = try XCTUnwrap(built.first { $0.id == "a2" })
         XCTAssertEqual(writer.latest?.summary.id, "t9", "the daemon's home chat, though the list's newest chats leave it out")
         XCTAssertEqual(writer.unread, 1)
         let again: [Bot] = bots(
-            agents: [agents[0], AgentSummary(record: agents[1].record, home: rows[1].summary), agents[2]], rows: rows, pinned: [],
+            agents: [agents[0], AgentSummary(record: agents[1].record, home: rows[1].summary, load: nil), agents[2]], rows: rows, pinned: [],
             fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         XCTAssertEqual(again.first { $0.id == "a1" }?.chats.map(\.summary.id), ["t2", "t4"], "a home already listed is not added twice")
         let seen: ThreadSummary = row("t9", actor: "a2", updated: 5, unread: false, asks: 0, title: "Writer", last: "Draft ready").summary
         let reread: [Bot] = bots(
-            agents: [agents[0], agents[1], AgentSummary(record: agents[2].record, home: seen)], rows: rows, pinned: [],
+            agents: [agents[0], agents[1], AgentSummary(record: agents[2].record, home: seen, load: nil)], rows: rows, pinned: [],
             fallbackDot: record("dot", "Dot", role: "", created: 0), gone: [])
         XCTAssertEqual(reread.first { $0.id == "a2" }?.unread, 0, "the home read again once seen stops counting")
         let deleted: [Bot] = bots(agents: withHome, rows: rows, pinned: [], fallbackDot: record("dot", "Dot", role: "", created: 0), gone: ["t9"])
@@ -184,5 +184,22 @@ final class BotsTests: XCTestCase {
         // A new chat kept on disk before the agent was added reads back as Dot's.
         let old: Data = Data(#"{"newChat":{"text":"Hi","images":[],"uploaded":[]}}"#.utf8)
         XCTAssertEqual(try JSONDecoder().decode(OutboxItem.Action.self, from: old), .newChat(text: "Hi", images: [], uploaded: [], start: nil, agent: nil))
+    }
+
+    /// What a bot carries (item 2067) as `GET /api/agents` writes it, and a daemon from before it that sends none.
+    func testABotsLoadIsReadAndMarksItOverloaded() throws {
+        let json: String = """
+            {"record": {"id": "a1", "name": "Researcher", "role": "", "instructions": "", "model": "", "effort": null,
+             "approvals": null, "tools": [], "created_at": 1, "updated_at": 1, "look": null, "paused_at": null},
+             "latest": null, "latest_title": null, "home": null,
+             "load": {"open_orders": 7, "active_routines": 2, "objectives": 1, "runs": 12, "done_share": 0.5, "steps": 30.5,
+                      "reasons": [{"kind": "orders", "count": 7, "limit": 5}]}}
+            """
+        let summary: AgentSummary = try JSONDecoder().decode(AgentSummary.self, from: Data(json.utf8))
+        XCTAssertEqual(summary.load?.reasons, [OverloadReason(kind: "orders", count: 7, limit: 5)])
+        let found: [Bot] = bots(agents: [agents[0], summary], rows: [], pinned: [], fallbackDot: agents[0].record, gone: [])
+        XCTAssertEqual(found.map(\.overloaded), [false, true])
+        let old: AgentSummary = try JSONDecoder().decode(AgentSummary.self, from: Data(json.replacingOccurrences(of: "\"load\":", with: "\"unused\":").utf8))
+        XCTAssertNil(old.load)
     }
 }

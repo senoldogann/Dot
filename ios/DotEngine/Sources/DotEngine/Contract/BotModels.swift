@@ -52,15 +52,60 @@ public struct AgentRecord: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
-/// An agent as `GET /api/agents` lists it: its record and its home chat, its conversation with the owner (items 1233,
-/// 1245); Dot first.
+/// One reason a bot is overloaded (item 2067, `OverloadReason`): `orders` and `routines` count against the most it
+/// should hold; `done_share` is its done share this week against the week before's, in whole percent.
+public struct OverloadReason: Codable, Sendable, Hashable {
+    public let kind: String
+    public let count: Int
+    public let limit: Int
+
+    public init(kind: String, count: Int, limit: Int) {
+        self.kind = kind
+        self.count = count
+        self.limit = limit
+    }
+}
+
+/// What a bot carries (item 2067, `BotLoad`): its open work orders, routines on, objectives, runs of the week, their
+/// done share and average steps, and why it is overloaded (none: it is not).
+public struct BotLoad: Codable, Sendable, Hashable {
+    public let openOrders: Int
+    public let activeRoutines: Int
+    public let objectives: Int
+    public let runs: Int
+    public let doneShare: Double?
+    public let steps: Double?
+    public let reasons: [OverloadReason]
+
+    enum CodingKeys: String, CodingKey {
+        case objectives, runs, steps, reasons
+        case openOrders = "open_orders"
+        case activeRoutines = "active_routines"
+        case doneShare = "done_share"
+    }
+
+    public init(openOrders: Int, activeRoutines: Int, objectives: Int, runs: Int, doneShare: Double?, steps: Double?, reasons: [OverloadReason]) {
+        self.openOrders = openOrders
+        self.activeRoutines = activeRoutines
+        self.objectives = objectives
+        self.runs = runs
+        self.doneShare = doneShare
+        self.steps = steps
+        self.reasons = reasons
+    }
+}
+
+/// An agent as `GET /api/agents` lists it: its record, its home chat, its conversation with the owner (items 1233,
+/// 1245), and what it carries (item 2067; `nil` from a daemon before it); Dot first.
 public struct AgentSummary: Codable, Sendable, Hashable {
     public let record: AgentRecord
     public let home: ThreadSummary?
+    public let load: BotLoad?
 
-    public init(record: AgentRecord, home: ThreadSummary?) {
+    public init(record: AgentRecord, home: ThreadSummary?, load: BotLoad?) {
         self.record = record
         self.home = home
+        self.load = load
     }
 }
 

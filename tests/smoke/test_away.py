@@ -239,6 +239,14 @@ async def _scheduled_runs(store: Store, count: int) -> None:
         await store.finish_run(ran.id, "done", f"Read {number + 1} papers.")
 
 
+async def _moment_kept(client: httpx.AsyncClient) -> None:
+    """Wait until Dot keeps the moment the home's card reads from (the page's first visit marks it)."""
+    deadline: float = time.monotonic() + 10
+    while (await client.get("/api/away/read")).json()["read_at"] is None:
+        assert time.monotonic() < deadline, "the page kept no moment for the home's card in 10 s"
+        await asyncio.sleep(0.05)
+
+
 @pytest.mark.browser
 async def test_the_home_shows_the_news_once_then_mark_as_read_puts_it_away(
     runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
@@ -264,6 +272,9 @@ async def test_the_home_shows_the_news_once_then_mark_as_read_puts_it_away(
                 # The first visit marks the moment: what came before it is not news here.
                 await expect(page.locator(".home-today")).to_be_attached()
                 await expect(card).to_be_hidden()
+                # The page marks the moment with a request of its own, after it read that none was kept: on a slow
+                # runner it came after the first run's decision, which was then not news (2 decisions of 3).
+                await _moment_kept(client)
                 await asyncio.sleep(0.05)
                 await _scheduled_runs(runtime.store, 3)
                 await page.reload()

@@ -167,6 +167,15 @@ final class ActivityLiveUITests: XCTestCase {
         app.sheets["Set this version aside?"].buttons["Set aside"].tap()
         sleep(2)
 
+        // Skills and plugins: the merge whose skills this home lacks cannot be used; Drop takes it away.
+        let merge: XCUIElement = row(app, "Merge find flights + book trains")
+        reveal(app, merge)
+        merge.tap()
+        XCTAssertTrue(app.buttons["proposal.drop"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["proposal.use"].exists, "a proposal that cannot be applied offers no Use")
+        app.buttons["proposal.drop"].tap()
+        XCTAssertTrue(merge.waitForNonExistence(timeout: 10))
+
         // Dot comes to you: the brief off, the check-in on.
         let brief: XCUIElement = app.switches["Morning brief"]
         reveal(app, brief)

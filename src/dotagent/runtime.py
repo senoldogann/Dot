@@ -97,7 +97,7 @@ from dotagent.phone.wda import WdaClient
 from dotagent.plugins.catalog import PluginShelf, load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
-from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox, hard_linked
+from dotagent.policy.sandbox import Sandbox, Seal, SwitchedSandbox, build_sandbox, check_sandbox, hard_linked
 from dotagent.safari.desk import SafariDesk
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import env_lock_path, optional_secret
@@ -492,7 +492,8 @@ async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths
         log.warning("sealed_file_has_other_names", path=str(linked), names=names)
     if config.shell.sandbox or config.shell.sandbox_unattended:
         await check_sandbox(built)
-    return SwitchedSandbox(built, config.shell.sandbox, config.shell.sandbox_unattended)
+    seal: Seal = Seal(sealed=sealed, unwritable=dot_paths, closed=closed, open_folders=workspace)
+    return SwitchedSandbox(built, seal, config.shell.sandbox, config.shell.sandbox_unattended)
 
 
 @dataclass(frozen=True)

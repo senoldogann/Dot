@@ -216,7 +216,7 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await expect(bar.get_by_role("button", name="Task details")).to_be_visible()
                     # The one capsule over the composer (item 1383): the run's time, its helpers and what is queued.
                     capsule: Locator = page.locator(".dockbar-capsule")
-                    await expect(capsule.locator('[data-segment="status"]')).to_contain_text("Waiting on 2 helpers")
+                    await expect(capsule.locator('[data-segment="status"]')).to_contain_text("Waiting for 2 helpers")
                     helpers_segment: Locator = capsule.locator('[data-segment="helpers"]')
                     await expect(helpers_segment).to_have_attribute(
                         "aria-label", re.compile(rf"^{len(_HELPERS)} helpers?\.")
@@ -318,7 +318,7 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                 await expect(wide.locator(".stage-title .stage-name")).to_be_visible()
                 await expect(wide.locator(".stage-heading-title")).to_be_visible()
                 await expect(wide.locator(".stage-tools button:visible")).to_have_count(1)
-                await expect(wide.locator(".capsule")).to_contain_text("Waiting on 2 helpers")
+                await expect(wide.locator(".capsule")).to_contain_text("Waiting for 2 helpers")
                 # The line names none of the run's calls (item 360): the conversation shows them. Before, it named
                 # the call the run waited on, the one that started its helpers.
                 await expect(wide.locator(".capsule")).not_to_contain_text("delegate")

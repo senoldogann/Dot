@@ -919,6 +919,12 @@ def _local_file(source: str, ctx: ToolContext) -> Path | None:
     return path if "/" in source.split(".", 1)[0] or path.is_file() else None
 
 
+def _source_files(sources: list[str], ctx: ToolContext) -> tuple[str, ...]:
+    """The files among ``sources``, resolved as the call reads them (:func:`_local_file`): what a run nobody started
+    may not read where its sandbox seals them (item 2026). Blocking."""
+    return tuple(str(path) for path in (_local_file(source, ctx) for source in sources) if path is not None)
+
+
 def _source_flags(sources: list[str], ctx: ToolContext) -> tuple[Flag, ...]:
     """The flags of reading ``sources``: a file's are those of read_file (its text goes to the fast model, so a file in
     a protected location is a secret's), an address's those of web_fetch (:func:`checked_address`: refused where Dot
@@ -933,10 +939,11 @@ def _source_flags(sources: list[str], ctx: ToolContext) -> tuple[Flag, ...]:
     return tuple(sorted(flags))
 
 
-async def _source_text(source: str, ctx: ToolContext, allowed: tuple[Flag, ...]) -> str:
+async def _source_text(source: str, ctx: ToolContext, authorized: ActionInfo) -> str:
     """The text of a source: a page, PDF or text file fetched from the web, or a file (:func:`_local_file`). A file is
-    read with no link followed on the way (item 681), and refused when it leads now where the call was not allowed to
-    read (``allowed``: the flags of the action that was authorised), as a link put on its path since would."""
+    read with no link followed on the way (item 681), and refused when it is not a file the call was allowed to read as
+    it was resolved then (``authorized.reads``) or leads now where it was not allowed to read (``authorized.flags``),
+    as a link put on its path since would."""
     config: AppConfig = ctx.runtime.config
     local: Path | None = await asyncio.to_thread(_local_file, source, ctx)
     if local is None:
@@ -950,7 +957,9 @@ async def _source_text(source: str, ctx: ToolContext, allowed: tuple[Flag, ...])
         if kind == "binary":
             raise WebError("not a page, a PDF or a text file", {"url": _clip(url, _SHOWN_URL_CHARS)})
         return (await _readable(document, kind, config.web.fetch_max_bytes)).text
-    if not set(read_flags(local, ctx)) <= set(allowed):
+    # The file must be one the call was allowed to read as it was resolved then (``reads``, the security review of
+    # item 2026: a link put in place of a source since leads elsewhere), and lead nowhere with flags it was not.
+    if str(local) not in authorized.reads or not set(read_flags(local, ctx)) <= set(authorized.flags):
         raise ToolInputError(
             f"{source} leads elsewhere now than when the call was allowed; call the tool again", {"source": source}
         )
@@ -1018,7 +1027,7 @@ def _extract_tool() -> RegisteredTool:
             # Every source, so that a rule of the owner's reads each of them, not the first alone.
             "\n".join(args.sources),
             _source_flags(args.sources, ctx),
-        )
+        ).model_copy(update={"reads": _source_files(args.sources, ctx)})
 
     async def run(args: ExtractArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         config: AppConfig = ctx.runtime.config
@@ -1045,7 +1054,7 @@ def _extract_tool() -> RegisteredTool:
                     return (source, _paused_text(paused, now))
                 try:
                     async with asyncio.timeout(left) as budget:
-                        text: str = await _source_text(source, ctx, authorized.flags)
+                        text: str = await _source_text(source, ctx, authorized)
                         # A pause that came while the source was read (another source's rate limit) holds it too.
                         now = time.time()
                         paused = paused_model(ctx.runtime.router, parse_model_ref(fast).label, now)

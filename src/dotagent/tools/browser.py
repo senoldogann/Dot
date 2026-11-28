@@ -1558,10 +1558,17 @@ def _upload_tool() -> RegisteredTool:
         risk: Risk = "high" if any(flag != "upload" for flag in flags) else "medium"
         names: str = ", ".join(path.name for path in resolved)
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
-        return _action("browser_upload", "browser_input", risk, f"Upload {names} to {target}", target, flags)
+        # The files go from Dot's own process (:func:`upload_copies`): named, so that a run nobody started hands no page
+        # a file its sandbox seals (item 2026).
+        return _action(
+            "browser_upload", "browser_input", risk, f"Upload {names} to {target}", target, flags
+        ).model_copy(update={"reads": tuple(str(path) for path in resolved)})
 
     async def run(args: UploadArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
-        resolved: list[Path] = [expand_path(raw, ctx.workspace) for raw in args.paths]
+        # The paths the call was allowed for, as they were resolved then (``reads``), not resolved again: a link put
+        # in place of one since would lead the copy to a file nobody checked, one the seal of a run nobody started
+        # closes among them (the security review of item 2026).
+        resolved: list[Path] = [Path(read) for read in authorized.reads]
         # Chrome reads a file when the page sends it, after the call: it is given a copy Dot made of the file it
         # checked, with no link followed, where a command of a run writes nothing (item 681).
         try:
