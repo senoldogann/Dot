@@ -25,13 +25,13 @@ public struct TeamEdit: Codable, Sendable, Hashable {
     public let purpose: String
     public let agents: [String]
 
-    /// A team the daemon takes, or `nil`: a name of 1 to 60 characters once trimmed, a purpose of at most 500, and 1
-    /// to 50 bots, each once (`TeamRequest`'s limits), in the order given.
+    /// A team the daemon takes, or `nil`: a name of 1 to 60 code points once trimmed (as Python counts them), a purpose of
+    /// at most 500, and 1 to 50 bots, each once (`TeamRequest`'s limits), in the order given.
     public static func checked(name: String, purpose: String, agents: [String]) -> TeamEdit? {
         let title: String = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let does: String = purpose.trimmingCharacters(in: .whitespacesAndNewlines)
         let unique: [String] = agents.reduce(into: [String]()) { kept, id in if !kept.contains(id) { kept.append(id) } }
-        guard !title.isEmpty, title.count <= 60, does.count <= 500, (1...50).contains(unique.count) else { return nil }
+        guard !title.isEmpty, title.unicodeScalars.count <= 60, does.unicodeScalars.count <= 500, (1...50).contains(unique.count) else { return nil }
         return TeamEdit(name: title, purpose: does, agents: unique)
     }
 }

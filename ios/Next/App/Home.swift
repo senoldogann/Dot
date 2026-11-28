@@ -109,7 +109,10 @@ struct HomeList: View {
                     if let problem = problem ?? model.agentsProblem {
                         FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: {
                             self.problem = nil
-                            Task { await model.loadAgents() }
+                            Task {
+                                await model.loadAgents()
+                                await model.loadTeams()
+                            }
                         })
                             .padding(.horizontal, Space.gutter)
                     }
