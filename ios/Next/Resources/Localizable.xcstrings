@@ -1514,6 +1514,28 @@
         }
       }
     },
+    "Add it": {
+      "comment": "Rules: confirm adding the previewed draft",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekle"
+          }
+        }
+      }
+    },
+    "Add rule": {
+      "comment": "Rules: add a rule from the owner’s words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kural ekle"
+          }
+        }
+      }
+    },
     "Add schedule": {
       "comment": "Tool row of Dot's own tool: a schedule added",
       "localizations": {
@@ -2049,6 +2071,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbeti silmeden önce sor"
+          }
+        }
+      }
+    },
+    "Ask me first": {
+      "comment": "Rules: ask before doing the matching action",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce bana sor"
           }
         }
       }
@@ -2661,6 +2694,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bilgi %@"
+          }
+        }
+      }
+    },
+    "Change the words": {
+      "comment": "Rules: return to editing a draft",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sözleri değiştir"
           }
         }
       }
@@ -3916,6 +3960,17 @@
         }
       }
     },
+    "Describe what Dot wants to do": {
+      "comment": "Rules: placeholder for the action that triggers the rule",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un yapmak istediği şeyi yaz"
+          }
+        }
+      }
+    },
     "Deselect all": {
       "comment": "Chat list select mode: clears the checks",
       "localizations": {
@@ -4587,6 +4642,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'teki Dot"
+          }
+        }
+      }
+    },
+    "Dot read your words differently from your choice.": {
+      "comment": "Rules: the draft proposed a different answer from the one selected",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot sözlerinizi seçiminizden farklı okudu."
           }
         }
       }
@@ -6018,6 +6084,28 @@
         }
       }
     },
+    "Goes ahead without asking": {
+      "comment": "Rules: an action the rule lets Dot do without asking",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sormadan ilerler"
+          }
+        }
+      }
+    },
+    "Goes ahead, whatever it has read": {
+      "comment": "Rules: a preapproved action, even after outside content was read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne okumuş olursa olsun ilerler"
+          }
+        }
+      }
+    },
     "Goes into the running task at its next step": {
       "comment": "Follow-up setting: what Steer does",
       "localizations": {
@@ -6678,6 +6766,17 @@
         }
       }
     },
+    "It would decide %lld of them.": {
+      "comment": "Rules preview: how many steps the draft would decide",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bunların %lld tanesine karar verirdi."
+          }
+        }
+      }
+    },
     "Its Terminal command stopped suddenly while this task worked.": {
       "comment": "Run end card: the dotx command died",
       "localizations": {
@@ -6982,6 +7081,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bugün öğrenilenler"
+          }
+        }
+      }
+    },
+    "Leave it to me": {
+      "comment": "Rules: hand the matching action back to the owner",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bana bırak"
           }
         }
       }
@@ -7830,6 +7940,17 @@
         }
       }
     },
+    "Never used": {
+      "comment": "Rules: another rule always decides first",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiç kullanılmadı"
+          }
+        }
+      }
+    },
     "New": {
       "comment": "Self-improvement: a version nobody tried yet",
       "localizations": {
@@ -8288,6 +8409,17 @@
         }
       }
     },
+    "No rules yet": {
+      "comment": "Rules: empty list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz kural yok"
+          }
+        }
+      }
+    },
     "No scheduled tasks": {
       "comment": "Schedules: empty",
       "localizations": {
@@ -8405,6 +8537,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz yok: Mac'inde bir tane oluştur"
+          }
+        }
+      }
+    },
+    "None: it fits every time.": {
+      "comment": "Rules detail: there is no pattern to match",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yok: her seferinde uyar."
           }
         }
       }
@@ -9179,6 +9322,17 @@
         }
       }
     },
+    "Only the newest steps were checked.": {
+      "comment": "Rules: the estimate covers only part of the requested time",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yalnızca en yeni adımlar kontrol edildi."
+          }
+        }
+      }
+    },
     "Only the start of the file shows here; open it on the Mac for the rest.": {
       "comment": "File preview: the text was cut",
       "localizations": {
@@ -9595,6 +9749,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Görseli yapıştır"
+          }
+        }
+      }
+    },
+    "Pattern": {
+      "comment": "Rules detail: the pattern an action must match",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desen"
           }
         }
       }
@@ -12632,6 +12797,17 @@
         }
       }
     },
+    "Steps decided": {
+      "comment": "Rules detail: count of steps the rule decided",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Karar verdiği adımlar"
+          }
+        }
+      }
+    },
     "Stop": {
       "comment": "Campaign: no session starts until it is resumed\nChat toolbar: stops the run at work\nComposer and ask dock: stops the run at work",
       "localizations": {
@@ -14338,6 +14514,17 @@
         }
       }
     },
+    "Tool": {
+      "comment": "Rules detail: the action’s tool name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Araç"
+          }
+        }
+      }
+    },
     "Tool calls in chat": {
       "comment": "Settings section: how much of the work log a chat shows",
       "localizations": {
@@ -14829,6 +15016,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "iPhone'un metin boyutunu kullan"
+          }
+        }
+      }
+    },
+    "Used lately": {
+      "comment": "Rules detail: recent use of the rule",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son zamanlarda kullanıldı"
           }
         }
       }
@@ -15467,6 +15665,39 @@
         }
       }
     },
+    "When Dot wants to": {
+      "comment": "Rules: introduces the action that triggers the rule",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot şunu yapmak istediğinde"
+          }
+        }
+      }
+    },
+    "When Dot wants to %@, it should ask me first.": {
+      "comment": "Rule sent to the drafter: the argument is the action the owner describes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot %@ istediğinde, önce bana sor."
+          }
+        }
+      }
+    },
+    "When Dot wants to %@, it should stop and let me do it.": {
+      "comment": "Rule sent to the drafter: the argument is the action the owner wants Dot to hand back",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot %@ istediğinde, dur ve benim yapmama izin ver."
+          }
+        }
+      }
+    },
     "When Dot works": {
       "comment": "System: keep-awake is on, nothing works now",
       "localizations": {
@@ -15760,6 +15991,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'te çalışıyor"
+          }
+        }
+      }
+    },
+    "Would have matched %lld of %lld steps.": {
+      "comment": "Rules preview: number of matching steps and total steps checked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld adımın %1$lld tanesiyle eşleşirdi."
           }
         }
       }

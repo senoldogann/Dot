@@ -61,7 +61,11 @@ settings are on your Mac"), and no row of it opens the web app (item 1791). The 
 on the Mac, and a connected app, 1Password's token or an official sign-in is taken back with Disconnect; adding a
 connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows Dot's version and
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
-which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Its **Campaigns** (item 1895, under Agents) lists each
+which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Under **Permissions**, read rules in the order Dot checks
+them. Open a rule to see what it matches and how often it decided a step in the last 30 days. To add a rule, describe
+the action and choose **Ask me first** or **Leave it to me**. Dot shows the draft and checks it against past steps before
+you can save it. Add rules that let Dot proceed without asking and manage existing rules in the Mac's **Settings › Rules**.
+Its **Campaigns** (item 1895, under Agents) lists each
 campaign with its state, goal and last progress, and a campaign's page stops it (it asks first), resumes it or marks it
 achieved, as the web's page does; deleting one is done on the Mac. Dot Next's composer records your voice (item 1802): the
 microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written
